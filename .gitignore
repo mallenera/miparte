@@ -5,3 +5,8 @@ obj/
 .idea/
 .env
 TestResults/
+
+# Supabase CLI (estado local)
+supabase/.temp/
+supabase/.branches/
+supabase/.env

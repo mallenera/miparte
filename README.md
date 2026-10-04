@@ -39,3 +39,16 @@ Tests contra PostgreSQL real (opcionales en local, siempre activos en CI):
 psql -d miparte -f supabase/tests/auth_stub.sql -f supabase/migrations/20261004000000_esquema_inicial.sql
 MIPARTE_TEST_DB="Host=localhost;Database=miparte;Username=postgres;Password=..." dotnet test
 ```
+
+## Autenticación
+`Core.Api` valida el JWT de Supabase Auth (`MiParte.Auth`). Variables de entorno:
+
+| Variable | Uso |
+|---|---|
+| `Supabase__Url` | URL del proyecto, p. ej. `https://xxxx.supabase.co`. Emisor esperado: `{Url}/auth/v1`; audiencia `authenticated`. |
+| `Supabase__JwtSecret` | Solo si el proyecto aún usa el secreto HS256 legado. Si se define, solo se aceptan tokens HS256. Si no, solo asimétricos validados con el JWKS del proyecto. |
+| `ConnectionStrings__Default` | Cadena de conexión a PostgreSQL. |
+
+Sin configuración, ningún token es válido (la API arranca igualmente). El hogar de la petición se
+deduce del usuario (`sub` → `miembro.user_id`); si pertenece a varios, se indica con la cabecera `X-Hogar-Id`.
+`GET /api/yo` devuelve el usuario y el hogar resueltos.

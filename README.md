@@ -12,7 +12,7 @@ src/
 ├── Assistant/
 │   └── Assistant.Api/  chatbot con tool calling
 └── Contracts/      DTOs compartidos entre front y servicios
-db/                 migraciones y políticas RLS (Supabase/PostgreSQL)
+supabase/       migraciones y políticas RLS (Supabase/PostgreSQL)
 docs/               decisiones y documentación
 ```
 

@@ -25,7 +25,56 @@ public static class HogaresEndpoints
             .RequireAuthorization()
             .WithMetadata(new SinHogarActual());
 
+        app.MapGet("/api/hogares/{id:guid}", ObtenerAsync)
+            .RequireAuthorization()
+            .WithMetadata(new SinHogarActual());
+
+        app.MapGet("/api/yo", YoAsync)
+            .RequireAuthorization()
+            .WithMetadata(new SinHogarActual());
+
         return app;
+    }
+
+    private static async Task<List<HogarResumen>> HogaresDelUsuario(MiParteDbContext db, Guid userId, CancellationToken ct)
+        => await db.Miembros.IgnoreQueryFilters()
+            .Where(m => m.UserId == userId && m.Activo)
+            .Join(db.Hogares.IgnoreQueryFilters(), m => m.HogarId, h => h.Id,
+                (_, h) => new HogarResumen(h.Id, h.Nombre))
+            .Distinct()
+            .OrderBy(h => h.Nombre)
+            .ToListAsync(ct);
+
+    private static async Task<IResult> YoAsync(
+        HttpContext ctx, [FromServices] MiParteDbContext db, CancellationToken ct)
+    {
+        if (!TryUsuario(ctx, out var userId)) return Results.Unauthorized();
+
+        var hogares = await HogaresDelUsuario(db, userId, ct);
+
+        // Hogar actual: el de la cabecera si es válido y propio; si no hay cabecera, el único hogar.
+        HogarResumen? actual = null;
+        if (ctx.Request.Headers.TryGetValue(HogarActualMiddleware.Cabecera, out var valor))
+        {
+            if (Guid.TryParse(valor.ToString(), out var pedido))
+                actual = hogares.FirstOrDefault(h => h.Id == pedido);
+        }
+        else if (hogares.Count == 1)
+        {
+            actual = hogares[0];
+        }
+
+        return Results.Ok(new YoResponse(userId.ToString(), hogares, actual));
+    }
+
+    private static async Task<IResult> ObtenerAsync(
+        Guid id, HttpContext ctx, [FromServices] MiParteDbContext db, CancellationToken ct)
+    {
+        if (!TryUsuario(ctx, out var userId)) return Results.Unauthorized();
+
+        // 404 tanto si no existe como si no eres miembro: no se revela la existencia.
+        var hogar = (await HogaresDelUsuario(db, userId, ct)).FirstOrDefault(h => h.Id == id);
+        return hogar is null ? Results.NotFound() : Results.Ok(hogar);
     }
 
     private static async Task<IResult> ListarAsync(
@@ -61,15 +110,18 @@ public static class HogaresEndpoints
 
         var hogar = new Hogar { Id = Guid.NewGuid(), Nombre = nombreHogar };
         db.Hogares.Add(hogar);
-        db.Miembros.Add(new Miembro
+        var creador = new Miembro
         {
             Id = Guid.NewGuid(),
             HogarId = hogar.Id,
             Nombre = nombreMiembro,
             Tipo = TipoMiembro.Adulto,
+            Rol = RolMiembro.Admin,
             UserId = userId,
-        });
-        await db.SaveChangesAsync(ct); // una sola transacción: o se crean ambos o ninguno
+        };
+        db.Miembros.Add(creador);
+        SemillaHogar.Sembrar(db, hogar.Id, creador.Id); // perfiles y categorías por defecto, como crear_hogar en SQL
+        await db.SaveChangesAsync(ct); // una sola transacción: o se crea todo o nada
 
         return Results.Created($"/api/hogares/{hogar.Id}", new HogarResumen(hogar.Id, hogar.Nombre));
     }

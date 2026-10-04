@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Prueba de humo de Core.Api contra un proyecto Supabase real: login, /api/yo y alta de hogar.
 

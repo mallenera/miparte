@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Arranca Core.Api en local cargando antes las variables del archivo .env de la raíz.
 
@@ -36,6 +36,14 @@ foreach ($linea in Get-Content $ArchivoEnv -Encoding UTF8) {
         $valor = $valor.Substring(1, $valor.Length - 2)
     }
     if ($valor -eq '') { continue }   # las variables vacías no se establecen
+    if ($valor.StartsWith("$nombre=", [StringComparison]::OrdinalIgnoreCase)) {
+        Write-Host "ERROR: en el .env el valor de $nombre empieza repitiendo '$nombre='. Deja solo el valor, tras el primer '='." -ForegroundColor Red
+        exit 1
+    }
+    if ($nombre -eq 'ConnectionStrings__Default' -and $valor -notmatch '(?i)(^|;)\s*(host|server)\s*=') {
+        Write-Host "ERROR: ConnectionStrings__Default debe incluir 'Host=<servidor>' (formato: Host=...;Port=5432;Database=postgres;Username=...;Password=...)." -ForegroundColor Red
+        exit 1
+    }
     Set-Item -Path "Env:$nombre" -Value $valor
     $cargadas += $nombre
 }
@@ -45,6 +53,10 @@ Write-Host "Variables cargadas desde .env: $($cargadas -join ', ')" -ForegroundC
 $faltan = @('Supabase__Url', 'ConnectionStrings__Default') | Where-Object { -not (Get-Item "Env:$_" -ErrorAction SilentlyContinue) }
 if ($faltan) {
     Write-Host "AVISO: faltan en el .env: $($faltan -join ', ')" -ForegroundColor Yellow
+}
+if ($env:Supabase__Url -and $env:Supabase__Url -notmatch '^https?://') {
+    Write-Host "ERROR: Supabase__Url debe ser la URL completa (https://<project-ref>.supabase.co) y es '$($env:Supabase__Url)'." -ForegroundColor Red
+    exit 1
 }
 if ($env:Supabase__Url) {
     Write-Host "Emisor esperado: $($env:Supabase__Url.TrimEnd('/'))/auth/v1" -ForegroundColor Cyan
@@ -56,3 +68,5 @@ if ($env:Supabase__JwtSecret) {
 }
 
 dotnet run --project (Join-Path $PSScriptRoot '..\src\Core\Core.Api') --launch-profile $Perfil
+# $ErrorActionPreference no cubre los programas externos: propaga el fallo de dotnet run a quien llame al script.
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

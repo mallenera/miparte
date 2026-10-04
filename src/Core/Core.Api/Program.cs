@@ -39,6 +39,14 @@ app.Logger.LogInformation(
     "Auth Supabase: emisor esperado = {Emisor}; modo = {Modo}",
     supabase.EmisorEfectivo ?? "(sin configurar: ningún token será válido)",
     string.IsNullOrWhiteSpace(supabase.JwtSecret) ? "JWKS (asimétrico)" : "HS256 (secreto legado)");
+if (!string.IsNullOrWhiteSpace(supabase.Url)
+    && !(Uri.TryCreate(supabase.Url, UriKind.Absolute, out var urlSupabase)
+         && (urlSupabase.Scheme == Uri.UriSchemeHttps || urlSupabase.Scheme == Uri.UriSchemeHttp)))
+{
+    app.Logger.LogError(
+        "Supabase__Url no es una URL absoluta ({Url}): debe ser https://<project-ref>.supabase.co. Ningún token será válido.",
+        supabase.Url);
+}
 
 app.UseCors();
 app.UseAuthentication();
@@ -58,4 +66,9 @@ app.MapMiembros();
 
 app.Run();
 
+/// <summary>
+/// Punto de entrada de Core.Api: configura autenticación Supabase, persistencia, CORS y el middleware
+/// de hogar actual, y registra los endpoints. La declaración parcial permite usarla desde los tests
+/// de integración (WebApplicationFactory).
+/// </summary>
 public partial class Program;

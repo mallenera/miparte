@@ -23,6 +23,9 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
     public DbSet<Gasto> Gastos => Set<Gasto>();
     public DbSet<GastoReparto> GastosReparto => Set<GastoReparto>();
 
+    public DbSet<InvitacionHogar> Invitaciones => Set<InvitacionHogar>();
+    public DbSet<PagoLiquidacionRegistro> PagosLiquidacion => Set<PagoLiquidacionRegistro>();
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         b.Entity<Hogar>(e =>
@@ -38,6 +41,26 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
             e.Property(x => x.Tipo).HasConversion(
                 v => v == TipoMiembro.Adulto ? "adulto" : "a_cargo",
                 v => v == "adulto" ? TipoMiembro.Adulto : TipoMiembro.ACargo);
+            e.Property(x => x.Rol).HasConversion(
+                v => v == RolMiembro.Admin ? "admin" : "miembro",
+                v => v == "admin" ? RolMiembro.Admin : RolMiembro.Miembro);
+            e.HasQueryFilter(x => x.HogarId == HogarId);
+        });
+
+        b.Entity<InvitacionHogar>(e =>
+        {
+            e.ToTable("invitacion_hogar");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.CreadaEn).HasDefaultValueSql("now()");
+            // FK (hogar_id, miembro_id) -> miembro(hogar_id, id): se aplica en SQL; EF solo mapea columnas.
+            e.HasQueryFilter(x => x.HogarId == HogarId);
+        });
+
+        b.Entity<PagoLiquidacionRegistro>(e =>
+        {
+            e.ToTable("pago_liquidacion");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Importe).HasPrecision(12, 2);
             e.HasQueryFilter(x => x.HogarId == HogarId);
         });
 

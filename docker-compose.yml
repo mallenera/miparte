@@ -1,0 +1,17 @@
+services:
+  core:
+    build:
+      context: .
+      dockerfile: src/Core/Dockerfile
+    ports: ["5001:8080"]
+  assistant:
+    build:
+      context: .
+      dockerfile: src/Assistant/Dockerfile
+    ports: ["5002:8080"]
+  web:
+    build:
+      context: .
+      dockerfile: src/Web/Dockerfile
+    ports: ["8080:80"]
+    depends_on: [core, assistant]

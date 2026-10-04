@@ -13,13 +13,19 @@ public sealed class JwksSigningKeyProvider(
     IOptions<SupabaseAuthOptions> options,
     ILogger<JwksSigningKeyProvider> logger) : ISigningKeyProvider
 {
+    /// <summary>Tiempo máximo que se reutilizan las claves cacheadas antes de recargarlas.</summary>
     private static readonly TimeSpan Vigencia = TimeSpan.FromMinutes(10);
+    /// <summary>Tiempo mínimo entre dos cargas del JWKS.</summary>
     private static readonly TimeSpan EsperaMinima = TimeSpan.FromMinutes(1);
 
+    /// <summary>Protege la caché de claves y la fecha de última carga.</summary>
     private readonly object _lock = new();
+    /// <summary>Claves de firma cacheadas del último JWKS descargado.</summary>
     private IReadOnlyList<SecurityKey> _claves = [];
+    /// <summary>Momento del último intento de carga del JWKS (incluso si falló).</summary>
     private DateTimeOffset _ultimaCarga = DateTimeOffset.MinValue;
 
+    /// <inheritdoc />
     public IReadOnlyCollection<SecurityKey> ObtenerClaves(string? kid)
     {
         lock (_lock)
@@ -37,6 +43,8 @@ public sealed class JwksSigningKeyProvider(
         }
     }
 
+    /// <summary>Descarga el JWKS de Supabase y sustituye la caché; si falla, registra el error y conserva las claves previas.</summary>
+    /// <param name="ahora">Instante que se anota como última carga.</param>
     private void Cargar(DateTimeOffset ahora)
     {
         _ultimaCarga = ahora; // también tras un fallo, para no martillear al servidor

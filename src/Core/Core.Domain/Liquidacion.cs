@@ -9,8 +9,10 @@ public sealed record PagoLiquidacion(Guid De, Guid A, decimal Importe);
 /// <summary>Saldo de un miembro: positivo = le deben, negativo = debe.</summary>
 public sealed record SaldoMiembro(Guid MiembroId, decimal Importe);
 
+/// <summary>Transferencia propuesta para liquidar deudas: <paramref name="De"/> debe pagar a <paramref name="A"/>.</summary>
 public sealed record Transferencia(Guid De, Guid A, decimal Importe);
 
+/// <summary>Cálculo de saldos entre miembros y de las transferencias mínimas para saldarlos.</summary>
 public static class Liquidacion
 {
     /// <summary>
@@ -24,6 +26,7 @@ public static class Liquidacion
     {
         var saldos = miembros.ToDictionary(id => id, _ => 0m);
 
+        // Devuelve el saldo actual de un miembro; falla si no pertenece a la lista dada.
         decimal Saldo(Guid id) => saldos.TryGetValue(id, out var s)
             ? s : throw new ArgumentException($"Miembro desconocido: {id}.", nameof(miembros));
 

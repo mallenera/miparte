@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# Configuración de CodeRabbit para Mi Parte, Tu Parte.
+reviews:
+  pre_merge_checks:
+    docstrings:
+      # Aviso, no bloquea la fusión. El umbral por defecto (80 %) cuenta también métodos de test
+      # y funciones privadas triviales; el código de producción se documenta con comentarios XML.
+      mode: warning
+      threshold: 60

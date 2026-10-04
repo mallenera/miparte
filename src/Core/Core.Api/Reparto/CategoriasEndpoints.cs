@@ -6,10 +6,13 @@ using MiParte.Core.Infrastructure.Persistencia;
 
 namespace MiParte.Core.Api.Reparto;
 
+/// <summary>Endpoints de categorías de gasto del hogar (jerárquicas, con perfil de reparto opcional).</summary>
 public static class CategoriasEndpoints
 {
+    /// <summary>Longitud máxima del nombre de una categoría.</summary>
     private const int MaxLongitudNombre = 100;
 
+    /// <summary>Registra los endpoints de /api/categorias (listar, crear, actualizar y eliminar); todos requieren autorización.</summary>
     public static IEndpointRouteBuilder MapCategorias(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/categorias", ListarAsync).RequireAuthorization();
@@ -19,14 +22,17 @@ public static class CategoriasEndpoints
         return app;
     }
 
+    /// <summary>Convierte una categoría en su DTO de respuesta.</summary>
     private static CategoriaDto Dto(Categoria c) => new(c.Id, c.Nombre, c.CategoriaPadreId, c.PerfilRepartoId);
 
+    /// <summary>GET /api/categorias: devuelve las categorías del hogar ordenadas por nombre.</summary>
     private static async Task<IResult> ListarAsync([FromServices] MiParteDbContext db, CancellationToken ct)
     {
         var lista = await db.Categorias.OrderBy(c => c.Nombre).ToListAsync(ct);
         return Results.Ok(lista.Select(Dto).ToList());
     }
 
+    /// <summary>POST /api/categorias: crea una categoría en el hogar actual. 201 si se crea; 400 si el cuerpo no es válido; 409 si ya existe una con ese nombre en ese nivel.</summary>
     private static async Task<IResult> CrearAsync(
         GuardarCategoriaRequest req, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
@@ -47,6 +53,7 @@ public static class CategoriasEndpoints
         return Results.Created($"/api/categorias/{cat.Id}", Dto(cat));
     }
 
+    /// <summary>PUT /api/categorias/{id}: actualiza nombre, categoría padre y perfil de reparto. 404 si no existe; 400 si no es válido (incluye ciclos); 409 si el nombre está duplicado en ese nivel.</summary>
     private static async Task<IResult> ActualizarAsync(
         Guid id, GuardarCategoriaRequest req, [FromServices] MiParteDbContext db, CancellationToken ct)
     {
@@ -64,6 +71,7 @@ public static class CategoriasEndpoints
         return Results.Ok(Dto(cat));
     }
 
+    /// <summary>DELETE /api/categorias/{id}: elimina la categoría. 404 si no existe; 409 si tiene subcategorías, gastos o gastos recurrentes asociados; 204 si se elimina.</summary>
     private static async Task<IResult> EliminarAsync(
         Guid id, [FromServices] MiParteDbContext db, CancellationToken ct)
     {
@@ -82,9 +90,11 @@ public static class CategoriasEndpoints
         return Results.NoContent();
     }
 
+    /// <summary>Respuesta 409 para una categoría con nombre repetido en el mismo nivel.</summary>
     private static IResult Duplicada()
         => Results.Conflict(new { error = "Ya existe una categoría con ese nombre en ese nivel." });
 
+    /// <summary>Respuesta 400 con el mensaje de error indicado.</summary>
     private static IResult Mal(string msg) => Results.BadRequest(new { error = msg });
 
     /// <summary>Valida el cuerpo; devuelve el nombre normalizado o el resultado de error.</summary>

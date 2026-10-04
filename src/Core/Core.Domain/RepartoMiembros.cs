@@ -8,6 +8,7 @@ public sealed record MiembroReparto(Guid MiembroId, decimal Valor);
 /// <summary>Importe que asume un miembro de un gasto.</summary>
 public sealed record ParteAsumida(Guid MiembroId, decimal Importe);
 
+/// <summary>Reparto de un gasto entre miembros reales según el modo del perfil.</summary>
 public static class RepartoMiembros
 {
     /// <summary>

@@ -7,8 +7,10 @@ using MiParte.Core.Infrastructure.Persistencia;
 
 namespace MiParte.Core.Api.Gastos;
 
+/// <summary>Endpoints de gastos del hogar; cada gasto guarda su reparto calculado en el momento de crearlo o editarlo.</summary>
 public static class GastosEndpoints
 {
+    /// <summary>Registra los endpoints de /api/gastos (listar, obtener, crear, editar y borrar); todos requieren autorización.</summary>
     public static IEndpointRouteBuilder MapGastos(this IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/gastos").RequireAuthorization();
@@ -20,10 +22,12 @@ public static class GastosEndpoints
         return app;
     }
 
+    /// <summary>Convierte un gasto con su reparto en el DTO de respuesta.</summary>
     private static GastoResponse A(Gasto g) => new(
         g.Id, g.Fecha, g.Importe, g.CategoriaId, g.PagadoPor, g.PerfilRepartoId, g.Concepto, g.GastoRecurrenteId,
         g.Repartos.OrderBy(r => r.MiembroId).Select(r => new RepartoGastoDto(r.MiembroId, r.ImporteAsumido)).ToList());
 
+    /// <summary>GET /api/gastos: lista los gastos, filtrables por mes (YYYY-MM) y categoría, de más reciente a más antiguo. 409 sin hogar; 400 si el mes es inválido.</summary>
     private static async Task<IResult> ListarAsync(
         [FromQuery] string? mes, [FromQuery] Guid? categoriaId,
         [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
@@ -41,6 +45,7 @@ public static class GastosEndpoints
         return Results.Ok(lista.Select(A));
     }
 
+    /// <summary>GET /api/gastos/{id}: devuelve un gasto con su reparto. 409 sin hogar; 404 si no existe.</summary>
     private static async Task<IResult> ObtenerAsync(
         Guid id, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
@@ -69,6 +74,7 @@ public static class GastosEndpoints
         return (partes, error);
     }
 
+    /// <summary>POST /api/gastos: crea el gasto y guarda su reparto en la misma transacción. 201 si se crea; 409 sin hogar; 400 si falla la validación o el reparto.</summary>
     private static async Task<IResult> CrearAsync(
         GastoRequest req, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
@@ -88,6 +94,7 @@ public static class GastosEndpoints
         return Results.Created($"/api/gastos/{g.Id}", A(g));
     }
 
+    /// <summary>PUT /api/gastos/{id}: actualiza el gasto y recalcula solo su reparto, sin tocar el resto del histórico. 409 sin hogar; 404 si no existe; 400 si no es válido.</summary>
     private static async Task<IResult> EditarAsync(
         Guid id, GastoRequest req, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
@@ -109,6 +116,7 @@ public static class GastosEndpoints
         return Results.Ok(A(g));
     }
 
+    /// <summary>DELETE /api/gastos/{id}: borra el gasto y su reparto. 409 sin hogar; 404 si no existe; 204 si se borra.</summary>
     private static async Task<IResult> BorrarAsync(
         Guid id, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {

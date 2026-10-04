@@ -9,9 +9,12 @@ namespace MiParte.Core.Api.Gastos;
 /// <summary>Utilidades compartidas por los endpoints de ingresos, gastos, recurrentes y liquidación.</summary>
 internal static partial class ApiComun
 {
+    /// <summary>Longitud máxima del concepto de un movimiento.</summary>
     public const int MaxConcepto = 200;
+    /// <summary>Importe máximo admitido en un movimiento.</summary>
     private const decimal MaxImporte = 9_999_999_999.99m;
 
+    /// <summary>Patrón estricto del mes con formato YYYY-MM.</summary>
     [GeneratedRegex(@"^\d{4}-(0[1-9]|1[0-2])$")]
     private static partial Regex PatronMes();
 
@@ -26,14 +29,19 @@ internal static partial class ApiComun
         return true;
     }
 
+    /// <summary>Formatea el primer día de un mes como "YYYY-MM".</summary>
     public static string FormatoMes(DateOnly inicio) => $"{inicio.Year:0000}-{inicio.Month:00}";
 
+    /// <summary>Respuesta 400 con el mensaje de error indicado.</summary>
     public static IResult Invalido(string mensaje) => Results.BadRequest(new { error = mensaje });
 
+    /// <summary>Respuesta 400 por mes con formato distinto de YYYY-MM.</summary>
     public static IResult MesInvalido() => Invalido("El mes debe tener el formato YYYY-MM.");
 
+    /// <summary>Respuesta 409 cuando la petición no tiene hogar seleccionado.</summary>
     public static IResult SinHogar() => Results.Conflict(new { error = "No hay hogar seleccionado." });
 
+    /// <summary>Valida que el importe sea mayor que cero, no exceda el máximo y tenga como mucho 2 decimales; devuelve el mensaje de error o null.</summary>
     public static string? ValidarImporte(decimal importe)
     {
         if (importe <= 0) return "El importe debe ser mayor que cero.";
@@ -42,16 +50,20 @@ internal static partial class ApiComun
         return null;
     }
 
+    /// <summary>Valida la longitud máxima del concepto; devuelve el mensaje de error o null.</summary>
     public static string? ValidarConcepto(string? concepto)
         => concepto is { Length: > MaxConcepto } ? $"El concepto admite como máximo {MaxConcepto} caracteres." : null;
 
+    /// <summary>Recorta el concepto y devuelve null si está vacío.</summary>
     public static string? NormalizarConcepto(string? concepto)
         => string.IsNullOrWhiteSpace(concepto) ? null : concepto.Trim();
 
+    /// <summary>Adultos activos del hogar, ordenados por nombre y id.</summary>
     public static Task<List<Miembro>> AdultosActivos(MiParteDbContext db, CancellationToken ct)
         => db.Miembros.Where(m => m.Activo && m.Tipo == TipoMiembro.Adulto)
             .OrderBy(m => m.Nombre).ThenBy(m => m.Id).ToListAsync(ct);
 
+    /// <summary>Indica si el miembro existe en el hogar, está activo y es adulto.</summary>
     public static Task<bool> EsAdultoActivo(MiParteDbContext db, Guid id, CancellationToken ct)
         => db.Miembros.AnyAsync(m => m.Id == id && m.Activo && m.Tipo == TipoMiembro.Adulto, ct);
 

@@ -1,5 +1,6 @@
 namespace MiParte.Core.Domain;
 
+/// <summary>Lógica pura de división de un importe entre miembros según pesos.</summary>
 public static class Reparto
 {
     /// <summary>

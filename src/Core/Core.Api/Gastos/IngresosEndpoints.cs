@@ -6,8 +6,10 @@ using MiParte.Core.Infrastructure.Persistencia;
 
 namespace MiParte.Core.Api.Gastos;
 
+/// <summary>Endpoints de ingresos de los adultos del hogar; los ingresos del mes sirven de base al reparto por ingresos.</summary>
 public static class IngresosEndpoints
 {
+    /// <summary>Registra los endpoints de /api/ingresos (listar, obtener, crear, editar y borrar); todos requieren autorización.</summary>
     public static IEndpointRouteBuilder MapIngresos(this IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/ingresos").RequireAuthorization();
@@ -19,8 +21,10 @@ public static class IngresosEndpoints
         return app;
     }
 
+    /// <summary>Convierte un ingreso en su DTO de respuesta.</summary>
     private static IngresoResponse A(Ingreso i) => new(i.Id, i.MiembroId, i.Fecha, i.Importe, i.Concepto);
 
+    /// <summary>GET /api/ingresos: lista los ingresos, filtrables por mes (YYYY-MM), de más reciente a más antiguo. 409 sin hogar; 400 si el mes es inválido.</summary>
     private static async Task<IResult> ListarAsync(
         [FromQuery] string? mes, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
@@ -36,6 +40,7 @@ public static class IngresosEndpoints
         return Results.Ok(lista.Select(A));
     }
 
+    /// <summary>GET /api/ingresos/{id}: devuelve un ingreso. 409 sin hogar; 404 si no existe.</summary>
     private static async Task<IResult> ObtenerAsync(
         Guid id, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
@@ -44,6 +49,7 @@ public static class IngresosEndpoints
         return i is null ? Results.NotFound() : Results.Ok(A(i));
     }
 
+    /// <summary>Valida importe, concepto, fecha obligatoria y que el miembro sea un adulto activo; devuelve el mensaje de error o null.</summary>
     private static async Task<string?> Validar(IngresoRequest r, MiParteDbContext db, CancellationToken ct)
     {
         var e = ApiComun.ValidarImporte(r.Importe) ?? ApiComun.ValidarConcepto(r.Concepto);
@@ -53,6 +59,7 @@ public static class IngresosEndpoints
         return null;
     }
 
+    /// <summary>POST /api/ingresos: registra un ingreso. 201 si se crea; 409 sin hogar; 400 si no es válido.</summary>
     private static async Task<IResult> CrearAsync(
         IngresoRequest req, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
@@ -69,6 +76,7 @@ public static class IngresosEndpoints
         return Results.Created($"/api/ingresos/{i.Id}", A(i));
     }
 
+    /// <summary>PUT /api/ingresos/{id}: actualiza un ingreso. 409 sin hogar; 404 si no existe; 400 si no es válido.</summary>
     private static async Task<IResult> EditarAsync(
         Guid id, IngresoRequest req, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
@@ -85,6 +93,7 @@ public static class IngresosEndpoints
         return Results.Ok(A(i));
     }
 
+    /// <summary>DELETE /api/ingresos/{id}: borra un ingreso. 409 sin hogar; 404 si no existe; 204 si se borra.</summary>
     private static async Task<IResult> BorrarAsync(
         Guid id, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {

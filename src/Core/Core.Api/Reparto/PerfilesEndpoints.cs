@@ -6,11 +6,15 @@ using MiParte.Core.Infrastructure.Persistencia;
 
 namespace MiParte.Core.Api.Reparto;
 
+/// <summary>Endpoints de perfiles de reparto del hogar (porcentaje, partes, ingresos o individual).</summary>
 public static class PerfilesEndpoints
 {
+    /// <summary>Longitud máxima del nombre de un perfil.</summary>
     private const int MaxLongitudNombre = 100;
+    /// <summary>Tolerancia admitida al comprobar que los porcentajes suman 100.</summary>
     private const decimal ToleranciaPorcentaje = 0.0001m;
 
+    /// <summary>Registra los endpoints de /api/perfiles (listar, obtener, crear, actualizar y eliminar); todos requieren autorización.</summary>
     public static IEndpointRouteBuilder MapPerfiles(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/perfiles", ListarAsync).RequireAuthorization();
@@ -21,6 +25,7 @@ public static class PerfilesEndpoints
         return app;
     }
 
+    /// <summary>Convierte el modo de reparto al texto usado en la API (porcentaje, partes, ingresos o individual).</summary>
     internal static string ModoATexto(ModoReparto m) => m switch
     {
         ModoReparto.Porcentaje => "porcentaje",
@@ -29,6 +34,7 @@ public static class PerfilesEndpoints
         _ => "individual",
     };
 
+    /// <summary>Interpreta el texto del modo (sin distinguir mayúsculas ni espacios laterales); devuelve false si no es válido.</summary>
     private static bool TryModo(string? texto, out ModoReparto modo)
     {
         switch (texto?.Trim().ToLowerInvariant())
@@ -41,22 +47,26 @@ public static class PerfilesEndpoints
         }
     }
 
+    /// <summary>Convierte un perfil en su DTO de respuesta, con el detalle ordenado por miembro.</summary>
     private static PerfilRepartoDto Dto(PerfilReparto p) => new(
         p.Id, p.Nombre, ModoATexto(p.Modo),
         p.Detalles.OrderBy(d => d.MiembroId).Select(d => new PerfilDetalleDto(d.MiembroId, d.Valor)).ToList());
 
+    /// <summary>GET /api/perfiles: devuelve los perfiles del hogar con su detalle, ordenados por nombre.</summary>
     private static async Task<IResult> ListarAsync([FromServices] MiParteDbContext db, CancellationToken ct)
     {
         var perfiles = await db.PerfilesReparto.Include(p => p.Detalles).OrderBy(p => p.Nombre).ToListAsync(ct);
         return Results.Ok(perfiles.Select(Dto).ToList());
     }
 
+    /// <summary>GET /api/perfiles/{id}: devuelve un perfil con su detalle; 404 si no existe.</summary>
     private static async Task<IResult> ObtenerAsync(Guid id, [FromServices] MiParteDbContext db, CancellationToken ct)
     {
         var p = await db.PerfilesReparto.Include(x => x.Detalles).FirstOrDefaultAsync(x => x.Id == id, ct);
         return p is null ? Results.NotFound() : Results.Ok(Dto(p));
     }
 
+    /// <summary>POST /api/perfiles: crea un perfil con su detalle. 201 si se crea; 400 si no supera la validación; 409 si el nombre ya existe.</summary>
     private static async Task<IResult> CrearAsync(
         GuardarPerfilRequest req, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
@@ -72,6 +82,7 @@ public static class PerfilesEndpoints
         return Results.Created($"/api/perfiles/{perfil.Id}", Dto(perfil));
     }
 
+    /// <summary>PUT /api/perfiles/{id}: sustituye nombre, modo y detalle del perfil. 404 si no existe; 400 si no es válido; 409 si el nombre ya existe.</summary>
     private static async Task<IResult> ActualizarAsync(
         Guid id, GuardarPerfilRequest req, [FromServices] MiParteDbContext db, CancellationToken ct)
     {
@@ -96,6 +107,7 @@ public static class PerfilesEndpoints
         return Results.Ok(Dto(perfil));
     }
 
+    /// <summary>DELETE /api/perfiles/{id}: elimina el perfil y su detalle. 404 si no existe; 409 si lo usan categorías, gastos o gastos recurrentes; 204 si se elimina.</summary>
     private static async Task<IResult> EliminarAsync(Guid id, [FromServices] MiParteDbContext db, CancellationToken ct)
     {
         var perfil = await db.PerfilesReparto.Include(p => p.Detalles).FirstOrDefaultAsync(p => p.Id == id, ct);
@@ -113,15 +125,19 @@ public static class PerfilesEndpoints
         return Results.NoContent();
     }
 
+    /// <summary>Crea una fila de detalle de perfil para el miembro y valor indicados.</summary>
     private static PerfilRepartoDetalle Nuevo(Guid hogarId, Guid perfilId, PerfilDetalleDto d) => new()
     {
         Id = Guid.NewGuid(), HogarId = hogarId, PerfilId = perfilId, MiembroId = d.MiembroId, Valor = d.Valor,
     };
 
+    /// <summary>Respuesta 409 para un perfil con nombre repetido.</summary>
     private static IResult Duplicado() => Results.Conflict(new { error = "Ya existe un perfil con ese nombre." });
 
+    /// <summary>Respuesta 400 con el mensaje de error indicado.</summary>
     private static IResult Mal(string msg) => Results.BadRequest(new { error = msg });
 
+    /// <summary>Valida el cuerpo y devuelve nombre normalizado, modo y detalle, o el resultado de error. Ingresos e individual no admiten detalle; porcentaje y partes exigen adultos activos sin repetir y valores no negativos, con porcentajes que suman 100 o alguna parte mayor que 0. El nombre no puede repetirse.</summary>
     private static async Task<(IResult? Error, string? Nombre, ModoReparto Modo, IReadOnlyList<PerfilDetalleDto>? Detalle)> ValidarAsync(
         GuardarPerfilRequest req, Guid? idActual, MiParteDbContext db, CancellationToken ct)
     {
@@ -145,9 +161,9 @@ public static class PerfilesEndpoints
                 return (Mal("Hay miembros repetidos en el detalle."), null, default, null);
 
             var ids = detalle.Select(d => d.MiembroId).ToList();
-            var activos = await db.Miembros.Where(m => m.Activo && ids.Contains(m.Id)).CountAsync(ct);
+            var activos = await db.Miembros.Where(m => m.Activo && m.Tipo == TipoMiembro.Adulto && ids.Contains(m.Id)).CountAsync(ct);
             if (activos != ids.Count)
-                return (Mal("El detalle solo puede incluir miembros activos del hogar."), null, default, null);
+                return (Mal("El detalle solo puede incluir adultos activos del hogar."), null, default, null);
 
             if (detalle.Any(d => d.Valor < 0)) return (Mal("Los valores no pueden ser negativos."), null, default, null);
             if (modo == ModoReparto.Porcentaje)

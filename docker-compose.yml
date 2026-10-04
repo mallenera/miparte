@@ -18,9 +18,7 @@ services:
       context: .
       dockerfile: src/Assistant/Dockerfile
     ports: ["5002:8080"]
-    env_file:
-      - path: .env
-        required: false
+    # Sin env_file: el .env completo incluye la cadena de la base de datos, que solo debe llegar a Core.
     environment:
       Supabase__Url: ${Supabase__Url:-}
       Supabase__JwtSecret: ${Supabase__JwtSecret:-}

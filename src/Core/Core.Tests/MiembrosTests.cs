@@ -127,6 +127,18 @@ public class MiembrosTests
         Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync("/api/miembros", new CrearMiembroRequest("X", "adulto", s.AnaId))).StatusCode);
     }
 
+    [Fact]
+    public async Task Perfil_ConDetalleDeACargo_400()
+    {
+        var s = await Crear();
+        using var _ = s.F;
+        var nino = await Sembrar(s.F, s.Hogar, null, "Nico", tipo: TipoMiembro.ACargo, responsable: s.AnaId);
+
+        var r = await s.ComoAna.PostAsJsonAsync("/api/perfiles", new GuardarPerfilRequest("Con niño", "porcentaje",
+            [new PerfilDetalleDto(s.AnaId, 50), new PerfilDetalleDto(nino, 50)]));
+        Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
+    }
+
     // ---- Actualización ----
 
     [Fact]

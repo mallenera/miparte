@@ -9,11 +9,22 @@ using MiParte.Core.Infrastructure.Persistencia;
 
 namespace MiParte.Core.Api.Miembros;
 
+/// <summary>
+/// Endpoints de miembros del hogar actual (listar, añadir, actualizar, desactivar) y de invitaciones
+/// (crear y aceptar). Los datos se filtran por hogar; las operaciones de gestión exigen rol admin.
+/// </summary>
 public static class MiembrosEndpoints
 {
+    /// <summary>Longitud máxima del nombre de un miembro.</summary>
     private const int MaxLongitudNombre = 100;
+
+    /// <summary>Tiempo durante el que una invitación puede aceptarse desde su creación (7 días).</summary>
     public static readonly TimeSpan VigenciaInvitacion = TimeSpan.FromDays(7);
 
+    /// <summary>
+    /// Registra GET/POST /api/miembros, PUT/DELETE /api/miembros/{id}, POST /api/invitaciones y
+    /// POST /api/invitaciones/aceptar (este último sin hogar actual). Todos requieren autenticación.
+    /// </summary>
     public static IEndpointRouteBuilder MapMiembros(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/miembros", ListarAsync).RequireAuthorization();
@@ -33,19 +44,24 @@ public static class MiembrosEndpoints
     public static string HashToken(string token)
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
 
+    /// <summary>Convierte un miembro en su DTO: tipo "adulto"/"a_cargo", rol "admin"/"miembro" y si está vinculado a un usuario.</summary>
     private static MiembroDto ADto(Miembro m) => new(
         m.Id, m.Nombre, m.Tipo == TipoMiembro.Adulto ? "adulto" : "a_cargo", m.ResponsableId, m.Activo,
         m.Rol == RolMiembro.Admin ? "admin" : "miembro", m.UserId is not null);
 
+    /// <summary>Obtiene el id del usuario autenticado del claim "sub"; false si falta o no es un GUID.</summary>
     private static bool TryUsuario(HttpContext ctx, out Guid userId)
         => Guid.TryParse(ctx.User.FindFirst("sub")?.Value, out userId);
 
+    /// <summary>Respuesta JSON de error { error } con el código HTTP indicado.</summary>
     private static IResult Error(int status, string mensaje)
         => Results.Json(new { error = mensaje }, statusCode: status);
 
+    /// <summary>Miembro activo del hogar actual vinculado al usuario autenticado, o null si no lo es.</summary>
     private static Task<Miembro?> Yo(MiParteDbContext db, Guid userId, CancellationToken ct)
         => db.Miembros.FirstOrDefaultAsync(m => m.UserId == userId && m.Activo, ct);
 
+    /// <summary>GET /api/miembros: miembros activos del hogar actual ordenados por nombre. Cualquier miembro puede consultarlo.</summary>
     private static async Task<IResult> ListarAsync(
         HttpContext ctx, [FromServices] MiParteDbContext db, CancellationToken ct)
     {
@@ -53,6 +69,11 @@ public static class MiembrosEndpoints
         return Results.Ok(miembros.Select(ADto).ToList());
     }
 
+    /// <summary>
+    /// POST /api/miembros (solo admin): añade un miembro "adulto" o "a_cargo" sin usuario vinculado.
+    /// Un a_cargo exige un responsable adulto activo y un adulto no puede tenerlo. 403 si no es admin,
+    /// 400 por datos inválidos, 201 con el miembro creado.
+    /// </summary>
     private static async Task<IResult> CrearAsync(
         CrearMiembroRequest req, HttpContext ctx, [FromServices] MiParteDbContext db,
         [FromServices] IHogarActual hogar, CancellationToken ct)
@@ -101,6 +122,12 @@ public static class MiembrosEndpoints
         return Results.Created($"/api/miembros/{nuevo.Id}", ADto(nuevo));
     }
 
+    /// <summary>
+    /// PUT /api/miembros/{id}: cambia nombre, estado activo, rol o responsable. Un no-admin solo puede
+    /// renombrarse a sí mismo (403 si intenta más). 404 si no existe; 400 por datos inválidos; 409 si
+    /// dejaría al hogar sin administrador activo y vinculado, o si desactiva a un responsable de miembros
+    /// a cargo activos.
+    /// </summary>
     private static async Task<IResult> ActualizarAsync(
         Guid id, ActualizarMiembroRequest req, HttpContext ctx, [FromServices] MiParteDbContext db,
         CancellationToken ct)
@@ -153,6 +180,16 @@ public static class MiembrosEndpoints
         var seActiva = req.Activo ?? m.Activo;
         var rolFinal = nuevoRol ?? m.Rol;
 
+        // Serializa por hogar la comprobación de "último admin" y el guardado: sin esto, dos admins que se
+        // degradan o desactivan a la vez ven cada uno al otro como admin activo, ambos guardan y el hogar
+        // se queda sin administrador. El bloqueo consultivo transaccional de Postgres se libera al
+        // confirmar o revertir; la segunda petición espera y su AnyAsync ya ve el cambio de la primera
+        // (READ COMMITTED). InMemory no admite transacciones ni SQL crudo, así que allí no se aplica.
+        await using var tx = db.Database.IsRelational() ? await db.Database.BeginTransactionAsync(ct) : null;
+        if (tx is not null)
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"select pg_advisory_xact_lock(hashtext({m.HogarId.ToString()}))", ct);
+
         // No dejar al hogar sin administrador activo y vinculado.
         if (m.Rol == RolMiembro.Admin && m.Activo && m.UserId is not null
             && (!seActiva || rolFinal != RolMiembro.Admin))
@@ -172,16 +209,22 @@ public static class MiembrosEndpoints
         if (req.ResponsableId is not null) m.ResponsableId = req.ResponsableId;
 
         await db.SaveChangesAsync(ct);
+        if (tx is not null) await tx.CommitAsync(ct);
         return Results.Ok(ADto(m));
     }
 
-    /// <summary>Borrado lógico: equivale a PUT con activo=false (mismas reglas).</summary>
+    /// <summary>DELETE /api/miembros/{id}: borrado lógico, equivale a PUT con activo=false (mismas reglas y códigos).</summary>
     private static Task<IResult> DesactivarAsync(
         Guid id, HttpContext ctx, [FromServices] MiParteDbContext db, CancellationToken ct)
     {
         return ActualizarAsync(id, new ActualizarMiembroRequest(Activo: false), ctx, db, ct);
     }
 
+    /// <summary>
+    /// POST /api/invitaciones (solo admin): crea una invitación, opcionalmente para vincular un miembro
+    /// existente (404 si no existe; 409 si está desactivado o ya vinculado). El token se devuelve en claro
+    /// solo en esta respuesta (201); en base de datos se guarda únicamente su hash SHA-256.
+    /// </summary>
     private static async Task<IResult> CrearInvitacionAsync(
         CrearInvitacionRequest? req, HttpContext ctx, [FromServices] MiParteDbContext db,
         [FromServices] IHogarActual hogar, CancellationToken ct)
@@ -217,10 +260,16 @@ public static class MiembrosEndpoints
         return Results.Created($"/api/invitaciones/{inv.Id}", new InvitacionCreada(inv.Id, token, inv.CaducaEn));
     }
 
+    /// <summary>Codifica bytes en Base64 apto para URL (sin relleno, '-' y '_' en lugar de '+' y '/').</summary>
     private static string Base64Url(byte[] bytes)
         => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
-    /// <summary>Replica en EF la lógica de la función SQL aceptar_invitacion.</summary>
+    /// <summary>
+    /// POST /api/invitaciones/aceptar (sin hogar actual): replica en EF la función SQL aceptar_invitacion.
+    /// Busca la invitación por hash del token y vincula al usuario a un miembro existente o crea uno nuevo
+    /// con el nombre dado. 400 sin token/nombre; 404 token desconocido; 409 si está usada, caducada, el
+    /// usuario ya está en el hogar o el miembro no está disponible. Devuelve el resumen del hogar.
+    /// </summary>
     private static async Task<IResult> AceptarInvitacionAsync(
         AceptarInvitacionRequest req, HttpContext ctx, [FromServices] MiParteDbContext db, CancellationToken ct)
     {
@@ -245,7 +294,9 @@ public static class MiembrosEndpoints
                 .FirstOrDefaultAsync(x => x.HogarId == inv.HogarId && x.Id == inv.MiembroId, ct);
             if (m is null || !m.Activo) return Error(409, "El miembro de la invitación ya no está disponible.");
             if (m.UserId is not null) return Error(409, "El miembro de la invitación ya está vinculado a un usuario.");
-            m.UserId = userId;
+            // En la rama relacional el vínculo se hace más abajo con un UPDATE condicional; con InMemory,
+            // por entity tracking.
+            if (!db.Database.IsRelational()) m.UserId = userId;
         }
         else
         {
@@ -277,6 +328,18 @@ public static class MiembrosEndpoints
                     .SetProperty(i => i.UsadaEn, ahora)
                     .SetProperty(i => i.UsadaPor, userId), ct);
             if (marcadas == 0) return Error(409, "La invitación ya fue utilizada o ha caducado.");
+
+            if (inv.MiembroId is Guid destino)
+            {
+                // Dos invitaciones distintas pueden apuntar al mismo miembro: la lectura previa no bloquea,
+                // así que el vínculo se hace condicional y atómico (user_id IS NULL y activo). Si otra
+                // aceptación se adelantó afecta 0 filas: 409 y se revierte todo, incluida la invitación.
+                var vinculados = await db.Miembros.IgnoreQueryFilters()
+                    .Where(x => x.HogarId == inv.HogarId && x.Id == destino && x.UserId == null && x.Activo)
+                    .ExecuteUpdateAsync(s => s.SetProperty(x => x.UserId, userId), ct);
+                if (vinculados == 0)
+                    return Error(409, "El miembro de la invitación ya no está disponible o ya está vinculado a un usuario.");
+            }
 
             await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);

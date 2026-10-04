@@ -132,6 +132,29 @@ public class CategoriasPerfilesTests
     }
 
     [Fact]
+    public async Task Perfil_DetalleConMiembroACargo_400()
+    {
+        using var x = await Preparar();
+        Guid nino;
+        using (var scope = x.F.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MiParteDbContext>();
+            var m = new Miembro
+            {
+                Id = Guid.NewGuid(), HogarId = x.HogarId, Nombre = "Nico", Tipo = TipoMiembro.ACargo, ResponsableId = x.MiembroId,
+            };
+            db.Miembros.Add(m);
+            await db.SaveChangesAsync();
+            nino = m.Id;
+        }
+
+        // El reparto solo cuenta adultos: el peso de un a_cargo se ignoraría, así que se rechaza.
+        var r = await CrearPerfil(x.C, "Con niño", "partes", new PerfilDetalleDto(x.MiembroId, 1), new PerfilDetalleDto(nino, 1));
+        Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
+        Assert.Contains("adultos activos", await r.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Perfil_Validaciones_400()
     {
         using var x = await Preparar();

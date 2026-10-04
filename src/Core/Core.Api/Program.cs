@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using MiParte.Auth;
 using MiParte.Core.Api.Gastos;
 using MiParte.Core.Api.Hogares;
@@ -31,6 +32,13 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
 }));
 
 var app = builder.Build();
+
+// Deja en el log qué espera la validación del JWT (sin secretos): ayuda a diagnosticar 401.
+var supabase = app.Services.GetRequiredService<IOptions<SupabaseAuthOptions>>().Value;
+app.Logger.LogInformation(
+    "Auth Supabase: emisor esperado = {Emisor}; modo = {Modo}",
+    supabase.EmisorEfectivo ?? "(sin configurar: ningún token será válido)",
+    string.IsNullOrWhiteSpace(supabase.JwtSecret) ? "JWKS (asimétrico)" : "HS256 (secreto legado)");
 
 app.UseCors();
 app.UseAuthentication();

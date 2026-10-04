@@ -122,7 +122,7 @@ public class ApiPostgresTests
         Assert.Equal(h2.Id, con.HogarActual!.Id);
 
         var lista = await Leer<List<HogarResumen>>(await e.Cliente(user).GetAsync("/api/hogares"));
-        Assert.Equal([h1.Id, h2.Id], lista.Select(h => h.Id).Order());
+        Assert.Equal([h1.Id, h2.Id], lista.Select(h => h.Id)); // la API ordena por nombre: "Casa A", "Casa B"
         Assert.Equal(HttpStatusCode.OK, (await e.Cliente(user).GetAsync($"/api/hogares/{h1.Id}")).StatusCode);
     }
 

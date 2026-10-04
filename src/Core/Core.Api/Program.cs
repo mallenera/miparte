@@ -27,6 +27,8 @@ app.MapGet("/api/yo", (HttpContext ctx, [FromServices] IHogarActual hogar) =>
         Results.Ok(new { userId = ctx.User.FindFirst("sub")?.Value, hogarId = hogar.HogarId }))
     .RequireAuthorization();
 
+app.MapHogares();
+
 app.Run();
 
 public partial class Program;

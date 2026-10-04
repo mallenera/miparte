@@ -52,3 +52,5 @@ MIPARTE_TEST_DB="Host=localhost;Database=miparte;Username=postgres;Password=..."
 Sin configuración, ningún token es válido (la API arranca igualmente). El hogar de la petición se
 deduce del usuario (`sub` → `miembro.user_id`); si pertenece a varios, se indica con la cabecera `X-Hogar-Id`.
 `GET /api/yo` devuelve el usuario y el hogar resueltos.
+
+

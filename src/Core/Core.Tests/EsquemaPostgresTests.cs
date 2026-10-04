@@ -93,4 +93,35 @@ public class EsquemaPostgresTests
             Assert.Equal("Otro", (await ctx.Miembros.SingleAsync()).Nombre);
         }
     }
+
+    [SkippableFact]
+    public async Task CrearHogarYMiembro_UsaLaFechaDeLaBaseDeDatos()
+    {
+        Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
+
+        var hogarId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        await using (var conn = new NpgsqlConnection(Cadena))
+        {
+            await conn.OpenAsync();
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "insert into auth.users (id) values (@u)";
+            cmd.Parameters.AddWithValue("u", userId);
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        await using (var ctx = Crear(null))
+        {
+            ctx.Hogares.Add(new Hogar { Id = hogarId, Nombre = "Casa" });
+            ctx.Miembros.Add(new Miembro { Id = Guid.NewGuid(), HogarId = hogarId, Nombre = "Ana", Tipo = TipoMiembro.Adulto, UserId = userId });
+            await ctx.SaveChangesAsync();
+        }
+
+        await using (var ctx = Crear(hogarId))
+        {
+            var h = await ctx.Hogares.SingleAsync();
+            Assert.True(h.CreadoEn > DateTimeOffset.UtcNow.AddMinutes(-5), $"CreadoEn = {h.CreadoEn}");
+            Assert.Equal(userId, (await ctx.Miembros.SingleAsync()).UserId);
+        }
+    }
 }

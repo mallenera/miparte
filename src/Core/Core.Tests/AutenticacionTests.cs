@@ -21,14 +21,14 @@ public class AutenticacionTests
 {
     private const string Url = "https://proyecto.supabase.co";
     private const string Emisor = Url + "/auth/v1";
-    private const string Secreto = "un-secreto-de-pruebas-de-al-menos-32-bytes!!";
+    internal const string Secreto = "un-secreto-de-pruebas-de-al-menos-32-bytes!!";
 
-    private sealed class ClaveFija(SecurityKey clave) : ISigningKeyProvider
+    internal sealed class ClaveFija(SecurityKey clave) : ISigningKeyProvider
     {
         public IReadOnlyCollection<SecurityKey> ObtenerClaves(string? kid) => kid == clave.KeyId ? [clave] : [];
     }
 
-    private static WebApplicationFactory<Program> Crear(string? secreto, ISigningKeyProvider? claves = null)
+    internal static WebApplicationFactory<Program> Crear(string? secreto, ISigningKeyProvider? claves = null)
     {
         var bd = Guid.NewGuid().ToString();
         return new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
@@ -45,7 +45,7 @@ public class AutenticacionTests
         });
     }
 
-    private static async Task Miembro(WebApplicationFactory<Program> f, Guid user, Guid hogar)
+    internal static async Task Miembro(WebApplicationFactory<Program> f, Guid user, Guid hogar)
     {
         using var scope = f.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MiParteDbContext>();
@@ -53,7 +53,7 @@ public class AutenticacionTests
         await db.SaveChangesAsync();
     }
 
-    private static string Token(SigningCredentials cred, Guid user, string issuer = Emisor,
+    internal static string Token(SigningCredentials cred, Guid user, string issuer = Emisor,
         string audience = "authenticated", DateTime? expira = null)
     {
         var d = new SecurityTokenDescriptor
@@ -68,10 +68,10 @@ public class AutenticacionTests
         return new JsonWebTokenHandler().CreateToken(d);
     }
 
-    private static SigningCredentials Hs256(string secreto = Secreto) =>
+    internal static SigningCredentials Hs256(string secreto = Secreto) =>
         new(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secreto)), SecurityAlgorithms.HmacSha256);
 
-    private static HttpClient Cliente(WebApplicationFactory<Program> f, string? token, Guid? hogar = null)
+    internal static HttpClient Cliente(WebApplicationFactory<Program> f, string? token, Guid? hogar = null)
     {
         var c = f.CreateClient();
         if (token is not null) c.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);

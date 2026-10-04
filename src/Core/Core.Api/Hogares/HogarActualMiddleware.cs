@@ -15,7 +15,8 @@ public class HogarActualMiddleware(RequestDelegate next)
     public async Task InvokeAsync(HttpContext ctx)
     {
         var sub = ctx.User.FindFirst("sub")?.Value;
-        if (ctx.User.Identity?.IsAuthenticated == true && Guid.TryParse(sub, out var userId))
+        var sinHogar = ctx.GetEndpoint()?.Metadata.GetMetadata<SinHogarActual>() is not null;
+        if (!sinHogar && ctx.User.Identity?.IsAuthenticated == true && Guid.TryParse(sub, out var userId))
         {
             // Se resuelven aquí y no en el constructor: sin base de datos configurada
             // (p. ej. /health) la petición no debe fallar.

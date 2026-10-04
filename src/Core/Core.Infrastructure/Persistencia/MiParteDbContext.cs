@@ -28,6 +28,7 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
         b.Entity<Hogar>(e =>
         {
             e.ToTable("hogar");
+            e.Property(x => x.CreadoEn).HasDefaultValueSql("now()"); // lo asigna la base de datos
             e.HasQueryFilter(x => x.Id == HogarId);
         });
 

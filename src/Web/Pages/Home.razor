@@ -1,7 +1,11 @@
 @page "/"
+@attribute [Authorize]
+@inject EstadoHogar Hogar
 
 <PageTitle>Mi Parte, Tu Parte</PageTitle>
 
-<h1>Mi Parte, Tu Parte</h1>
-
-<p>Gastos e ingresos del hogar con reparto y liquidación mensual.</p>
+<RequiereHogar>
+    <h1>@Hogar.HogarActual!.Nombre</h1>
+    <p>Gastos e ingresos del hogar con reparto y liquidación mensual.</p>
+    <p class="text-muted">Las pantallas de miembros, gastos y liquidación llegarán en las siguientes fases.</p>
+</RequiereHogar>

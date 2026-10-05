@@ -5,6 +5,9 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,6 +15,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using MiParte.Auth;
+using MiParte.Contracts;
 using MiParte.Core.Domain.Entidades;
 using MiParte.Core.Infrastructure.Persistencia;
 
@@ -41,14 +45,29 @@ public class AutenticacionTests
                 s.RemoveAll<DbContextOptions<MiParteDbContext>>();
                 s.AddDbContext<MiParteDbContext>(o => o.UseInMemoryDatabase(bd));
                 if (claves is not null) s.Replace(ServiceDescriptor.Singleton(claves));
+                s.AddSingleton<IStartupFilter, EndpointExigeHogarFilter>();
             });
         });
+    }
+
+    /// <summary>Endpoint solo de pruebas que requiere hogar actual (sin SinHogarActual), para probar el middleware.</summary>
+    private sealed class EndpointExigeHogarFilter : IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+        {
+            next(app);
+            app.Run(ctx => ctx.Request.Path == "/prueba/hogar"
+                ? ctx.Response.WriteAsJsonAsync(new { hogarId = ctx.RequestServices.GetRequiredService<IHogarActual>().HogarId })
+                : Task.CompletedTask);
+        };
     }
 
     internal static async Task Miembro(WebApplicationFactory<Program> f, Guid user, Guid hogar)
     {
         using var scope = f.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MiParteDbContext>();
+        if (!await db.Hogares.IgnoreQueryFilters().AnyAsync(h => h.Id == hogar))
+            db.Hogares.Add(new Hogar { Id = hogar, Nombre = "Hogar " + hogar.ToString()[..4] });
         db.Miembros.Add(new Miembro { Id = Guid.NewGuid(), HogarId = hogar, Nombre = "M", Tipo = TipoMiembro.Adulto, UserId = user });
         await db.SaveChangesAsync();
     }
@@ -80,7 +99,7 @@ public class AutenticacionTests
     }
 
     private const string HogarActualMiddleware_Cabecera = "X-Hogar-Id";
-    private sealed record Yo(string? UserId, Guid? HogarId);
+    private sealed record Yo(string? UserId, List<HogarResumen> Hogares, HogarResumen? HogarActual);
 
     [Fact]
     public async Task SinToken_401()
@@ -109,7 +128,7 @@ public class AutenticacionTests
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
         var yo = await r.Content.ReadFromJsonAsync<Yo>(new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
         Assert.Equal(user.ToString(), yo!.UserId);
-        Assert.Equal(hogar, yo.HogarId);
+        Assert.Equal(hogar, yo.HogarActual!.Id);
     }
 
     [Fact]
@@ -119,7 +138,8 @@ public class AutenticacionTests
         var r = await Cliente(f, Token(Hs256(), Guid.NewGuid())).GetAsync("/api/yo");
         var yo = await r.Content.ReadFromJsonAsync<Yo>(new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
-        Assert.Null(yo!.HogarId);
+        Assert.Null(yo!.HogarActual);
+        Assert.Empty(yo.Hogares);
     }
 
     [Fact]
@@ -208,8 +228,8 @@ public class AutenticacionTests
         await Miembro(f, user, h2);
         var t = Token(Hs256(), user);
 
-        Assert.Equal(HttpStatusCode.Conflict, (await Cliente(f, t).GetAsync("/api/yo")).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await Cliente(f, t, h2).GetAsync("/api/yo")).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await Cliente(f, t).GetAsync("/prueba/hogar")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Cliente(f, t, h2).GetAsync("/prueba/hogar")).StatusCode);
     }
 
     [Fact]
@@ -220,6 +240,6 @@ public class AutenticacionTests
         await Miembro(f, user, Guid.NewGuid());
         var t = Token(Hs256(), user);
 
-        Assert.Equal(HttpStatusCode.Forbidden, (await Cliente(f, t, Guid.NewGuid()).GetAsync("/api/yo")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Cliente(f, t, Guid.NewGuid()).GetAsync("/prueba/hogar")).StatusCode);
     }
 }

@@ -9,12 +9,22 @@ namespace MiParte.Core.Api.Hogares;
 /// <summary>Marca endpoints que funcionan sin hogar seleccionado (alta y listado de hogares).</summary>
 public sealed record SinHogarActual;
 
+/// <summary>
+/// Endpoints de hogares del usuario autenticado: listar, crear, obtener y /api/yo. Todos exigen
+/// autenticación y funcionan sin hogar seleccionado (<see cref="SinHogarActual"/>).
+/// </summary>
 public static class HogaresEndpoints
 {
     /// <summary>Tope por usuario, para que un registro gratuito no llene la base de datos.</summary>
     public const int MaxHogaresPorUsuario = 10;
+
+    /// <summary>Longitud máxima del nombre de hogar y del nombre de miembro.</summary>
     private const int MaxLongitudNombre = 100;
 
+    /// <summary>
+    /// Registra GET /api/hogares, POST /api/hogares, GET /api/hogares/{id} y GET /api/yo,
+    /// todos con autorización y sin necesidad de hogar actual.
+    /// </summary>
     public static IEndpointRouteBuilder MapHogares(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/hogares", ListarAsync)
@@ -25,24 +35,87 @@ public static class HogaresEndpoints
             .RequireAuthorization()
             .WithMetadata(new SinHogarActual());
 
+        app.MapGet("/api/hogares/{id:guid}", ObtenerAsync)
+            .RequireAuthorization()
+            .WithMetadata(new SinHogarActual());
+
+        app.MapGet("/api/yo", YoAsync)
+            .RequireAuthorization()
+            .WithMetadata(new SinHogarActual());
+
         return app;
     }
 
+    /// <summary>
+    /// Hogares donde el usuario es miembro activo. Se proyecta a columnas y se mapea después:
+    /// un Distinct sobre un record no se traduce a SQL en Npgsql (InMemory sí lo admitía).
+    /// No hace falta Distinct: miembro tiene unique (hogar_id, user_id).
+    /// </summary>
+    private static async Task<List<HogarResumen>> HogaresDelUsuario(MiParteDbContext db, Guid userId, CancellationToken ct)
+    {
+        var filas = await db.Hogares.IgnoreQueryFilters()
+            .Where(h => db.Miembros.IgnoreQueryFilters()
+                .Any(m => m.HogarId == h.Id && m.UserId == userId && m.Activo))
+            .OrderBy(h => h.Nombre)
+            .Select(h => new { h.Id, h.Nombre })
+            .ToListAsync(ct);
+        return filas.Select(h => new HogarResumen(h.Id, h.Nombre)).ToList();
+    }
+
+    /// <summary>
+    /// GET /api/yo: devuelve el id del usuario, sus hogares y el hogar actual (el de la cabecera
+    /// X-Hogar-Id si es válido y propio, o el único hogar si no hay cabecera). 401 sin claim "sub".
+    /// </summary>
+    private static async Task<IResult> YoAsync(
+        HttpContext ctx, [FromServices] MiParteDbContext db, CancellationToken ct)
+    {
+        if (!TryUsuario(ctx, out var userId)) return Results.Unauthorized();
+
+        var hogares = await HogaresDelUsuario(db, userId, ct);
+
+        // Hogar actual: el de la cabecera si es válido y propio; si no hay cabecera, el único hogar.
+        HogarResumen? actual = null;
+        if (ctx.Request.Headers.TryGetValue(HogarActualMiddleware.Cabecera, out var valor))
+        {
+            if (Guid.TryParse(valor.ToString(), out var pedido))
+                actual = hogares.FirstOrDefault(h => h.Id == pedido);
+        }
+        else if (hogares.Count == 1)
+        {
+            actual = hogares[0];
+        }
+
+        return Results.Ok(new YoResponse(userId.ToString(), hogares, actual));
+    }
+
+    /// <summary>
+    /// GET /api/hogares/{id}: resumen de un hogar del usuario. 404 si no existe o no es miembro
+    /// (no se revela su existencia); 401 sin claim "sub".
+    /// </summary>
+    private static async Task<IResult> ObtenerAsync(
+        Guid id, HttpContext ctx, [FromServices] MiParteDbContext db, CancellationToken ct)
+    {
+        if (!TryUsuario(ctx, out var userId)) return Results.Unauthorized();
+
+        // 404 tanto si no existe como si no eres miembro: no se revela la existencia.
+        var hogar = (await HogaresDelUsuario(db, userId, ct)).FirstOrDefault(h => h.Id == id);
+        return hogar is null ? Results.NotFound() : Results.Ok(hogar);
+    }
+
+    /// <summary>GET /api/hogares: hogares donde el usuario es miembro activo, ordenados por nombre. 401 sin claim "sub".</summary>
     private static async Task<IResult> ListarAsync(
         HttpContext ctx, [FromServices] MiParteDbContext db, CancellationToken ct)
     {
         if (!TryUsuario(ctx, out var userId)) return Results.Unauthorized();
 
-        var hogares = await db.Miembros.IgnoreQueryFilters()
-            .Where(m => m.UserId == userId && m.Activo)
-            .Join(db.Hogares.IgnoreQueryFilters(), m => m.HogarId, h => h.Id,
-                (_, h) => new HogarResumen(h.Id, h.Nombre))
-            .OrderBy(h => h.Nombre)
-            .ToListAsync(ct);
-
-        return Results.Ok(hogares);
+        return Results.Ok(await HogaresDelUsuario(db, userId, ct));
     }
 
+    /// <summary>
+    /// POST /api/hogares: crea un hogar y a su creador como miembro adulto y admin, con la semilla por
+    /// defecto, todo en una transacción. 400 si faltan nombres o superan la longitud máxima; 409 si el
+    /// usuario ya está en <see cref="MaxHogaresPorUsuario"/> hogares; 201 con el resumen del hogar.
+    /// </summary>
     private static async Task<IResult> CrearAsync(
         CrearHogarRequest req, HttpContext ctx, [FromServices] MiParteDbContext db, CancellationToken ct)
     {
@@ -59,21 +132,32 @@ public static class HogaresEndpoints
         if (actuales >= MaxHogaresPorUsuario)
             return Results.Conflict(new { error = $"Has alcanzado el máximo de {MaxHogaresPorUsuario} hogares." });
 
+        // El modelo EF solo conoce dos relaciones (las FK compuestas las aplica el SQL), así que no ordena
+        // los INSERT por padres e hijos: se guarda por etapas (hogar → miembro → perfiles → detalle y
+        // categorías) dentro de una transacción, y si algo falla se deshace todo. InMemory no admite transacciones.
+        await using var tx = db.Database.IsRelational() ? await db.Database.BeginTransactionAsync(ct) : null;
+
         var hogar = new Hogar { Id = Guid.NewGuid(), Nombre = nombreHogar };
         db.Hogares.Add(hogar);
-        db.Miembros.Add(new Miembro
+        await db.SaveChangesAsync(ct);
+        var creador = new Miembro
         {
             Id = Guid.NewGuid(),
             HogarId = hogar.Id,
             Nombre = nombreMiembro,
             Tipo = TipoMiembro.Adulto,
+            Rol = RolMiembro.Admin,
             UserId = userId,
-        });
-        await db.SaveChangesAsync(ct); // una sola transacción: o se crean ambos o ninguno
+        };
+        db.Miembros.Add(creador);
+        await db.SaveChangesAsync(ct);
+        await SemillaHogar.SembrarAsync(db, hogar.Id, creador.Id, ct); // perfiles y categorías por defecto, como crear_hogar en SQL
+        if (tx is not null) await tx.CommitAsync(ct);
 
         return Results.Created($"/api/hogares/{hogar.Id}", new HogarResumen(hogar.Id, hogar.Nombre));
     }
 
+    /// <summary>Obtiene el id del usuario autenticado del claim "sub"; false si falta o no es un GUID.</summary>
     private static bool TryUsuario(HttpContext ctx, out Guid userId)
         => Guid.TryParse(ctx.User.FindFirst("sub")?.Value, out userId);
 }

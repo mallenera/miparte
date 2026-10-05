@@ -8,8 +8,10 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace MiParte.Auth;
 
+/// <summary>Extensiones de registro de servicios de autenticación.</summary>
 public static class ServiceCollectionExtensions
 {
+    /// <summary>Algoritmos de firma asimétrica aceptados al validar con JWKS.</summary>
     private static readonly string[] AlgoritmosAsimetricos =
         [SecurityAlgorithms.RsaSha256, SecurityAlgorithms.EcdsaSha256];
 
@@ -17,6 +19,9 @@ public static class ServiceCollectionExtensions
     /// Autenticación con JWT de Supabase Auth. Falla cerrado: sin configuración
     /// ningún token es válido (pero la aplicación arranca).
     /// </summary>
+    /// <param name="services">Colección de servicios donde se registra la autenticación.</param>
+    /// <param name="config">Configuración de la que se lee la sección "Supabase".</param>
+    /// <returns>La misma colección de servicios, para encadenar llamadas.</returns>
     public static IServiceCollection AddSupabaseAuth(this IServiceCollection services, IConfiguration config)
     {
         services.Configure<SupabaseAuthOptions>(config.GetSection(SupabaseAuthOptions.Seccion));

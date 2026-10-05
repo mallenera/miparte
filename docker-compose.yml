@@ -1,14 +1,28 @@
+# Las variables se leen de .env (opcional, ver .env.example) o del entorno. Sin secretos en el repo.
 services:
   core:
     build:
       context: .
       dockerfile: src/Core/Dockerfile
     ports: ["5001:8080"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      Supabase__Url: ${Supabase__Url:-}
+      Supabase__JwtSecret: ${Supabase__JwtSecret:-}
+      ConnectionStrings__Default: ${ConnectionStrings__Default:-}
+      Cors__OrigenesPermitidos__0: ${Cors__OrigenesPermitidos__0:-}
   assistant:
     build:
       context: .
       dockerfile: src/Assistant/Dockerfile
     ports: ["5002:8080"]
+    # Sin env_file: el .env completo incluye la cadena de la base de datos, que solo debe llegar a Core.
+    environment:
+      Supabase__Url: ${Supabase__Url:-}
+      Supabase__JwtSecret: ${Supabase__JwtSecret:-}
+      Cors__OrigenesPermitidos__0: ${Cors__OrigenesPermitidos__0:-}
   web:
     build:
       context: .

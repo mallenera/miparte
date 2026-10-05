@@ -1,6 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using MiParte.Auth;
+using MiParte.Core.Api.Gastos;
 using MiParte.Core.Api.Hogares;
+using MiParte.Core.Api.Miembros;
+using MiParte.Core.Api.Reparto;
 using MiParte.Core.Infrastructure;
 using MiParte.Core.Infrastructure.Persistencia;
 
@@ -15,20 +19,56 @@ if (!string.IsNullOrWhiteSpace(connectionString))
     builder.Services.AddPersistencia(connectionString);
 }
 
+// CORS: orígenes en Cors:OrigenesPermitidos (env Cors__OrigenesPermitidos__0, ...).
+// Sin configuración no se permite ningún origen cruzado.
+var origenes = builder.Configuration.GetSection("Cors:OrigenesPermitidos").Get<string[]>()
+    ?.Where(o => !string.IsNullOrWhiteSpace(o)).Select(o => o.Trim().TrimEnd('/')).ToArray() ?? [];
+builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
+{
+    if (origenes.Length > 0)
+        p.WithOrigins(origenes)
+         .WithHeaders("Authorization", "Content-Type", HogarActualMiddleware.Cabecera)
+         .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
+}));
+
 var app = builder.Build();
 
+// Deja en el log qué espera la validación del JWT (sin secretos): ayuda a diagnosticar 401.
+var supabase = app.Services.GetRequiredService<IOptions<SupabaseAuthOptions>>().Value;
+app.Logger.LogInformation(
+    "Auth Supabase: emisor esperado = {Emisor}; modo = {Modo}",
+    supabase.EmisorEfectivo ?? "(sin configurar: ningún token será válido)",
+    string.IsNullOrWhiteSpace(supabase.JwtSecret) ? "JWKS (asimétrico)" : "HS256 (secreto legado)");
+if (!string.IsNullOrWhiteSpace(supabase.Url)
+    && !(Uri.TryCreate(supabase.Url, UriKind.Absolute, out var urlSupabase)
+         && (urlSupabase.Scheme == Uri.UriSchemeHttps || urlSupabase.Scheme == Uri.UriSchemeHttp)))
+{
+    app.Logger.LogError(
+        "Supabase__Url no es una URL absoluta ({Url}): debe ser https://<project-ref>.supabase.co. Ningún token será válido.",
+        supabase.Url);
+}
+
+app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<HogarActualMiddleware>();
 
 app.MapGet("/health", () => Results.Ok(new { service = "core", status = "ok" }));
 
-app.MapGet("/api/yo", (HttpContext ctx, [FromServices] IHogarActual hogar) =>
-        Results.Ok(new { userId = ctx.User.FindFirst("sub")?.Value, hogarId = hogar.HogarId }))
-    .RequireAuthorization();
-
 app.MapHogares();
+app.MapIngresos();
+app.MapGastos();
+app.MapGastosRecurrentes();
+app.MapLiquidacion();
+app.MapCategorias();
+app.MapPerfiles();
+app.MapMiembros();
 
 app.Run();
 
+/// <summary>
+/// Punto de entrada de Core.Api: configura autenticación Supabase, persistencia, CORS y el middleware
+/// de hogar actual, y registra los endpoints. La declaración parcial permite usarla desde los tests
+/// de integración (WebApplicationFactory).
+/// </summary>
 public partial class Program;

@@ -1,0 +1,47 @@
+# Configuración de la CLI de Supabase para Mi Parte, Tu Parte.
+# Las migraciones viven en supabase/migrations (el esquema es SQL, no EF).
+# Los secretos se leen de variables de entorno con env(...): nunca los escribas aquí.
+
+project_id = "miparte"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+
+[db]
+port = 54322
+# Debe coincidir con la versión de Postgres de tu proyecto en Supabase
+# (Settings → Infrastructure). La migración usa "unique nulls not distinct" (PG 15+).
+major_version = 17
+
+[db.migrations]
+enabled = true
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+# Origen del Web en local (src/Web, perfil http de launchSettings.json)
+site_url = "http://localhost:5211"
+additional_redirect_urls = [
+  "http://localhost:5211",
+  "https://localhost:7205",
+  "http://localhost:8080",
+]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+
+# Google es opcional: se activa con credenciales OAuth propias (Google Cloud Console).
+[auth.external.google]
+enabled = false
+client_id = "env(SUPABASE_AUTH_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_GOOGLE_SECRET)"
+skip_nonce_check = false

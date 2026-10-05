@@ -124,4 +124,92 @@ public class EsquemaPostgresTests
             Assert.Equal(userId, (await ctx.Miembros.SingleAsync()).UserId);
         }
     }
+
+    // --- Migración 20261005: roles, invitaciones, seed y RLS de miembro ---------------
+
+    private static async Task<NpgsqlConnection> AbrirAsync()
+    {
+        var conn = new NpgsqlConnection(Cadena);
+        await conn.OpenAsync();
+        return conn;
+    }
+
+    private static async Task<Guid> CrearUsuarioAsync(NpgsqlConnection conn)
+    {
+        var id = Guid.NewGuid();
+        await using var cmd = new NpgsqlCommand("insert into auth.users (id) values (@u)", conn);
+        cmd.Parameters.AddWithValue("u", id);
+        await cmd.ExecuteNonQueryAsync();
+        return id;
+    }
+
+    // Ejecuta SQL simulando al usuario (claim sub de la sesión, como hace auth_stub.sql).
+    private static async Task<object?> EscalarComoAsync(
+        NpgsqlConnection conn, NpgsqlTransaction tx, Guid usuario, string sql, params (string, object)[] ps)
+    {
+        await using (var set = new NpgsqlCommand("select set_config('request.jwt.claim.sub', @u, true)", conn, tx))
+        {
+            set.Parameters.AddWithValue("u", usuario.ToString());
+            await set.ExecuteNonQueryAsync();
+        }
+        await using var cmd = new NpgsqlCommand(sql, conn, tx);
+        foreach (var (n, v) in ps) cmd.Parameters.AddWithValue(n, v);
+        return await cmd.ExecuteScalarAsync();
+    }
+
+    [SkippableFact]
+    public async Task CrearHogar_DejaAdminYSembraPerfilesYCategorias()
+    {
+        Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
+
+        await using var conn = await AbrirAsync();
+        var user = await CrearUsuarioAsync(conn);
+        await using var tx = await conn.BeginTransactionAsync();
+
+        var hogar = (Guid)(await EscalarComoAsync(conn, tx, user,
+            "select public.crear_hogar('Casa seed', 'Ana')"))!;
+
+        Assert.Equal("admin", await EscalarComoAsync(conn, tx, user,
+            "select rol from public.miembro where hogar_id = @h", ("h", hogar)));
+        Assert.Equal(4L, await EscalarComoAsync(conn, tx, user,
+            "select count(*) from public.perfil_reparto where hogar_id = @h", ("h", hogar)));
+        Assert.Equal(6L, await EscalarComoAsync(conn, tx, user,
+            "select count(*) from public.categoria where hogar_id = @h and perfil_reparto_id is not null", ("h", hogar)));
+        Assert.Equal(1L, await EscalarComoAsync(conn, tx, user,
+            "select count(*) from public.perfil_reparto where hogar_id = @h and nombre = 'Individual' and modo = 'individual'", ("h", hogar)));
+        await tx.RollbackAsync();
+    }
+
+    [SkippableFact]
+    public async Task AceptarInvitacion_VinculaMiembro_YNoSePuedeReutilizar()
+    {
+        Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
+
+        await using var conn = await AbrirAsync();
+        var admin = await CrearUsuarioAsync(conn);
+        var invitado = await CrearUsuarioAsync(conn);
+        await using var tx = await conn.BeginTransactionAsync();
+
+        var hogar = (Guid)(await EscalarComoAsync(conn, tx, admin, "select public.crear_hogar('Casa inv', 'Ana')"))!;
+        var beto = Guid.NewGuid();
+        await EscalarComoAsync(conn, tx, admin,
+            "insert into public.miembro (id, hogar_id, nombre, tipo) values (@m, @h, 'Beto', 'adulto') returning id",
+            ("m", beto), ("h", hogar));
+
+        const string token = "token-de-prueba-123";
+        await EscalarComoAsync(conn, tx, admin,
+            "insert into public.invitacion_hogar (hogar_id, miembro_id, token_hash, caduca_en) " +
+            "values (@h, @m, encode(sha256(convert_to(@t, 'UTF8')), 'hex'), now() + interval '1 day') returning id",
+            ("h", hogar), ("m", beto), ("t", token));
+
+        var devuelto = (Guid)(await EscalarComoAsync(conn, tx, invitado,
+            "select public.aceptar_invitacion(@t, null)", ("t", token)))!;
+        Assert.Equal(hogar, devuelto);
+        Assert.Equal(invitado, await EscalarComoAsync(conn, tx, invitado,
+            "select user_id from public.miembro where id = @m", ("m", beto)));
+
+        await Assert.ThrowsAsync<PostgresException>(() => EscalarComoAsync(conn, tx, invitado,
+            "select public.aceptar_invitacion(@t, null)", ("t", token)));
+        await tx.RollbackAsync();
+    }
 }

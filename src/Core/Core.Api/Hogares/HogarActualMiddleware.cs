@@ -8,10 +8,17 @@ namespace MiParte.Core.Api.Hogares;
 /// miembro.user_id). Si el usuario pertenece a varios hogares debe indicar cuál con
 /// la cabecera X-Hogar-Id. Nunca se confía en un hogar que el usuario no tenga.
 /// </summary>
+/// <param name="next">Siguiente delegado del pipeline HTTP.</param>
 public class HogarActualMiddleware(RequestDelegate next)
 {
+    /// <summary>Nombre de la cabecera HTTP con la que el cliente elige hogar cuando pertenece a varios.</summary>
     public const string Cabecera = "X-Hogar-Id";
 
+    /// <summary>
+    /// Fija <see cref="HogarActual"/> para la petición autenticada y continúa el pipeline. Responde 400 si la
+    /// cabecera no es un GUID, 403 si el hogar no es del usuario y 409 si tiene varios hogares y no la envía.
+    /// Se omite en endpoints marcados con <see cref="SinHogarActual"/> y en peticiones anónimas.
+    /// </summary>
     public async Task InvokeAsync(HttpContext ctx)
     {
         var sub = ctx.User.FindFirst("sub")?.Value;
@@ -58,6 +65,7 @@ public class HogarActualMiddleware(RequestDelegate next)
         await next(ctx);
     }
 
+    /// <summary>Escribe una respuesta JSON de error { error } con el código HTTP indicado.</summary>
     private static Task Responder(HttpContext ctx, int status, string mensaje)
     {
         ctx.Response.StatusCode = status;

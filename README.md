@@ -36,7 +36,10 @@ El esquema vive en `supabase/migrations` (SQL); EF Core solo lo mapea, no genera
 
 Tests contra PostgreSQL real (opcionales en local, siempre activos en CI):
 ```
-psql -d miparte -f supabase/tests/auth_stub.sql -f supabase/migrations/20261004000000_esquema_inicial.sql
+psql -d miparte -v ON_ERROR_STOP=1 -f supabase/tests/auth_stub.sql || exit 1
+for f in supabase/migrations/*.sql; do   # todas, en orden; se detiene en el primer error
+  psql -d miparte -v ON_ERROR_STOP=1 -f "$f" || exit 1
+done
 MIPARTE_TEST_DB="Host=localhost;Database=miparte;Username=postgres;Password=..." dotnet test
 ```
 
@@ -54,3 +57,25 @@ deduce del usuario (`sub` → `miembro.user_id`); si pertenece a varios, se indi
 `GET /api/yo` devuelve el usuario y el hogar resueltos.
 
 
+
+## Configuración
+Copia `.env.example` a `.env` (ignorado por git) y rellena los valores; `docker compose` lo lee de forma opcional
+y pasa las variables a `core` y `assistant`. En local sin Docker, usa variables de entorno o `dotnet user-secrets`.
+
+| Variable | Uso |
+|---|---|
+| `Supabase__Url` | URL del proyecto Supabase. |
+| `Supabase__JwtSecret` | Opcional, solo secreto HS256 legado. |
+| `ConnectionStrings__Default` | Cadena del pooler de Supabase (ver formato en `.env.example`). |
+| `Cors__OrigenesPermitidos__0` | Origen del front permitido por CORS (aumentar el índice para más). |
+
+### Configuración del front (`src/Web/wwwroot/appsettings.json`)
+Blazor WASM lee este fichero en el navegador, así que **nunca** pongas secretos aquí. Rellena las claves
+(vienen vacías en el repo):
+
+| Clave | Valor |
+|---|---|
+| `Supabase:Url` | URL del proyecto Supabase. |
+| `Supabase:AnonKey` | Anon key (clave pública) de Supabase: Project Settings > API. |
+| `Api:CoreUrl` | URL base de Core.Api (p. ej. `http://localhost:5001`). |
+| `Api:AssistantUrl` | URL base de Assistant.Api (p. ej. `http://localhost:5002`). |

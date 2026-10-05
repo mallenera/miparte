@@ -1,0 +1,52 @@
+@* Envuelve las páginas que necesitan un hogar seleccionado: si aún no lo hay, pasa por el flujo de arranque. *@
+@implements IDisposable
+@inject EstadoHogar Hogar
+@inject ServicioArranque Arranque
+@inject NavigationManager Navegacion
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger" role="alert">
+        @_error
+        <button class="btn btn-link p-0 ms-2" @onclick="CargarAsync">Reintentar</button>
+    </div>
+}
+else if (Hogar.HogarActual is not null)
+{
+    @ChildContent
+}
+else
+{
+    <p>Cargando tu hogar…</p>
+}
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Hogar.Cambiado += AlCambiarHogar;
+        if (Hogar.HogarActual is null) await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        _error = null;
+        try
+        {
+            var destino = await Arranque.CargarAsync();
+            if (destino == DestinoArranque.SinHogar) Navegacion.NavigateTo("sin-hogar", replace: true);
+            else if (destino == DestinoArranque.ElegirHogar) Navegacion.NavigateTo("elegir-hogar", replace: true);
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+    }
+
+    private void AlCambiarHogar() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Hogar.Cambiado -= AlCambiarHogar;
+}

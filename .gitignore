@@ -10,3 +10,6 @@ TestResults/
 supabase/.temp/
 supabase/.branches/
 supabase/.env
+
+# Configuración local del front (URL y anon key de tu proyecto)
+src/Web/wwwroot/appsettings.Development.json

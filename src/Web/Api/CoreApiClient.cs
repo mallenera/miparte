@@ -5,7 +5,7 @@ using MiParte.Contracts;
 
 namespace MiParte.Web.Api;
 
-/// <summary>Cliente tipado de Core.Api. De momento solo cubre usuario y hogares; el resto se añadirá con cada pantalla.</summary>
+/// <summary>Cliente tipado de Core.Api. Cubre usuario, hogares, miembros, invitaciones, categorías y perfiles; el resto se añadirá con cada pantalla.</summary>
 public sealed class CoreApiClient
 {
     private readonly HttpClient _http;
@@ -30,7 +30,98 @@ public sealed class CoreApiClient
     public Task<HogarResumen> AceptarInvitacionAsync(AceptarInvitacionRequest peticion, CancellationToken ct = default) =>
         EnviarAsync<HogarResumen>(HttpMethod.Post, "api/invitaciones/aceptar", peticion, ct);
 
+    /// <summary>Miembros activos del hogar actual (<c>GET /api/miembros</c>); <c>EsYo</c> marca al usuario autenticado.</summary>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<List<MiembroDto>> ListarMiembrosAsync(CancellationToken ct = default) =>
+        ObtenerAsync<List<MiembroDto>>("api/miembros", ct);
+
+    /// <summary>Añade una persona sin cuenta (<c>POST /api/miembros</c>, solo admin).</summary>
+    /// <param name="peticion">Nombre, tipo y responsable (si es a cargo).</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<MiembroDto> CrearMiembroAsync(CrearMiembroRequest peticion, CancellationToken ct = default) =>
+        EnviarAsync<MiembroDto>(HttpMethod.Post, "api/miembros", peticion, ct);
+
+    /// <summary>Edita un miembro; los campos null no cambian (<c>PUT /api/miembros/{id}</c>).</summary>
+    /// <param name="id">Miembro a editar.</param>
+    /// <param name="peticion">Cambios.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<MiembroDto> ActualizarMiembroAsync(Guid id, ActualizarMiembroRequest peticion, CancellationToken ct = default) =>
+        EnviarAsync<MiembroDto>(HttpMethod.Put, $"api/miembros/{id}", peticion, ct);
+
+    /// <summary>Crea una invitación (<c>POST /api/invitaciones</c>, solo admin); el token solo se devuelve aquí.</summary>
+    /// <param name="peticion">Miembro existente al que vincular, o null para un nuevo adulto.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<InvitacionCreada> CrearInvitacionAsync(CrearInvitacionRequest peticion, CancellationToken ct = default) =>
+        EnviarAsync<InvitacionCreada>(HttpMethod.Post, "api/invitaciones", peticion, ct);
+
+    /// <summary>Categorías del hogar actual (<c>GET /api/categorias</c>).</summary>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<List<CategoriaDto>> ListarCategoriasAsync(CancellationToken ct = default) =>
+        ObtenerAsync<List<CategoriaDto>>("api/categorias", ct);
+
+    /// <summary>Crea una categoría (<c>POST /api/categorias</c>).</summary>
+    /// <param name="peticion">Nombre, categoría padre y perfil por defecto.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<CategoriaDto> CrearCategoriaAsync(GuardarCategoriaRequest peticion, CancellationToken ct = default) =>
+        EnviarAsync<CategoriaDto>(HttpMethod.Post, "api/categorias", peticion, ct);
+
+    /// <summary>Reemplaza todos los campos de una categoría (<c>PUT /api/categorias/{id}</c>).</summary>
+    /// <param name="id">Categoría a editar.</param>
+    /// <param name="peticion">Nuevos valores.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<CategoriaDto> GuardarCategoriaAsync(Guid id, GuardarCategoriaRequest peticion, CancellationToken ct = default) =>
+        EnviarAsync<CategoriaDto>(HttpMethod.Put, $"api/categorias/{id}", peticion, ct);
+
+    /// <summary>Elimina una categoría sin subcategorías ni gastos (<c>DELETE /api/categorias/{id}</c>).</summary>
+    /// <param name="id">Categoría a eliminar.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task EliminarCategoriaAsync(Guid id, CancellationToken ct = default) =>
+        EnviarSinRespuestaAsync(HttpMethod.Delete, $"api/categorias/{id}", ct);
+
+    /// <summary>Perfiles de reparto con su detalle (<c>GET /api/perfiles</c>).</summary>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<List<PerfilRepartoDto>> ListarPerfilesAsync(CancellationToken ct = default) =>
+        ObtenerAsync<List<PerfilRepartoDto>>("api/perfiles", ct);
+
+    /// <summary>Crea un perfil de reparto (<c>POST /api/perfiles</c>).</summary>
+    /// <param name="peticion">Nombre, modo y detalle.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<PerfilRepartoDto> CrearPerfilAsync(GuardarPerfilRequest peticion, CancellationToken ct = default) =>
+        EnviarAsync<PerfilRepartoDto>(HttpMethod.Post, "api/perfiles", peticion, ct);
+
+    /// <summary>Reemplaza nombre, modo y detalle de un perfil (<c>PUT /api/perfiles/{id}</c>).</summary>
+    /// <param name="id">Perfil a editar.</param>
+    /// <param name="peticion">Nuevos valores.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<PerfilRepartoDto> GuardarPerfilAsync(Guid id, GuardarPerfilRequest peticion, CancellationToken ct = default) =>
+        EnviarAsync<PerfilRepartoDto>(HttpMethod.Put, $"api/perfiles/{id}", peticion, ct);
+
+    /// <summary>Elimina un perfil que no esté en uso (<c>DELETE /api/perfiles/{id}</c>).</summary>
+    /// <param name="id">Perfil a eliminar.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task EliminarPerfilAsync(Guid id, CancellationToken ct = default) =>
+        EnviarSinRespuestaAsync(HttpMethod.Delete, $"api/perfiles/{id}", ct);
+
     private Task<T> ObtenerAsync<T>(string ruta, CancellationToken ct) => EnviarAsync<T>(HttpMethod.Get, ruta, null, ct);
+
+    private async Task EnviarSinRespuestaAsync(HttpMethod metodo, string ruta, CancellationToken ct)
+    {
+        using var peticion = new HttpRequestMessage(metodo, ruta);
+        HttpResponseMessage respuesta;
+        try
+        {
+            respuesta = await _http.SendAsync(peticion, ct);
+        }
+        catch (HttpRequestException)
+        {
+            throw new ApiException(HttpStatusCode.ServiceUnavailable, "No se pudo conectar con el servidor. Comprueba tu conexión.");
+        }
+
+        using (respuesta)
+        {
+            if (!respuesta.IsSuccessStatusCode) throw new ApiException(respuesta.StatusCode, await LeerErrorAsync(respuesta, ct));
+        }
+    }
 
     private async Task<T> EnviarAsync<T>(HttpMethod metodo, string ruta, object? cuerpo, CancellationToken ct)
     {

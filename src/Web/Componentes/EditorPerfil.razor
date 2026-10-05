@@ -1,0 +1,156 @@
+@* Formulario de un perfil de reparto (nuevo o existente) con un valor por adulto activo y validación previa. *@
+@using System.Globalization
+@inject CoreApiClient Api
+
+<form @onsubmit="GuardarAsync">
+    <div class="fields">
+        <label>Nombre
+            <input maxlength="100" @bind="_edicion.Nombre" @bind:event="oninput" />
+        </label>
+        <label>Modo de reparto
+            <select value="@_edicion.Modo" @onchange="AlCambiarModo">
+                @foreach (var m in ModosReparto.Todos)
+                {
+                    <option value="@m">@ModosReparto.Texto(m)</option>
+                }
+            </select>
+        </label>
+    </div>
+
+    @if (_edicion.Modo == ModosReparto.Ingresos)
+    {
+        <p class="muted">Cada adulto asume una parte proporcional a sus ingresos del mes del gasto. No lleva valores.</p>
+    }
+    else if (_edicion.Modo == ModosReparto.Individual)
+    {
+        <p class="muted">Lo asume por completo quien paga el gasto. No lleva valores.</p>
+    }
+    else
+    {
+        <div class="fields">
+            @foreach (var a in _adultos)
+            {
+                var id = a.Id;
+                <label>
+                    <span class="who"><Avatar Nombre="@a.Nombre" Color="@ColorMiembro.De(id, Miembros)" Tamano="sm" />@a.Nombre @(_edicion.Modo == ModosReparto.Porcentaje ? "(%)" : "(partes)")</span>
+                    <input type="number" inputmode="decimal" min="0" step="any" value="@Texto(id)"
+                           @oninput="e => Poner(id, e.Value?.ToString())" />
+                </label>
+            }
+        </div>
+        @if (_edicion.Modo == ModosReparto.Porcentaje)
+        {
+            <p class="sumline @(Math.Abs(_edicion.Suma - 100m) <= EdicionPerfil.Tolerancia ? "ok" : "bad")" role="status">
+                Suma: @_edicion.Suma.ToString("0.##") % @(Math.Abs(_edicion.Suma - 100m) <= EdicionPerfil.Tolerancia ? "✓" : "· debe ser 100")
+            </p>
+        }
+    }
+
+    @if (_error is not null)
+    {
+        <div class="aviso err" role="alert">@_error</div>
+    }
+    else if (_edicion.Error is { } aviso)
+    {
+        <p class="sumline bad">@aviso</p>
+    }
+
+    <div class="actions">
+        <button class="btn btn-sm" type="submit" disabled="@(_edicion.Error is not null || _enviando)">Guardar</button>
+        @if (Perfil is null)
+        {
+            <button class="linkbtn" type="button" @onclick="() => OnCancelar.InvokeAsync()">Cancelar</button>
+        }
+        else if (_confirmando)
+        {
+            <span class="muted">¿Eliminar el perfil?</span>
+            <button class="linkbtn danger" type="button" @onclick="EliminarAsync">Sí, eliminar</button>
+            <button class="linkbtn" type="button" @onclick="() => _confirmando = false">No</button>
+        }
+        else
+        {
+            <button class="linkbtn danger" type="button" @onclick="() => _confirmando = true">Eliminar</button>
+        }
+    </div>
+</form>
+
+@code {
+    /// <summary>Perfil a editar, o null para crear uno nuevo.</summary>
+    [Parameter] public PerfilRepartoDto? Perfil { get; set; }
+
+    /// <summary>Miembros activos del hogar; solo los adultos reciben valor.</summary>
+    [Parameter] public List<MiembroDto> Miembros { get; set; } = [];
+
+    /// <summary>Se invoca con el mensaje de confirmación tras guardar.</summary>
+    [Parameter] public EventCallback<string> OnGuardado { get; set; }
+
+    /// <summary>Se invoca con el mensaje de confirmación tras eliminar.</summary>
+    [Parameter] public EventCallback<string> OnEliminado { get; set; }
+
+    /// <summary>Se invoca al cancelar el alta de un perfil nuevo.</summary>
+    [Parameter] public EventCallback OnCancelar { get; set; }
+
+    private EdicionPerfil _edicion = new([]);
+    private List<MiembroDto> _adultos = [];
+    private string? _error;
+    private bool _enviando, _confirmando;
+
+    protected override void OnInitialized()
+    {
+        _adultos = Miembros.Where(m => m.Tipo == "adulto" && m.Activo).OrderBy(m => m.Nombre).ToList();
+        var ids = _adultos.Select(a => a.Id);
+        _edicion = Perfil is null ? new EdicionPerfil(ids) : EdicionPerfil.Desde(Perfil, ids);
+    }
+
+    private string Texto(Guid id) => _edicion.Valores.GetValueOrDefault(id).ToString(CultureInfo.InvariantCulture);
+
+    private void Poner(Guid id, string? texto)
+    {
+        _edicion.Valores[id] = decimal.TryParse(texto, NumberStyles.Number, CultureInfo.InvariantCulture, out var v) ? v : 0m;
+        _error = null;
+    }
+
+    private void AlCambiarModo(ChangeEventArgs e)
+    {
+        _edicion.CambiarModo(e.Value?.ToString() ?? ModosReparto.Partes);
+        _error = null;
+    }
+
+    private async Task GuardarAsync()
+    {
+        if (_edicion.Error is not null) return;
+        _enviando = true;
+        _error = null;
+        try
+        {
+            var peticion = _edicion.ARequest();
+            if (Perfil is null) await Api.CrearPerfilAsync(peticion);
+            else await Api.GuardarPerfilAsync(Perfil.Id, peticion);
+            await OnGuardado.InvokeAsync(Perfil is null ? "Perfil creado" : "Perfil guardado");
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+        finally
+        {
+            _enviando = false;
+        }
+    }
+
+    private async Task EliminarAsync()
+    {
+        if (Perfil is null) return;
+        _error = null;
+        try
+        {
+            await Api.EliminarPerfilAsync(Perfil.Id);
+            await OnEliminado.InvokeAsync("Perfil eliminado");
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+            _confirmando = false;
+        }
+    }
+}

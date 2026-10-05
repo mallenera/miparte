@@ -171,7 +171,7 @@ Total: 39 endpoints de negocio (4 hogares/yo, 6 miembros/invitaciones, 4 categor
 ```json
 {
   "id": "b0000000-0000-4000-8000-0000000000bb", "nombre": "Leo", "tipo": "a_cargo",
-  "responsableId": "b0000000-0000-4000-8000-0000000000aa", "activo": true, "rol": "miembro", "vinculado": false
+  "responsableId": "b0000000-0000-4000-8000-0000000000aa", "activo": true, "rol": "miembro", "vinculado": false, "esYo": false
 }
 ```
 
@@ -375,6 +375,7 @@ Error típico si se pasa de la deuda (409): `{ "error": "El importe supera la de
 - **Quién interviene**: pagador, ingresos y reparto solo se asignan a adultos activos. Los miembros `a_cargo` necesitan un responsable adulto activo.
 - **Recurrentes**: `diaMes` entre 1 y 28. `generar` es idempotente por mes y plantilla; una plantilla con gastos generados no se borra, se desactiva.
 - **Semilla al crear hogar**: 4 perfiles (`Proporcional a ingresos`, `Por partes`, `Porcentaje fijo`, `Individual`; el creador queda con 1 parte en "Por partes" y 100 % en "Porcentaje fijo") y 6 categorías (Hipoteca/Alquiler, Alimentación, Suministros y Gastos varios de casa con perfil de ingresos; Hijo con "Por partes"; Ocio personal con "Individual"). El creador es admin y adulto.
+- **Quién soy**: `MiembroDto.esYo` es `true` en el miembro vinculado al usuario autenticado (en `GET /api/miembros`, `PUT` y `DELETE`; el alta siempre devuelve `false`). El front lo usa para saber si mostrar los controles de admin y cuál es "su" miembro.
 - **Roles**: solo admin crea miembros e invitaciones y modifica a otros; el hogar siempre conserva al menos un admin activo y vinculado (409). Un adulto responsable de miembros a cargo activos no se puede desactivar (409).
 - **Invitaciones**: el `token` en claro solo se devuelve en la respuesta de `POST /api/invitaciones` (en base de datos solo se guarda su hash): mostrarlo o copiarlo en ese momento. Caduca a los 7 días (`caducaEn`) y es de un solo uso. Quien acepta no necesita hogar previo. Si la invitación apunta a un `miembroId`, ese miembro queda vinculado al usuario; si no, hay que enviar `nombre` y entra como adulto con rol `miembro`.
 - **Eliminaciones**: categorías y perfiles en uso devuelven 409; los miembros se desactivan, no se borran.

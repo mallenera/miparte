@@ -44,10 +44,11 @@ public static class MiembrosEndpoints
     public static string HashToken(string token)
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
 
-    /// <summary>Convierte un miembro en su DTO: tipo "adulto"/"a_cargo", rol "admin"/"miembro" y si está vinculado a un usuario.</summary>
-    private static MiembroDto ADto(Miembro m) => new(
+    /// <summary>Convierte un miembro en su DTO: tipo "adulto"/"a_cargo", rol "admin"/"miembro", si está vinculado a un usuario y si es el usuario autenticado (<paramref name="usuarioActual"/>).</summary>
+    private static MiembroDto ADto(Miembro m, Guid? usuarioActual = null) => new(
         m.Id, m.Nombre, m.Tipo == TipoMiembro.Adulto ? "adulto" : "a_cargo", m.ResponsableId, m.Activo,
-        m.Rol == RolMiembro.Admin ? "admin" : "miembro", m.UserId is not null);
+        m.Rol == RolMiembro.Admin ? "admin" : "miembro", m.UserId is not null,
+        usuarioActual is not null && m.UserId == usuarioActual);
 
     /// <summary>Obtiene el id del usuario autenticado del claim "sub"; false si falta o no es un GUID.</summary>
     private static bool TryUsuario(HttpContext ctx, out Guid userId)
@@ -66,7 +67,8 @@ public static class MiembrosEndpoints
         HttpContext ctx, [FromServices] MiParteDbContext db, CancellationToken ct)
     {
         var miembros = await db.Miembros.Where(m => m.Activo).OrderBy(m => m.Nombre).ToListAsync(ct);
-        return Results.Ok(miembros.Select(ADto).ToList());
+        var usuario = TryUsuario(ctx, out var userId) ? userId : (Guid?)null;
+        return Results.Ok(miembros.Select(m => ADto(m, usuario)).ToList());
     }
 
     /// <summary>
@@ -210,7 +212,7 @@ public static class MiembrosEndpoints
 
         await db.SaveChangesAsync(ct);
         if (tx is not null) await tx.CommitAsync(ct);
-        return Results.Ok(ADto(m));
+        return Results.Ok(ADto(m, userId));
     }
 
     /// <summary>DELETE /api/miembros/{id}: borrado lógico, equivale a PUT con activo=false (mismas reglas y códigos).</summary>

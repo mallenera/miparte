@@ -19,6 +19,7 @@ builder.Services.AddScoped<IAlmacenLocal, AlmacenLocalJs>();
 builder.Services.AddScoped<ServicioSesion>();
 builder.Services.AddScoped<EstadoHogar>();
 builder.Services.AddScoped<ServicioArranque>();
+builder.Services.AddScoped<ServicioAvisos>();
 builder.Services.AddScoped<ManejadorCoreApi>();
 
 // URLs vacías si falta configuración: la app arranca y las pantallas de acceso avisan de ello.

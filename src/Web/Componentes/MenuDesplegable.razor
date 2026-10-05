@@ -1,0 +1,39 @@
+@* Botón con menú desplegable. Cierra con Escape, al pulsar fuera o al elegir una opción (el contenido llama a Cerrar). *@
+<div class="dd" @onkeydown="AlPulsarTecla">
+    <button class="menubtn @ClaseBoton" type="button" aria-haspopup="menu" aria-expanded="@_abierto.ToString().ToLowerInvariant()"
+            aria-label="@Etiqueta" @onclick="Alternar">
+        @Boton
+    </button>
+    @if (_abierto)
+    {
+        <button class="menu-fondo" type="button" tabindex="-1" aria-hidden="true" @onclick="Cerrar"></button>
+        <div class="menu" role="menu" @onclick="Cerrar">
+            @ChildContent
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>Contenido del botón (etiqueta, valor, flecha).</summary>
+    [Parameter] public RenderFragment? Boton { get; set; }
+
+    /// <summary>Opciones del menú; cualquier clic dentro cierra el menú.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Texto accesible del botón.</summary>
+    [Parameter] public string Etiqueta { get; set; } = "";
+
+    /// <summary>Clase extra del botón (p. ej. "user").</summary>
+    [Parameter] public string? ClaseBoton { get; set; }
+
+    private bool _abierto;
+
+    private void Alternar() => _abierto = !_abierto;
+
+    private void Cerrar() => _abierto = false;
+
+    private void AlPulsarTecla(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") _abierto = false;
+    }
+}

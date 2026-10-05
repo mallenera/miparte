@@ -74,6 +74,18 @@ public class MiembrosTests
     }
 
     [Fact]
+    public async Task Listar_MarcaEsYoSoloEnElMiembroDelUsuarioAutenticado()
+    {
+        var s = await Crear();
+        using var _ = s.F;
+        await Sembrar(s.F, s.Hogar, null, "SinCuenta");
+
+        var lista = await Leer<List<MiembroDto>>(await s.ComoBeto.GetAsync("/api/miembros"));
+
+        Assert.Equal([s.BetoId], lista.Where(m => m.EsYo).Select(m => m.Id));
+    }
+
+    [Fact]
     public async Task SinToken_401()
     {
         using var f = AutenticacionTests.Crear(Secreto);

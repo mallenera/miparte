@@ -1,12 +1,105 @@
-﻿@inherits LayoutComponentBase
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject ServicioSesion Sesion
+@inject EstadoHogar Hogar
+@inject ServicioAvisos Avisos
+@inject NavigationManager Navegacion
 
-    <main>
-        <article class="content px-4">
-            @Body
-        </article>
+<div class="wrap">
+    <header class="top">
+        <Logotipo Lema="@(Hogar.HogarActual is null)" />
+        <AuthorizeView>
+            <Authorized>
+                <div class="right">
+                    @if (Hogar.HogarActual is { } actual)
+                    {
+                        <MenuDesplegable Etiqueta="@($"Cambiar de hogar. Hogar actual: {actual.Nombre}")">
+                            <Boton>
+                                <span class="mb-lab">Hogar</span>
+                                <span class="mb-val">@actual.Nombre</span>
+                                <span class="caret" aria-hidden="true">▾</span>
+                            </Boton>
+                            <ChildContent>
+                                @foreach (var h in Hogar.Hogares)
+                                {
+                                    var id = h.Id;
+                                    <button class="mitem" type="button" role="menuitemradio" aria-checked="@((id == actual.Id).ToString().ToLowerInvariant())"
+                                            @onclick="() => CambiarHogarAsync(id)">
+                                        <span class="tick" aria-hidden="true">@(id == actual.Id ? "✓" : "")</span>@h.Nombre
+                                    </button>
+                                }
+                                <div class="msep"></div>
+                                <a class="mitem" href="sin-hogar" role="menuitem">Crear otro hogar o unirme a uno</a>
+                            </ChildContent>
+                        </MenuDesplegable>
+                    }
+                    <MenuDesplegable Etiqueta="@($"Menú de usuario {context.User.Identity?.Name}")" ClaseBoton="user">
+                        <Boton>
+                            <Avatar Nombre="@(context.User.Identity?.Name ?? "?")" Color="0" />
+                            <span class="caret" aria-hidden="true">▾</span>
+                        </Boton>
+                        <ChildContent>
+                            <div class="mhead">Sesión iniciada como<b>@context.User.Identity?.Name</b></div>
+                            <div class="msep"></div>
+                            <button class="mitem" type="button" role="menuitem" @onclick="CerrarSesionAsync">Cerrar sesión</button>
+                        </ChildContent>
+                    </MenuDesplegable>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+    </header>
+
+    @if (Hogar.HogarActual is not null)
+    {
+        <AuthorizeView>
+            <Authorized>
+                <nav class="tabs" aria-label="Secciones">
+                    <NavLink class="tab" ActiveClass="active" href="" Match="NavLinkMatch.All">Resumen</NavLink>
+                    <span class="tab off" aria-disabled="true">Gastos<span class="soon">pronto</span></span>
+                    <NavLink class="tab" ActiveClass="active" href="hogar">Hogar</NavLink>
+                    <NavLink class="tab" ActiveClass="active" href="categorias">Categorías</NavLink>
+                    <span class="tab off" aria-disabled="true">Chat<span class="soon">pronto</span></span>
+                </nav>
+            </Authorized>
+        </AuthorizeView>
+    }
+
+    <main class="panel" tabindex="-1">
+        @* La clave recrea la página al cambiar de hogar para que recargue sus datos. *@
+        <div @key="Hogar.HogarActual?.Id">@Body</div>
     </main>
 </div>
+
+@if (Avisos.Texto is { } aviso)
+{
+    <div class="toast" role="status" aria-live="polite">@aviso</div>
+}
+
+@code {
+    protected override void OnInitialized()
+    {
+        Hogar.Cambiado += Refrescar;
+        Avisos.Cambiado += Refrescar;
+    }
+
+    private async Task CambiarHogarAsync(Guid id)
+    {
+        await Hogar.SeleccionarAsync(id);
+        Navegacion.NavigateTo("");
+    }
+
+    private async Task CerrarSesionAsync()
+    {
+        await Sesion.CerrarSesionAsync();
+        await Hogar.LimpiarAsync();
+        Navegacion.NavigateTo("login");
+    }
+
+    private void Refrescar() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Hogar.Cambiado -= Refrescar;
+        Avisos.Cambiado -= Refrescar;
+    }
+}

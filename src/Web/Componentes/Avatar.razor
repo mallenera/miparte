@@ -1,0 +1,17 @@
+@* Avatar de miembro: color + inicial (paleta de 8 tonos --m0..--m7 de app.css). *@
+<span class="av @Clase" aria-hidden="true" style="background: var(--m@(Color % 8)); color: var(--m@(Color % 8)-on)">@Inicial</span>
+
+@code {
+    /// <summary>Nombre del que se toma la inicial.</summary>
+    [Parameter] public string Nombre { get; set; } = "";
+
+    /// <summary>Índice de color 0-7.</summary>
+    [Parameter] public int Color { get; set; }
+
+    /// <summary>Variante de tamaño: "sm" o "lg"; vacío para el tamaño normal.</summary>
+    [Parameter] public string? Tamano { get; set; }
+
+    private string Inicial => string.IsNullOrWhiteSpace(Nombre) ? "?" : char.ToUpperInvariant(Nombre.Trim()[0]).ToString();
+
+    private string Clase => Tamano ?? "";
+}

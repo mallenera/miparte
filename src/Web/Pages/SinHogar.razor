@@ -71,6 +71,8 @@
 
     private async Task EjecutarAsync(Func<Task<HogarResumen>> accion)
     {
+        // Enter y clic seguidos lanzarían dos altas: el botón deshabilitado no frena el envío con teclado.
+        if (_enviando) return;
         _enviando = true;
         _error = null;
         try

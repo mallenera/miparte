@@ -141,8 +141,17 @@ public sealed class CoreApiClient
         using (respuesta)
         {
             if (!respuesta.IsSuccessStatusCode) throw new ApiException(respuesta.StatusCode, await LeerErrorAsync(respuesta, ct));
-            return await respuesta.Content.ReadFromJsonAsync<T>(ct)
-                   ?? throw new ApiException(HttpStatusCode.BadGateway, "Respuesta vacía del servidor.");
+            try
+            {
+                return await respuesta.Content.ReadFromJsonAsync<T>(ct)
+                       ?? throw new ApiException(HttpStatusCode.BadGateway, "Respuesta vacía del servidor.");
+            }
+            catch (Exception e) when (e is JsonException or NotSupportedException)
+            {
+                // Típico de un Api:CoreUrl que apunta a otra cosa (p. ej. al propio front, que responde con index.html).
+                throw new ApiException(HttpStatusCode.BadGateway,
+                    "El servidor no ha respondido con datos válidos. Comprueba que Api:CoreUrl apunta a Core.Api y que está en marcha.");
+            }
         }
     }
 

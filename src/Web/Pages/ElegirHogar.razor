@@ -1,0 +1,56 @@
+@page "/elegir-hogar"
+@attribute [Authorize]
+@inject EstadoHogar Hogar
+@inject ServicioArranque Arranque
+@inject NavigationManager Navegacion
+
+<PageTitle>Elegir hogar · Mi Parte, Tu Parte</PageTitle>
+
+<div class="mx-auto" style="max-width: 32rem;">
+    <h1 class="h3 mb-3">¿Con qué hogar quieres trabajar?</h1>
+
+    @if (_error is not null)
+    {
+        <div class="alert alert-danger" role="alert">@_error</div>
+    }
+
+    @if (!Hogar.Cargado)
+    {
+        <p>Cargando tus hogares…</p>
+    }
+    else
+    {
+        <div class="list-group mb-3">
+            @foreach (var h in Hogar.Hogares)
+            {
+                <button class="list-group-item list-group-item-action" @onclick="() => ElegirAsync(h.Id)">@h.Nombre</button>
+            }
+        </div>
+        <a href="sin-hogar">Crear otro hogar o unirme a uno</a>
+    }
+</div>
+
+@code {
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Hogar.Cargado) return;
+        try
+        {
+            var destino = await Arranque.CargarAsync();
+            if (destino == DestinoArranque.SinHogar) Navegacion.NavigateTo("sin-hogar", replace: true);
+            else if (destino == DestinoArranque.Listo) Navegacion.NavigateTo("", replace: true);
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+    }
+
+    private async Task ElegirAsync(Guid id)
+    {
+        await Hogar.SeleccionarAsync(id);
+        Navegacion.NavigateTo("");
+    }
+}

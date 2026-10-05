@@ -43,10 +43,12 @@ public class AutenticacionTests
             b.ConfigureServices(s =>
             {
                 s.RemoveAll<DbContextOptions<MiParteDbContext>>();
-                // EF Core 9+: la configuración de Npgsql se acumula aparte y hay que quitarla para cambiar de proveedor.
-#pragma warning disable EF1001 // IDbContextOptionsConfiguration es API interna, pero es la vía documentada
-                s.RemoveAll<Microsoft.EntityFrameworkCore.Internal.IDbContextOptionsConfiguration<MiParteDbContext>>();
-#pragma warning restore EF1001
+                // EF Core 9+: la configuración de Npgsql se acumula en IDbContextOptionsConfiguration<T> (tipo interno)
+                // y hay que quitarla para cambiar de proveedor; se busca por nombre para no depender de su namespace.
+                foreach (var d in s.Where(x => x.ServiceType.IsGenericType
+                                               && x.ServiceType.Name.StartsWith("IDbContextOptionsConfiguration")
+                                               && x.ServiceType.GenericTypeArguments[0] == typeof(MiParteDbContext)).ToList())
+                    s.Remove(d);
                 s.AddDbContext<MiParteDbContext>(o => o.UseInMemoryDatabase(bd));
                 if (claves is not null) s.Replace(ServiceDescriptor.Singleton(claves));
                 s.AddSingleton<IStartupFilter, EndpointExigeHogarFilter>();

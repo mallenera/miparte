@@ -119,8 +119,8 @@ public static class RecurrentesEndpoints
         var fin = inicio.AddMonths(1);
 
         // Dos peticiones simultáneas pueden leer lo mismo y generar duplicados: el índice único
-        // gasto_recurrente_mes_uq lo impide y aquí se trata el conflicto reintentando una vez.
-        // En el reintento ya se ven los gastos de la otra petición, así que no queda nada pendiente.
+        // gasto_recurrente_mes_uq lo impide y aquí se trata el conflicto reintentando (hasta 3 veces).
+        // En cada reintento se vuelven a leer los gastos, que ya incluyen los de la otra petición.
         for (var intento = 0; ; intento++)
         {
             var plantillas = await db.GastosRecurrentes.Where(r => r.Activo).OrderBy(r => r.DiaMes).ThenBy(r => r.Id).ToListAsync(ct);
@@ -155,7 +155,7 @@ public static class RecurrentesEndpoints
                 {
                     await db.SaveChangesAsync(ct);
                 }
-                catch (DbUpdateException ex) when (intento == 0 && EsUnicidadViolada(ex))
+                catch (DbUpdateException ex) when (intento < 3 && EsUnicidadViolada(ex))
                 {
                     // Otra petición generó alguno antes: se descartan los cambios y se recalcula.
                     db.ChangeTracker.Clear();

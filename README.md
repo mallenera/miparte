@@ -36,8 +36,10 @@ El esquema vive en `supabase/migrations` (SQL); EF Core solo lo mapea, no genera
 
 Tests contra PostgreSQL real (opcionales en local, siempre activos en CI):
 ```
-psql -d miparte -f supabase/tests/auth_stub.sql
-for f in supabase/migrations/*.sql; do psql -d miparte -v ON_ERROR_STOP=1 -f "$f"; done   # todas, en orden
+psql -d miparte -v ON_ERROR_STOP=1 -f supabase/tests/auth_stub.sql || exit 1
+for f in supabase/migrations/*.sql; do   # todas, en orden; se detiene en el primer error
+  psql -d miparte -v ON_ERROR_STOP=1 -f "$f" || exit 1
+done
 MIPARTE_TEST_DB="Host=localhost;Database=miparte;Username=postgres;Password=..." dotnet test
 ```
 

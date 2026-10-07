@@ -56,7 +56,6 @@ app.UseMiddleware<HogarActualMiddleware>();
 app.MapGet("/health", () => Results.Ok(new { service = "core", status = "ok" }));
 
 app.MapHogares();
-app.MapIngresos();
 app.MapGastos();
 app.MapGastosRecurrentes();
 app.MapLiquidacion();

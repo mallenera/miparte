@@ -6,7 +6,7 @@ using MiParte.Core.Infrastructure.Persistencia;
 
 namespace MiParte.Core.Api.Reparto;
 
-/// <summary>Endpoints de perfiles de reparto del hogar (porcentaje, partes, ingresos o individual).</summary>
+/// <summary>Endpoints de perfiles de reparto del hogar (porcentaje, partes, cuenta común o individual).</summary>
 public static class PerfilesEndpoints
 {
     /// <summary>Longitud máxima del nombre de un perfil.</summary>
@@ -25,12 +25,12 @@ public static class PerfilesEndpoints
         return app;
     }
 
-    /// <summary>Convierte el modo de reparto al texto usado en la API (porcentaje, partes, ingresos o individual).</summary>
+    /// <summary>Convierte el modo de reparto al texto usado en la API (porcentaje, partes, cuenta_comun o individual).</summary>
     internal static string ModoATexto(ModoReparto m) => m switch
     {
         ModoReparto.Porcentaje => "porcentaje",
         ModoReparto.Partes => "partes",
-        ModoReparto.Ingresos => "ingresos",
+        ModoReparto.CuentaComun => "cuenta_comun",
         _ => "individual",
     };
 
@@ -41,7 +41,7 @@ public static class PerfilesEndpoints
         {
             case "porcentaje": modo = ModoReparto.Porcentaje; return true;
             case "partes": modo = ModoReparto.Partes; return true;
-            case "ingresos": modo = ModoReparto.Ingresos; return true;
+            case "cuenta_comun": modo = ModoReparto.CuentaComun; return true;
             case "individual": modo = ModoReparto.Individual; return true;
             default: modo = default; return false;
         }
@@ -137,7 +137,7 @@ public static class PerfilesEndpoints
     /// <summary>Respuesta 400 con el mensaje de error indicado.</summary>
     private static IResult Mal(string msg) => Results.BadRequest(new { error = msg });
 
-    /// <summary>Valida el cuerpo y devuelve nombre normalizado, modo y detalle, o el resultado de error. Ingresos e individual no admiten detalle; porcentaje y partes exigen adultos activos sin repetir y valores no negativos, con porcentajes que suman 100 o alguna parte mayor que 0. El nombre no puede repetirse.</summary>
+    /// <summary>Valida el cuerpo y devuelve nombre normalizado, modo y detalle, o el resultado de error. Cuenta común e individual no admiten detalle; porcentaje y partes exigen adultos activos sin repetir y valores no negativos, con porcentajes que suman 100 o alguna parte mayor que 0. El nombre no puede repetirse.</summary>
     private static async Task<(IResult? Error, string? Nombre, ModoReparto Modo, IReadOnlyList<PerfilDetalleDto>? Detalle)> ValidarAsync(
         GuardarPerfilRequest req, Guid? idActual, MiParteDbContext db, CancellationToken ct)
     {
@@ -146,10 +146,10 @@ public static class PerfilesEndpoints
         if (nombre.Length > MaxLongitudNombre)
             return (Mal($"El nombre admite como máximo {MaxLongitudNombre} caracteres."), null, default, null);
         if (!TryModo(req.Modo, out var modo))
-            return (Mal("Modo no válido: use porcentaje, partes, ingresos o individual."), null, default, null);
+            return (Mal("Modo no válido: use porcentaje, partes, cuenta_comun o individual."), null, default, null);
 
         var detalle = req.Detalle ?? [];
-        if (modo is ModoReparto.Ingresos or ModoReparto.Individual)
+        if (modo is ModoReparto.CuentaComun or ModoReparto.Individual)
         {
             if (detalle.Count > 0)
                 return (Mal($"El modo {ModoATexto(modo)} no lleva detalle."), null, default, null);

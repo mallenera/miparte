@@ -1,22 +1,32 @@
 {
-  "name": "MiParte.Web",
-  "short_name": "MiParte.Web",
+  "name": "Mi parte, tu parte",
+  "short_name": "Mi parte",
+  "description": "Los gastos del hogar, cada uno con su parte",
+  "lang": "es",
   "id": "./",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#03173d",
+  "background_color": "#FBF5EF",
+  "theme_color": "#7A1F33",
   "prefer_related_applications": false,
   "icons": [
     {
       "src": "icon-512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any"
     },
     {
       "src": "icon-192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
     }
   ]
 }

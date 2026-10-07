@@ -2,10 +2,15 @@
 @attribute [Authorize]
 @inject EstadoHogar Hogar
 
-<PageTitle>Mi Parte, Tu Parte</PageTitle>
+<PageTitle>Resumen · Mi parte, tu parte</PageTitle>
 
 <RequiereHogar>
-    <h1>@Hogar.HogarActual!.Nombre</h1>
-    <p>Gastos e ingresos del hogar con reparto y liquidación mensual.</p>
-    <p class="text-muted">Las pantallas de miembros, gastos y liquidación llegarán en las siguientes fases.</p>
+    <section class="card">
+        <h1 class="page-title">@Hogar.HogarActual!.Nombre</h1>
+        <p class="muted">El resumen del mes y la liquidación llegarán en la siguiente fase.</p>
+        <div class="actions">
+            <a class="btn" href="hogar">Miembros y reparto</a>
+            <a class="btn btn-ghost" href="categorias">Categorías</a>
+        </div>
+    </section>
 </RequiereHogar>

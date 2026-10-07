@@ -9,8 +9,8 @@ namespace MiParte.Core.Api.Hogares;
 /// </summary>
 public static class SemillaHogar
 {
-    /// <summary>Nombre del perfil de reparto proporcional a ingresos.</summary>
-    public const string PerfilIngresos = "Proporcional a ingresos";
+    /// <summary>Nombre del perfil de reparto a cargo de la cuenta común (sin reparto entre personas).</summary>
+    public const string PerfilCuentaComun = "Cuenta común";
 
     /// <summary>Nombre del perfil de reparto por partes.</summary>
     public const string PerfilPartes = "Por partes";
@@ -24,10 +24,10 @@ public static class SemillaHogar
     /// <summary>Categoría de ejemplo y nombre del perfil de reparto por defecto.</summary>
     public static readonly IReadOnlyList<(string Categoria, string Perfil)> Categorias =
     [
-        ("Hipoteca/Alquiler", PerfilIngresos),
-        ("Alimentación", PerfilIngresos),
-        ("Suministros", PerfilIngresos),
-        ("Gastos varios de casa", PerfilIngresos),
+        ("Hipoteca/Alquiler", PerfilPartes),
+        ("Alimentación", PerfilPartes),
+        ("Suministros", PerfilPartes),
+        ("Gastos varios de casa", PerfilPartes),
         ("Hijo", PerfilPartes),
         ("Ocio personal", PerfilIndividual),
     ];
@@ -48,13 +48,13 @@ public static class SemillaHogar
             return p;
         }
 
-        var ingresos = Perfil(PerfilIngresos, ModoReparto.Ingresos);
+        var cuentaComun = Perfil(PerfilCuentaComun, ModoReparto.CuentaComun);
         var partes = Perfil(PerfilPartes, ModoReparto.Partes);
         var porcentaje = Perfil(PerfilPorcentaje, ModoReparto.Porcentaje);
         var individual = Perfil(PerfilIndividual, ModoReparto.Individual);
         var porNombre = new Dictionary<string, PerfilReparto>
         {
-            [PerfilIngresos] = ingresos, [PerfilPartes] = partes,
+            [PerfilCuentaComun] = cuentaComun, [PerfilPartes] = partes,
             [PerfilPorcentaje] = porcentaje, [PerfilIndividual] = individual,
         };
 

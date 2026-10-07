@@ -8,8 +8,9 @@ namespace MiParte.Contracts;
 /// <param name="Activo">Si el miembro está activo en el hogar.</param>
 /// <param name="Rol">Rol en el hogar: "admin" o "miembro".</param>
 /// <param name="Vinculado">Si el miembro está vinculado a un usuario con cuenta.</param>
+/// <param name="EsYo">Si el miembro es el usuario autenticado que hace la petición (se informa en GET, PUT y DELETE; en el alta es false).</param>
 public record MiembroDto(
-    Guid Id, string Nombre, string Tipo, Guid? ResponsableId, bool Activo, string Rol, bool Vinculado);
+    Guid Id, string Nombre, string Tipo, Guid? ResponsableId, bool Activo, string Rol, bool Vinculado, bool EsYo = false);
 
 /// <summary>Alta de una persona sin cuenta. Un "a_cargo" necesita ResponsableId (adulto activo del hogar).</summary>
 /// <param name="Nombre">Nombre de la persona (máximo 100 caracteres).</param>

@@ -1,0 +1,311 @@
+@* Pestaña Hogar: miembros, invitaciones y perfiles de reparto del hogar actual. *@
+@inject CoreApiClient Api
+@inject EstadoHogar Hogar
+@inject ServicioAvisos Avisos
+@inject IJSRuntime JS
+
+<h1 class="sr">Hogar @Hogar.HogarActual?.Nombre</h1>
+
+@if (_cargando)
+{
+    <div class="spinbox" role="status"><div class="spin"></div><span>Cargando el hogar…</span></div>
+}
+else if (_errorCarga is not null)
+{
+    <div class="aviso err" role="alert">
+        @_errorCarga
+        <button class="linkbtn" type="button" @onclick="CargarAsync">Reintentar</button>
+    </div>
+}
+else
+{
+    <div class="cols-even">
+        <section class="card" aria-labelledby="t-miembros">
+            <div class="card-head">
+                <h2 id="t-miembros">Miembros de @Hogar.HogarActual?.Nombre</h2>
+                <span class="tag">@(_miembros.Count) @(_miembros.Count == 1 ? "persona" : "personas")</span>
+            </div>
+            @if (_errorMiembros is not null)
+            {
+                <div class="aviso err" role="alert">@_errorMiembros</div>
+            }
+            <div class="mlist">
+                @foreach (var m in _miembros)
+                {
+                    var miembro = m;
+                    <div class="mrow">
+                        <Avatar Nombre="@miembro.Nombre" Color="@ColorMiembro.De(miembro.Id, _miembros)" Tamano="lg" />
+                        @if (_renombrando == miembro.Id)
+                        {
+                            <form class="renombrar" @onsubmit="() => GuardarNombreAsync(miembro)">
+                                <label class="sr" for="nombre-@miembro.Id">Nombre de @miembro.Nombre</label>
+                                <input id="nombre-@miembro.Id" maxlength="100" @bind="_nombreNuevo" @bind:event="oninput" />
+                                <button class="btn btn-sm" type="submit" disabled="@(string.IsNullOrWhiteSpace(_nombreNuevo))">Guardar</button>
+                                <button class="linkbtn" type="button" @onclick="() => _renombrando = null">Cancelar</button>
+                            </form>
+                        }
+                        else
+                        {
+                            <div class="mname">
+                                <strong>@miembro.Nombre</strong>
+                                @if (miembro.EsYo) { <span class="tag cur">Tú</span> }
+                                @if (miembro.Rol == "admin") { <span class="tag admin">Admin</span> }
+                                @if (miembro.Tipo == "a_cargo") { <span class="tag">A cargo</span> }
+                                else if (!miembro.Vinculado) { <span class="tag off">Sin cuenta</span> }
+                            </div>
+                            <div class="mmeta">
+                                @if (miembro.Tipo == "a_cargo" && miembro.ResponsableId is { } resp)
+                                {
+                                    <span>Responsable: @NombreDe(resp)</span>
+                                }
+                            </div>
+                            <div class="macc">
+                                @if (_confirmandoDesactivar == miembro.Id)
+                                {
+                                    <span class="muted">¿Desactivar a @miembro.Nombre?</span>
+                                    <button class="linkbtn danger" type="button" @onclick="() => DesactivarAsync(miembro)">Sí, desactivar</button>
+                                    <button class="linkbtn" type="button" @onclick="() => _confirmandoDesactivar = null">Cancelar</button>
+                                }
+                                else
+                                {
+                                    @if (EsAdmin || miembro.EsYo)
+                                    {
+                                        <button class="linkbtn" type="button" aria-label="Renombrar a @miembro.Nombre"
+                                                @onclick="() => EmpezarRenombrar(miembro)">Renombrar</button>
+                                    }
+                                    @if (EsAdmin && miembro.Tipo == "adulto" && miembro.Vinculado && !miembro.EsYo)
+                                    {
+                                        <button class="linkbtn" type="button" @onclick="() => CambiarRolAsync(miembro)">
+                                            @(miembro.Rol == "admin" ? "Quitar admin" : "Hacer admin")
+                                        </button>
+                                    }
+                                    @if (EsAdmin && miembro.Tipo == "adulto" && !miembro.Vinculado)
+                                    {
+                                        <button class="linkbtn" type="button" aria-label="Invitar a @miembro.Nombre"
+                                                @onclick="() => InvitarAsync(miembro.Id)">Invitar</button>
+                                    }
+                                    @if (EsAdmin && !miembro.EsYo)
+                                    {
+                                        <button class="linkbtn danger" type="button" aria-label="Desactivar a @miembro.Nombre"
+                                                @onclick="() => _confirmandoDesactivar = miembro.Id">Desactivar</button>
+                                    }
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            @if (EsAdmin)
+            {
+                <form class="addm" @onsubmit="AnadirMiembroAsync">
+                    <label>Nombre
+                        <input maxlength="100" placeholder="Nombre de la persona" @bind="_nuevoNombre" @bind:event="oninput" />
+                    </label>
+                    <label>Tipo
+                        <select @bind="_nuevoTipo">
+                            <option value="adulto">Adulto</option>
+                            <option value="a_cargo">A cargo</option>
+                        </select>
+                    </label>
+                    @if (_nuevoTipo == "a_cargo")
+                    {
+                        <label>Responsable
+                            <select @bind="_nuevoResponsable">
+                                <option value="">Elige un adulto…</option>
+                                @foreach (var a in Adultos)
+                                {
+                                    <option value="@a.Id">@a.Nombre</option>
+                                }
+                            </select>
+                        </label>
+                    }
+                    <button class="btn" type="submit" disabled="@(string.IsNullOrWhiteSpace(_nuevoNombre) || (_nuevoTipo == "a_cargo" && string.IsNullOrEmpty(_nuevoResponsable)))">Añadir</button>
+                </form>
+            }
+            else
+            {
+                <p class="muted" style="margin-top: 14px">Solo un administrador puede añadir o desactivar miembros.</p>
+            }
+        </section>
+
+        <div class="card-stack">
+            <section class="card" id="card-invite" aria-labelledby="t-invitar">
+                <h2 id="t-invitar">Invitar a alguien con cuenta</h2>
+                <p class="muted">Genera un código de un solo uso que caduca a los 7 días. Quien lo reciba lo pega en «Unirme con una invitación».</p>
+                @if (_errorInvitacion is not null)
+                {
+                    <div class="aviso err" role="alert" style="margin-top: 12px">@_errorInvitacion</div>
+                }
+                @if (_invitacion is { } inv)
+                {
+                    <div class="invite" role="status">
+                        <span class="lab2">Código@(_invitacionPara is null ? "" : " para " + _invitacionPara)</span>
+                        <code class="token" id="token-invitacion">@inv.Token</code>
+                        <div class="aviso warn">Cópialo ahora: por seguridad no se vuelve a mostrar. Caduca el @inv.CaducaEn.ToLocalTime().ToString("dd/MM/yyyy HH:mm").</div>
+                        <div class="actions" style="margin-top: 0">
+                            <button class="btn btn-sm" type="button" @onclick="CopiarAsync">Copiar código</button>
+                            <button class="linkbtn" type="button" @onclick="OcultarInvitacion">Cerrar aviso</button>
+                        </div>
+                    </div>
+                }
+                <div class="actions">
+                    <button class="btn btn-orange" type="button" disabled="@(!EsAdmin || _creandoInvitacion)" @onclick="() => InvitarAsync(null)">
+                        @(_invitacion is null ? "Invitar miembro" : "Generar otro código")
+                    </button>
+                    @if (!EsAdmin)
+                    {
+                        <span class="muted">Solo un administrador puede invitar.</span>
+                    }
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <PanelPerfiles Perfiles="_perfiles" Miembros="_miembros" OnCambiado="CargarSinParpadeoAsync" />
+}
+
+@code {
+    private List<MiembroDto> _miembros = [];
+    private List<PerfilRepartoDto> _perfiles = [];
+    private bool _cargando = true;
+    private string? _errorCarga, _errorMiembros, _errorInvitacion;
+
+    private Guid? _renombrando, _confirmandoDesactivar;
+    private string _nombreNuevo = "";
+
+    private string _nuevoNombre = "", _nuevoTipo = "adulto", _nuevoResponsable = "";
+
+    private InvitacionCreada? _invitacion;
+    private string? _invitacionPara;
+    private bool _creandoInvitacion;
+
+    private bool EsAdmin => _miembros.FirstOrDefault(m => m.EsYo)?.Rol == "admin";
+
+    private IEnumerable<MiembroDto> Adultos => _miembros.Where(m => m.Tipo == "adulto" && m.Activo);
+
+    protected override Task OnInitializedAsync() => CargarAsync();
+
+    private string NombreDe(Guid id) => _miembros.FirstOrDefault(m => m.Id == id)?.Nombre ?? "—";
+
+    private async Task CargarAsync()
+    {
+        _cargando = true;
+        _errorCarga = null;
+        await CargarSinParpadeoAsync();
+        _cargando = false;
+    }
+
+    private async Task CargarSinParpadeoAsync()
+    {
+        try
+        {
+            var miembros = Api.ListarMiembrosAsync();
+            var perfiles = Api.ListarPerfilesAsync();
+            await Task.WhenAll(miembros, perfiles);
+            _miembros = miembros.Result;
+            _perfiles = perfiles.Result;
+        }
+        catch (ApiException e)
+        {
+            _errorCarga = e.Message;
+        }
+    }
+
+    private void EmpezarRenombrar(MiembroDto m)
+    {
+        _renombrando = m.Id;
+        _nombreNuevo = m.Nombre;
+        _errorMiembros = null;
+    }
+
+    private Task GuardarNombreAsync(MiembroDto m) =>
+        EjecutarMiembroAsync(async () =>
+        {
+            await Api.ActualizarMiembroAsync(m.Id, new ActualizarMiembroRequest(Nombre: _nombreNuevo.Trim()));
+            _renombrando = null;
+            return "Nombre actualizado";
+        });
+
+    private Task CambiarRolAsync(MiembroDto m) =>
+        EjecutarMiembroAsync(async () =>
+        {
+            await Api.ActualizarMiembroAsync(m.Id, new ActualizarMiembroRequest(Rol: m.Rol == "admin" ? "miembro" : "admin"));
+            return m.Rol == "admin" ? $"{m.Nombre} ya no es admin" : $"{m.Nombre} ahora es admin";
+        });
+
+    private Task DesactivarAsync(MiembroDto m) =>
+        EjecutarMiembroAsync(async () =>
+        {
+            await Api.ActualizarMiembroAsync(m.Id, new ActualizarMiembroRequest(Activo: false));
+            _confirmandoDesactivar = null;
+            return $"{m.Nombre} desactivado";
+        });
+
+    private Task AnadirMiembroAsync() =>
+        EjecutarMiembroAsync(async () =>
+        {
+            Guid? responsable = _nuevoTipo == "a_cargo" && Guid.TryParse(_nuevoResponsable, out var r) ? r : null;
+            await Api.CrearMiembroAsync(new CrearMiembroRequest(_nuevoNombre.Trim(), _nuevoTipo, responsable));
+            var nombre = _nuevoNombre.Trim();
+            _nuevoNombre = "";
+            _nuevoResponsable = "";
+            return $"{nombre} añadido";
+        });
+
+    /// <summary>Ejecuta una operación sobre miembros, recarga la lista y muestra el aviso o el error de la API.</summary>
+    private async Task EjecutarMiembroAsync(Func<Task<string>> accion)
+    {
+        _errorMiembros = null;
+        try
+        {
+            var aviso = await accion();
+            await CargarSinParpadeoAsync();
+            Avisos.Mostrar(aviso);
+        }
+        catch (ApiException e)
+        {
+            _errorMiembros = e.Message;
+        }
+    }
+
+    private async Task InvitarAsync(Guid? miembroId)
+    {
+        _errorInvitacion = null;
+        _creandoInvitacion = true;
+        try
+        {
+            _invitacion = await Api.CrearInvitacionAsync(new CrearInvitacionRequest(miembroId));
+            _invitacionPara = miembroId is { } id ? NombreDe(id) : null;
+            Avisos.Mostrar("Invitación creada");
+        }
+        catch (ApiException e)
+        {
+            _errorInvitacion = e.Message;
+        }
+        finally
+        {
+            _creandoInvitacion = false;
+        }
+    }
+
+    private async Task CopiarAsync()
+    {
+        if (_invitacion is null) return;
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _invitacion.Token);
+            Avisos.Mostrar("Código copiado");
+        }
+        catch (JSException)
+        {
+            Avisos.Mostrar("Selecciona el código y cópialo con Ctrl+C");
+        }
+    }
+
+    private void OcultarInvitacion()
+    {
+        _invitacion = null;
+        _invitacionPara = null;
+    }
+}

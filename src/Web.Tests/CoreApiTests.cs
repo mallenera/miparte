@@ -93,6 +93,20 @@ public class CoreApiTests
     }
 
     [Fact]
+    public async Task Una_respuesta_que_no_es_json_se_convierte_en_ApiException_en_vez_de_romper()
+    {
+        // Api:CoreUrl apuntando al propio front: responde 200 con index.html.
+        var servidor = new ManejadorFalso(_ => new HttpResponseMessage(HttpStatusCode.OK)
+            { Content = new StringContent("<!DOCTYPE html><html></html>", System.Text.Encoding.UTF8, "text/html") });
+        var (api, _, _) = await Crear(servidor);
+
+        var e = await Assert.ThrowsAsync<ApiException>(() => api.YoAsync());
+
+        Assert.Equal(HttpStatusCode.BadGateway, e.Codigo);
+        Assert.Contains("Api:CoreUrl", e.Message);
+    }
+
+    [Fact]
     public async Task El_arranque_aplica_yo_al_estado_del_hogar()
     {
         var casa = new HogarResumen(Guid.NewGuid(), "Casa");

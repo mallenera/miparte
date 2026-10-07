@@ -1,0 +1,289 @@
+@* Pestaña Gastos: gastos del mes con su reparto, alta y edición. El servidor calcula el reparto según el perfil. *@
+@using System.Globalization
+@inject CoreApiClient Api
+@inject EstadoHogar Hogar
+@inject ServicioAvisos Avisos
+
+<h1 class="sr">Gastos de @Hogar.HogarActual?.Nombre</h1>
+
+@if (_cargando)
+{
+    <div class="spinbox" role="status"><div class="spin"></div><span>Cargando gastos…</span></div>
+}
+else if (_errorCarga is not null)
+{
+    <div class="aviso err" role="alert">
+        @_errorCarga
+        <button class="linkbtn" type="button" @onclick="CargarAsync">Reintentar</button>
+    </div>
+}
+else
+{
+    <section class="card" aria-labelledby="t-gastos">
+        <div class="card-head">
+            <h2 id="t-gastos">Gastos</h2>
+            <div class="mesnav">
+                <button class="linkbtn" type="button" aria-label="Mes anterior" @onclick="() => CambiarMesAsync(-1)">‹</button>
+                <span class="tag cur" aria-live="polite">@NombreMes</span>
+                <button class="linkbtn" type="button" aria-label="Mes siguiente" @onclick="() => CambiarMesAsync(1)">›</button>
+            </div>
+        </div>
+        <p class="muted">Total del mes: <b>@Euros(_gastos.Sum(g => g.Importe))</b> en @_gastos.Count @(_gastos.Count == 1 ? "gasto" : "gastos").</p>
+
+        @if (_error is not null)
+        {
+            <div class="aviso err" role="alert" style="margin-top: 12px">@_error</div>
+        }
+
+        <div style="margin-top: 10px">
+            @foreach (var g in _gastos)
+            {
+                <div class="gastorow">
+                    <div class="g-main">
+                        <div class="g-concepto">@(string.IsNullOrWhiteSpace(g.Concepto) ? NombreCategoria(g.CategoriaId) : g.Concepto)</div>
+                        <div class="muted g-meta">
+                            @g.Fecha.ToString("dd/MM/yyyy", Es) · @NombreCategoria(g.CategoriaId) · paga @NombreMiembro(g.PagadoPor)
+                            @if (g.GastoRecurrenteId is not null) { <span class="tag off">recurrente</span> }
+                        </div>
+                        <div class="g-reparto">
+                            @if (g.ACargoCuentaComun)
+                            {
+                                <span class="tag cur">Cuenta común: sin reparto entre personas</span>
+                            }
+                            @foreach (var r in g.Repartos)
+                            {
+                                <span class="chip"><Avatar Nombre="@NombreMiembro(r.MiembroId)" Color="@ColorDe(r.MiembroId)" Tamano="sm" />@Euros(r.ImporteAsumido)</span>
+                            }
+                        </div>
+                    </div>
+                    <div class="g-importe">@Euros(g.Importe)</div>
+                    <div class="c-acc">
+                        @if (_confirmandoEliminar == g.Id)
+                        {
+                            <span class="muted">¿Eliminar?</span>
+                            <button class="linkbtn danger" type="button" @onclick="() => EliminarAsync(g)">Sí</button>
+                            <button class="linkbtn" type="button" @onclick="() => _confirmandoEliminar = null">No</button>
+                        }
+                        else
+                        {
+                            <button class="linkbtn" type="button" aria-label="Editar gasto @g.Concepto" @onclick="() => EmpezarEdicion(g)">Editar</button>
+                            <button class="linkbtn danger" type="button" aria-label="Eliminar gasto @g.Concepto" @onclick="() => _confirmandoEliminar = g.Id">Eliminar</button>
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (_gastos.Count == 0)
+            {
+                <div class="empty">No hay gastos en este mes. Añade el primero abajo.</div>
+            }
+        </div>
+
+        @if (_adultos.Count == 0 || _categorias.Count == 0 || _perfiles.Count == 0)
+        {
+            <div class="aviso warn" style="margin-top: 14px">Para registrar gastos hace falta al menos un adulto, una categoría y un perfil de reparto.</div>
+        }
+        else
+        {
+            <form class="addcat" @onsubmit="GuardarAsync">
+                <h3 style="flex: 1 1 100%; margin: 0">@(_editando is null ? "Nuevo gasto" : "Editar gasto")</h3>
+                <label>Fecha
+                    <input type="date" required @bind="_fecha" />
+                </label>
+                <label>Importe (€)
+                    <input inputmode="decimal" required placeholder="0,00" @bind="_importe" @bind:event="oninput" />
+                </label>
+                <label>Categoría
+                    <select @bind="_categoria" @bind:after="AlCambiarCategoria">
+                        @foreach (var n in _arbol)
+                        {
+                            <option value="@n.Categoria.Id">@(new string(' ', n.Nivel * 3))@n.Categoria.Nombre</option>
+                        }
+                    </select>
+                </label>
+                <label>Paga
+                    <select @bind="_pagador">
+                        @foreach (var m in _adultos)
+                        {
+                            <option value="@m.Id">@m.Nombre</option>
+                        }
+                    </select>
+                </label>
+                <label>Reparto
+                    <select @bind="_perfil">
+                        @foreach (var p in _perfiles)
+                        {
+                            <option value="@p.Id">@p.Nombre</option>
+                        }
+                    </select>
+                </label>
+                <label>Concepto
+                    <input maxlength="200" placeholder="Opcional" @bind="_concepto" @bind:event="oninput" />
+                </label>
+                <button class="btn" type="submit" disabled="@(!ImporteValido)">@(_editando is null ? "Añadir" : "Guardar")</button>
+                @if (_editando is not null)
+                {
+                    <button class="linkbtn" type="button" @onclick="CancelarEdicion">Cancelar</button>
+                }
+            </form>
+        }
+    </section>
+}
+
+@code {
+    private static readonly CultureInfo Es = new("es-ES");
+
+    private List<GastoResponse> _gastos = [];
+    private List<MiembroDto> _miembros = [], _adultos = [];
+    private List<CategoriaDto> _categorias = [];
+    private List<PerfilRepartoDto> _perfiles = [];
+    private List<NodoCategoria> _arbol = [];
+    private bool _cargando = true;
+    private string? _errorCarga, _error;
+    private DateOnly _mes = new(DateTime.Today.Year, DateTime.Today.Month, 1);
+
+    private Guid? _editando, _confirmandoEliminar;
+    private DateOnly _fecha = DateOnly.FromDateTime(DateTime.Today);
+    private string _importe = "", _concepto = "";
+    private Guid _categoria, _pagador, _perfil;
+
+    private string NombreMes => _mes.ToString("MMMM yyyy", Es);
+
+    private bool ImporteValido => TryImporte(out _);
+
+    protected override Task OnInitializedAsync() => CargarAsync();
+
+    private async Task CargarAsync()
+    {
+        _cargando = true;
+        _errorCarga = null;
+        try
+        {
+            var miembros = Api.ListarMiembrosAsync();
+            var categorias = Api.ListarCategoriasAsync();
+            var perfiles = Api.ListarPerfilesAsync();
+            await Task.WhenAll(miembros, categorias, perfiles);
+            _miembros = miembros.Result;
+            _adultos = _miembros.Where(m => m.Tipo == "adulto" && m.Activo).ToList();
+            _categorias = categorias.Result;
+            _perfiles = perfiles.Result;
+            _arbol = ArbolCategorias.Aplanar(_categorias);
+            await RecargarGastosAsync();
+            ReiniciarFormulario();
+        }
+        catch (ApiException e)
+        {
+            _errorCarga = e.Message;
+        }
+
+        _cargando = false;
+    }
+
+    private async Task RecargarGastosAsync() =>
+        _gastos = (await Api.ListarGastosAsync(_mes.ToString("yyyy-MM", CultureInfo.InvariantCulture)))
+            .OrderByDescending(g => g.Fecha).ToList();
+
+    private async Task CambiarMesAsync(int delta)
+    {
+        _mes = _mes.AddMonths(delta);
+        _error = null;
+        _confirmandoEliminar = null;
+        if (_editando is not null) ReiniciarFormulario();
+        try
+        {
+            await RecargarGastosAsync();
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+    }
+
+    private string NombreMiembro(Guid id) => _miembros.FirstOrDefault(m => m.Id == id)?.Nombre ?? "—";
+
+    private int ColorDe(Guid id) => ColorMiembro.De(id, _miembros);
+
+    private string NombreCategoria(Guid id) => _categorias.FirstOrDefault(c => c.Id == id)?.Nombre ?? "—";
+
+    private static string Euros(decimal importe) => importe.ToString("C2", Es);
+
+    private bool TryImporte(out decimal valor) =>
+        decimal.TryParse(_importe.Trim().Replace(',', '.'), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out valor)
+        && valor > 0 && decimal.Round(valor, 2) == valor;
+
+    private void ReiniciarFormulario()
+    {
+        _editando = null;
+        _importe = "";
+        _concepto = "";
+        _categoria = _arbol.Count > 0 ? _arbol[0].Categoria.Id : Guid.Empty;
+        _pagador = (_adultos.FirstOrDefault(m => m.EsYo) ?? _adultos.FirstOrDefault())?.Id ?? Guid.Empty;
+        _perfil = _perfiles.FirstOrDefault()?.Id ?? Guid.Empty;
+        AlCambiarCategoria();
+    }
+
+    /// <summary>Al elegir una categoría se propone su perfil de reparto por defecto.</summary>
+    private void AlCambiarCategoria()
+    {
+        if (_editando is null && _categorias.FirstOrDefault(c => c.Id == _categoria)?.PerfilRepartoId is { } p) _perfil = p;
+    }
+
+    private void EmpezarEdicion(GastoResponse g)
+    {
+        _editando = g.Id;
+        _fecha = g.Fecha;
+        _importe = g.Importe.ToString(CultureInfo.InvariantCulture);
+        _categoria = g.CategoriaId;
+        _pagador = g.PagadoPor;
+        _perfil = g.PerfilRepartoId;
+        _concepto = g.Concepto ?? "";
+        _error = null;
+    }
+
+    private void CancelarEdicion() => ReiniciarFormulario();
+
+    private Task GuardarAsync() =>
+        EjecutarAsync(async () =>
+        {
+            if (!TryImporte(out var importe)) throw new ApiException(System.Net.HttpStatusCode.BadRequest, "Introduce un importe mayor que 0 con máximo 2 decimales.");
+            var peticion = new GastoRequest(_fecha, importe, _categoria, _pagador, _perfil,
+                string.IsNullOrWhiteSpace(_concepto) ? null : _concepto.Trim());
+            if (_editando is { } id)
+            {
+                await Api.GuardarGastoAsync(id, peticion);
+                ReiniciarFormulario();
+                return "Gasto guardado";
+            }
+
+            await Api.CrearGastoAsync(peticion);
+            _importe = "";
+            _concepto = "";
+            return "Gasto añadido";
+        });
+
+    private Task EliminarAsync(GastoResponse g) =>
+        EjecutarAsync(async () =>
+        {
+            await Api.EliminarGastoAsync(g.Id);
+            _confirmandoEliminar = null;
+            if (_editando == g.Id) ReiniciarFormulario();
+            return "Gasto eliminado";
+        });
+
+    /// <summary>Ejecuta una operación, recarga el mes y muestra el aviso; los errores de la API salen en pantalla.</summary>
+    private async Task EjecutarAsync(Func<Task<string>> accion)
+    {
+        _error = null;
+        try
+        {
+            var aviso = await accion();
+            await RecargarGastosAsync();
+            Avisos.Mostrar(aviso);
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+            _confirmandoEliminar = null;
+        }
+    }
+}

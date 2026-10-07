@@ -2,7 +2,7 @@ using MiParte.Core.Domain.Entidades;
 
 namespace MiParte.Core.Domain;
 
-/// <summary>Valor de un miembro para el reparto: porcentaje, partes o ingresos del mes, según el modo.</summary>
+/// <summary>Valor de un miembro para el reparto: porcentaje o partes, según el modo.</summary>
 public sealed record MiembroReparto(Guid MiembroId, decimal Valor);
 
 /// <summary>Importe que asume un miembro de un gasto.</summary>
@@ -13,7 +13,7 @@ public static class RepartoMiembros
 {
     /// <summary>
     /// Reparte un importe entre N miembros según el modo. Porcentaje y Partes usan el valor como peso;
-    /// Ingresos usa los ingresos del mes (si todos son 0, a partes iguales); Individual asigna el 100%
+    /// Individual asigna el 100%
     /// a quien paga. Redondeo a 2 decimales y el último miembro absorbe el céntimo sobrante.
     /// </summary>
     public static IReadOnlyList<ParteAsumida> Repartir(
@@ -27,7 +27,11 @@ public static class RepartoMiembros
         if (modo == ModoReparto.Individual && miembros.All(m => m.MiembroId != pagadoPor))
             throw new ArgumentException("Quien paga debe ser uno de los miembros.", nameof(pagadoPor));
 
-        // Hogar monopersonal: 100% para el único miembro, sea cual sea el modo.
+        // Antes del caso monopersonal: la cuenta común nunca se reparte entre personas.
+        if (modo == ModoReparto.CuentaComun)
+            throw new ArgumentException("Un gasto de la cuenta común no se reparte entre personas.", nameof(modo));
+
+        // Hogar monopersonal: 100% para el único miembro, salvo cuenta común.
         if (miembros.Count == 1) return [new ParteAsumida(miembros[0].MiembroId, importe)];
 
         IReadOnlyList<decimal> pesos;
@@ -37,13 +41,6 @@ public static class RepartoMiembros
                 if (miembros.All(m => m.MiembroId != pagadoPor))
                     throw new ArgumentException("Quien paga debe ser uno de los miembros.", nameof(pagadoPor));
                 pesos = miembros.Select(m => m.MiembroId == pagadoPor ? 1m : 0m).ToList();
-                break;
-            case ModoReparto.Ingresos:
-                if (miembros.Any(m => m.Valor < 0))
-                    throw new ArgumentException("Los ingresos no pueden ser negativos.", nameof(miembros));
-                pesos = miembros.All(m => m.Valor == 0)
-                    ? miembros.Select(_ => 1m).ToList()
-                    : miembros.Select(m => m.Valor).ToList();
                 break;
             case ModoReparto.Porcentaje:
             case ModoReparto.Partes:

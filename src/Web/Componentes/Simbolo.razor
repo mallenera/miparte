@@ -1,0 +1,12 @@
+@* Símbolo de la marca: dos mitades desiguales (60/40) giradas 45°. Los colores salen de app.css (modo oscuro incluido). *@
+<svg class="logo" width="@Tamano" height="@Tamano" viewBox="0 0 100 100" aria-hidden="true">
+    <g transform="rotate(45 50 50)">
+        <path class="h1" d="M42 11 A33 33 0 0 0 42 77 Z"></path>
+        <path class="h2" d="M48 14 A40 40 0 0 1 48 94 Z"></path>
+    </g>
+</svg>
+
+@code {
+    /// <summary>Lado en píxeles (16 como mínimo según la guía de marca).</summary>
+    [Parameter] public int Tamano { get; set; } = 40;
+}

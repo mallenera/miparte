@@ -20,15 +20,13 @@ public record ResumenMiembroDto(Guid MiembroId, string Nombre, decimal Pagado, d
 public record ResumenCategoriaDto(
     Guid CategoriaId, string Nombre, decimal Total, IReadOnlyList<ImporteMiembroDto> PorMiembro);
 
-/// <summary>GET /api/resumen?mes=YYYY-MM. Queda = ingresos - gastos.</summary>
+/// <summary>GET /api/resumen?mes=YYYY-MM.</summary>
 /// <param name="Mes">Mes consultado, en formato YYYY-MM.</param>
-/// <param name="IngresosTotales">Suma de los ingresos del mes.</param>
 /// <param name="GastosTotales">Suma de los gastos del mes.</param>
-/// <param name="Queda">Ingresos totales menos gastos totales; puede ser negativo.</param>
 /// <param name="Miembros">Pagado y asumido por cada miembro.</param>
 /// <param name="Categorias">Total y desglose por categoría.</param>
 public record ResumenMensualResponse(
-    string Mes, decimal IngresosTotales, decimal GastosTotales, decimal Queda,
+    string Mes, decimal GastosTotales,
     IReadOnlyList<ResumenMiembroDto> Miembros, IReadOnlyList<ResumenCategoriaDto> Categorias);
 
 /// <summary>Saldo positivo = le deben; negativo = debe. Ya descuenta los pagos registrados.</summary>

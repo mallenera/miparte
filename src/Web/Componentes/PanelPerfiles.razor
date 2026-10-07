@@ -1,0 +1,73 @@
+@* Perfiles de reparto del hogar: lista desplegable con edición y alta de uno nuevo. *@
+@inject ServicioAvisos Avisos
+
+<section class="card" aria-labelledby="t-perfiles">
+    <div class="card-head">
+        <h2 id="t-perfiles">Perfiles de reparto</h2>
+        <button class="btn btn-ghost btn-sm" type="button" @onclick="() => _nuevo = !_nuevo">
+            @(_nuevo ? "Cancelar" : "Nuevo perfil")
+        </button>
+    </div>
+    <p class="muted">Cómo se reparte un gasto entre los adultos; con «cuenta común» el gasto no se reparte ni genera deuda. Cada categoría puede llevar uno por defecto. Cambiar un perfil no modifica los gastos ya registrados.</p>
+
+    @if (_nuevo)
+    {
+        <div class="invite">
+            <h3 style="margin-top: 0">Nuevo perfil</h3>
+            <EditorPerfil Perfil="null" Miembros="Miembros" OnGuardado="AlGuardar" OnCancelar="() => _nuevo = false" />
+        </div>
+    }
+
+    @foreach (var p in Perfiles)
+    {
+        var perfil = p;
+        <div class="prof @(_abierto == perfil.Id ? "abierto" : "")">
+            <button class="prof-sum" type="button" aria-expanded="@((_abierto == perfil.Id).ToString().ToLowerInvariant())" @onclick="() => Alternar(perfil.Id)">
+                <span class="pn">@perfil.Nombre</span>
+                <span class="tag">@ModosReparto.Texto(perfil.Modo)</span>
+                <span class="psum">
+                    @foreach (var d in perfil.Detalle)
+                    {
+                        var miembro = Miembros.FirstOrDefault(m => m.Id == d.MiembroId);
+                        <span class="who"><Avatar Nombre="@(miembro?.Nombre ?? "?")" Color="@ColorMiembro.De(d.MiembroId, Miembros)" Tamano="sm" />@(miembro?.Nombre ?? "—") @d.Valor.ToString("0.##")@(perfil.Modo == ModosReparto.Porcentaje ? " %" : "")</span>
+                    }
+                </span>
+            </button>
+            <div class="pbody">
+                @if (_abierto == perfil.Id)
+                {
+                    <EditorPerfil Perfil="perfil" Miembros="Miembros" OnGuardado="AlGuardar" OnEliminado="AlGuardar" />
+                }
+            </div>
+        </div>
+    }
+
+    @if (Perfiles.Count == 0)
+    {
+        <div class="empty">Todavía no hay perfiles. Crea el primero con «Nuevo perfil».</div>
+    }
+</section>
+
+@code {
+    /// <summary>Perfiles del hogar con su detalle.</summary>
+    [Parameter] public List<PerfilRepartoDto> Perfiles { get; set; } = [];
+
+    /// <summary>Miembros activos del hogar (los adultos reparten; todos dan color al avatar).</summary>
+    [Parameter] public List<MiembroDto> Miembros { get; set; } = [];
+
+    /// <summary>Se invoca tras crear, editar o eliminar un perfil para que el padre recargue.</summary>
+    [Parameter] public EventCallback OnCambiado { get; set; }
+
+    private Guid? _abierto;
+    private bool _nuevo;
+
+    private void Alternar(Guid id) => _abierto = _abierto == id ? null : id;
+
+    private async Task AlGuardar(string mensaje)
+    {
+        _nuevo = false;
+        _abierto = null;
+        Avisos.Mostrar(mensaje);
+        await OnCambiado.InvokeAsync();
+    }
+}

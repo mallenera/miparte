@@ -4,14 +4,14 @@
 @inject ServicioArranque Arranque
 @inject NavigationManager Navegacion
 
-<PageTitle>Elegir hogar · Mi Parte, Tu Parte</PageTitle>
+<PageTitle>Elegir hogar · Mi parte, tu parte</PageTitle>
 
-<div class="mx-auto" style="max-width: 32rem;">
-    <h1 class="h3 mb-3">¿Con qué hogar quieres trabajar?</h1>
+<div class="auth ancho">
+    <h1 class="page-title">¿Con qué hogar quieres trabajar?</h1>
 
     @if (_error is not null)
     {
-        <div class="alert alert-danger" role="alert">@_error</div>
+        <div class="aviso err" role="alert">@_error</div>
     }
 
     @if (!Hogar.Cargado)
@@ -20,12 +20,24 @@
     }
     else
     {
-        <div class="list-group mb-3">
+        <ul class="hogar-list">
             @foreach (var h in Hogar.Hogares)
             {
-                <button class="list-group-item list-group-item-action" @onclick="() => ElegirAsync(h.Id)">@h.Nombre</button>
+                var id = h.Id;
+                <li>
+                    <button class="hcard" type="button" @onclick="() => ElegirAsync(id)">
+                        <h3>
+                            @h.Nombre
+                            @if (Hogar.HogarActual?.Id == id)
+                            {
+                                <span class="tag cur">Hogar actual</span>
+                            }
+                        </h3>
+                        <span class="btn btn-ghost btn-sm" aria-hidden="true">Entrar</span>
+                    </button>
+                </li>
             }
-        </div>
+        </ul>
         <a href="sin-hogar">Crear otro hogar o unirme a uno</a>
     }
 </div>

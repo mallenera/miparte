@@ -4,7 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Proyecto
 
-"Mi Parte, Tu Parte": app web de gastos e ingresos del hogar con reparto (porcentaje, partes, ingresos), liquidación mensual y chatbot con IA. Proyecto fin de máster. Código, esquema SQL y comentarios están en español; mantén esa convención (nombres de dominio como `Hogar`, `Miembro`, `Gasto`, `PerfilReparto`).
+"Mi Parte, Tu Parte": app web de gastos e ingresos del hogar con reparto (individual, porcentajes, partes, cuenta común), liquidación mensual y chatbot con IA. Proyecto fin de máster. Código, esquema SQL y comentarios están en español; mantén esa convención (nombres de dominio como `Hogar`, `Miembro`, `Gasto`, `PerfilReparto`).
+
+## Documentación y reglas
+
+Toda la documentación de producto está en `docs/`; empieza por `docs/README.md` (índice, jerarquía de fuentes y **tabla de estado diseño frente a código**):
+
+- `docs/diseno-y-decisiones.md`: objetivo, MVP, reglas de reparto, cuenta común, chatbot, decisiones D1-D7, plan y riesgos.
+- `docs/modelo-de-datos.md`: tablas, relaciones e invariantes (la fuente de verdad sigue siendo `supabase/migrations`).
+- `docs/marca.md`: logotipo, paleta y tipografía. `docs/referencia/` guarda la maqueta interactiva y la hoja de identidad originales.
+- `docs/api.md`: contrato HTTP de Core.Api.
+
+Si el código y el diseño chocan, manda el código; si te apartas del diseño a propósito, refleja el cambio en `docs/README.md`. Las reglas por área están en `.claude/rules/` (idioma y documentación, dominio de reparto, base de datos, Core.Api, front y marca, tests); varias se cargan solo al tocar las rutas que indican.
 
 ## Comandos
 
@@ -40,26 +51,29 @@ MIPARTE_TEST_DB="Host=localhost;Database=miparte;Username=postgres;Password=..."
 
 ## Arquitectura
 
-- `src/Web`: Blazor WASM (PWA), front independiente. Lee `wwwroot/appsettings.json` (`Supabase:Url`, `Supabase:AnonKey`, `Api:CoreUrl`; nunca secretos). Los DTOs compartidos viven en `src/Contracts`. Ya tiene la base: login/registro contra Supabase Auth por REST (`Autenticacion/`, sesión en `localStorage`, renovación automática), `ManejadorCoreApi` (pone `Authorization` y `X-Hogar-Id`; un 401 descarta la sesión), `CoreApiClient` (de momento `/api/yo`, crear hogar, aceptar invitación), `EstadoHogar`/`ServicioArranque` (flujo de arranque de `docs/api.md` §2) y páginas Login, Registro, SinHogar, ElegirHogar y Home. Las páginas que necesitan hogar se envuelven en `<RequiereHogar>`; las protegidas llevan `[Authorize]`. Faltan las pantallas de negocio (miembros, categorías, perfiles, ingresos, gastos, recurrentes, liquidación). Tests en `src/Web.Tests` (xUnit, sin bUnit aún).
+- `src/Web`: Blazor WASM (PWA), front independiente. Lee `wwwroot/appsettings.json` (`Supabase:Url`, `Supabase:AnonKey`, `Api:CoreUrl`; nunca secretos). Los DTOs compartidos viven en `src/Contracts`. Ya tiene la base: login/registro contra Supabase Auth por REST (`Autenticacion/`, sesión en `localStorage`, renovación automática), `ManejadorCoreApi` (pone `Authorization` y `X-Hogar-Id`; un 401 descarta la sesión), `CoreApiClient` (usuario, hogares, miembros, invitaciones, categorías y perfiles), `EstadoHogar`/`ServicioArranque` (flujo de arranque de `docs/api.md` §2) y páginas Login, Registro, SinHogar, ElegirHogar, Home, Hogar (miembros, invitaciones, perfiles de reparto), Categorías y Gastos (lista por mes con reparto, alta, edición y borrado). Las páginas que necesitan hogar se envuelven en `<RequiereHogar>` y delegan en un componente `Vista*` que carga sus datos; las protegidas llevan `[Authorize]`. Faltan recurrentes, resumen y liquidación (los ingresos ya no se guardan: ver abajo). Tests en `src/Web.Tests` (xUnit + bUnit; `ApiFalsa` simula Core.Api).
+  - **Imagen de marca** (detalle en `docs/marca.md`): burdeos `#7A1F33` principal, naranja `#E8742A` acento, crema `#FBF5EF` fondo, tinta `#24161A`; Fraunces solo en logotipo y titulares grandes, Manrope en toda la interfaz; modo oscuro propio; el nombre en el logotipo va siempre en minúsculas. Los tokens están en `wwwroot/css/app.css` (no hay Bootstrap). Cada miembro tiene color + inicial (`--m0..--m7`, `Avatar` y `ColorMiembro`, derivado del orden por id porque la API no guarda color). Los colores de estado (ok/err/warn) nunca son burdeos ni naranja y siempre llevan texto o signo. Iconos PWA generados desde el símbolo del logo.
+  - `MiembroDto.EsYo` (API) permite al front saber qué miembro es el usuario y si es admin.
 - `src/Core`: `Core.Domain` (entidades y lógica sin dependencias: `Reparto.Dividir` redondea a 2 decimales y el último miembro absorbe el céntimo sobrante; `RepartoMiembros` reparte entre N miembros; `Liquidacion` calcula transferencias mínimas), `Core.Infrastructure` (EF Core/Npgsql), `Core.Api` (minimal API), `Core.Tests` (xUnit).
 - `src/Assistant/Assistant.Api`: chatbot con tool calling (aún esqueleto: solo `/health`).
 - `src/BuildingBlocks/Auth` (`MiParte.Auth`): validación del JWT de Supabase compartida entre APIs.
 
 ### Core.Api: endpoints y reglas
 
-Endpoints por carpeta en `src/Core/Core.Api`: `Hogares`, `Miembros`, `Reparto` (categorías y perfiles), `Gastos` (gastos, ingresos, recurrentes y liquidación). La referencia completa para el front está en `docs/api.md`; **actualízala al cambiar un endpoint o DTO**. Reglas a recordar:
+Endpoints por carpeta en `src/Core/Core.Api`: `Hogares`, `Miembros`, `Reparto` (categorías y perfiles), `Gastos` (gastos, recurrentes y liquidación). La referencia completa para el front está en `docs/api.md`; **actualízala al cambiar un endpoint o DTO**. Reglas a recordar:
 
 - Los endpoints que funcionan sin hogar seleccionado (hogares, `/api/yo`, aceptar invitación) llevan el metadato `SinHogarActual`; el resto exige hogar.
 - Al crear un hogar se siembran 4 perfiles y 6 categorías (`SemillaHogar`); el creador es admin y adulto.
-- Roles: solo admin gestiona miembros e invitaciones; siempre queda un admin activo y vinculado. Pagador, ingresos y reparto solo van a adultos activos; los miembros `a_cargo` necesitan un adulto responsable.
+- Roles: solo admin gestiona miembros e invitaciones; siempre queda un admin activo y vinculado. Pagador y reparto solo van a adultos activos; los miembros `a_cargo` necesitan un adulto responsable.
 - Invitaciones: el token en claro solo se devuelve al crearla (en BD solo el hash); caducan a 7 días y son de un solo uso.
 - Cada gasto guarda su reparto al crearse y no se recalcula salvo con `PUT` del gasto. Importes > 0 con máx. 2 decimales; meses con formato `YYYY-MM`.
 - Recurrentes: `diaMes` 1-28; `POST /api/gastos-recurrentes/generar?mes=` es idempotente. No hay proceso en segundo plano: lo dispara el cliente.
 - CORS: orígenes permitidos en `Cors__OrigenesPermitidos__N`.
+- **Ingresos no se guardan** (decisión de diseño): la migración `20261007000000_perfiles_cuenta_comun_sin_ingresos.sql` elimina la tabla `ingreso`; los perfiles son individual, porcentajes, partes y cuenta común (`cuenta_comun`: el gasto no se reparte ni genera deuda; `gasto.a_cargo_cuenta_comun`). **Cuenta común**: marcar el gasto y excluirlo del reparto ya funciona; faltan las aportaciones, el saldo y los reembolsos (ver `docs/diseno-y-decisiones.md`).
 
 ### Base de datos: el esquema es SQL, no EF
 
-El esquema y las políticas RLS viven en `supabase/migrations/*.sql` (esquema inicial, multihogar con invitaciones y pagos, recurrentes únicos). EF Core **solo mapea** (no se generan migraciones EF; `MiParteDbContext` fija tablas con `ToTable`, `UseSnakeCaseNamingConvention`, y conversiones explícitas de enums a texto). Cambios de esquema = nueva migración SQL + ajustar el mapeo en `MiParteDbContext`; CI aplica todas las migraciones en orden.
+El esquema y las políticas RLS viven en `supabase/migrations/*.sql` (esquema inicial, multihogar con invitaciones y pagos, recurrentes únicos, perfiles de cuenta común sin ingresos). EF Core **solo mapea** (no se generan migraciones EF; `MiParteDbContext` fija tablas con `ToTable`, `UseSnakeCaseNamingConvention`, y conversiones explícitas de enums a texto). Cambios de esquema = nueva migración SQL + ajustar el mapeo en `MiParteDbContext`; CI aplica todas las migraciones en orden.
 
 ### Multitenencia por hogar (dos capas)
 

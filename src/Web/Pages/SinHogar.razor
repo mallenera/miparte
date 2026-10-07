@@ -5,52 +5,52 @@
 @inject ServicioArranque Arranque
 @inject NavigationManager Navegacion
 
-<PageTitle>Tu hogar · Mi Parte, Tu Parte</PageTitle>
+<PageTitle>Tu hogar · Mi parte, tu parte</PageTitle>
 
-<div class="mx-auto" style="max-width: 32rem;">
-    <h1 class="h3 mb-3">Crea tu hogar o únete a uno</h1>
+<div class="auth ancho">
+    <h1 class="page-title">Crea tu hogar o únete a uno</h1>
 
     @if (_error is not null)
     {
-        <div class="alert alert-danger" role="alert">@_error</div>
+        <div class="aviso err" role="alert">@_error</div>
     }
 
-    <section class="card mb-4">
+    <section class="card">
         <div class="card-body">
-            <h2 class="h5">Crear un hogar nuevo</h2>
+            <h2>Crear un hogar nuevo</h2>
             <EditForm Model="_crear" OnValidSubmit="CrearAsync">
                 <DataAnnotationsValidator />
-                <div class="mb-3">
-                    <label class="form-label" for="hogar">Nombre del hogar</label>
-                    <InputText id="hogar" class="form-control" @bind-Value="_crear.NombreHogar" />
+                <div class="fieldrow">
+                    <label for="hogar">Nombre del hogar</label>
+                    <InputText id="hogar" @bind-Value="_crear.NombreHogar" />
                     <ValidationMessage For="() => _crear.NombreHogar" />
                 </div>
-                <div class="mb-3">
-                    <label class="form-label" for="yo">Tu nombre en el hogar</label>
-                    <InputText id="yo" class="form-control" @bind-Value="_crear.NombreMiembro" />
+                <div class="fieldrow">
+                    <label for="yo">Tu nombre en el hogar</label>
+                    <InputText id="yo" @bind-Value="_crear.NombreMiembro" />
                     <ValidationMessage For="() => _crear.NombreMiembro" />
                 </div>
-                <button class="btn btn-primary" type="submit" disabled="@_enviando">Crear hogar</button>
+                <button class="btn" type="submit" disabled="@_enviando">Crear hogar</button>
             </EditForm>
         </div>
     </section>
 
     <section class="card">
         <div class="card-body">
-            <h2 class="h5">Unirme con una invitación</h2>
+            <h2>Unirme con una invitación</h2>
             <EditForm Model="_unirse" OnValidSubmit="UnirseAsync">
                 <DataAnnotationsValidator />
-                <div class="mb-3">
-                    <label class="form-label" for="token">Código de invitación</label>
-                    <InputText id="token" class="form-control" @bind-Value="_unirse.Token" />
+                <div class="fieldrow">
+                    <label for="token">Código de invitación</label>
+                    <InputText id="token" @bind-Value="_unirse.Token" />
                     <ValidationMessage For="() => _unirse.Token" />
                 </div>
-                <div class="mb-3">
-                    <label class="form-label" for="nombre">Tu nombre (si la invitación no lo trae)</label>
-                    <InputText id="nombre" class="form-control" @bind-Value="_unirse.Nombre" />
+                <div class="fieldrow">
+                    <label for="nombre">Tu nombre (si la invitación no lo trae)</label>
+                    <InputText id="nombre" @bind-Value="_unirse.Nombre" />
                     <ValidationMessage For="() => _unirse.Nombre" />
                 </div>
-                <button class="btn btn-outline-primary" type="submit" disabled="@_enviando">Unirme</button>
+                <button class="btn btn-ghost" type="submit" disabled="@_enviando">Unirme</button>
             </EditForm>
         </div>
     </section>
@@ -71,6 +71,8 @@
 
     private async Task EjecutarAsync(Func<Task<HogarResumen>> accion)
     {
+        // Enter y clic seguidos lanzarían dos altas: el botón deshabilitado no frena el envío con teclado.
+        if (_enviando) return;
         _enviando = true;
         _error = null;
         try

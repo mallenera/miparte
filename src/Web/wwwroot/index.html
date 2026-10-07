@@ -3,25 +3,31 @@
 
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Mi Parte, Tu Parte</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Mi parte, tu parte</title>
     <base href="/" />
-    <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
+    <meta name="theme-color" content="#7A1F33" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400;1,9..144,600&amp;family=Manrope:wght@400;500;600;700&amp;display=swap" />
     <link rel="stylesheet" href="css/app.css" />
-    <link rel="icon" type="image/png" href="favicon.png" />
-    <link href="MiParte.Web.styles.css" rel="stylesheet" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="icon" type="image/png" sizes="48x48" href="favicon.png" />
     <link href="manifest.webmanifest" rel="manifest" />
-    <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png" />
-    <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
 </head>
 
 <body>
     <div id="app">
-        <svg class="loading-progress">
-            <circle r="40%" cx="50%" cy="50%" />
-            <circle r="40%" cx="50%" cy="50%" />
-        </svg>
-        <div class="loading-progress-text"></div>
+        <div class="arranque" role="status" aria-label="Cargando">
+            <svg width="64" height="64" viewBox="0 0 100 100" aria-hidden="true">
+                <g transform="rotate(45 50 50)">
+                    <path d="M42 11 A33 33 0 0 0 42 77 Z" fill="#E8742A"></path>
+                    <path d="M48 14 A40 40 0 0 1 48 94 Z" fill="#7A1F33"></path>
+                </g>
+            </svg>
+            <div class="spin"></div>
+        </div>
     </div>
 
     <div id="blazor-error-ui">

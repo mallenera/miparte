@@ -27,7 +27,7 @@ Todos los endpoints `/api/*` exigen `Authorization: Bearer <access_token>`, el `
 | Sin cabecera y el usuario tiene varios hogares | **409** (hay que enviar la cabecera) |
 | Sin cabecera y el usuario no tiene hogares | La petición continúa sin hogar (ver abajo) |
 
-Si no hay hogar y el endpoint lo necesita, los de ingresos, gastos, gastos recurrentes, resumen, liquidación y pagos responden **409** `{ "error": "No hay hogar seleccionado." }`. En el resto (miembros, invitaciones, categorías, perfiles) un usuario sin hogar no tiene datos accesibles; el front no debe llamarlos sin hogar.
+Si no hay hogar y el endpoint lo necesita, los de gastos, gastos recurrentes, resumen, liquidación y pagos responden **409** `{ "error": "No hay hogar seleccionado." }`. En el resto (miembros, invitaciones, categorías, perfiles) un usuario sin hogar no tiene datos accesibles; el front no debe llamarlos sin hogar.
 
 **Endpoints `SinHogarActual`** (el middleware no resuelve hogar; no se exige ni se valida `X-Hogar-Id`):
 
@@ -94,17 +94,11 @@ Permisos: "miembro" = cualquier miembro activo del hogar (incluye admin). "admin
 | `PUT /api/perfiles/{id}` | Reemplaza nombre, modo y detalle | `GuardarPerfilRequest` | `PerfilRepartoDto` 200 | 400, 404, 409 | miembro |
 | `DELETE /api/perfiles/{id}` | Elimina | - | 204 | 404; 409 en uso por categorías, gastos o recurrentes | miembro |
 
-Validación de perfiles (400): nombre obligatorio (≤ 100); `modo` en `porcentaje|partes|ingresos|individual`; `ingresos` e `individual` no llevan detalle; `porcentaje` y `partes` exigen detalle sin miembros repetidos, solo adultos activos (los miembros a cargo no reparten), valores ≥ 0; `porcentaje` debe sumar 100 (tolerancia 0,0001); `partes` necesita alguna parte > 0.
+Validación de perfiles (400): nombre obligatorio (≤ 100); `modo` en `porcentaje|partes|cuenta_comun|individual`; `cuenta_comun` e `individual` no llevan detalle; `porcentaje` y `partes` exigen detalle sin miembros repetidos, solo adultos activos (los miembros a cargo no reparten), valores ≥ 0; `porcentaje` debe sumar 100 (tolerancia 0,0001); `partes` necesita alguna parte > 0.
 
 ### 3.5 Ingresos
 
-| Método y ruta | Descripción | Request | Response | Errores | Permisos |
-|---|---|---|---|---|---|
-| `GET /api/ingresos?mes=YYYY-MM` | Lista (más recientes primero); `mes` opcional | - | `IngresoResponse[]` 200 | 400 mes inválido; 409 sin hogar | miembro |
-| `GET /api/ingresos/{id}` | Uno | - | `IngresoResponse` 200 | 404; 409 | miembro |
-| `POST /api/ingresos` | Crea | `IngresoRequest` | `IngresoResponse` 201 | 400 importe, concepto > 200, fecha vacía, miembro no adulto activo; 409 | miembro |
-| `PUT /api/ingresos/{id}` | Edita | `IngresoRequest` | `IngresoResponse` 200 | 400, 404, 409 | miembro |
-| `DELETE /api/ingresos/{id}` | Elimina | - | 204 | 404; 409 | miembro |
+Los ingresos del hogar **no se guardan** y no hay endpoints de ingresos. Los perfiles de reparto son cuatro modos: `individual` (100 % de quien paga), `porcentaje` (por porcentajes, suman 100), `partes` (por número de personas/partes) y `cuenta_comun`. Un gasto con perfil `cuenta_comun` lo asume la cuenta común: `GastoResponse.aCargoCuentaComun` es `true`, `repartos` va vacío, no genera deuda entre personas y no entra en la liquidación ni en el «pagado» del resumen (sí en `gastosTotales` y en el total por categoría). Aún no existen aportaciones, saldo ni reembolsos de la cuenta común.
 
 ### 3.6 Gastos
 
@@ -131,12 +125,12 @@ Validación de perfiles (400): nombre obligatorio (≤ 100); `modo` en `porcenta
 
 | Método y ruta | Descripción | Request | Response | Errores | Permisos |
 |---|---|---|---|---|---|
-| `GET /api/resumen?mes=YYYY-MM` | Ingresos, gastos, lo que queda, por miembro y por categoría. `mes` obligatorio | - | `ResumenMensualResponse` 200 | 400 mes inválido; 409 sin hogar | miembro |
+| `GET /api/resumen?mes=YYYY-MM` | Gastos del mes, por miembro y por categoría. `mes` obligatorio | - | `ResumenMensualResponse` 200 | 400 mes inválido; 409 sin hogar | miembro |
 | `GET /api/liquidacion?mes=YYYY-MM` | Saldos (ya descontando pagos), transferencias sugeridas y pagos registrados. `mes` obligatorio | - | `LiquidacionResponse` 200 | 400; 409 | miembro |
 | `POST /api/pagos-liquidacion` | Registra un pago entre dos miembros del mes | `CrearPagoLiquidacionRequest` | `PagoLiquidacionDto` 201 | 400 mes no es día 1, mismo miembro, importe, miembros fuera del hogar; 409 importe mayor que la deuda pendiente (`{ error, pendiente }`) o sin hogar | miembro |
 | `DELETE /api/pagos-liquidacion/{id}` | Elimina un pago | - | 204 | 404; 409 sin hogar | miembro |
 
-Total: 39 endpoints de negocio (4 hogares/yo, 6 miembros/invitaciones, 4 categorías, 5 perfiles, 5 ingresos, 5 gastos, 6 recurrentes, 4 resumen/liquidación/pagos) más `GET /health`.
+Total: 39 endpoints de negocio (4 hogares/yo, 6 miembros/invitaciones, 4 categorías, 5 perfiles, 5 gastos, 6 recurrentes, 4 resumen/liquidación/pagos) más `GET /health`.
 
 ## 4. Ejemplos JSON
 
@@ -171,7 +165,7 @@ Total: 39 endpoints de negocio (4 hogares/yo, 6 miembros/invitaciones, 4 categor
 ```json
 {
   "id": "b0000000-0000-4000-8000-0000000000bb", "nombre": "Leo", "tipo": "a_cargo",
-  "responsableId": "b0000000-0000-4000-8000-0000000000aa", "activo": true, "rol": "miembro", "vinculado": false
+  "responsableId": "b0000000-0000-4000-8000-0000000000aa", "activo": true, "rol": "miembro", "vinculado": false, "esYo": false
 }
 ```
 
@@ -236,17 +230,6 @@ Total: 39 endpoints de negocio (4 hogares/yo, 6 miembros/invitaciones, 4 categor
 }
 ```
 
-### Ingresos
-
-`POST /api/ingresos`:
-
-```json
-{ "miembroId": "b0000000-0000-4000-8000-0000000000aa", "fecha": "2026-10-01", "importe": 2100.50, "concepto": "Nómina" }
-```
-```json
-{ "id": "f0000000-0000-4000-8000-000000000001", "miembroId": "b0000000-0000-4000-8000-0000000000aa", "fecha": "2026-10-01", "importe": 2100.50, "concepto": "Nómina" }
-```
-
 ### Gastos
 
 `POST /api/gastos`:
@@ -266,7 +249,7 @@ Total: 39 endpoints de negocio (4 hogares/yo, 6 miembros/invitaciones, 4 categor
   "categoriaId": "d0000000-0000-4000-8000-000000000002",
   "pagadoPor": "b0000000-0000-4000-8000-0000000000aa",
   "perfilRepartoId": "e0000000-0000-4000-8000-000000000007",
-  "concepto": "Compra semanal", "gastoRecurrenteId": null,
+  "concepto": "Compra semanal", "gastoRecurrenteId": null, "aCargoCuentaComun": false,
   "repartos": [
     { "miembroId": "b0000000-0000-4000-8000-0000000000aa", "importeAsumido": 60.00 },
     { "miembroId": "b0000000-0000-4000-8000-0000000000dd", "importeAsumido": 40.00 }
@@ -308,7 +291,7 @@ Total: 39 endpoints de negocio (4 hogares/yo, 6 miembros/invitaciones, 4 categor
 
 ```json
 {
-  "mes": "2026-10", "ingresosTotales": 3500.00, "gastosTotales": 1200.00, "queda": 2300.00,
+  "mes": "2026-10", "gastosTotales": 1200.00,
   "miembros": [
     { "miembroId": "b0000000-0000-4000-8000-0000000000aa", "nombre": "Ana", "pagado": 1000.00, "asumido": 700.00 },
     { "miembroId": "b0000000-0000-4000-8000-0000000000dd", "nombre": "Luis", "pagado": 200.00, "asumido": 500.00 }
@@ -371,10 +354,11 @@ Error típico si se pasa de la deuda (409): `{ "error": "El importe supera la de
 - **Hogar de un adulto**: el reparto funciona (el creador recibe el 100 %), pero no hay liquidación que mostrar: el único saldo es 0 y no hay transferencias. La UI puede ocultar la pantalla de liquidación con un solo adulto activo.
 - **Importes**: mayores que 0, máximo 2 decimales y hasta 9.999.999.999,99. Más decimales dan 400. Conceptos de hasta 200 caracteres; nombres de hogar, miembro, categoría y perfil hasta 100.
 - **Meses**: parámetro `mes` con formato estricto `YYYY-MM` (`2026-10`); otro formato da 400. En `POST /api/pagos-liquidacion` el campo `mes` es una fecha que debe ser día 1 (`2026-10-01`). Las respuestas devuelven `mes` como `YYYY-MM`, salvo `PagoLiquidacionDto.mes`, que es fecha.
-- **Reparto guardado e inmutable**: cada gasto guarda sus `repartos` al crearse (con los ingresos del mes de su fecha si el perfil es `ingresos`). Cambiar un perfil o añadir ingresos después no recalcula gastos antiguos. Solo `PUT /api/gastos/{id}` recalcula ese gasto. Editar una plantilla recurrente tampoco toca los gastos ya generados. El último miembro absorbe el céntimo sobrante.
-- **Quién interviene**: pagador, ingresos y reparto solo se asignan a adultos activos. Los miembros `a_cargo` necesitan un responsable adulto activo.
+- **Reparto guardado e inmutable**: cada gasto guarda sus `repartos` al crearse. Cambiar un perfil después no recalcula gastos antiguos. Solo `PUT /api/gastos/{id}` recalcula ese gasto. Editar una plantilla recurrente tampoco toca los gastos ya generados. El último miembro absorbe el céntimo sobrante.
+- **Quién interviene**: pagador y reparto solo se asignan a adultos activos. Los miembros `a_cargo` necesitan un responsable adulto activo.
 - **Recurrentes**: `diaMes` entre 1 y 28. `generar` es idempotente por mes y plantilla; una plantilla con gastos generados no se borra, se desactiva.
-- **Semilla al crear hogar**: 4 perfiles (`Proporcional a ingresos`, `Por partes`, `Porcentaje fijo`, `Individual`; el creador queda con 1 parte en "Por partes" y 100 % en "Porcentaje fijo") y 6 categorías (Hipoteca/Alquiler, Alimentación, Suministros y Gastos varios de casa con perfil de ingresos; Hijo con "Por partes"; Ocio personal con "Individual"). El creador es admin y adulto.
+- **Semilla al crear hogar**: 4 perfiles (`Cuenta común`, `Por partes`, `Porcentaje fijo`, `Individual`; el creador queda con 1 parte en "Por partes" y 100 % en "Porcentaje fijo") y 6 categorías (Hipoteca/Alquiler, Alimentación, Suministros, Gastos varios de casa e Hijo con "Por partes"; Ocio personal con "Individual"). El creador es admin y adulto.
+- **Quién soy**: `MiembroDto.esYo` es `true` en el miembro vinculado al usuario autenticado (en `GET /api/miembros`, `PUT` y `DELETE`; el alta siempre devuelve `false`). El front lo usa para saber si mostrar los controles de admin y cuál es "su" miembro.
 - **Roles**: solo admin crea miembros e invitaciones y modifica a otros; el hogar siempre conserva al menos un admin activo y vinculado (409). Un adulto responsable de miembros a cargo activos no se puede desactivar (409).
 - **Invitaciones**: el `token` en claro solo se devuelve en la respuesta de `POST /api/invitaciones` (en base de datos solo se guarda su hash): mostrarlo o copiarlo en ese momento. Caduca a los 7 días (`caducaEn`) y es de un solo uso. Quien acepta no necesita hogar previo. Si la invitación apunta a un `miembroId`, ese miembro queda vinculado al usuario; si no, hay que enviar `nombre` y entra como adulto con rol `miembro`.
 - **Eliminaciones**: categorías y perfiles en uso devuelven 409; los miembros se desactivan, no se borran.

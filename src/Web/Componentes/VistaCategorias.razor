@@ -1,0 +1,209 @@
+@* Pestaña Categorías: árbol de categorías del hogar con su perfil de reparto por defecto. *@
+@inject CoreApiClient Api
+@inject EstadoHogar Hogar
+@inject ServicioAvisos Avisos
+
+<h1 class="sr">Categorías de @Hogar.HogarActual?.Nombre</h1>
+
+@if (_cargando)
+{
+    <div class="spinbox" role="status"><div class="spin"></div><span>Cargando categorías…</span></div>
+}
+else if (_errorCarga is not null)
+{
+    <div class="aviso err" role="alert">
+        @_errorCarga
+        <button class="linkbtn" type="button" @onclick="CargarAsync">Reintentar</button>
+    </div>
+}
+else
+{
+    <section class="card" aria-labelledby="t-categorias">
+        <div class="card-head">
+            <h2 id="t-categorias">Categorías de @Hogar.HogarActual?.Nombre</h2>
+            <span class="tag">@_categorias.Count @(_categorias.Count == 1 ? "categoría" : "categorías")</span>
+        </div>
+        <p class="muted">El perfil por defecto decide cómo se reparte un gasto de esa categoría. Las subcategorías cuelgan de otra categoría.</p>
+
+        @if (_error is not null)
+        {
+            <div class="aviso err" role="alert" style="margin-top: 12px">@_error</div>
+        }
+
+        <div style="margin-top: 10px">
+            @foreach (var nodo in _arbol)
+            {
+                var c = nodo.Categoria;
+                <div class="catrow">
+                    <div class="c-name @(nodo.Nivel > 0 ? "sub" : "")">@c.Nombre</div>
+                    <div class="c-sel">@NombrePerfil(c.PerfilRepartoId)</div>
+                    <div class="c-acc">
+                        @if (_confirmandoEliminar == c.Id)
+                        {
+                            <span class="muted">¿Eliminar?</span>
+                            <button class="linkbtn danger" type="button" @onclick="() => EliminarAsync(c)">Sí</button>
+                            <button class="linkbtn" type="button" @onclick="() => _confirmandoEliminar = null">No</button>
+                        }
+                        else
+                        {
+                            <button class="linkbtn" type="button" aria-label="Editar @c.Nombre" @onclick="() => EmpezarEdicion(c)">Editar</button>
+                            <button class="linkbtn danger" type="button" aria-label="Eliminar @c.Nombre" @onclick="() => _confirmandoEliminar = c.Id">Eliminar</button>
+                        }
+                    </div>
+                    @if (_editando == c.Id)
+                    {
+                        <form class="editcat" @onsubmit="() => GuardarEdicionAsync(c)">
+                            <label>Nombre
+                                <input maxlength="100" @bind="_nombre" @bind:event="oninput" />
+                            </label>
+                            <label>Cuelga de
+                                <select @bind="_padre">
+                                    <option value="">Ninguna (primer nivel)</option>
+                                    @foreach (var otra in _arbol.Where(n => !ArbolCategorias.ConDescendientes(_categorias, c.Id).Contains(n.Categoria.Id)))
+                                    {
+                                        <option value="@otra.Categoria.Id">@(new string(' ', otra.Nivel * 3))@otra.Categoria.Nombre</option>
+                                    }
+                                </select>
+                            </label>
+                            <label>Perfil por defecto
+                                <select @bind="_perfil">
+                                    <option value="">Sin perfil</option>
+                                    @foreach (var p in _perfiles)
+                                    {
+                                        <option value="@p.Id">@p.Nombre</option>
+                                    }
+                                </select>
+                            </label>
+                            <button class="btn btn-sm" type="submit" disabled="@string.IsNullOrWhiteSpace(_nombre)">Guardar</button>
+                            <button class="linkbtn" type="button" @onclick="() => _editando = null">Cancelar</button>
+                        </form>
+                    }
+                </div>
+            }
+
+            @if (_categorias.Count == 0)
+            {
+                <div class="empty">Todavía no hay categorías. Añade la primera abajo.</div>
+            }
+        </div>
+
+        <form class="addcat" @onsubmit="AnadirAsync">
+            <label>Nueva categoría
+                <input maxlength="100" placeholder="Nombre" @bind="_nuevoNombre" @bind:event="oninput" />
+            </label>
+            <label>Cuelga de
+                <select @bind="_nuevoPadre">
+                    <option value="">Ninguna (primer nivel)</option>
+                    @foreach (var n in _arbol)
+                    {
+                        <option value="@n.Categoria.Id">@(new string(' ', n.Nivel * 3))@n.Categoria.Nombre</option>
+                    }
+                </select>
+            </label>
+            <label>Perfil por defecto
+                <select @bind="_nuevoPerfil">
+                    <option value="">Sin perfil</option>
+                    @foreach (var p in _perfiles)
+                    {
+                        <option value="@p.Id">@p.Nombre</option>
+                    }
+                </select>
+            </label>
+            <button class="btn" type="submit" disabled="@string.IsNullOrWhiteSpace(_nuevoNombre)">Añadir</button>
+        </form>
+    </section>
+}
+
+@code {
+    private List<CategoriaDto> _categorias = [];
+    private List<PerfilRepartoDto> _perfiles = [];
+    private List<NodoCategoria> _arbol = [];
+    private bool _cargando = true;
+    private string? _errorCarga, _error;
+
+    private Guid? _editando, _confirmandoEliminar;
+    private string _nombre = "", _padre = "", _perfil = "";
+    private string _nuevoNombre = "", _nuevoPadre = "", _nuevoPerfil = "";
+
+    protected override Task OnInitializedAsync() => CargarAsync();
+
+    private async Task CargarAsync()
+    {
+        _cargando = true;
+        _errorCarga = null;
+        await RecargarAsync();
+        _cargando = false;
+    }
+
+    private async Task RecargarAsync()
+    {
+        try
+        {
+            var categorias = Api.ListarCategoriasAsync();
+            var perfiles = Api.ListarPerfilesAsync();
+            await Task.WhenAll(categorias, perfiles);
+            _categorias = categorias.Result;
+            _perfiles = perfiles.Result;
+            _arbol = ArbolCategorias.Aplanar(_categorias);
+        }
+        catch (ApiException e)
+        {
+            _errorCarga = e.Message;
+        }
+    }
+
+    private string NombrePerfil(Guid? id) =>
+        id is { } g ? _perfiles.FirstOrDefault(p => p.Id == g)?.Nombre ?? "—" : "Sin perfil";
+
+    private static Guid? ComoGuid(string texto) => Guid.TryParse(texto, out var g) ? g : null;
+
+    private void EmpezarEdicion(CategoriaDto c)
+    {
+        _editando = c.Id;
+        _nombre = c.Nombre;
+        _padre = c.CategoriaPadreId?.ToString() ?? "";
+        _perfil = c.PerfilRepartoId?.ToString() ?? "";
+        _error = null;
+    }
+
+    private Task GuardarEdicionAsync(CategoriaDto c) =>
+        EjecutarAsync(async () =>
+        {
+            await Api.GuardarCategoriaAsync(c.Id, new GuardarCategoriaRequest(_nombre.Trim(), ComoGuid(_padre), ComoGuid(_perfil)));
+            _editando = null;
+            return "Categoría guardada";
+        });
+
+    private Task EliminarAsync(CategoriaDto c) =>
+        EjecutarAsync(async () =>
+        {
+            await Api.EliminarCategoriaAsync(c.Id);
+            _confirmandoEliminar = null;
+            return "Categoría eliminada";
+        });
+
+    private Task AnadirAsync() =>
+        EjecutarAsync(async () =>
+        {
+            await Api.CrearCategoriaAsync(new GuardarCategoriaRequest(_nuevoNombre.Trim(), ComoGuid(_nuevoPadre), ComoGuid(_nuevoPerfil)));
+            _nuevoNombre = "";
+            return "Categoría añadida";
+        });
+
+    /// <summary>Ejecuta una operación, recarga la lista y muestra el aviso; los errores de la API (409 en uso, duplicada…) salen en pantalla.</summary>
+    private async Task EjecutarAsync(Func<Task<string>> accion)
+    {
+        _error = null;
+        try
+        {
+            var aviso = await accion();
+            await RecargarAsync();
+            Avisos.Mostrar(aviso);
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+            _confirmandoEliminar = null;
+        }
+    }
+}

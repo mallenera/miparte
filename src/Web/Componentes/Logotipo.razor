@@ -1,0 +1,16 @@
+@* Logotipo horizontal para cabecera: símbolo + «mi parte · tu parte» (siempre en minúsculas en el logotipo). *@
+<a class="brand" href="" aria-label="Mi parte, tu parte. Ir al inicio">
+    <Simbolo Tamano="40" />
+    <div>
+        <h1 aria-hidden="true"><span class="w1">mi parte</span><span class="dot">·</span><span class="w2">tu parte</span></h1>
+        @if (Lema)
+        {
+            <p>Los gastos del hogar, cada uno con su parte</p>
+        }
+    </div>
+</a>
+
+@code {
+    /// <summary>Muestra el lema bajo el logotipo (se oculta en móvil).</summary>
+    [Parameter] public bool Lema { get; set; } = true;
+}

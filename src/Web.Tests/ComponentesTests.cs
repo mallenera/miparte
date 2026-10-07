@@ -30,7 +30,7 @@ public class ComponentesTests : TestContext
         };
         var perfiles = new List<PerfilRepartoDto>
         {
-            new(Guid.NewGuid(), "Por ingresos", "ingresos", []),
+            new(Guid.NewGuid(), "Cuenta común", "cuenta_comun", []),
             new(Guid.NewGuid(), "60/40", "porcentaje", [new(AnaId, 60m), new(LuisId, 40m)]),
         };
         return new ApiFalsa()
@@ -164,7 +164,7 @@ public class ComponentesTests : TestContext
     [Fact]
     public void Anadir_categoria_envia_nombre_padre_y_perfil()
     {
-        var perfil = new PerfilRepartoDto(Guid.NewGuid(), "Por ingresos", "ingresos", []);
+        var perfil = new PerfilRepartoDto(Guid.NewGuid(), "Cuenta común", "cuenta_comun", []);
         var api = new ApiFalsa()
             .Responde("GET /api/categorias", HttpStatusCode.OK, Array.Empty<CategoriaDto>())
             .Responde("GET /api/perfiles", HttpStatusCode.OK, new[] { perfil })
@@ -178,5 +178,31 @@ public class ComponentesTests : TestContext
 
         Assert.Contains("\"nombre\":\"Ocio\"", api.Cuerpos["POST /api/categorias"]);
         Assert.Contains(perfil.Id.ToString(), api.Cuerpos["POST /api/categorias"]);
+    }
+
+    [Fact]
+    public void Anadir_gasto_envia_importe_categoria_pagador_y_perfil_por_defecto()
+    {
+        var ana = ApiFalsa.Miembro("Ana", esYo: true);
+        var perfil = new PerfilRepartoDto(Guid.NewGuid(), "Cuenta común", "cuenta_comun", []);
+        var cat = new CategoriaDto(Guid.NewGuid(), "Comida", null, perfil.Id);
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
+            .Responde("GET /api/categorias", HttpStatusCode.OK, new[] { cat })
+            .Responde("GET /api/perfiles", HttpStatusCode.OK, new[] { perfil })
+            .Responde("GET /api/gastos", HttpStatusCode.OK, Array.Empty<GastoResponse>())
+            .Responde("POST /api/gastos", HttpStatusCode.Created,
+                new GastoResponse(Guid.NewGuid(), DateOnly.FromDateTime(DateTime.Today), 12.5m, cat.Id, ana.Id, perfil.Id, null, null, []));
+        Registrar(api);
+        var c = RenderComponent<VistaGastos>();
+
+        c.Find("form.addcat input[inputmode=decimal]").Input("12,50");
+        c.Find("form.addcat").Submit();
+
+        var cuerpo = api.Cuerpos["POST /api/gastos"];
+        Assert.Contains("\"importe\":12.5", cuerpo);
+        Assert.Contains(cat.Id.ToString(), cuerpo);
+        Assert.Contains(ana.Id.ToString(), cuerpo);
+        Assert.Contains(perfil.Id.ToString(), cuerpo);
     }
 }

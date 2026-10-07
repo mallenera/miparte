@@ -301,6 +301,25 @@ input.invalid, input[aria-invalid="true"] { border-color: var(--err); outline: 0
 .addcat, .editcat { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-top: 14px; padding-top: 16px; border-top: 1px solid var(--line); }
 .editcat { margin: 0; padding: 12px 0 4px; border-top: 0; grid-column: 1 / -1; }
 .addcat label, .editcat label { flex: 1 1 11rem; }
+/* Gastos */
+.mesnav { display: flex; align-items: center; gap: 10px; }
+.mesnav .linkbtn { font-size: 1.3rem; text-decoration: none; padding: 0 8px; }
+.mesnav .tag { text-transform: capitalize; }
+.gastorow {
+    display: grid; gap: 8px 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line);
+    grid-template-columns: minmax(0, 1fr) auto auto;
+}
+.gastorow:first-child { border-top: 0; }
+.g-concepto { font-weight: 600; overflow-wrap: anywhere; }
+.g-meta { font-size: .85rem; }
+.g-reparto { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; padding: 2px 8px 2px 2px; border: 1px solid var(--line); border-radius: 999px; }
+.g-importe { font-weight: 700; font-variant-numeric: tabular-nums; }
+.gastorow .c-acc { display: flex; gap: 12px; justify-content: flex-end; }
+@media (max-width: 640px) {
+    .gastorow { grid-template-columns: minmax(0, 1fr) auto; }
+    .gastorow .c-acc { grid-column: 1 / -1; justify-content: flex-start; }
+}
 .empty { padding: 28px 8px; text-align: center; display: grid; gap: 14px; justify-items: center; color: var(--ink-2); }
 
 /* Acceso, sin hogar, elegir hogar */

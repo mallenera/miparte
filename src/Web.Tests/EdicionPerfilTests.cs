@@ -67,10 +67,10 @@ public class EdicionPerfilTests
     }
 
     [Fact]
-    public void Ingresos_e_individual_no_llevan_detalle()
+    public void CuentaComun_e_individual_no_llevan_detalle()
     {
-        var e = new EdicionPerfil([Ana, Luis]) { Nombre = "Por ingresos" };
-        e.CambiarModo(ModosReparto.Ingresos);
+        var e = new EdicionPerfil([Ana, Luis]) { Nombre = "Cuenta común" };
+        e.CambiarModo(ModosReparto.CuentaComun);
 
         Assert.Null(e.Error);
         Assert.Empty(e.ARequest().Detalle!);

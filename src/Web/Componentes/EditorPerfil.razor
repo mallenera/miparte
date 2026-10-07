@@ -17,9 +17,9 @@
         </label>
     </div>
 
-    @if (_edicion.Modo == ModosReparto.Ingresos)
+    @if (_edicion.Modo == ModosReparto.CuentaComun)
     {
-        <p class="muted">Cada adulto asume una parte proporcional a sus ingresos del mes del gasto. No lleva valores.</p>
+        <p class="muted">Lo asume la cuenta común: no se reparte entre personas ni genera deuda. No lleva valores.</p>
     }
     else if (_edicion.Modo == ModosReparto.Individual)
     {

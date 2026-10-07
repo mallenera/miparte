@@ -5,7 +5,7 @@ using MiParte.Contracts;
 
 namespace MiParte.Web.Api;
 
-/// <summary>Cliente tipado de Core.Api. Cubre usuario, hogares, miembros, invitaciones, categorías y perfiles; el resto se añadirá con cada pantalla.</summary>
+/// <summary>Cliente tipado de Core.Api. Cubre usuario, hogares, miembros, invitaciones, categorías, perfiles y gastos; el resto se añadirá con cada pantalla.</summary>
 public sealed class CoreApiClient
 {
     private readonly HttpClient _http;
@@ -101,6 +101,31 @@ public sealed class CoreApiClient
     /// <param name="ct">Token de cancelación.</param>
     public Task EliminarPerfilAsync(Guid id, CancellationToken ct = default) =>
         EnviarSinRespuestaAsync(HttpMethod.Delete, $"api/perfiles/{id}", ct);
+
+    /// <summary>Gastos del hogar con su reparto (<c>GET /api/gastos</c>).</summary>
+    /// <param name="mes">Mes en formato <c>YYYY-MM</c>, o null para todos.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<List<GastoResponse>> ListarGastosAsync(string? mes = null, CancellationToken ct = default) =>
+        ObtenerAsync<List<GastoResponse>>(mes is null ? "api/gastos" : $"api/gastos?mes={Uri.EscapeDataString(mes)}", ct);
+
+    /// <summary>Crea un gasto; el servidor calcula y guarda el reparto (<c>POST /api/gastos</c>).</summary>
+    /// <param name="peticion">Datos del gasto.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<GastoResponse> CrearGastoAsync(GastoRequest peticion, CancellationToken ct = default) =>
+        EnviarAsync<GastoResponse>(HttpMethod.Post, "api/gastos", peticion, ct);
+
+    /// <summary>Edita un gasto y recalcula su reparto (<c>PUT /api/gastos/{id}</c>).</summary>
+    /// <param name="id">Gasto a editar.</param>
+    /// <param name="peticion">Nuevos valores.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<GastoResponse> GuardarGastoAsync(Guid id, GastoRequest peticion, CancellationToken ct = default) =>
+        EnviarAsync<GastoResponse>(HttpMethod.Put, $"api/gastos/{id}", peticion, ct);
+
+    /// <summary>Elimina un gasto y su reparto (<c>DELETE /api/gastos/{id}</c>).</summary>
+    /// <param name="id">Gasto a eliminar.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task EliminarGastoAsync(Guid id, CancellationToken ct = default) =>
+        EnviarSinRespuestaAsync(HttpMethod.Delete, $"api/gastos/{id}", ct);
 
     private Task<T> ObtenerAsync<T>(string ruta, CancellationToken ct) => EnviarAsync<T>(HttpMethod.Get, ruta, null, ct);
 

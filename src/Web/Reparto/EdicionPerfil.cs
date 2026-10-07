@@ -11,22 +11,22 @@ public static class ModosReparto
     /// <summary>Reparto por partes: el detalle necesita alguna parte mayor que 0.</summary>
     public const string Partes = "partes";
 
-    /// <summary>Reparto proporcional a los ingresos del mes; sin detalle.</summary>
-    public const string Ingresos = "ingresos";
+    /// <summary>Lo asume la cuenta común: sin reparto entre personas ni deuda; sin detalle.</summary>
+    public const string CuentaComun = "cuenta_comun";
 
     /// <summary>Lo asume quien paga; sin detalle.</summary>
     public const string Individual = "individual";
 
     /// <summary>Modos en el orden en que se ofrecen.</summary>
-    public static readonly IReadOnlyList<string> Todos = [Ingresos, Partes, Porcentaje, Individual];
+    public static readonly IReadOnlyList<string> Todos = [Individual, Porcentaje, Partes, CuentaComun];
 
     /// <summary>Texto del modo para mostrar al usuario.</summary>
     /// <param name="modo">Modo de la API.</param>
     public static string Texto(string modo) => modo switch
     {
-        Ingresos => "Proporcional a ingresos",
-        Partes => "Por partes",
-        Porcentaje => "Porcentaje fijo",
+        CuentaComun => "Cuenta común",
+        Partes => "Por personas (partes)",
+        Porcentaje => "Por porcentajes",
         Individual => "Individual (quien paga)",
         _ => modo,
     };

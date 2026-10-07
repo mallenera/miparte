@@ -3,7 +3,8 @@
   y tinta #24161A (texto). Fraunces solo para logotipo y titulares grandes; Manrope para toda la interfaz.
   Cada miembro tiene color + inicial (--m0..--m7). Los colores de estado (ok / err) nunca son burdeos ni naranja.
 */
-:root {
+:root,
+[data-tema="claro"] {
     --bg: #FBF5EF;
     --surface: #FFFFFF;
     --surface-2: #F5EAE1;
@@ -37,22 +38,53 @@
     --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
     --font-body: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
     --radius: 12px;
+    --link-hover: var(--wine-deep);
+    --logo-h2: var(--wine);
+    color-scheme: light;
 }
 
+/*
+  Temas: sin atributo `data-tema` en <html> se sigue el del sistema (claro u oscuro). Con él se fuerza uno:
+  claro y oscuro (marca), oceano y bosque (claros), medianoche y grafito (oscuros). El selector `[data-tema]` sin :root
+  permite mostrar una muestra de cada tema dentro del menú (ver .muestra).
+*/
+/* Valores comunes a todos los temas oscuros: estados, colores de miembro y sombra. */
+[data-tema="oscuro"], [data-tema="medianoche"], [data-tema="grafito"] {
+    --err: #FF8F86;
+    --err-soft: #4A2220;
+    --ok: #7FD39B;
+    --ok-soft: #173424;
+    --warn: #F0C15A;
+    --warn-soft: #3D2F0E;
+    --m0: #E08A9C; --m0-on: #1C1114;
+    --m1: #F2904A; --m1-on: #1C1114;
+    --m2: #3DBFB2; --m2-on: #1C1114;
+    --m3: #7DA7F0; --m3-on: #1C1114;
+    --m4: #C38DE8; --m4-on: #1C1114;
+    --m5: #B6CA5C; --m5-on: #1C1114;
+    --m6: #F27BA9; --m6-on: #1C1114;
+    --m7: #C4B8AC; --m7-on: #1C1114;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+    --link-hover: var(--ink);
+    --logo-h2: var(--wine-text);
+    color-scheme: dark;
+}
+[data-tema="oscuro"] {
+    --bg: #1C1114;
+    --surface: #2A1A1F;
+    --surface-2: #35222A;
+    --ink: #F5ECE6;
+    --ink-2: #C8A9AD;
+    --line: #47282F;
+    --wine: #A32D40;
+    --wine-text: #E08A9C;
+    --wine-soft: #44202A;
+    --orange: #F2904A;
+    --orange-text: #F8A862;
+    --orange-soft: #3F2813;
+}
 @media (prefers-color-scheme: dark) {
-    :root {
-        --bg: #1C1114;
-        --surface: #2A1A1F;
-        --surface-2: #35222A;
-        --ink: #F5ECE6;
-        --ink-2: #C8A9AD;
-        --line: #47282F;
-        --wine: #A32D40;
-        --wine-text: #E08A9C;
-        --wine-soft: #44202A;
-        --orange: #F2904A;
-        --orange-text: #F8A862;
-        --orange-soft: #3F2813;
+    :root:not([data-tema]) {
         --err: #FF8F86;
         --err-soft: #4A2220;
         --ok: #7FD39B;
@@ -68,17 +100,104 @@
         --m6: #F27BA9; --m6-on: #1C1114;
         --m7: #C4B8AC; --m7-on: #1C1114;
         --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+        --link-hover: var(--ink);
+        --logo-h2: var(--wine-text);
         color-scheme: dark;
+        --bg: #1C1114;
+        --surface: #2A1A1F;
+        --surface-2: #35222A;
+        --ink: #F5ECE6;
+        --ink-2: #C8A9AD;
+        --line: #47282F;
+        --wine: #A32D40;
+        --wine-text: #E08A9C;
+        --wine-soft: #44202A;
+        --orange: #F2904A;
+        --orange-text: #F8A862;
+        --orange-soft: #3F2813;
     }
+}
+
+[data-tema="medianoche"] {
+    --bg: #0E1220;
+    --surface: #171C30;
+    --surface-2: #1F2640;
+    --ink: #E8EBF7;
+    --ink-2: #9AA3C4;
+    --line: #2A3254;
+    --wine: #4F6BE0;
+    --wine-text: #9DB0FF;
+    --wine-soft: #1F2A57;
+    --orange: #F5B94A;
+    --orange-text: #F8C86E;
+    --orange-soft: #3A2E12;
+    --on-orange: #0E1220;
+}
+
+[data-tema="grafito"] {
+    --bg: #131416;
+    --surface: #1C1E21;
+    --surface-2: #25282C;
+    --ink: #ECEDEE;
+    --ink-2: #A0A6AD;
+    --line: #32363B;
+    --wine: #5B6B7C;
+    --wine-text: #B4C0CC;
+    --wine-soft: #262E37;
+    --orange: #D9A441;
+    --orange-text: #E6B85C;
+    --orange-soft: #382C14;
+    --on-orange: #131416;
+}
+
+[data-tema="oceano"] {
+    --bg: #F1F6FA;
+    --surface: #FFFFFF;
+    --surface-2: #E4EEF5;
+    --ink: #12222E;
+    --ink-2: #566A7A;
+    --line: #D2E0EB;
+    --wine: #1D4E7A;
+    --wine-deep: #0F2F4D;
+    --wine-text: #1D4E7A;
+    --wine-soft: #D9E8F4;
+    --orange: #E59A1F;
+    --orange-text: #8A5700;
+    --orange-soft: #FDEFD3;
+    --on-orange: #12222E;
+    --shadow: 0 1px 2px rgba(15, 47, 77, .06), 0 8px 24px rgba(15, 47, 77, .06);
+    color-scheme: light;
+}
+
+[data-tema="bosque"] {
+    --bg: #F4F5EE;
+    --surface: #FFFFFF;
+    --surface-2: #E9EDE0;
+    --ink: #1C261F;
+    --ink-2: #5B6A5F;
+    --line: #D9DFCF;
+    --wine: #2F5D45;
+    --wine-deep: #1B3A2A;
+    --wine-text: #2F5D45;
+    --wine-soft: #DCE9DF;
+    --orange: #C8962E;
+    --orange-text: #7A5710;
+    --orange-soft: #F6EAC8;
+    --on-orange: #1C261F;
+    --shadow: 0 1px 2px rgba(27, 58, 42, .06), 0 8px 24px rgba(27, 58, 42, .06);
+    color-scheme: light;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
 
 html, body { margin: 0; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+img, svg { max-width: 100%; }
 
 body {
-    padding-inline: 16px;
-    padding-block: 0 56px;
+    /* Los márgenes laterales respetan las muescas (viewport-fit=cover) y crecen con el ancho. */
+    padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px));
+    padding-block: env(safe-area-inset-top, 0px) calc(56px + env(safe-area-inset-bottom, 0px));
     font: 15px/1.5 var(--font-body);
     background: var(--bg);
     color: var(--ink);
@@ -90,8 +209,7 @@ h2, h3 { text-wrap: balance; }
 button { font: inherit; }
 h1:focus { outline: none; }
 a { color: var(--wine-text); }
-a:hover { color: var(--wine-deep); }
-@media (prefers-color-scheme: dark) { a:hover { color: var(--ink); } }
+a:hover { color: var(--link-hover); }
 [hidden] { display: none !important; }
 
 .wrap { max-width: 1080px; margin-inline: auto; }
@@ -114,8 +232,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .brand { display: flex; align-items: center; gap: 12px; min-width: 0; text-decoration: none; color: inherit; }
 .logo { flex: none; }
 .logo .h1 { fill: var(--orange); }
-.logo .h2 { fill: var(--wine); }
-@media (prefers-color-scheme: dark) { .logo .h2 { fill: var(--wine-text); } }
+.logo .h2 { fill: var(--logo-h2); }
 .brand h1 { font: 600 1.6rem/1.1 var(--font-display); letter-spacing: -.015em; white-space: nowrap; }
 .brand h1 .w1 { color: var(--wine-text); }
 .brand h1 .dot { color: var(--orange); padding-inline: .3em; font-weight: 400; }
@@ -163,7 +280,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .who { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; min-width: 0; }
 
 /* Pestañas */
-.tabs { display: flex; gap: 4px; margin-top: 8px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tabs {
+    display: flex; gap: 4px; margin-top: 8px; border-bottom: 1px solid var(--line);
+    overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab { scroll-snap-align: start; }
 .tab {
     appearance: none; border: 0; background: none; cursor: pointer; white-space: nowrap; text-decoration: none;
     color: var(--ink-2); font-weight: 600; padding: 11px 16px; border-bottom: 3px solid transparent; margin-bottom: -1px;
@@ -364,3 +486,56 @@ form { display: grid; gap: 14px; }
 .auth.ancho { max-width: 560px; }
 .auth .card { box-shadow: none; }
 .panel > div { min-width: 0; }
+
+/* Responsive: móvil (hasta 640 px), tablet (641-1023 px) y escritorio (desde 1024 px) */
+@media (min-width: 641px) {
+    body { padding-inline: max(24px, env(safe-area-inset-left, 0px)) max(24px, env(safe-area-inset-right, 0px)); }
+}
+@media (min-width: 1024px) {
+    body { padding-inline: max(32px, env(safe-area-inset-left, 0px)) max(32px, env(safe-area-inset-right, 0px)); }
+}
+/* Tablet: los formularios de tres o más campos aprovechan el ancho de la tarjeta. */
+@media (min-width: 641px) and (max-width: 1023px) {
+    .cols-even { gap: 16px; }
+    .card { padding: 18px; }
+}
+@media (max-width: 640px) {
+    .card { padding: 16px; }
+    .auth { padding: 18px; }
+    .page-title { font-size: 1.45rem; }
+    .panel { padding-block-start: 16px; gap: 14px; }
+    .tab { padding: 11px 12px; }
+    /* Los menús ocupan el ancho de la cabecera para no salirse de la pantalla. */
+    .right { position: relative; width: 100%; justify-content: space-between; }
+    .dd { position: static; }
+    .menu { left: 0; right: 0; max-width: none; min-width: 0; }
+    .menubtn { max-width: 100%; }
+    /* 16 px evita el zoom automático de iOS al enfocar un campo. */
+    input, select { font-size: 16px; }
+    .addm label, .addcat label, .editcat label { flex-basis: 100%; }
+    .addm .btn, .addcat .btn, .actions .btn { flex: 1 1 auto; }
+    .toast { white-space: normal; }
+}
+/* Pantallas táctiles: objetivos de al menos 44 px. */
+@media (pointer: coarse) {
+    .iconbtn { width: 44px; height: 44px; }
+    .menubtn { height: 44px; }
+    .btn-sm, .mrow select, .mrow .renombrar input { min-height: 44px; }
+    .mitem { padding-block: 12px; }
+    .linkbtn { padding-block: 10px; }
+    .seg button { padding-block: 10px; }
+}
+/* Móvil en horizontal: menos aire vertical. */
+@media (max-height: 480px) and (orientation: landscape) {
+    .top { padding-block: 10px 8px; }
+    .panel { padding-block-start: 12px; }
+}
+
+/* Selector de tema del menú de usuario */
+.mitem .muestra {
+    display: inline-flex; align-items: center; gap: 3px; flex: none; margin-left: auto; padding: 3px 5px; border-radius: 999px;
+    background: var(--bg); border: 1px solid var(--line);
+}
+.mitem .muestra i { width: 10px; height: 10px; border-radius: 50%; background: var(--wine); }
+.mitem .muestra i + i { background: var(--orange); }
+.mitem .muestra.auto { background: linear-gradient(90deg, #FBF5EF 50%, #1C1114 50%); }

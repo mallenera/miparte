@@ -52,4 +52,12 @@ Cada miembro tiene color + inicial (`--m0..--m7`): burdeos, naranja, verde azula
 Símbolo blanco/crema sobre burdeos con esquinas redondeadas (`rx` ≈ 22 %). Ya generados en `src/Web/wwwroot/` (`favicon.*`, `apple-touch-icon.png`, `icon-192/512.png`, `icon-maskable-512.png`).
 
 ## Modo oscuro
-Propio, no una inversión automática: se activa con `prefers-color-scheme` y con `data-theme="dark|light"` en `<html>`.
+Propio, no una inversión automática: sin `data-tema` en `<html>` se sigue `prefers-color-scheme`; con `data-tema` se fuerza el tema elegido (ver «Temas»).
+
+## Adaptación a pantallas (responsive)
+
+Tres tramos en `wwwroot/css/app.css`: móvil (hasta 640 px, usable desde 375 px), tablet (641-1023 px) y escritorio (desde 1024 px, contenido de hasta 1080 px). Los márgenes laterales respetan las muescas (`safe-area-inset-*`), los menús de la cabecera ocupan todo el ancho en móvil, los campos usan 16 px para evitar el zoom de iOS y en pantallas táctiles (`pointer: coarse`) los controles miden al menos 44 px.
+
+## Temas
+
+El usuario elige tema en su menú (esquina superior derecha) y se recuerda en `localStorage` (`miparte.tema`). Se aplica con el atributo `data-tema` de `<html>`; sin él se sigue al sistema (claro u oscuro). Temas: **Claro** y **Oscuro** (los de marca), **Océano** (azul petróleo y ámbar), **Bosque** (verde y dorado) **Medianoche** (índigo oscuro) y **Grafito** (gris carbón con acento dorado). Cada tema redefine los mismos tokens de `app.css` (`--wine` es el color principal y `--orange` el de acento, sea cual sea su tono); los componentes nunca llevan colores propios. Los estados (ok/err/warn) y los colores de miembro no cambian en los temas claros, y en los oscuros usan la variante oscura de marca. Un tema nuevo = un bloque `[data-tema="..."]` en `app.css` + una entrada en `ServicioTema.Todos`.

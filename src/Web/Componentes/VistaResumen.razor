@@ -40,6 +40,13 @@ else if (_resumen is not null && _liquidacion is not null)
                 <span>No hay gastos en @NombreMes.</span>
                 <a class="btn" href="gastos">Añadir un gasto</a>
             </div>
+            @foreach (var m in _resumen.Miembros.Where(m => m.DebeCuentaComun > 0))
+            {
+                <div class="catrow">
+                    <div class="c-name"><Avatar Nombre="@m.Nombre" Color="@ColorMiembro.De(m.MiembroId, _miembros)" Tamano="sm" /> @m.Nombre</div>
+                    <div class="c-sel"><span class="chip">La cuenta común le debe&nbsp;<b>@Euros(m.DebeCuentaComun)</b></span></div>
+                </div>
+            }
         }
         else
         {

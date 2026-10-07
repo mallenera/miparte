@@ -74,14 +74,14 @@ else
                         @if (_confirmandoEliminar == p.Id)
                         {
                             <span class="muted">¿Eliminar?</span>
-                            <button class="linkbtn danger" type="button" @onclick="() => EliminarAsync(p)">Sí</button>
+                            <button class="linkbtn danger" type="button" disabled="@_guardando" @onclick="() => EliminarAsync(p)">Sí</button>
                             <button class="linkbtn" type="button" @onclick="() => _confirmandoEliminar = null">No</button>
                         }
                         else
                         {
                             <button class="linkbtn" type="button" aria-label="Editar @NombrePlantilla(p)" @onclick="() => EmpezarEdicion(p)">Editar</button>
-                            <button class="linkbtn" type="button" aria-label="@(p.Activo ? "Pausar" : "Reanudar") @NombrePlantilla(p)" @onclick="() => AlternarActivaAsync(p)">@(p.Activo ? "Pausar" : "Reanudar")</button>
-                            <button class="linkbtn danger" type="button" aria-label="Eliminar @NombrePlantilla(p)" @onclick="() => _confirmandoEliminar = p.Id">Eliminar</button>
+                            <button class="linkbtn" type="button" disabled="@_guardando" aria-label="@(p.Activo ? "Pausar" : "Reanudar") @NombrePlantilla(p)" @onclick="() => AlternarActivaAsync(p)">@(p.Activo ? "Pausar" : "Reanudar")</button>
+                            <button class="linkbtn danger" type="button" disabled="@_guardando" aria-label="Eliminar @NombrePlantilla(p)" @onclick="() => _confirmandoEliminar = p.Id">Eliminar</button>
                         }
                     </div>
                 </div>
@@ -134,7 +134,7 @@ else
                         }
                     </select>
                 </label>
-                <button class="btn" type="submit" disabled="@(!FormularioValido)">@(_editando is null ? "Añadir" : "Guardar")</button>
+                <button class="btn" type="submit" disabled="@(!FormularioValido || _guardando)">@(_editando is null ? "Añadir" : "Guardar")</button>
                 @if (_editando is not null)
                 {
                     <button class="linkbtn" type="button" @onclick="ReiniciarFormulario">Cancelar</button>
@@ -152,7 +152,7 @@ else
     private List<CategoriaDto> _categorias = [];
     private List<PerfilRepartoDto> _perfiles = [];
     private List<NodoCategoria> _arbol = [];
-    private bool _cargando = true, _generando;
+    private bool _cargando = true, _generando, _guardando;
     private string? _errorCarga, _error, _resultado;
     private DateOnly _mes;
 
@@ -346,6 +346,8 @@ else
     /// <summary>Ejecuta una operación, recarga las plantillas y muestra el aviso; los errores de la API salen en pantalla.</summary>
     private async Task EjecutarAsync(Func<Task<string>> accion)
     {
+        if (_guardando) return; // evita duplicar plantillas con doble clic o doble Intro
+        _guardando = true;
         _error = null;
         try
         {
@@ -357,6 +359,10 @@ else
         {
             _error = e.Message;
             _confirmandoEliminar = null;
+        }
+        finally
+        {
+            _guardando = false;
         }
     }
 }

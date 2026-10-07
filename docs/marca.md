@@ -53,3 +53,7 @@ Símbolo blanco/crema sobre burdeos con esquinas redondeadas (`rx` ≈ 22 %). Ya
 
 ## Modo oscuro
 Propio, no una inversión automática: se activa con `prefers-color-scheme` y con `data-theme="dark|light"` en `<html>`.
+
+## Adaptación a pantallas (responsive)
+
+Tres tramos en `wwwroot/css/app.css`: móvil (hasta 640 px, usable desde 375 px), tablet (641-1023 px) y escritorio (desde 1024 px, contenido de hasta 1080 px). Los márgenes laterales respetan las muescas (`safe-area-inset-*`), los menús de la cabecera ocupan todo el ancho en móvil, los campos usan 16 px para evitar el zoom de iOS y en pantallas táctiles (`pointer: coarse`) los controles miden al menos 44 px.

@@ -3,6 +3,7 @@ using MiParte.Web.Api;
 using MiParte.Web.Autenticacion;
 using MiParte.Web.Configuracion;
 using MiParte.Web.Hogares;
+using MiParte.Web.Temas;
 
 namespace MiParte.Web;
 
@@ -26,6 +27,7 @@ public static class ServiciosWeb
         servicios.AddSingleton<ServicioSesion>();
         servicios.AddSingleton<EstadoHogar>();
         servicios.AddSingleton<ServicioAvisos>();
+        servicios.AddSingleton<ServicioTema>();
         servicios.AddScoped<ServicioArranque>();
         servicios.AddTransient<ManejadorCoreApi>();
 

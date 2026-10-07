@@ -52,10 +52,25 @@ Cada miembro tiene color + inicial (`--m0..--m7`): burdeos, naranja, verde azula
 Símbolo blanco/crema sobre burdeos con esquinas redondeadas (`rx` ≈ 22 %). Ya generados en `src/Web/wwwroot/` (`favicon.*`, `apple-touch-icon.png`, `icon-192/512.png`, `icon-maskable-512.png`).
 
 ## Modo oscuro
-Propio, no una inversión automática: se activa con `prefers-color-scheme` y con `data-theme="dark|light"` en `<html>`.
+Propio, no una inversión automática: sin `data-tema` en `<html>` se sigue `prefers-color-scheme`; con `data-tema` se fuerza el tema elegido (ver «Temas»).
 
-> **Rediseño `feature/web-design` (código manda sobre este documento):** la web ya no tiene tema claro. Solo hay un tema oscuro
-> (fondo `#020617`, texto `#F1F5F9`, equivalentes a `slate-950`/`slate-100` de Tailwind) con verde menta neón `#3DFFB4` reservado a
-> la acción principal (`.btn`); burdeos y naranja quedan en logotipo, pestaña activa y resplandores de fondo. Los tokens siguen
-> en `wwwroot/css/app.css` (no se usa Tailwind) y los iconos son Lucide incrustados como SVG en `Componentes/Icono.razor`
-> (el front es Blazor, no React). La paleta clara de la tabla de arriba queda como referencia histórica.
+## Adaptación a pantallas (responsive)
+
+Tres tramos en `wwwroot/css/app.css`: móvil (hasta 640 px, usable desde 375 px), tablet (641-1023 px) y escritorio (desde 1024 px, contenido de hasta 1080 px). Los márgenes laterales respetan las muescas (`safe-area-inset-*`), los menús de la cabecera ocupan todo el ancho en móvil, los campos usan 16 px para evitar el zoom de iOS y en pantallas táctiles (`pointer: coarse`) los controles miden al menos 44 px.
+
+## Temas
+
+Estética «SaaS premium» (rediseño de `feature/web-design`; el código manda sobre las tablas de color de arriba): superficies con gradientes sutiles, rejilla asimétrica, mucho aire, hover `scale(1.02)` de 300 ms e iconos Lucide incrustados como SVG (`Componentes/Icono.razor`; el front es Blazor, no React, y no usa Tailwind: los valores `slate` son tokens de `app.css`). Una sola llamada a la acción vistosa por pantalla (`.btn`, color `--cta`).
+
+El usuario elige tema en su menú (esquina superior derecha) y se recuerda en `localStorage` (`miparte.tema`). Se aplica con el atributo `data-tema` de `<html>`; sin él se sigue al sistema (claro u oscuro). Todos los temas redefinen los mismos tokens de `app.css` (`--wine` principal de marca, `--orange` acento, `--cta` acción); los componentes nunca llevan colores propios.
+
+| Tema | Tipo | Base | Acción (`--cta`) |
+|---|---|---|---|
+| Claro | claro | slate-50, burdeos y naranja de marca | menta |
+| Oscuro | oscuro | slate-950 / slate-100, resplandor burdeos | menta neón `#3DFFB4` |
+| Océano | claro | azul petróleo, acento ámbar | cian |
+| Bosque | claro | verde profundo, acento dorado | lima |
+| Medianoche | oscuro | índigo profundo, acento ámbar | azul eléctrico |
+| Grafito | oscuro | grises de carbón, acento dorado | oro |
+
+Los estados (ok/err/warn) y los colores de miembro no cambian en los temas claros, y en los oscuros usan la variante oscura. Las translucideces (cristal de tarjetas y menús, resplandores) se derivan de los tokens con `color-mix`, así que un tema nuevo = un bloque `[data-tema="..."]` en `app.css` + una entrada en `ServicioTema.Todos` y en la lista de `index.html`.

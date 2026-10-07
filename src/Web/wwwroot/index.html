@@ -6,11 +6,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Mi parte, tu parte</title>
     <base href="/" />
-    <meta name="theme-color" content="#020617" />
+    <meta name="theme-color" content="#7A1F33" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400;1,9..144,600&amp;family=Manrope:wght@400;500;600;700&amp;display=swap" />
     <link rel="stylesheet" href="css/app.css" />
+    <script>
+        // Aplica el tema guardado antes de pintar (sin parpadeo). "sistema" = sin atributo. Clave: ServicioTema.Clave.
+        window.miparteTema = {
+            aplicar: function (id) {
+                var r = document.documentElement;
+                // Solo temas conocidos (los de ServicioTema.Todos); cualquier otro valor equivale a "sistema".
+                if (['claro', 'oscuro', 'oceano', 'bosque', 'medianoche', 'grafito'].indexOf(id) < 0) r.removeAttribute('data-tema'); else r.setAttribute('data-tema', id);
+                var estilo = getComputedStyle(r);
+                var meta = document.querySelector('meta[name="theme-color"]');
+                var color = (estilo.colorScheme.indexOf('dark') >= 0 ? estilo.getPropertyValue('--bg') : estilo.getPropertyValue('--wine')).trim();
+                if (meta && color) meta.setAttribute('content', color);
+            }
+        };
+        try { window.miparteTema.aplicar(localStorage.getItem('miparte.tema')); } catch (e) { }
+    </script>
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="icon" type="image/png" sizes="48x48" href="favicon.png" />
     <link href="manifest.webmanifest" rel="manifest" />
@@ -20,10 +35,10 @@
 <body>
     <div id="app">
         <div class="arranque" role="status" aria-label="Cargando">
-            <svg width="64" height="64" viewBox="0 0 100 100" aria-hidden="true">
+            <svg class="logo" width="64" height="64" viewBox="0 0 100 100" aria-hidden="true">
                 <g transform="rotate(45 50 50)">
-                    <path d="M42 11 A33 33 0 0 0 42 77 Z" fill="#F2904A"></path>
-                    <path d="M48 14 A40 40 0 0 1 48 94 Z" fill="#F0A3B3"></path>
+                    <path class="h1" d="M42 11 A33 33 0 0 0 42 77 Z"></path>
+                    <path class="h2" d="M48 14 A40 40 0 0 1 48 94 Z"></path>
                 </g>
             </svg>
             <div class="spin"></div>

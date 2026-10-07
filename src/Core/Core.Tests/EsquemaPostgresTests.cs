@@ -34,6 +34,7 @@ public class EsquemaPostgresTests
         var beto = Guid.NewGuid();
         var otro = Guid.NewGuid();
         var perfil = Guid.NewGuid();
+        var perfilComun = Guid.NewGuid();
         var categoria = Guid.NewGuid();
 
         // Datos base por SQL (hogar y miembros no se crean desde EF en esta fase).
@@ -55,11 +56,16 @@ public class EsquemaPostgresTests
         }
 
         var gastoId = Guid.NewGuid();
+        var gastoComunId = Guid.NewGuid();
         await using (var ctx = Crear(hogarA))
         {
             ctx.PerfilesReparto.Add(new PerfilReparto
             {
-                Id = perfil, HogarId = hogarA, Nombre = "Cuenta común", Modo = ModoReparto.CuentaComun,
+                Id = perfil, HogarId = hogarA, Nombre = "Partes", Modo = ModoReparto.Partes,
+            });
+            ctx.PerfilesReparto.Add(new PerfilReparto
+            {
+                Id = perfilComun, HogarId = hogarA, Nombre = "Cuenta común", Modo = ModoReparto.CuentaComun,
             });
             ctx.Categorias.Add(new Categoria { Id = categoria, HogarId = hogarA, Nombre = "Casa" });
             await ctx.SaveChangesAsync();
@@ -74,6 +80,13 @@ public class EsquemaPostgresTests
                     new GastoReparto { MiembroId = beto, HogarId = hogarA, ImporteAsumido = 300m },
                 ],
             });
+            // Gasto a cargo de la cuenta común: sin filas en gasto_reparto.
+            ctx.Gastos.Add(new Gasto
+            {
+                Id = gastoComunId, HogarId = hogarA, Fecha = new DateOnly(2026, 10, 2), Importe = 120m,
+                CategoriaId = categoria, PagadoPor = ana, PerfilRepartoId = perfilComun, Concepto = "Luz",
+                ACargoCuentaComun = true,
+            });
             await ctx.SaveChangesAsync();
         }
 
@@ -82,7 +95,11 @@ public class EsquemaPostgresTests
             var gasto = await ctx.Gastos.Include(g => g.Repartos).SingleAsync(g => g.Id == gastoId);
             Assert.Equal(900m, gasto.Importe);
             Assert.Equal(900m, gasto.Repartos.Sum(r => r.ImporteAsumido));
-            var p = await ctx.PerfilesReparto.SingleAsync();
+
+            var comun = await ctx.Gastos.Include(g => g.Repartos).SingleAsync(g => g.Id == gastoComunId);
+            Assert.True(comun.ACargoCuentaComun);
+            Assert.Empty(comun.Repartos);
+            var p = await ctx.PerfilesReparto.SingleAsync(x => x.Id == perfilComun);
             Assert.Equal(ModoReparto.CuentaComun, p.Modo);
         }
 

@@ -1,7 +1,7 @@
 {
   "name": "Mi parte, tu parte",
   "short_name": "Mi parte",
-  "description": "Gastos e ingresos del hogar, cada uno con su parte",
+  "description": "Los gastos del hogar, cada uno con su parte",
   "lang": "es",
   "id": "./",
   "start_url": "./",

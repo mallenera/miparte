@@ -25,7 +25,8 @@ public static class GastosEndpoints
     /// <summary>Convierte un gasto con su reparto en el DTO de respuesta.</summary>
     private static GastoResponse A(Gasto g) => new(
         g.Id, g.Fecha, g.Importe, g.CategoriaId, g.PagadoPor, g.PerfilRepartoId, g.Concepto, g.GastoRecurrenteId,
-        g.Repartos.OrderBy(r => r.MiembroId).Select(r => new RepartoGastoDto(r.MiembroId, r.ImporteAsumido)).ToList());
+        g.Repartos.OrderBy(r => r.MiembroId).Select(r => new RepartoGastoDto(r.MiembroId, r.ImporteAsumido)).ToList(),
+        g.ACargoCuentaComun);
 
     /// <summary>GET /api/gastos: lista los gastos, filtrables por mes (YYYY-MM) y categoría, de más reciente a más antiguo. 409 sin hogar; 400 si el mes es inválido.</summary>
     private static async Task<IResult> ListarAsync(
@@ -54,24 +55,21 @@ public static class GastosEndpoints
         return g is null ? Results.NotFound() : Results.Ok(A(g));
     }
 
-    /// <summary>Valida el cuerpo y calcula el reparto con los ingresos del mes de la fecha del gasto.</summary>
-    private static async Task<(IReadOnlyList<ParteAsumida>? Partes, string? Error)> Preparar(
+    /// <summary>Valida el cuerpo y calcula el reparto (vacío y marcado a cargo de la cuenta común si el perfil es de cuenta común).</summary>
+    private static async Task<(IReadOnlyList<ParteAsumida>? Partes, string? Error, bool CuentaComun)> Preparar(
         GastoRequest r, MiParteDbContext db, CancellationToken ct)
     {
         var e = ApiComun.ValidarImporte(r.Importe) ?? ApiComun.ValidarConcepto(r.Concepto);
-        if (e is not null) return (null, e);
-        if (r.Fecha == default) return (null, "La fecha es obligatoria.");
-        if (!await db.Categorias.AnyAsync(c => c.Id == r.CategoriaId, ct)) return (null, "La categoría no existe en el hogar.");
-        if (!await ApiComun.EsAdultoActivo(db, r.PagadoPor, ct)) return (null, "Quien paga debe ser un adulto activo del hogar.");
+        if (e is not null) return (null, e, false);
+        if (r.Fecha == default) return (null, "La fecha es obligatoria.", false);
+        if (!await db.Categorias.AnyAsync(c => c.Id == r.CategoriaId, ct)) return (null, "La categoría no existe en el hogar.", false);
+        if (!await ApiComun.EsAdultoActivo(db, r.PagadoPor, ct)) return (null, "Quien paga debe ser un adulto activo del hogar.", false);
         var perfil = await db.PerfilesReparto.Include(p => p.Detalles).FirstOrDefaultAsync(p => p.Id == r.PerfilRepartoId, ct);
-        if (perfil is null) return (null, "El perfil de reparto no existe en el hogar.");
+        if (perfil is null) return (null, "El perfil de reparto no existe en el hogar.", false);
 
         var adultos = await ApiComun.AdultosActivos(db, ct);
-        var mes = new DateOnly(r.Fecha.Year, r.Fecha.Month, 1);
-        var ingresos = perfil.Modo == ModoReparto.Ingresos
-            ? await ApiComun.IngresosDelMes(db, mes, ct) : new Dictionary<Guid, decimal>();
-        var partes = ApiComun.Repartir(perfil, adultos, ingresos, r.Importe, r.PagadoPor, out var error);
-        return (partes, error);
+        var partes = ApiComun.Repartir(perfil, adultos, r.Importe, r.PagadoPor, out var error);
+        return (partes, error, perfil.Modo == ModoReparto.CuentaComun);
     }
 
     /// <summary>POST /api/gastos: crea el gasto y guarda su reparto en la misma transacción. 201 si se crea; 409 sin hogar; 400 si falla la validación o el reparto.</summary>
@@ -79,14 +77,14 @@ public static class GastosEndpoints
         GastoRequest req, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
-        var (partes, error) = await Preparar(req, db, ct);
+        var (partes, error, cuentaComun) = await Preparar(req, db, ct);
         if (partes is null) return ApiComun.Invalido(error!);
 
         var g = new Gasto
         {
             Id = Guid.NewGuid(), HogarId = hogarId, Fecha = req.Fecha, Importe = req.Importe,
             CategoriaId = req.CategoriaId, PagadoPor = req.PagadoPor, PerfilRepartoId = req.PerfilRepartoId,
-            Concepto = ApiComun.NormalizarConcepto(req.Concepto),
+            Concepto = ApiComun.NormalizarConcepto(req.Concepto), ACargoCuentaComun = cuentaComun,
         };
         ApiComun.AplicarReparto(g, partes);
         db.Gastos.Add(g);
@@ -101,7 +99,7 @@ public static class GastosEndpoints
         if (hogar.HogarId is null) return ApiComun.SinHogar();
         var g = await db.Gastos.Include(x => x.Repartos).FirstOrDefaultAsync(x => x.Id == id, ct);
         if (g is null) return Results.NotFound();
-        var (partes, error) = await Preparar(req, db, ct);
+        var (partes, error, cuentaComun) = await Preparar(req, db, ct);
         if (partes is null) return ApiComun.Invalido(error!);
 
         // Solo se recalcula este gasto; el resto del histórico no se toca.
@@ -111,6 +109,7 @@ public static class GastosEndpoints
         g.PagadoPor = req.PagadoPor;
         g.PerfilRepartoId = req.PerfilRepartoId;
         g.Concepto = ApiComun.NormalizarConcepto(req.Concepto);
+        g.ACargoCuentaComun = cuentaComun;
         ApiComun.AplicarReparto(g, partes);
         await db.SaveChangesAsync(ct);
         return Results.Ok(A(g));

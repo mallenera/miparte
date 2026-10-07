@@ -17,7 +17,7 @@ public class GastosLiquidacionTests
 
     private sealed record Escenario(
         HttpClient Cliente, WebApplicationFactory<Program> F, Guid Hogar, Guid Ana, Guid? Beto, Guid Categoria,
-        Guid Perfil5050, Guid Perfil6040, Guid PerfilIngresos, Guid PerfilIndividual);
+        Guid Perfil5050, Guid Perfil6040, Guid PerfilCuentaComun, Guid PerfilIndividual);
 
     private static async Task<Escenario> Montar(bool conBeto = true)
     {
@@ -55,7 +55,7 @@ public class GastosLiquidacionTests
             db.PerfilesReparto.AddRange(
                 Perfil(p5050, "50/50", ModoReparto.Porcentaje, 50, 50),
                 Perfil(p6040, "60/40", ModoReparto.Porcentaje, 60, 40),
-                Perfil(pIng, "Ingresos", ModoReparto.Ingresos, 0, 0),
+                Perfil(pIng, "Cuenta común", ModoReparto.CuentaComun, 0, 0),
                 Perfil(pInd, "Individual", ModoReparto.Individual, 0, 0));
             await db.SaveChangesAsync();
         }
@@ -95,21 +95,35 @@ public class GastosLiquidacionTests
     }
 
     [Fact]
-    public async Task Gasto_ModoIngresos_UsaLosIngresosDelMesDelGasto()
+    public async Task Gasto_CuentaComun_NoSeRepartePorPersonasNiGeneraDeuda()
     {
         var e = await Montar();
-        foreach (var (miembro, fecha, importe) in new[]
-        {
-            (e.Ana, "2026-09-01", 1000m), (e.Beto!.Value, "2026-09-02", 1500m), (e.Beto.Value, "2026-09-20", 1500m),
-            (e.Ana, "2026-08-01", 99999m), // otro mes: no cuenta
-        })
-            Assert.Equal(HttpStatusCode.Created,
-                (await e.Cliente.PostAsJsonAsync("/api/ingresos", new IngresoRequest(miembro, DateOnly.Parse(fecha), importe, null))).StatusCode);
+        var g = await CrearGasto(e, Gasto(e, 100m, e.PerfilCuentaComun)); // lo paga Ana, lo asume la cuenta común
 
-        var g = await CrearGasto(e, Gasto(e, 100m, e.PerfilIngresos));
+        Assert.True(g.ACargoCuentaComun);
+        Assert.Empty(g.Repartos);
+        var leido = await Leer<GastoResponse>(await e.Cliente.GetAsync($"/api/gastos/{g.Id}"));
+        Assert.True(leido.ACargoCuentaComun);
 
-        Assert.Equal(25m, g.Repartos.Single(r => r.MiembroId == e.Ana).ImporteAsumido);
-        Assert.Equal(75m, g.Repartos.Single(r => r.MiembroId == e.Beto.Value).ImporteAsumido);
+        var liq = await Leer<LiquidacionResponse>(await e.Cliente.GetAsync("/api/liquidacion?mes=2026-09"));
+        Assert.All(liq.Saldos, s => Assert.Equal(0m, s.Saldo));
+        Assert.Empty(liq.Transferencias);
+        var resumen = await Leer<ResumenMensualResponse>(await e.Cliente.GetAsync("/api/resumen?mes=2026-09"));
+        Assert.Equal(100m, resumen.GastosTotales);
+        Assert.All(resumen.Miembros, m => Assert.Equal((0m, 0m), (m.Pagado, m.Asumido)));
+    }
+
+    [Fact]
+    public async Task Gasto_CuentaComun_AlEditarAOtroPerfilVuelveARepartirse()
+    {
+        var e = await Montar();
+        var g = await CrearGasto(e, Gasto(e, 100m, e.PerfilCuentaComun));
+
+        var r = await e.Cliente.PutAsJsonAsync($"/api/gastos/{g.Id}", Gasto(e, 100m, e.Perfil6040));
+        var editado = await Leer<GastoResponse>(r);
+
+        Assert.False(editado.ACargoCuentaComun);
+        Assert.Equal(60m, editado.Repartos.Single(x => x.MiembroId == e.Ana).ImporteAsumido);
     }
 
     [Fact]
@@ -187,40 +201,6 @@ public class GastosLiquidacionTests
         Assert.Equal(HttpStatusCode.NotFound, (await e.Cliente.GetAsync($"/api/gastos/{sep.Id}")).StatusCode);
         using var scope = e.F.Services.CreateScope();
         Assert.Equal(2, await scope.ServiceProvider.GetRequiredService<MiParteDbContext>().GastosReparto.IgnoreQueryFilters().CountAsync());
-    }
-
-    [Fact]
-    public async Task Ingresos_CRUD_FiltroMes_YSoloAdultosActivos()
-    {
-        var e = await Montar();
-        var c = e.Cliente;
-        var creado = await c.PostAsJsonAsync("/api/ingresos", new IngresoRequest(e.Ana, new DateOnly(2026, 9, 1), 1200m, "Nómina"));
-        Assert.Equal(HttpStatusCode.Created, creado.StatusCode);
-        var ing = (await creado.Content.ReadFromJsonAsync<IngresoResponse>(Web))!;
-        await c.PostAsJsonAsync("/api/ingresos", new IngresoRequest(e.Ana, new DateOnly(2026, 10, 1), 1300m, null));
-
-        Assert.Equal(ing.Id, Assert.Single(await Leer<List<IngresoResponse>>(await c.GetAsync("/api/ingresos?mes=2026-09"))).Id);
-        Assert.Equal(2, (await Leer<List<IngresoResponse>>(await c.GetAsync("/api/ingresos"))).Count);
-
-        var editado = await Leer<IngresoResponse>(await c.PutAsJsonAsync($"/api/ingresos/{ing.Id}",
-            new IngresoRequest(e.Ana, new DateOnly(2026, 9, 3), 1250m, "Nómina+")));
-        Assert.Equal(1250m, editado.Importe);
-
-        Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync("/api/ingresos", new IngresoRequest(e.Ana, new DateOnly(2026, 9, 1), 0m, null))).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync("/api/ingresos", new IngresoRequest(Guid.NewGuid(), new DateOnly(2026, 9, 1), 5m, null))).StatusCode);
-
-        // Un miembro a cargo no puede tener ingresos.
-        var hijo = Guid.NewGuid();
-        using (var scope = e.F.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<MiParteDbContext>();
-            db.Miembros.Add(new Miembro { Id = hijo, HogarId = e.Hogar, Nombre = "Hijo", Tipo = TipoMiembro.ACargo, ResponsableId = e.Ana });
-            await db.SaveChangesAsync();
-        }
-        Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync("/api/ingresos", new IngresoRequest(hijo, new DateOnly(2026, 9, 1), 5m, null))).StatusCode);
-
-        Assert.Equal(HttpStatusCode.NoContent, (await c.DeleteAsync($"/api/ingresos/{ing.Id}")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/ingresos/{ing.Id}")).StatusCode);
     }
 
     [Fact]
@@ -331,15 +311,13 @@ public class GastosLiquidacionTests
     {
         var e = await Montar();
         var c = e.Cliente;
-        await c.PostAsJsonAsync("/api/ingresos", new IngresoRequest(e.Ana, new DateOnly(2026, 9, 1), 1000m, null));
-        await c.PostAsJsonAsync("/api/ingresos", new IngresoRequest(e.Beto!.Value, new DateOnly(2026, 9, 1), 500m, null));
         await CrearGasto(e, Gasto(e, 100m, e.Perfil6040)); // Ana paga; 60/40
         await CrearGasto(e, Gasto(e, 50m, e.Perfil5050, pagador: e.Beto.Value));
         await CrearGasto(e, Gasto(e, 999m, e.Perfil5050, "2026-10-01")); // otro mes
 
         var r = await Leer<ResumenMensualResponse>(await c.GetAsync("/api/resumen?mes=2026-09"));
 
-        Assert.Equal((1500m, 150m, 1350m), (r.IngresosTotales, r.GastosTotales, r.Queda));
+        Assert.Equal(150m, r.GastosTotales);
         var ana = r.Miembros.Single(m => m.MiembroId == e.Ana);
         Assert.Equal((100m, 85m), (ana.Pagado, ana.Asumido));
         var beto = r.Miembros.Single(m => m.MiembroId == e.Beto.Value);

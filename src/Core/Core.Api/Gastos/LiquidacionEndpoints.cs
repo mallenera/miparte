@@ -27,7 +27,7 @@ public static class LiquidacionEndpoints
         return await db.Gastos.Include(g => g.Repartos).Where(g => g.Fecha >= inicio && g.Fecha < fin).ToListAsync(ct);
     }
 
-    /// <summary>GET /api/resumen?mes=YYYY-MM: ingresos, gastos y balance del mes, con totales pagados y asumidos por miembro y desglose por categoría. 409 sin hogar; 400 si el mes es inválido.</summary>
+    /// <summary>GET /api/resumen?mes=YYYY-MM: gastos del mes, con totales pagados y asumidos por miembro y desglose por categoría. 409 sin hogar; 400 si el mes es inválido.</summary>
     private static async Task<IResult> ResumenAsync(
         [FromQuery] string? mes, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
@@ -35,12 +35,10 @@ public static class LiquidacionEndpoints
         if (!ApiComun.TryMes(mes, out var inicio)) return ApiComun.MesInvalido();
         var fin = inicio.AddMonths(1);
 
-        var ingresos = await db.Ingresos.Where(i => i.Fecha >= inicio && i.Fecha < fin).Select(i => i.Importe).ToListAsync(ct);
         var gastos = await GastosDelMes(db, inicio, ct);
         var miembros = await db.Miembros.ToListAsync(ct);
         var categorias = await db.Categorias.ToDictionaryAsync(c => c.Id, c => c.Nombre, ct);
 
-        var ingresosTotales = ingresos.Sum();
         var gastosTotales = gastos.Sum(g => g.Importe);
 
         var implicados = miembros.Where(m => m.Activo && m.Tipo == TipoMiembro.Adulto).Select(m => m.Id)
@@ -49,7 +47,7 @@ public static class LiquidacionEndpoints
         var porMiembro = miembros.Where(m => implicados.Contains(m.Id)).OrderBy(m => m.Nombre).ThenBy(m => m.Id)
             .Select(m => new ResumenMiembroDto(
                 m.Id, m.Nombre,
-                gastos.Where(g => g.PagadoPor == m.Id).Sum(g => g.Importe),
+                gastos.Where(g => g.PagadoPor == m.Id && !g.ACargoCuentaComun).Sum(g => g.Importe),
                 gastos.SelectMany(g => g.Repartos).Where(r => r.MiembroId == m.Id).Sum(r => r.ImporteAsumido)))
             .ToList();
 
@@ -62,7 +60,7 @@ public static class LiquidacionEndpoints
             .OrderBy(c => c.Nombre).ThenBy(c => c.CategoriaId).ToList();
 
         return Results.Ok(new ResumenMensualResponse(
-            ApiComun.FormatoMes(inicio), ingresosTotales, gastosTotales, ingresosTotales - gastosTotales, porMiembro, porCategoria));
+            ApiComun.FormatoMes(inicio), gastosTotales, porMiembro, porCategoria));
     }
 
     /// <summary>Resultado del cálculo de liquidación de un mes: saldos, transferencias propuestas, pagos registrados, nombres de miembros y si el mes tiene gastos.</summary>
@@ -73,7 +71,8 @@ public static class LiquidacionEndpoints
     /// <summary>Calcula los saldos del mes a partir de gastos y pagos de liquidación registrados, y las transferencias que los saldan.</summary>
     private static async Task<Calculo> Calcular(MiParteDbContext db, DateOnly inicio, CancellationToken ct)
     {
-        var gastos = await GastosDelMes(db, inicio, ct);
+        // Lo que asume la cuenta común no entra en la deuda entre personas.
+        var gastos = (await GastosDelMes(db, inicio, ct)).Where(g => !g.ACargoCuentaComun).ToList();
         var pagos = await db.PagosLiquidacion.Where(p => p.Mes == inicio).OrderBy(p => p.Fecha).ThenBy(p => p.Id).ToListAsync(ct);
         var miembros = await db.Miembros.ToListAsync(ct);
 

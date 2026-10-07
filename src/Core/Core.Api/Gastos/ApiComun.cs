@@ -6,7 +6,7 @@ using MiParte.Core.Infrastructure.Persistencia;
 
 namespace MiParte.Core.Api.Gastos;
 
-/// <summary>Utilidades compartidas por los endpoints de ingresos, gastos, recurrentes y liquidación.</summary>
+/// <summary>Utilidades compartidas por los endpoints de gastos, recurrentes y liquidación.</summary>
 internal static partial class ApiComun
 {
     /// <summary>Longitud máxima del concepto de un movimiento.</summary>
@@ -67,32 +67,23 @@ internal static partial class ApiComun
     public static Task<bool> EsAdultoActivo(MiParteDbContext db, Guid id, CancellationToken ct)
         => db.Miembros.AnyAsync(m => m.Id == id && m.Activo && m.Tipo == TipoMiembro.Adulto, ct);
 
-    /// <summary>Suma de ingresos de cada miembro en el mes que empieza en <paramref name="inicio"/>.</summary>
-    public static async Task<Dictionary<Guid, decimal>> IngresosDelMes(MiParteDbContext db, DateOnly inicio, CancellationToken ct)
-    {
-        var fin = inicio.AddMonths(1);
-        var filas = await db.Ingresos.Where(i => i.Fecha >= inicio && i.Fecha < fin)
-            .Select(i => new { i.MiembroId, i.Importe }).ToListAsync(ct);
-        return filas.GroupBy(f => f.MiembroId).ToDictionary(g => g.Key, g => g.Sum(x => x.Importe));
-    }
-
     /// <summary>
     /// Calcula el reparto de un gasto entre los adultos activos según el modo del perfil.
     /// Devuelve null y un mensaje si no se puede repartir.
     /// </summary>
     public static IReadOnlyList<ParteAsumida>? Repartir(
-        PerfilReparto perfil, IReadOnlyList<Miembro> adultos, IReadOnlyDictionary<Guid, decimal> ingresosMes,
+        PerfilReparto perfil, IReadOnlyList<Miembro> adultos,
         decimal importe, Guid pagadoPor, out string? error)
     {
         error = null;
+        if (perfil.Modo == ModoReparto.CuentaComun) return []; // lo asume la cuenta común: sin reparto entre personas
         if (adultos.Count == 0) { error = "El hogar no tiene adultos activos entre los que repartir."; return null; }
 
         var miembros = adultos.Select(a => new MiembroReparto(a.Id, perfil.Modo switch
         {
             ModoReparto.Porcentaje or ModoReparto.Partes
                 => perfil.Detalles.Where(d => d.MiembroId == a.Id).Sum(d => d.Valor),
-            ModoReparto.Ingresos => ingresosMes.GetValueOrDefault(a.Id),
-            _ => 0m,
+                        _ => 0m,
         })).ToList();
 
         if (perfil.Modo is ModoReparto.Porcentaje or ModoReparto.Partes && adultos.Count > 1 && miembros.All(m => m.Valor <= 0))

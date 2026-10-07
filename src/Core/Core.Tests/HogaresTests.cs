@@ -61,7 +61,7 @@ public class HogaresTests
         var perfiles = await db.PerfilesReparto.IgnoreQueryFilters().Where(p => p.HogarId == creado!.Id).ToListAsync();
         Assert.Equal(4, perfiles.Count);
         var porNombre = perfiles.ToDictionary(p => p.Nombre);
-        Assert.Equal(ModoReparto.Ingresos, porNombre[SemillaHogar.PerfilIngresos].Modo);
+        Assert.Equal(ModoReparto.CuentaComun, porNombre[SemillaHogar.PerfilCuentaComun].Modo);
         Assert.Equal(ModoReparto.Partes, porNombre[SemillaHogar.PerfilPartes].Modo);
         Assert.Equal(ModoReparto.Porcentaje, porNombre[SemillaHogar.PerfilPorcentaje].Modo);
         Assert.Equal(ModoReparto.Individual, porNombre[SemillaHogar.PerfilIndividual].Modo);
@@ -70,7 +70,7 @@ public class HogaresTests
         Assert.Equal(6, categorias.Count);
         foreach (var (nombre, perfil) in SemillaHogar.Categorias)
             Assert.Equal(porNombre[perfil].Id, categorias.Single(x => x.Nombre == nombre).PerfilRepartoId);
-        Assert.Equal(4, categorias.Count(x => x.PerfilRepartoId == porNombre[SemillaHogar.PerfilIngresos].Id));
+        Assert.Equal(5, categorias.Count(x => x.PerfilRepartoId == porNombre[SemillaHogar.PerfilPartes].Id));
 
         var detalles = await db.PerfilesRepartoDetalle.IgnoreQueryFilters().Where(d => d.HogarId == creado!.Id).ToListAsync();
         Assert.Equal(2, detalles.Count);

@@ -120,12 +120,12 @@ public class CategoriasPerfilesTests
     }
 
     [Fact]
-    public async Task Perfil_IngresosEIndividual_NoLlevanDetalle()
+    public async Task Perfil_CuentaComunEIndividual_NoLlevanDetalle()
     {
         using var x = await Preparar();
-        Assert.Equal(HttpStatusCode.Created, (await CrearPerfil(x.C, "Por ingresos", "ingresos")).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await CrearPerfil(x.C, "Cuenta común", "cuenta_comun")).StatusCode);
         Assert.Equal(HttpStatusCode.Created, (await CrearPerfil(x.C, "Individual", "individual")).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await CrearPerfil(x.C, "Ing con detalle", "ingresos",
+        Assert.Equal(HttpStatusCode.BadRequest, (await CrearPerfil(x.C, "CC con detalle", "cuenta_comun",
             new PerfilDetalleDto(x.MiembroId, 1))).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await CrearPerfil(x.C, "Ind con detalle", "individual",
             new PerfilDetalleDto(x.MiembroId, 1))).StatusCode);
@@ -161,7 +161,7 @@ public class CategoriasPerfilesTests
         var inactivo = await AnadirMiembro(x.F, x.HogarId, activo: false);
 
         Assert.Equal(HttpStatusCode.BadRequest, (await CrearPerfil(x.C, "  ", "partes", new PerfilDetalleDto(x.MiembroId, 1))).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await CrearPerfil(x.C, new string('a', 101), "ingresos")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await CrearPerfil(x.C, new string('a', 101), "cuenta_comun")).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await CrearPerfil(x.C, "Modo raro", "otro")).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await CrearPerfil(x.C, "Sin detalle", "partes")).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await CrearPerfil(x.C, "Ajeno", "partes", new PerfilDetalleDto(Guid.NewGuid(), 1))).StatusCode);
@@ -175,13 +175,13 @@ public class CategoriasPerfilesTests
     public async Task Perfil_NombreDuplicado_409_YPutPermiteMismoNombre()
     {
         using var x = await Preparar();
-        var id = await IdPerfil(x.C, "Igual", "ingresos");
+        var id = await IdPerfil(x.C, "Igual", "cuenta_comun");
         Assert.Equal(HttpStatusCode.Conflict, (await CrearPerfil(x.C, "Igual", "individual")).StatusCode);
 
-        var otro = await IdPerfil(x.C, "Otro", "ingresos");
+        var otro = await IdPerfil(x.C, "Otro", "cuenta_comun");
         // Mismo nombre que otro perfil: 409. Mismo nombre que el propio: OK.
         Assert.Equal(HttpStatusCode.Conflict, (await x.C.PutAsJsonAsync($"/api/perfiles/{otro}",
-            new GuardarPerfilRequest("Igual", "ingresos", null))).StatusCode);
+            new GuardarPerfilRequest("Igual", "cuenta_comun", null))).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await x.C.PutAsJsonAsync($"/api/perfiles/{id}",
             new GuardarPerfilRequest("Igual", "individual", null))).StatusCode);
     }
@@ -205,7 +205,7 @@ public class CategoriasPerfilesTests
         Assert.Equal(2, get.Detalle.Count);
 
         Assert.Equal(HttpStatusCode.NotFound, (await x.C.PutAsJsonAsync($"/api/perfiles/{Guid.NewGuid()}",
-            new GuardarPerfilRequest("Z", "ingresos", null))).StatusCode);
+            new GuardarPerfilRequest("Z", "cuenta_comun", null))).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await x.C.GetAsync($"/api/perfiles/{Guid.NewGuid()}")).StatusCode);
     }
 
@@ -213,11 +213,11 @@ public class CategoriasPerfilesTests
     public async Task Perfil_Delete_204_404_Y409SiLoUsanCategoriaOGasto()
     {
         using var x = await Preparar();
-        var libre = await IdPerfil(x.C, "Libre", "ingresos");
+        var libre = await IdPerfil(x.C, "Libre", "cuenta_comun");
         Assert.Equal(HttpStatusCode.NoContent, (await x.C.DeleteAsync($"/api/perfiles/{libre}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await x.C.DeleteAsync($"/api/perfiles/{libre}")).StatusCode);
 
-        var conCat = await IdPerfil(x.C, "ConCat", "ingresos");
+        var conCat = await IdPerfil(x.C, "ConCat", "cuenta_comun");
         await IdCategoria(x.C, "Luz", perfil: conCat);
         Assert.Equal(HttpStatusCode.Conflict, (await x.C.DeleteAsync($"/api/perfiles/{conCat}")).StatusCode);
 
@@ -241,7 +241,7 @@ public class CategoriasPerfilesTests
     public async Task Categoria_CrudBasico()
     {
         using var x = await Preparar();
-        var perfil = await IdPerfil(x.C, "Ingresos", "ingresos");
+        var perfil = await IdPerfil(x.C, "CuentaComun", "cuenta_comun");
         var padre = await IdCategoria(x.C, "Hogar");
         var hija = await IdCategoria(x.C, "Luz", padre, perfil);
 
@@ -337,7 +337,7 @@ public class CategoriasPerfilesTests
     {
         using var a = await Preparar();
         using var b = await Preparar(a.F);
-        var perfilA = await IdPerfil(a.C, "PA", "ingresos");
+        var perfilA = await IdPerfil(a.C, "PA", "cuenta_comun");
         var catA = await IdCategoria(a.C, "CA");
 
         Assert.Empty((await (await b.C.GetAsync("/api/perfiles")).Content.ReadFromJsonAsync<List<PerfilRepartoDto>>(Web))!);
@@ -352,6 +352,6 @@ public class CategoriasPerfilesTests
         Assert.Equal(HttpStatusCode.BadRequest, (await CrearPerfil(b.C, "Z", "partes",
             new PerfilDetalleDto(a.MiembroId, 1))).StatusCode);
         // Mismo nombre en hogares distintos es válido.
-        Assert.Equal(HttpStatusCode.Created, (await CrearPerfil(b.C, "PA", "ingresos")).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await CrearPerfil(b.C, "PA", "cuenta_comun")).StatusCode);
     }
 }

@@ -28,27 +28,9 @@ public class RepartoNMiembrosTests
     }
 
     [Fact]
-    public void Ingresos_CuatroMiembros_ProporcionalesYSumaExacta()
+    public void CuentaComun_NoSeRepartePorPersonas()
     {
-        var r = RepartoMiembros.Repartir(1000m, ModoReparto.Ingresos,
-            [new(A, 1500m), new(B, 1000m), new(C, 500m), new(D, 333m)], A);
-        Assert.Equal(1000m, r.Sum(p => p.Importe));
-        Assert.Equal(4, r.Count);
-        Assert.True(r[0].Importe > r[1].Importe && r[1].Importe > r[2].Importe && r[2].Importe > r[3].Importe);
-    }
-
-    [Fact]
-    public void Ingresos_TodosCero_PartesIguales()
-    {
-        var r = RepartoMiembros.Repartir(90m, ModoReparto.Ingresos, [new(A, 0m), new(B, 0m), new(C, 0m)], A);
-        Assert.Equal([30m, 30m, 30m], Importes(r));
-    }
-
-    [Fact]
-    public void Ingresos_UnoACero_NoAsumeNada()
-    {
-        var r = RepartoMiembros.Repartir(100m, ModoReparto.Ingresos, [new(A, 2000m), new(B, 0m)], A);
-        Assert.Equal([100m, 0m], Importes(r));
+        Assert.Throws<ArgumentException>(() => RepartoMiembros.Repartir(100m, ModoReparto.CuentaComun, [new(A, 1m), new(B, 1m)], A));
     }
 
     [Fact]

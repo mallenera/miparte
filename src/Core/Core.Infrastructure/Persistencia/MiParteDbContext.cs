@@ -24,8 +24,6 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
     public DbSet<PerfilRepartoDetalle> PerfilesRepartoDetalle => Set<PerfilRepartoDetalle>();
     /// <summary>Conjunto de <see cref="Categoria"/> del hogar actual.</summary>
     public DbSet<Categoria> Categorias => Set<Categoria>();
-    /// <summary>Conjunto de <see cref="Ingreso"/> del hogar actual.</summary>
-    public DbSet<Ingreso> Ingresos => Set<Ingreso>();
     /// <summary>Conjunto de <see cref="GastoRecurrente"/> del hogar actual.</summary>
     public DbSet<GastoRecurrente> GastosRecurrentes => Set<GastoRecurrente>();
     /// <summary>Conjunto de <see cref="Gasto"/> del hogar actual.</summary>
@@ -103,13 +101,6 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
             e.HasQueryFilter(x => x.HogarId == HogarId);
         });
 
-        b.Entity<Ingreso>(e =>
-        {
-            e.ToTable("ingreso");
-            e.Property(x => x.Importe).HasPrecision(12, 2);
-            e.HasQueryFilter(x => x.HogarId == HogarId);
-        });
-
         b.Entity<GastoRecurrente>(e =>
         {
             e.ToTable("gasto_recurrente");
@@ -139,7 +130,7 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
     {
         ModoReparto.Porcentaje => "porcentaje",
         ModoReparto.Partes => "partes",
-        ModoReparto.Ingresos => "ingresos",
+        ModoReparto.CuentaComun => "cuenta_comun",
         ModoReparto.Individual => "individual",
         _ => throw new ArgumentOutOfRangeException(nameof(m)),
     };
@@ -149,7 +140,7 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
     {
         "porcentaje" => ModoReparto.Porcentaje,
         "partes" => ModoReparto.Partes,
-        "ingresos" => ModoReparto.Ingresos,
+        "cuenta_comun" => ModoReparto.CuentaComun,
         "individual" => ModoReparto.Individual,
         _ => throw new InvalidOperationException($"Modo de reparto desconocido: {t}"),
     };

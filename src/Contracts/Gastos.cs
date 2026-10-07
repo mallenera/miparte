@@ -24,10 +24,11 @@ public record RepartoGastoDto(Guid MiembroId, decimal ImporteAsumido);
 /// <param name="PerfilRepartoId">Perfil de reparto usado al crear el gasto.</param>
 /// <param name="Concepto">Descripción opcional del gasto.</param>
 /// <param name="GastoRecurrenteId">Plantilla recurrente que lo generó, o null si es manual.</param>
-/// <param name="Repartos">Importe asumido por cada miembro, guardado al crear el gasto.</param>
+/// <param name="Repartos">Importe asumido por cada miembro, guardado al crear el gasto; vacío si lo asume la cuenta común.</param>
+/// <param name="ACargoCuentaComun">Si lo asume la cuenta común (perfil «cuenta común»): sin reparto entre personas ni deuda.</param>
 public record GastoResponse(
     Guid Id, DateOnly Fecha, decimal Importe, Guid CategoriaId, Guid PagadoPor, Guid PerfilRepartoId,
-    string? Concepto, Guid? GastoRecurrenteId, IReadOnlyList<RepartoGastoDto> Repartos);
+    string? Concepto, Guid? GastoRecurrenteId, IReadOnlyList<RepartoGastoDto> Repartos, bool ACargoCuentaComun = false);
 
 /// <summary>Plantilla de gasto mensual. DiaMes entre 1 y 28.</summary>
 /// <param name="Importe">Importe del gasto que se generará cada mes.</param>

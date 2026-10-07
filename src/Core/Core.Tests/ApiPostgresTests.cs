@@ -127,7 +127,7 @@ public class ApiPostgresTests
     }
 
     [SkippableFact]
-    public async Task Ingreso_Gasto_Resumen_Liquidacion_EnPostgres()
+    public async Task Gasto_Resumen_Liquidacion_EnPostgres()
     {
         Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
         await using var e = new Entorno();
@@ -137,12 +137,9 @@ public class ApiPostgresTests
 
         var ana = (await Leer<List<MiembroDto>>(await c.GetAsync("/api/miembros"))).Single();
         var perfil = (await Leer<List<PerfilRepartoDto>>(await c.GetAsync("/api/perfiles")))
-            .Single(p => p.Modo == "ingresos");
+            .Single(p => p.Modo == "partes");
         var categoria = (await Leer<List<CategoriaDto>>(await c.GetAsync("/api/categorias")))
             .Single(x => x.Nombre == "Alimentación");
-
-        await Leer<IngresoResponse>(await c.PostAsJsonAsync("/api/ingresos",
-            new IngresoRequest(ana.Id, new DateOnly(2026, 10, 1), 2000m, "Nómina")), HttpStatusCode.Created);
 
         var gasto = await Leer<GastoResponse>(await c.PostAsJsonAsync("/api/gastos",
             new GastoRequest(new DateOnly(2026, 10, 3), 100.01m, categoria.Id, ana.Id, perfil.Id, "Compra")),
@@ -152,7 +149,6 @@ public class ApiPostgresTests
         Assert.Single(await Leer<List<GastoResponse>>(await c.GetAsync("/api/gastos?mes=2026-10")));
 
         var resumen = await Leer<ResumenMensualResponse>(await c.GetAsync("/api/resumen?mes=2026-10"));
-        Assert.Equal(2000m, resumen.IngresosTotales);
         Assert.Equal(100.01m, resumen.GastosTotales);
 
         var liquidacion = await Leer<LiquidacionResponse>(await c.GetAsync("/api/liquidacion?mes=2026-10"));

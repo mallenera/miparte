@@ -132,12 +132,11 @@ public static class RecurrentesEndpoints
             if (pendientes.Count > 0)
             {
                 var adultos = await ApiComun.AdultosActivos(db, ct);
-                var ingresos = await ApiComun.IngresosDelMes(db, inicio, ct);
                 var perfiles = await db.PerfilesReparto.Include(p => p.Detalles).ToDictionaryAsync(p => p.Id, ct);
 
                 foreach (var p in pendientes)
                 {
-                    var partes = ApiComun.Repartir(perfiles[p.PerfilRepartoId], adultos, ingresos, p.Importe, p.PagadoPor, out var error);
+                    var partes = ApiComun.Repartir(perfiles[p.PerfilRepartoId], adultos, p.Importe, p.PagadoPor, out var error);
                     if (partes is null) // nada se guarda: o se generan todos o ninguno
                         return ApiComun.Invalido($"No se puede repartir el gasto recurrente '{p.Concepto ?? p.Id.ToString()}': {error}");
 
@@ -146,6 +145,7 @@ public static class RecurrentesEndpoints
                         Id = Guid.NewGuid(), HogarId = hogarId, Fecha = new DateOnly(inicio.Year, inicio.Month, p.DiaMes),
                         Importe = p.Importe, CategoriaId = p.CategoriaId, PagadoPor = p.PagadoPor,
                         PerfilRepartoId = p.PerfilRepartoId, Concepto = p.Concepto, GastoRecurrenteId = p.Id,
+                        ACargoCuentaComun = perfiles[p.PerfilRepartoId].Modo == ModoReparto.CuentaComun,
                     };
                     ApiComun.AplicarReparto(g, partes);
                     db.Gastos.Add(g);

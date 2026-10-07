@@ -59,7 +59,7 @@ public class EsquemaPostgresTests
         {
             ctx.PerfilesReparto.Add(new PerfilReparto
             {
-                Id = perfil, HogarId = hogarA, Nombre = "Ingresos", Modo = ModoReparto.Ingresos,
+                Id = perfil, HogarId = hogarA, Nombre = "Cuenta común", Modo = ModoReparto.CuentaComun,
             });
             ctx.Categorias.Add(new Categoria { Id = categoria, HogarId = hogarA, Nombre = "Casa" });
             await ctx.SaveChangesAsync();
@@ -83,7 +83,7 @@ public class EsquemaPostgresTests
             Assert.Equal(900m, gasto.Importe);
             Assert.Equal(900m, gasto.Repartos.Sum(r => r.ImporteAsumido));
             var p = await ctx.PerfilesReparto.SingleAsync();
-            Assert.Equal(ModoReparto.Ingresos, p.Modo);
+            Assert.Equal(ModoReparto.CuentaComun, p.Modo);
         }
 
         await using (var ctx = Crear(hogarB))

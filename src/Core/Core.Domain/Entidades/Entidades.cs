@@ -3,8 +3,8 @@ namespace MiParte.Core.Domain.Entidades;
 /// <summary>Tipo de miembro: adulto con cuenta propia o persona a cargo de un responsable.</summary>
 public enum TipoMiembro { Adulto, ACargo }
 
-/// <summary>Modo en que se reparte un gasto: por porcentaje, partes, ingresos del mes o íntegro a quien paga.</summary>
-public enum ModoReparto { Porcentaje, Partes, Ingresos, Individual }
+/// <summary>Modo en que se reparte un gasto: por porcentaje, partes, a cargo de la cuenta común (sin reparto entre personas) o íntegro a quien paga.</summary>
+public enum ModoReparto { Porcentaje, Partes, CuentaComun, Individual }
 
 /// <summary>Rol de un miembro dentro del hogar.</summary>
 public enum RolMiembro { Admin, Miembro }
@@ -137,23 +137,6 @@ public class Categoria
     public Guid? PerfilRepartoId { get; set; }
 }
 
-/// <summary>Ingreso de un miembro; los ingresos del mes sirven de peso en el reparto por ingresos.</summary>
-public class Ingreso
-{
-    /// <summary>Identificador del ingreso.</summary>
-    public Guid Id { get; set; }
-    /// <summary>Hogar al que pertenece el ingreso.</summary>
-    public Guid HogarId { get; set; }
-    /// <summary>Miembro que percibe el ingreso.</summary>
-    public Guid MiembroId { get; set; }
-    /// <summary>Fecha del ingreso.</summary>
-    public DateOnly Fecha { get; set; }
-    /// <summary>Importe del ingreso.</summary>
-    public decimal Importe { get; set; }
-    /// <summary>Descripción opcional.</summary>
-    public string? Concepto { get; set; }
-}
-
 /// <summary>Plantilla de gasto que se genera periódicamente un día fijo del mes.</summary>
 public class GastoRecurrente
 {
@@ -198,6 +181,8 @@ public class Gasto
     public string? Concepto { get; set; }
     /// <summary>Gasto recurrente que lo originó; null si se registró a mano.</summary>
     public Guid? GastoRecurrenteId { get; set; }
+    /// <summary>Si lo asume la cuenta común (perfil «cuenta común»): no se reparte entre personas ni genera deuda.</summary>
+    public bool ACargoCuentaComun { get; set; }
     /// <summary>Importe asumido por cada miembro.</summary>
     public List<GastoReparto> Repartos { get; set; } = [];
 }

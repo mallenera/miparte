@@ -10,6 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="bunit" Version="1.*" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.*" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.*" />
     <PackageReference Include="xunit" Version="2.9.*" />

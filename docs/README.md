@@ -25,7 +25,7 @@ Actualizado el 2026-10-07. Mantén esta tabla al día cuando cierres o cambies a
 
 | Tema del diseño | Estado en el código |
 |---|---|
-| Ingresos del hogar **no se guardan**; perfiles = individual, porcentajes, partes y cuenta común | **Hecho** (sin commitear): migración `20261007000000_perfiles_cuenta_comun_sin_ingresos.sql` (elimina `ingreso`, sustituye el modo `ingresos` por `cuenta_comun`, añade `gasto.a_cargo_cuenta_comun`; no ejecutada contra Postgres real en local). Un gasto con perfil de cuenta común no se reparte ni genera deuda. |
+| Ingresos del hogar **no se guardan**; perfiles = individual, porcentajes, partes y cuenta común | **Hecho** (sin commitear): migración `20261007000000_perfiles_cuenta_comun_sin_ingresos.sql` (elimina `ingreso`, convierte los perfiles con modo `ingresos` en `partes`, añade el modo nuevo `cuenta_comun`, añade `gasto.a_cargo_cuenta_comun`; no ejecutada contra Postgres real en local). Un gasto con perfil de cuenta común no se reparte ni genera deuda. |
 | Cuenta común: aportaciones, saldo, reembolsos | **Sin implementar**; solo existe el modo de perfil y el marcado del gasto. |
 | Categorías con subcategorías y perfil por defecto | Esquema con `categoria_padre_id`; la UI aún no gestiona subcategorías. |
 | Gastos, recurrentes, pagos de liquidación y resumen | API hecha. Front: solo Gastos; faltan recurrentes, resumen y liquidación. |

@@ -15,5 +15,5 @@ public record PerfilRepartoDto(Guid Id, string Nombre, string Modo, IReadOnlyLis
 /// <summary>Alta y edición de perfil (PUT reemplaza nombre, modo y detalle).</summary>
 /// <param name="Nombre">Nombre del perfil (máximo 100 caracteres).</param>
 /// <param name="Modo">Modo de reparto: "porcentaje", "partes", "cuenta_comun" o "individual".</param>
-/// <param name="Detalle">Valor por miembro; obligatorio en "porcentaje" y "partes", sin uso en "cuenta_comun" e "individual".</param>
+/// <param name="Detalle">Valor por miembro; obligatorio en "porcentaje" y "partes", debe estar vacío u omitirse en "cuenta_comun" e "individual" (si no, la API responde 400).</param>
 public record GuardarPerfilRequest(string Nombre, string Modo, IReadOnlyList<PerfilDetalleDto>? Detalle);

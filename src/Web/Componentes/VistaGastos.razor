@@ -188,6 +188,7 @@ else
         _mes = _mes.AddMonths(delta);
         _error = null;
         _confirmandoEliminar = null;
+        if (_editando is not null) ReiniciarFormulario();
         try
         {
             await RecargarGastosAsync();

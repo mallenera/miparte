@@ -34,7 +34,7 @@ erDiagram
 | `perfil_reparto_detalle` | Valor (% o partes) por miembro y perfil. No se usa en `cuenta_comun` ni en `individual`. |
 | `categoria` | Jerárquica (`categoria_padre_id`) con perfil de reparto por defecto. |
 | `gasto` | Fecha, `importe > 0` con 2 decimales, categoría, `pagado_por`, perfil aplicado, concepto, `gasto_recurrente_id` de origen, `a_cargo_cuenta_comun` (sin filas en `gasto_reparto`, fuera de la liquidación). |
-| `gasto_reparto` | **Resultado del reparto congelado al crear el gasto**: `importe_asumido` por miembro. No se recalcula salvo con `PUT` del gasto. La suma de las filas = importe del gasto. |
+| `gasto_reparto` | **Resultado del reparto congelado al crear el gasto**: `importe_asumido` por miembro. No se recalcula salvo con `PUT` del gasto. En los gastos repartidos, la suma de las filas = importe del gasto; los `a_cargo_cuenta_comun` no tienen filas. |
 | `gasto_recurrente` | Plantilla mensual, `dia_mes` 1-28, `activo`. Índice único evita duplicar la generación de un mes (idempotente). |
 | `invitacion_hogar` | Solo se guarda el **hash SHA-256** del token; caduca a 7 días; un solo uso (`usada_en`/`usada_por`). |
 | `pago_liquidacion` | Transferencia real `de_miembro_id` → `a_miembro_id` en un `mes` (primer día del mes) para saldar la liquidación. |
@@ -47,4 +47,4 @@ erDiagram
 - Cambiar partes o perfiles solo afecta a gastos **nuevos**.
 
 ## Pendiente de modelar (ver diseño)
-Cuenta común (aportaciones mensuales por adulto, gasto «a cargo de la cuenta» y reembolsos), cierre de mes, gastos personales fuera de liquidación, etiquetas, historial de cambios. Cada uno requerirá una migración SQL nueva y su mapeo en `MiParteDbContext`.
+Cuenta común (aportaciones mensuales por adulto, saldo y reembolsos; el gasto «a cargo de la cuenta» ya está modelado), cierre de mes, gastos personales fuera de liquidación, etiquetas, historial de cambios. Cada uno requerirá una migración SQL nueva y su mapeo en `MiParteDbContext`.

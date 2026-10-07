@@ -1,16 +1,8 @@
 @page "/"
 @attribute [Authorize]
-@inject EstadoHogar Hogar
 
 <PageTitle>Resumen · Mi parte, tu parte</PageTitle>
 
 <RequiereHogar>
-    <section class="card">
-        <h1 class="page-title">@Hogar.HogarActual!.Nombre</h1>
-        <p class="muted">El resumen del mes, los gastos y la liquidación llegarán en la siguiente fase.</p>
-        <div class="actions">
-            <a class="btn" href="hogar">Miembros y reparto</a>
-            <a class="btn btn-ghost" href="categorias">Categorías</a>
-        </div>
-    </section>
+    <VistaResumen />
 </RequiereHogar>

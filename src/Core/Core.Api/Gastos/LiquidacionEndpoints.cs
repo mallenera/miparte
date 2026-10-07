@@ -46,14 +46,16 @@ public static class LiquidacionEndpoints
 
         var gastosTotales = gastos.Sum(g => g.Importe);
 
-        var implicados = miembros.Where(m => m.Activo && m.Tipo == TipoMiembro.Adulto).Select(m => m.Id)
-            .Concat(gastos.Where(g => g.PagadoPor is not null).Select(g => g.PagadoPor!.Value))
-            .Concat(gastos.SelectMany(g => g.Repartos).Select(r => r.MiembroId))
-            .ToHashSet();
         // Lo que adelantó un miembro para la cuenta común cuenta como pagado, y la cuenta le debe lo aún no reembolsado.
         var reembolsos = await db.ReembolsosCuenta.ToListAsync(ct);
         var cuenta = CuentaComun.Calcular(
             inicio, [], await GastosDeCuenta(db, ct), reembolsos.Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe)));
+        // Los acreedores con pendiente de meses anteriores aparecen aunque no participen en los gastos de este mes (p. ej. un miembro ya inactivo).
+        var implicados = miembros.Where(m => m.Activo && m.Tipo == TipoMiembro.Adulto).Select(m => m.Id)
+            .Concat(gastos.Where(g => g.PagadoPor is not null).Select(g => g.PagadoPor!.Value))
+            .Concat(gastos.SelectMany(g => g.Repartos).Select(r => r.MiembroId))
+            .Concat(cuenta.Pendientes.Where(p => p.Importe > 0m).Select(p => p.MiembroId))
+            .ToHashSet();
         var porMiembro = miembros.Where(m => implicados.Contains(m.Id)).OrderBy(m => m.Nombre).ThenBy(m => m.Id)
             .Select(m => new ResumenMiembroDto(
                 m.Id, m.Nombre,

@@ -29,6 +29,7 @@ public sealed class ServicioTema
         new("oceano", "Océano"),
         new("bosque", "Bosque"),
         new("medianoche", "Medianoche"),
+        new("grafito", "Grafito"),
     ];
 
     private readonly IAlmacenLocal _almacen;

@@ -45,11 +45,11 @@
 
 /*
   Temas: sin atributo `data-tema` en <html> se sigue el del sistema (claro u oscuro). Con él se fuerza uno:
-  claro y oscuro (marca), oceano y bosque (claros), medianoche (oscuro). El selector `[data-tema]` sin :root
+  claro y oscuro (marca), oceano y bosque (claros), medianoche y grafito (oscuros). El selector `[data-tema]` sin :root
   permite mostrar una muestra de cada tema dentro del menú (ver .muestra).
 */
 /* Valores comunes a todos los temas oscuros: estados, colores de miembro y sombra. */
-[data-tema="oscuro"], [data-tema="medianoche"] {
+[data-tema="oscuro"], [data-tema="medianoche"], [data-tema="grafito"] {
     --err: #FF8F86;
     --err-soft: #4A2220;
     --ok: #7FD39B;
@@ -132,6 +132,22 @@
     --orange-text: #F8C86E;
     --orange-soft: #3A2E12;
     --on-orange: #0E1220;
+}
+
+[data-tema="grafito"] {
+    --bg: #131416;
+    --surface: #1C1E21;
+    --surface-2: #25282C;
+    --ink: #ECEDEE;
+    --ink-2: #A0A6AD;
+    --line: #32363B;
+    --wine: #5B6B7C;
+    --wine-text: #B4C0CC;
+    --wine-soft: #262E37;
+    --orange: #D9A441;
+    --orange-text: #E6B85C;
+    --orange-soft: #382C14;
+    --on-orange: #131416;
 }
 
 [data-tema="oceano"] {

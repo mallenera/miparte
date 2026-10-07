@@ -53,3 +53,9 @@ Símbolo blanco/crema sobre burdeos con esquinas redondeadas (`rx` ≈ 22 %). Ya
 
 ## Modo oscuro
 Propio, no una inversión automática: se activa con `prefers-color-scheme` y con `data-theme="dark|light"` en `<html>`.
+
+> **Rediseño `feature/web-design` (código manda sobre este documento):** la web ya no tiene tema claro. Solo hay un tema oscuro
+> (fondo `#020617`, texto `#F1F5F9`, equivalentes a `slate-950`/`slate-100` de Tailwind) con verde menta neón `#3DFFB4` reservado a
+> la acción principal (`.btn`); burdeos y naranja quedan en logotipo, pestaña activa y resplandores de fondo. Los tokens siguen
+> en `wwwroot/css/app.css` (no se usa Tailwind) y los iconos son Lucide incrustados como SVG en `Componentes/Icono.razor`
+> (el front es Blazor, no React). La paleta clara de la tabla de arriba queda como referencia histórica.

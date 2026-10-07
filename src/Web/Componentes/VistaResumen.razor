@@ -23,9 +23,9 @@ else if (_resumen is not null && _liquidacion is not null)
         <div class="card-head">
             <h2 id="t-resumen">Resumen del mes</h2>
             <div class="mesnav">
-                <button class="linkbtn" type="button" aria-label="Mes anterior" @onclick="() => CambiarMesAsync(-1)">‹</button>
+                <button class="linkbtn" type="button" aria-label="Mes anterior" @onclick="() => CambiarMesAsync(-1)"><Icono Nombre="chevron-left" /></button>
                 <span class="tag cur" aria-live="polite">@NombreMes</span>
-                <button class="linkbtn" type="button" aria-label="Mes siguiente" @onclick="() => CambiarMesAsync(1)">›</button>
+                <button class="linkbtn" type="button" aria-label="Mes siguiente" @onclick="() => CambiarMesAsync(1)"><Icono Nombre="chevron-right" /></button>
             </div>
         </div>
 

@@ -24,9 +24,9 @@ else
         <div class="card-head">
             <h2 id="t-generar">Generar gastos del mes</h2>
             <div class="mesnav">
-                <button class="linkbtn" type="button" aria-label="Mes anterior" @onclick="() => CambiarMes(-1)">‹</button>
+                <button class="linkbtn" type="button" aria-label="Mes anterior" @onclick="() => CambiarMes(-1)"><Icono Nombre="chevron-left" /></button>
                 <span class="tag cur" aria-live="polite">@NombreMes</span>
-                <button class="linkbtn" type="button" aria-label="Mes siguiente" @onclick="() => CambiarMes(1)">›</button>
+                <button class="linkbtn" type="button" aria-label="Mes siguiente" @onclick="() => CambiarMes(1)"><Icono Nombre="chevron-right" /></button>
             </div>
         </div>
         <p class="muted">Crea el gasto de cada plantilla activa que aún no lo tenga en el mes. Se puede repetir sin duplicar gastos.</p>

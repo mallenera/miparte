@@ -5,7 +5,7 @@ using MiParte.Contracts;
 
 namespace MiParte.Web.Api;
 
-/// <summary>Cliente tipado de Core.Api. Cubre usuario, hogares, miembros, invitaciones, categorías, perfiles, gastos, cuenta común, resumen y liquidación; el resto se añadirá con cada pantalla.</summary>
+/// <summary>Cliente tipado de Core.Api. Cubre usuario, hogares, miembros, invitaciones, categorías, perfiles, gastos, gastos recurrentes, cuenta común, resumen y liquidación; el resto se añadirá con cada pantalla.</summary>
 public sealed class CoreApiClient
 {
     private readonly HttpClient _http;
@@ -126,6 +126,36 @@ public sealed class CoreApiClient
     /// <param name="ct">Token de cancelación.</param>
     public Task EliminarGastoAsync(Guid id, CancellationToken ct = default) =>
         EnviarSinRespuestaAsync(HttpMethod.Delete, $"api/gastos/{id}", ct);
+
+    /// <summary>Plantillas de gasto mensual del hogar, por día del mes (<c>GET /api/gastos-recurrentes</c>).</summary>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<List<GastoRecurrenteResponse>> ListarRecurrentesAsync(CancellationToken ct = default) =>
+        ObtenerAsync<List<GastoRecurrenteResponse>>("api/gastos-recurrentes", ct);
+
+    /// <summary>Crea una plantilla de gasto mensual (<c>POST /api/gastos-recurrentes</c>).</summary>
+    /// <param name="peticion">Importe, categoría, pagador, perfil, día del mes y concepto.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<GastoRecurrenteResponse> CrearRecurrenteAsync(GastoRecurrenteRequest peticion, CancellationToken ct = default) =>
+        EnviarAsync<GastoRecurrenteResponse>(HttpMethod.Post, "api/gastos-recurrentes", peticion, ct);
+
+    /// <summary>Edita una plantilla sin tocar los gastos ya generados (<c>PUT /api/gastos-recurrentes/{id}</c>).</summary>
+    /// <param name="id">Plantilla a editar.</param>
+    /// <param name="peticion">Nuevos valores.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<GastoRecurrenteResponse> GuardarRecurrenteAsync(Guid id, GastoRecurrenteRequest peticion, CancellationToken ct = default) =>
+        EnviarAsync<GastoRecurrenteResponse>(HttpMethod.Put, $"api/gastos-recurrentes/{id}", peticion, ct);
+
+    /// <summary>Borra una plantilla sin gastos generados (<c>DELETE /api/gastos-recurrentes/{id}</c>).</summary>
+    /// <param name="id">Plantilla a borrar.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task EliminarRecurrenteAsync(Guid id, CancellationToken ct = default) =>
+        EnviarSinRespuestaAsync(HttpMethod.Delete, $"api/gastos-recurrentes/{id}", ct);
+
+    /// <summary>Crea los gastos del mes de las plantillas activas que aún no lo tienen; es idempotente (<c>POST /api/gastos-recurrentes/generar</c>).</summary>
+    /// <param name="mes">Mes en formato YYYY-MM.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<GenerarRecurrentesResponse> GenerarRecurrentesAsync(string mes, CancellationToken ct = default) =>
+        EnviarAsync<GenerarRecurrentesResponse>(HttpMethod.Post, $"api/gastos-recurrentes/generar?mes={Uri.EscapeDataString(mes)}", null, ct);
 
     /// <summary>Estado de la cuenta común al final de un mes (<c>GET /api/cuenta-comun</c>).</summary>
     /// <param name="mes">Mes en formato YYYY-MM.</param>

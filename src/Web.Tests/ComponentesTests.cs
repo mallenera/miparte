@@ -399,6 +399,126 @@ public class ComponentesTests : TestContext
         Assert.Contains($"DELETE /api/pagos-liquidacion/{pago.Id}", api.Recibidas);
     }
 
+    private static readonly CategoriaDto CatVivienda = new(Guid.NewGuid(), "Vivienda", null, null);
+    private static readonly PerfilRepartoDto Perfil6040 = new(Guid.NewGuid(), "60/40", "porcentaje", [new(AnaId, 60m), new(LuisId, 40m)]);
+
+    private static GastoRecurrenteResponse Alquiler(bool activo = true) =>
+        new(Guid.NewGuid(), 850m, CatVivienda.Id, AnaId, Perfil6040.Id, 5, "Alquiler", activo);
+
+    private static ApiFalsa ApiRecurrentes(params GastoRecurrenteResponse[] plantillas) =>
+        new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK,
+                new[] { ApiFalsa.Miembro("Ana", esYo: true, id: AnaId), ApiFalsa.Miembro("Luis", id: LuisId) })
+            .Responde("GET /api/categorias", HttpStatusCode.OK, new[] { CatVivienda })
+            .Responde("GET /api/perfiles", HttpStatusCode.OK, new[] { Perfil6040 })
+            .Responde("GET /api/gastos-recurrentes", HttpStatusCode.OK, plantillas);
+
+    [Fact]
+    public void Recurrentes_lista_las_plantillas_y_marca_las_pausadas()
+    {
+        Registrar(ApiRecurrentes(Alquiler(), Alquiler(activo: false) with { Concepto = "Gimnasio", Importe = 30m, DiaMes = 10 }));
+
+        var c = RenderComponent<VistaRecurrentes>();
+
+        Assert.Contains("Alquiler", c.Markup);
+        Assert.Contains("Día 5", c.Markup);
+        Assert.Contains("Gimnasio", c.Markup);
+        Assert.Single(c.FindAll(".tag.off"));
+        Assert.Contains("pausada", c.Find(".tag.off").TextContent);
+    }
+
+    [Fact]
+    public void Recurrentes_sin_plantillas_no_permite_generar_y_lo_explica()
+    {
+        Registrar(ApiRecurrentes());
+
+        var c = RenderComponent<VistaRecurrentes>();
+
+        Assert.Contains("Todavía no hay gastos recurrentes", c.Markup);
+        Assert.True(c.Find("#generar").HasAttribute("disabled"));
+    }
+
+    [Fact]
+    public void Recurrentes_generar_envia_el_mes_y_cuenta_creados_y_existentes()
+    {
+        var api = ApiRecurrentes(Alquiler())
+            .Responde("POST /api/gastos-recurrentes/generar", HttpStatusCode.OK, new GenerarRecurrentesResponse("2026-10", 2, 1));
+        Registrar(api);
+        var c = RenderComponent<VistaRecurrentes>();
+
+        c.Find("#generar").Click();
+
+        Assert.Contains("POST /api/gastos-recurrentes/generar", api.Recibidas);
+        Assert.Contains("han creado 2 gastos", c.Find(".aviso.ok").TextContent);
+        Assert.Contains("1 ya existían", c.Find(".aviso.ok").TextContent);
+    }
+
+    [Fact]
+    public void Recurrentes_crear_plantilla_envia_importe_dia_pagador_y_perfil()
+    {
+        var api = ApiRecurrentes()
+            .Responde("POST /api/gastos-recurrentes", HttpStatusCode.Created, Alquiler());
+        Registrar(api);
+        var c = RenderComponent<VistaRecurrentes>();
+
+        // Cada Input re-renderiza: se vuelve a buscar el campo para no usar un manejador obsoleto.
+        c.FindAll("#form-recurrente input")[0].Input("Alquiler");
+        c.FindAll("#form-recurrente input")[1].Input("850,50");
+        c.FindAll("#form-recurrente input")[2].Input("5");
+        c.Find("#form-recurrente").Submit();
+
+        var cuerpo = api.Cuerpos["POST /api/gastos-recurrentes"];
+        Assert.Contains("\"importe\":850.5", cuerpo);
+        Assert.Contains("\"diaMes\":5", cuerpo);
+        Assert.Contains("\"concepto\":\"Alquiler\"", cuerpo);
+        Assert.Contains($"\"pagadoPor\":\"{AnaId}\"", cuerpo);
+        Assert.Contains($"\"perfilRepartoId\":\"{Perfil6040.Id}\"", cuerpo);
+        Assert.Contains("\"activo\":true", cuerpo);
+    }
+
+    [Fact]
+    public void Recurrentes_dia_fuera_de_1_a_28_deshabilita_el_guardado()
+    {
+        Registrar(ApiRecurrentes());
+        var c = RenderComponent<VistaRecurrentes>();
+
+        c.FindAll("#form-recurrente input")[1].Input("100");
+        c.FindAll("#form-recurrente input")[2].Input("31");
+
+        Assert.True(c.Find("#form-recurrente button[type=submit]").HasAttribute("disabled"));
+    }
+
+    [Fact]
+    public void Recurrentes_pausar_reenvia_la_plantilla_con_activo_falso()
+    {
+        var p = Alquiler();
+        var api = ApiRecurrentes(p).Responde($"PUT /api/gastos-recurrentes/{p.Id}", HttpStatusCode.OK, p with { Activo = false });
+        Registrar(api);
+        var c = RenderComponent<VistaRecurrentes>();
+
+        c.FindAll("button").First(b => b.TextContent == "Pausar").Click();
+
+        var cuerpo = api.Cuerpos[$"PUT /api/gastos-recurrentes/{p.Id}"];
+        Assert.Contains("\"activo\":false", cuerpo);
+        Assert.Contains("\"importe\":850", cuerpo);
+    }
+
+    [Fact]
+    public void Recurrentes_eliminar_con_gastos_generados_muestra_el_conflicto_y_sugiere_pausar()
+    {
+        var p = Alquiler();
+        var api = ApiRecurrentes(p).Error($"DELETE /api/gastos-recurrentes/{p.Id}", HttpStatusCode.Conflict, "La plantilla ya tiene gastos generados.");
+        Registrar(api);
+        var c = RenderComponent<VistaRecurrentes>();
+
+        c.FindAll("button").First(b => b.TextContent == "Eliminar").Click();
+        c.FindAll("button").First(b => b.TextContent == "Sí").Click();
+
+        var error = c.Find("[role=alert]").TextContent;
+        Assert.Contains("ya tiene gastos generados", error);
+        Assert.Contains("pausa la plantilla", error);
+    }
+
     [Fact]
     public void Gasto_sin_cuenta_configurada_no_ofrece_a_la_cuenta_como_pagador()
     {

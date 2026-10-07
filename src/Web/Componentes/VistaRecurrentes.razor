@@ -1,0 +1,324 @@
+@* Pestaña Recurrentes: plantillas de gasto mensual (alta, edición, activar/desactivar, borrado) y generación de los gastos de un mes. *@
+@using System.Globalization
+@inject CoreApiClient Api
+@inject EstadoHogar Hogar
+@inject ServicioAvisos Avisos
+
+<h1 class="sr">Gastos recurrentes de @Hogar.HogarActual?.Nombre</h1>
+
+@if (_cargando)
+{
+    <div class="spinbox" role="status"><div class="spin"></div><span>Cargando gastos recurrentes…</span></div>
+}
+else if (_errorCarga is not null)
+{
+    <div class="aviso err" role="alert">
+        @_errorCarga
+        <button class="linkbtn" type="button" @onclick="CargarAsync">Reintentar</button>
+    </div>
+}
+else
+{
+    <section class="card" aria-labelledby="t-generar">
+        <div class="card-head">
+            <h2 id="t-generar">Generar gastos del mes</h2>
+            <div class="mesnav">
+                <button class="linkbtn" type="button" aria-label="Mes anterior" @onclick="() => CambiarMes(-1)">‹</button>
+                <span class="tag cur" aria-live="polite">@NombreMes</span>
+                <button class="linkbtn" type="button" aria-label="Mes siguiente" @onclick="() => CambiarMes(1)">›</button>
+            </div>
+        </div>
+        <p class="muted">Crea el gasto de cada plantilla activa que aún no lo tenga en el mes. Se puede repetir sin duplicar gastos.</p>
+        <div class="actions" style="margin-top: 10px">
+            <button class="btn" id="generar" type="button" disabled="@(_generando || _plantillas.All(p => !p.Activo))" @onclick="GenerarAsync">Generar gastos de @NombreMes</button>
+        </div>
+        @if (_resultado is not null)
+        {
+            <div class="aviso ok" role="status" style="margin-top: 12px">@_resultado</div>
+        }
+    </section>
+
+    <section class="card" aria-labelledby="t-plantillas">
+        <div class="card-head"><h2 id="t-plantillas">Plantillas</h2></div>
+        <p class="muted">Un gasto que se repite cada mes (alquiler, suscripciones…). Editar una plantilla no cambia los gastos ya generados.</p>
+
+        @if (_error is not null)
+        {
+            <div class="aviso err" role="alert" style="margin-top: 12px">@_error</div>
+        }
+
+        <div style="margin-top: 10px">
+            @foreach (var p in _plantillas)
+            {
+                <div class="gastorow">
+                    <div class="g-main">
+                        <div class="g-concepto">@(string.IsNullOrWhiteSpace(p.Concepto) ? NombreCategoria(p.CategoriaId) : p.Concepto)</div>
+                        <div class="muted g-meta">
+                            Día @p.DiaMes · @NombreCategoria(p.CategoriaId) · paga @NombreMiembro(p.PagadoPor) · @NombrePerfil(p.PerfilRepartoId)
+                            @if (!p.Activo) { <span class="tag off">pausada</span> }
+                        </div>
+                    </div>
+                    <div class="g-importe">@Euros(p.Importe)</div>
+                    <div class="c-acc">
+                        @if (_confirmandoEliminar == p.Id)
+                        {
+                            <span class="muted">¿Eliminar?</span>
+                            <button class="linkbtn danger" type="button" @onclick="() => EliminarAsync(p)">Sí</button>
+                            <button class="linkbtn" type="button" @onclick="() => _confirmandoEliminar = null">No</button>
+                        }
+                        else
+                        {
+                            <button class="linkbtn" type="button" aria-label="Editar @NombrePlantilla(p)" @onclick="() => EmpezarEdicion(p)">Editar</button>
+                            <button class="linkbtn" type="button" aria-label="@(p.Activo ? "Pausar" : "Reanudar") @NombrePlantilla(p)" @onclick="() => AlternarActivaAsync(p)">@(p.Activo ? "Pausar" : "Reanudar")</button>
+                            <button class="linkbtn danger" type="button" aria-label="Eliminar @NombrePlantilla(p)" @onclick="() => _confirmandoEliminar = p.Id">Eliminar</button>
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (_plantillas.Count == 0)
+            {
+                <div class="empty">Todavía no hay gastos recurrentes. Añade el primero abajo.</div>
+            }
+        </div>
+
+        @if (_adultos.Count == 0 || _categorias.Count == 0 || _perfiles.Count == 0)
+        {
+            <div class="aviso warn" style="margin-top: 14px">Para crear plantillas hace falta al menos un adulto, una categoría y un perfil de reparto.</div>
+        }
+        else
+        {
+            <form class="addcat" id="form-recurrente" @onsubmit="GuardarAsync">
+                <h3 style="flex: 1 1 100%; margin: 0">@(_editando is null ? "Nueva plantilla" : "Editar plantilla")</h3>
+                <label>Concepto
+                    <input maxlength="200" placeholder="Opcional" @bind="_concepto" @bind:event="oninput" />
+                </label>
+                <label>Importe (€)
+                    <input inputmode="decimal" required placeholder="0,00" @bind="_importe" @bind:event="oninput" />
+                </label>
+                <label>Día del mes (1-28)
+                    <input type="number" min="1" max="28" required @bind="_dia" @bind:event="oninput" />
+                </label>
+                <label>Categoría
+                    <select @bind="_categoria" @bind:after="AlCambiarCategoria">
+                        @foreach (var n in _arbol)
+                        {
+                            <option value="@n.Categoria.Id">@(new string(' ', n.Nivel * 3))@n.Categoria.Nombre</option>
+                        }
+                    </select>
+                </label>
+                <label>Paga
+                    <select @bind="_pagador">
+                        @foreach (var m in _adultos)
+                        {
+                            <option value="@m.Id">@m.Nombre</option>
+                        }
+                    </select>
+                </label>
+                <label>Reparto
+                    <select @bind="_perfil">
+                        @foreach (var pf in _perfiles)
+                        {
+                            <option value="@pf.Id">@pf.Nombre</option>
+                        }
+                    </select>
+                </label>
+                <button class="btn" type="submit" disabled="@(!FormularioValido)">@(_editando is null ? "Añadir" : "Guardar")</button>
+                @if (_editando is not null)
+                {
+                    <button class="linkbtn" type="button" @onclick="ReiniciarFormulario">Cancelar</button>
+                }
+            </form>
+        }
+    </section>
+}
+
+@code {
+    private static readonly CultureInfo Es = new("es-ES");
+
+    private List<GastoRecurrenteResponse> _plantillas = [];
+    private List<MiembroDto> _adultos = [], _miembros = [];
+    private List<CategoriaDto> _categorias = [];
+    private List<PerfilRepartoDto> _perfiles = [];
+    private List<NodoCategoria> _arbol = [];
+    private bool _cargando = true, _generando;
+    private string? _errorCarga, _error, _resultado;
+    private DateOnly _mes = new(DateTime.Today.Year, DateTime.Today.Month, 1);
+
+    private Guid? _editando, _confirmandoEliminar;
+    private string _importe = "", _concepto = "";
+    private int _dia = 1;
+    private Guid _categoria, _pagador, _perfil;
+
+    private string NombreMes => _mes.ToString("MMMM yyyy", Es);
+
+    private bool FormularioValido => TryImporte(out _) && _dia is >= 1 and <= 28;
+
+    protected override Task OnInitializedAsync() => CargarAsync();
+
+    private async Task CargarAsync()
+    {
+        _cargando = true;
+        _errorCarga = null;
+        try
+        {
+            var miembros = Api.ListarMiembrosAsync();
+            var categorias = Api.ListarCategoriasAsync();
+            var perfiles = Api.ListarPerfilesAsync();
+            await Task.WhenAll(miembros, categorias, perfiles);
+            _miembros = miembros.Result;
+            _adultos = _miembros.Where(m => m.Tipo == "adulto" && m.Activo).ToList();
+            _categorias = categorias.Result;
+            _perfiles = perfiles.Result;
+            _arbol = ArbolCategorias.Aplanar(_categorias);
+            await RecargarAsync();
+            ReiniciarFormulario();
+        }
+        catch (ApiException e)
+        {
+            _errorCarga = e.Message;
+        }
+
+        _cargando = false;
+    }
+
+    private async Task RecargarAsync() =>
+        _plantillas = (await Api.ListarRecurrentesAsync()).OrderBy(p => p.DiaMes).ThenBy(p => p.Concepto).ToList();
+
+    private void CambiarMes(int delta)
+    {
+        _mes = _mes.AddMonths(delta);
+        _resultado = null;
+    }
+
+    private string NombreMiembro(Guid id) => _miembros.FirstOrDefault(m => m.Id == id)?.Nombre ?? "—";
+
+    private string NombreCategoria(Guid id) => _categorias.FirstOrDefault(c => c.Id == id)?.Nombre ?? "—";
+
+    private string NombrePerfil(Guid id) => _perfiles.FirstOrDefault(p => p.Id == id)?.Nombre ?? "—";
+
+    private string NombrePlantilla(GastoRecurrenteResponse p) => string.IsNullOrWhiteSpace(p.Concepto) ? NombreCategoria(p.CategoriaId) : p.Concepto;
+
+    private static string Euros(decimal importe) => importe.ToString("C2", Es);
+
+    private bool TryImporte(out decimal valor) =>
+        decimal.TryParse(_importe.Trim().Replace(',', '.'), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out valor)
+        && valor > 0 && decimal.Round(valor, 2) == valor;
+
+    private void ReiniciarFormulario()
+    {
+        _editando = null;
+        _importe = "";
+        _concepto = "";
+        _dia = 1;
+        _categoria = _arbol.Count > 0 ? _arbol[0].Categoria.Id : Guid.Empty;
+        _pagador = (_adultos.FirstOrDefault(m => m.EsYo) ?? _adultos.FirstOrDefault())?.Id ?? Guid.Empty;
+        _perfil = _perfiles.FirstOrDefault()?.Id ?? Guid.Empty;
+        AlCambiarCategoria();
+    }
+
+    /// <summary>Al elegir una categoría se propone su perfil de reparto por defecto.</summary>
+    private void AlCambiarCategoria()
+    {
+        if (_editando is null && _categorias.FirstOrDefault(c => c.Id == _categoria)?.PerfilRepartoId is { } p) _perfil = p;
+    }
+
+    private void EmpezarEdicion(GastoRecurrenteResponse p)
+    {
+        _editando = p.Id;
+        _importe = p.Importe.ToString(CultureInfo.InvariantCulture);
+        _concepto = p.Concepto ?? "";
+        _dia = p.DiaMes;
+        _categoria = p.CategoriaId;
+        _pagador = p.PagadoPor;
+        _perfil = p.PerfilRepartoId;
+        _error = null;
+    }
+
+    private Task GuardarAsync() =>
+        EjecutarAsync(async () =>
+        {
+            if (!TryImporte(out var importe)) throw new ApiException(System.Net.HttpStatusCode.BadRequest, "Introduce un importe mayor que 0 con máximo 2 decimales.");
+            // Al editar se conserva si la plantilla estaba pausada: el formulario no toca ese estado.
+            var activo = _editando is { } actual ? _plantillas.FirstOrDefault(p => p.Id == actual)?.Activo ?? true : true;
+            var peticion = new GastoRecurrenteRequest(importe, _categoria, _pagador, _perfil, (short)_dia,
+                string.IsNullOrWhiteSpace(_concepto) ? null : _concepto.Trim(), activo);
+            if (_editando is { } id)
+            {
+                await Api.GuardarRecurrenteAsync(id, peticion);
+                ReiniciarFormulario();
+                return "Plantilla guardada";
+            }
+
+            await Api.CrearRecurrenteAsync(peticion);
+            _importe = "";
+            _concepto = "";
+            return "Plantilla añadida";
+        });
+
+    private Task AlternarActivaAsync(GastoRecurrenteResponse p) =>
+        EjecutarAsync(async () =>
+        {
+            await Api.GuardarRecurrenteAsync(p.Id, new GastoRecurrenteRequest(
+                p.Importe, p.CategoriaId, p.PagadoPor, p.PerfilRepartoId, p.DiaMes, p.Concepto, !p.Activo));
+            return p.Activo ? "Plantilla pausada" : "Plantilla reanudada";
+        });
+
+    private Task EliminarAsync(GastoRecurrenteResponse p) =>
+        EjecutarAsync(async () =>
+        {
+            try
+            {
+                await Api.EliminarRecurrenteAsync(p.Id);
+            }
+            catch (ApiException e) when (e.Codigo == System.Net.HttpStatusCode.Conflict)
+            {
+                throw new ApiException(e.Codigo,$"{e.Message} Si ya generó gastos, pausa la plantilla en lugar de eliminarla.");
+            }
+
+            _confirmandoEliminar = null;
+            if (_editando == p.Id) ReiniciarFormulario();
+            return "Plantilla eliminada";
+        });
+
+    private async Task GenerarAsync()
+    {
+        _error = null;
+        _resultado = null;
+        _generando = true;
+        try
+        {
+            var r = await Api.GenerarRecurrentesAsync(_mes.ToString("yyyy-MM", CultureInfo.InvariantCulture));
+            _resultado = r.Creados == 0
+                ? $"No se ha creado ningún gasto: {r.YaExistentes} {(r.YaExistentes == 1 ? "plantilla ya tenía" : "plantillas ya tenían")} su gasto en {NombreMes}."
+                : $"Se {(r.Creados == 1 ? "ha creado 1 gasto" : $"han creado {r.Creados} gastos")} en {NombreMes}"
+                  + (r.YaExistentes > 0 ? $" ({r.YaExistentes} ya existían)." : ".");
+            Avisos.Mostrar("Gastos generados");
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+        finally
+        {
+            _generando = false;
+        }
+    }
+
+    /// <summary>Ejecuta una operación, recarga las plantillas y muestra el aviso; los errores de la API salen en pantalla.</summary>
+    private async Task EjecutarAsync(Func<Task<string>> accion)
+    {
+        _error = null;
+        try
+        {
+            var aviso = await accion();
+            await RecargarAsync();
+            Avisos.Mostrar(aviso);
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+            _confirmandoEliminar = null;
+        }
+    }
+}

@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Comandos
 
-.NET SDK 8.0 (solución `MiParte.sln`).
+.NET SDK 10.0 (solución `MiParte.sln`).
 
 ```bash
 dotnet build

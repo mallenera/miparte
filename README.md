@@ -18,7 +18,7 @@ docs/               decisiones y documentación
 ```
 
 ## Requisitos
-.NET SDK 8.0 y, opcionalmente, Docker.
+.NET SDK 10.0 y, opcionalmente, Docker.
 
 ## Arranque
 ```

@@ -1,0 +1,275 @@
+@* Pestaña Cuenta común: saldo y efectivo del mes, aportaciones fijas por adulto y reembolsos a quien adelantó gastos de la cuenta. *@
+@using System.Globalization
+@inject CoreApiClient Api
+@inject EstadoHogar Hogar
+@inject ServicioAvisos Avisos
+
+<h1 class="sr">Cuenta común de @Hogar.HogarActual?.Nombre</h1>
+
+@if (_cargando)
+{
+    <div class="spinbox" role="status"><div class="spin"></div><span>Cargando la cuenta común…</span></div>
+}
+else if (_errorCarga is not null)
+{
+    <div class="aviso err" role="alert">
+        @_errorCarga
+        <button class="linkbtn" type="button" @onclick="CargarAsync">Reintentar</button>
+    </div>
+}
+else if (_estado is not null)
+{
+    <section class="card" aria-labelledby="t-cuenta">
+        <div class="card-head">
+            <h2 id="t-cuenta">Cuenta común</h2>
+            <div class="mesnav">
+                <button class="linkbtn" type="button" aria-label="Mes anterior" @onclick="() => CambiarMesAsync(-1)">‹</button>
+                <span class="tag cur" aria-live="polite">@NombreMes</span>
+                <button class="linkbtn" type="button" aria-label="Mes siguiente" @onclick="() => CambiarMesAsync(1)">›</button>
+            </div>
+        </div>
+        <p class="muted">Saldo acumulado hasta final de mes: aportaciones menos los gastos cargados a la cuenta.</p>
+
+        @if (_error is not null)
+        {
+            <div class="aviso err" role="alert" style="margin-top: 12px">@_error</div>
+        }
+
+        <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px">
+            <span class="chip">Saldo&nbsp;<b id="saldo">@Euros(_estado.Saldo)</b></span>
+            <span class="chip">Efectivo&nbsp;<b>@Euros(_estado.Efectivo)</b></span>
+            <span class="chip">Aportado este mes&nbsp;<b>@Euros(_estado.AportadoMes)</b></span>
+            <span class="chip">Aportado en total&nbsp;<b>@Euros(_estado.Aportado)</b></span>
+            <span class="chip">Gastado en total&nbsp;<b>@Euros(_estado.Gastado)</b></span>
+        </div>
+
+        @if (_estado.Saldo < 0)
+        {
+            <div class="aviso warn" role="status" style="margin-top: 12px">
+                La cuenta no cubre los gastos: faltan @Euros(-_estado.Saldo) para cubrirlos.
+            </div>
+        }
+    </section>
+
+    <section class="card" aria-labelledby="t-aportaciones">
+        <div class="card-head"><h2 id="t-aportaciones">Aportación mensual</h2></div>
+        <p class="muted">Importe fijo que aporta cada adulto al mes. Un cambio vale desde el mes elegido en adelante.</p>
+        <div style="margin-top: 10px">
+            @foreach (var a in _adultos)
+            {
+                <div class="catrow">
+                    <div class="c-name"><Avatar Nombre="@a.Nombre" Color="@ColorMiembro.De(a.Id, _miembros)" Tamano="sm" /> @a.Nombre</div>
+                    <div class="c-sel">@Euros(VigenteDe(a.Id)) al mes</div>
+                </div>
+            }
+            @if (_adultos.Count == 0)
+            {
+                <div class="empty">El hogar no tiene adultos activos.</div>
+            }
+        </div>
+
+        @if (_adultos.Count > 0)
+        {
+            <form class="addcat" id="form-aportacion" @onsubmit="FijarAportacionAsync">
+                <label>Adulto
+                    <select @bind="_aportante" @bind:after="AlCambiarAportante">
+                        @foreach (var a in _adultos)
+                        {
+                            <option value="@a.Id">@a.Nombre</option>
+                        }
+                    </select>
+                </label>
+                <label>Importe al mes (€)
+                    <input inputmode="decimal" required placeholder="0,00" @bind="_importeAportacion" @bind:event="oninput" />
+                </label>
+                <button class="btn" type="submit" disabled="@(!AportacionValida)">Fijar desde @NombreMes</button>
+            </form>
+        }
+    </section>
+
+    <section class="card" aria-labelledby="t-reembolsos">
+        <div class="card-head"><h2 id="t-reembolsos">Reembolsos</h2></div>
+        <p class="muted">Cuando una persona adelanta un gasto de la cuenta, esta le debe ese importe hasta reembolsárselo.</p>
+
+        @if (_estado.Pendientes.Count == 0)
+        {
+            <div class="empty">No hay reembolsos pendientes.</div>
+        }
+        @foreach (var p in _estado.Pendientes)
+        {
+            <div class="catrow">
+                <div class="c-name">@p.Nombre</div>
+                <div class="c-sel">La cuenta le debe @Euros(p.Importe)</div>
+            </div>
+        }
+
+        @foreach (var r in _estado.Reembolsos.OrderByDescending(r => r.Fecha))
+        {
+            <div class="gastorow">
+                <div class="g-main">
+                    <div class="g-concepto">Reembolso a @NombreMiembro(r.MiembroId)</div>
+                    <div class="muted g-meta">@r.Fecha.ToString("dd/MM/yyyy", Es)@(string.IsNullOrWhiteSpace(r.Concepto) ? "" : " · " + r.Concepto)</div>
+                </div>
+                <div class="g-importe">@Euros(r.Importe)</div>
+                <div class="c-acc">
+                    @if (_confirmandoEliminar == r.Id)
+                    {
+                        <span class="muted">¿Eliminar?</span>
+                        <button class="linkbtn danger" type="button" @onclick="() => EliminarAsync(r)">Sí</button>
+                        <button class="linkbtn" type="button" @onclick="() => _confirmandoEliminar = null">No</button>
+                    }
+                    else
+                    {
+                        <button class="linkbtn danger" type="button" aria-label="Eliminar reembolso a @NombreMiembro(r.MiembroId)" @onclick="() => _confirmandoEliminar = r.Id">Eliminar</button>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (_estado.Pendientes.Count > 0)
+        {
+            <form class="addcat" id="form-reembolso" @onsubmit="ReembolsarAsync">
+                <h3 style="flex: 1 1 100%; margin: 0">Nuevo reembolso</h3>
+                <label>A
+                    <select @bind="_reembolsado">
+                        @foreach (var p in _estado.Pendientes)
+                        {
+                            <option value="@p.MiembroId">@p.Nombre</option>
+                        }
+                    </select>
+                </label>
+                <label>Importe (€)
+                    <input inputmode="decimal" required placeholder="0,00" @bind="_importeReembolso" @bind:event="oninput" />
+                </label>
+                <label>Concepto
+                    <input maxlength="200" placeholder="Opcional" @bind="_conceptoReembolso" @bind:event="oninput" />
+                </label>
+                <button class="btn" type="submit" disabled="@(!ReembolsoValido)">Reembolsar</button>
+            </form>
+        }
+    </section>
+}
+
+@code {
+    private static readonly CultureInfo Es = new("es-ES");
+
+    private CuentaComunResponse? _estado;
+    private List<MiembroDto> _miembros = [], _adultos = [];
+    private bool _cargando = true;
+    private string? _errorCarga, _error;
+    private DateOnly _mes = new(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private Guid? _confirmandoEliminar;
+
+    private Guid _aportante, _reembolsado;
+    private string _importeAportacion = "", _importeReembolso = "", _conceptoReembolso = "";
+
+    private string NombreMes => _mes.ToString("MMMM yyyy", Es);
+    private bool AportacionValida => TryImporte(_importeAportacion, permitirCero: true, out _);
+    private bool ReembolsoValido => TryImporte(_importeReembolso, permitirCero: false, out _);
+
+    protected override Task OnInitializedAsync() => CargarAsync();
+
+    private async Task CargarAsync()
+    {
+        _cargando = true;
+        _errorCarga = null;
+        try
+        {
+            _miembros = await Api.ListarMiembrosAsync();
+            _adultos = _miembros.Where(m => m.Tipo == "adulto" && m.Activo).ToList();
+            _aportante = (_adultos.FirstOrDefault(m => m.EsYo) ?? _adultos.FirstOrDefault())?.Id ?? Guid.Empty;
+            await RecargarAsync();
+        }
+        catch (ApiException e)
+        {
+            _errorCarga = e.Message;
+        }
+
+        _cargando = false;
+    }
+
+    private async Task RecargarAsync()
+    {
+        _estado = await Api.ObtenerCuentaComunAsync(_mes.ToString("yyyy-MM", CultureInfo.InvariantCulture));
+        if (_estado.Pendientes.All(p => p.MiembroId != _reembolsado)) _reembolsado = _estado.Pendientes.FirstOrDefault()?.MiembroId ?? Guid.Empty;
+        AlCambiarAportante();
+    }
+
+    private async Task CambiarMesAsync(int delta)
+    {
+        _mes = _mes.AddMonths(delta);
+        _error = null;
+        _confirmandoEliminar = null;
+        try
+        {
+            await RecargarAsync();
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+    }
+
+    private string NombreMiembro(Guid id) => _miembros.FirstOrDefault(m => m.Id == id)?.Nombre ?? "—";
+
+    private static string Euros(decimal importe) => importe.ToString("C2", Es);
+
+    /// <summary>Aportación de un adulto en el mes mostrado: la de la fila más reciente que no pase de ese mes.</summary>
+    private decimal VigenteDe(Guid miembro) =>
+        _estado?.Aportaciones.Where(a => a.MiembroId == miembro && a.Desde <= _mes)
+            .OrderByDescending(a => a.Desde).Select(a => a.Importe).FirstOrDefault() ?? 0m;
+
+    /// <summary>Al elegir adulto (o cambiar de mes) el campo de importe muestra su aportación vigente.</summary>
+    private void AlCambiarAportante() =>
+        _importeAportacion = VigenteDe(_aportante).ToString(CultureInfo.InvariantCulture);
+
+    private static bool TryImporte(string texto, bool permitirCero, out decimal valor) =>
+        decimal.TryParse(texto.Trim().Replace(',', '.'), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out valor)
+        && (valor > 0 || (permitirCero && valor == 0)) && decimal.Round(valor, 2) == valor;
+
+    private Task FijarAportacionAsync() =>
+        EjecutarAsync(async () =>
+        {
+            if (!TryImporte(_importeAportacion, permitirCero: true, out var importe))
+                throw new ApiException(System.Net.HttpStatusCode.BadRequest, "Introduce un importe de 0 o más con máximo 2 decimales.");
+            await Api.FijarAportacionAsync(new FijarAportacionRequest(_aportante, _mes, importe));
+            return "Aportación guardada";
+        });
+
+    private Task ReembolsarAsync() =>
+        EjecutarAsync(async () =>
+        {
+            if (!TryImporte(_importeReembolso, permitirCero: false, out var importe))
+                throw new ApiException(System.Net.HttpStatusCode.BadRequest, "Introduce un importe mayor que 0 con máximo 2 decimales.");
+            await Api.CrearReembolsoAsync(new CrearReembolsoRequest(
+                _reembolsado, importe, null, string.IsNullOrWhiteSpace(_conceptoReembolso) ? null : _conceptoReembolso.Trim()));
+            _importeReembolso = "";
+            _conceptoReembolso = "";
+            return "Reembolso registrado";
+        });
+
+    private Task EliminarAsync(ReembolsoCuentaDto r) =>
+        EjecutarAsync(async () =>
+        {
+            await Api.EliminarReembolsoAsync(r.Id);
+            _confirmandoEliminar = null;
+            return "Reembolso eliminado";
+        });
+
+    /// <summary>Ejecuta una operación, recarga el estado y muestra el aviso; los errores de la API salen en pantalla.</summary>
+    private async Task EjecutarAsync(Func<Task<string>> accion)
+    {
+        _error = null;
+        try
+        {
+            var aviso = await accion();
+            await RecargarAsync();
+            Avisos.Mostrar(aviso);
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+            _confirmandoEliminar = null;
+        }
+    }
+}

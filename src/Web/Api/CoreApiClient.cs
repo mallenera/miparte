@@ -127,6 +127,30 @@ public sealed class CoreApiClient
     public Task EliminarGastoAsync(Guid id, CancellationToken ct = default) =>
         EnviarSinRespuestaAsync(HttpMethod.Delete, $"api/gastos/{id}", ct);
 
+    /// <summary>Estado de la cuenta común al final de un mes (<c>GET /api/cuenta-comun</c>).</summary>
+    /// <param name="mes">Mes en formato YYYY-MM.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<CuentaComunResponse> ObtenerCuentaComunAsync(string mes, CancellationToken ct = default) =>
+        ObtenerAsync<CuentaComunResponse>($"api/cuenta-comun?mes={Uri.EscapeDataString(mes)}", ct);
+
+    /// <summary>Fija lo que aporta un adulto a la cuenta común desde un mes (<c>PUT /api/cuenta-comun/aportaciones</c>).</summary>
+    /// <param name="peticion">Adulto, mes de inicio (día 1) e importe.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<AportacionCuentaDto> FijarAportacionAsync(FijarAportacionRequest peticion, CancellationToken ct = default) =>
+        EnviarAsync<AportacionCuentaDto>(HttpMethod.Put, "api/cuenta-comun/aportaciones", peticion, ct);
+
+    /// <summary>Registra un reembolso de la cuenta común a quien adelantó gastos (<c>POST /api/cuenta-comun/reembolsos</c>).</summary>
+    /// <param name="peticion">Miembro, importe, fecha y concepto.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<ReembolsoCuentaDto> CrearReembolsoAsync(CrearReembolsoRequest peticion, CancellationToken ct = default) =>
+        EnviarAsync<ReembolsoCuentaDto>(HttpMethod.Post, "api/cuenta-comun/reembolsos", peticion, ct);
+
+    /// <summary>Elimina un reembolso (<c>DELETE /api/cuenta-comun/reembolsos/{id}</c>).</summary>
+    /// <param name="id">Reembolso a eliminar.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task EliminarReembolsoAsync(Guid id, CancellationToken ct = default) =>
+        EnviarSinRespuestaAsync(HttpMethod.Delete, $"api/cuenta-comun/reembolsos/{id}", ct);
+
     private Task<T> ObtenerAsync<T>(string ruta, CancellationToken ct) => EnviarAsync<T>(HttpMethod.Get, ruta, null, ct);
 
     private async Task EnviarSinRespuestaAsync(HttpMethod metodo, string ruta, CancellationToken ct)

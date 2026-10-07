@@ -3,6 +3,7 @@
 @inject ServicioSesion Sesion
 @inject EstadoHogar Hogar
 @inject ServicioAvisos Avisos
+@inject ServicioTema Apariencia
 @inject NavigationManager Navegacion
 
 <div class="wrap">
@@ -41,6 +42,19 @@
                         <ChildContent>
                             <div class="mhead">Sesión iniciada como<b>@context.User.Identity?.Name</b></div>
                             <div class="msep"></div>
+                            <div class="mhead" id="tema-etiqueta">Tema</div>
+                            <div role="group" aria-labelledby="tema-etiqueta">
+                                @foreach (var t in ServicioTema.Todos)
+                                {
+                                    var id = t.Id;
+                                    <button class="mitem" type="button" role="menuitemradio" aria-checked="@((id == Apariencia.Actual).ToString().ToLowerInvariant())"
+                                            @onclick="() => Apariencia.ElegirAsync(id)">
+                                        <span class="tick" aria-hidden="true">@(id == Apariencia.Actual ? "✓" : "")</span>@t.Nombre
+                                        <span class="@(id == ServicioTema.Sistema ? "muestra auto" : "muestra")" data-tema="@(id == ServicioTema.Sistema ? null : id)" aria-hidden="true"><i></i><i></i></span>
+                                    </button>
+                                }
+                            </div>
+                            <div class="msep"></div>
                             <button class="mitem" type="button" role="menuitem" @onclick="CerrarSesionAsync">Cerrar sesión</button>
                         </ChildContent>
                     </MenuDesplegable>
@@ -77,10 +91,12 @@
 }
 
 @code {
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         Hogar.Cambiado += Refrescar;
         Avisos.Cambiado += Refrescar;
+        Apariencia.Cambiado += Refrescar;
+        await Apariencia.IniciarAsync();
     }
 
     private async Task CambiarHogarAsync(Guid id)
@@ -102,5 +118,6 @@
     {
         Hogar.Cambiado -= Refrescar;
         Avisos.Cambiado -= Refrescar;
+        Apariencia.Cambiado -= Refrescar;
     }
 }

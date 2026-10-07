@@ -26,6 +26,7 @@ public static class ServiciosWeb
         servicios.AddSingleton<ServicioSesion>();
         servicios.AddSingleton<EstadoHogar>();
         servicios.AddSingleton<ServicioAvisos>();
+        servicios.AddSingleton<ServicioTema>();
         servicios.AddScoped<ServicioArranque>();
         servicios.AddTransient<ManejadorCoreApi>();
 

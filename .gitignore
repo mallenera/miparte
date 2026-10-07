@@ -13,3 +13,6 @@ supabase/.env
 
 # Configuración local del front (URL y anon key de tu proyecto)
 src/Web/wwwroot/appsettings.Development.json
+
+# Dependencias de npm
+node_modules/

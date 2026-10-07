@@ -3,6 +3,7 @@
 @inject CoreApiClient Api
 @inject EstadoHogar Hogar
 @inject ServicioAvisos Avisos
+@inject TimeProvider Reloj
 
 <h1 class="sr">Gastos recurrentes de @Hogar.HogarActual?.Nombre</h1>
 
@@ -45,6 +46,16 @@ else
         @if (_error is not null)
         {
             <div class="aviso err" role="alert" style="margin-top: 12px">@_error</div>
+        }
+
+        @if (_diaPasado is { } dp)
+        {
+            <div class="aviso warn" role="status" id="aviso-dia-pasado" style="margin-top: 12px">
+                El día @dp.Dia de este mes ya ha pasado, así que «@dp.Nombre» no se ha creado como gasto de @NombreMesActual.
+                ¿Quieres crearlo ahora?
+                <button class="linkbtn" type="button" id="crear-gasto-pasado" disabled="@_generando" @onclick="GenerarMesActualAsync">Crear gasto de @NombreMesActual</button>
+                <button class="linkbtn" type="button" @onclick="() => _diaPasado = null">Ahora no</button>
+            </div>
         }
 
         <div style="margin-top: 10px">
@@ -143,18 +154,29 @@ else
     private List<NodoCategoria> _arbol = [];
     private bool _cargando = true, _generando;
     private string? _errorCarga, _error, _resultado;
-    private DateOnly _mes = new(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private DateOnly _mes;
 
     private Guid? _editando, _confirmandoEliminar;
     private string _importe = "", _concepto = "";
     private int _dia = 1;
     private Guid _categoria, _pagador, _perfil;
 
+    // Plantilla recién creada cuyo día ya pasó este mes: no se genera sola, se ofrece crear el gasto.
+    private (string Nombre, int Dia)? _diaPasado;
+
     private string NombreMes => _mes.ToString("MMMM yyyy", Es);
+
+    private DateTime Hoy => Reloj.GetLocalNow().DateTime;
+
+    private string NombreMesActual => Hoy.ToString("MMMM yyyy", Es);
 
     private bool FormularioValido => TryImporte(out _) && _dia is >= 1 and <= 28;
 
-    protected override Task OnInitializedAsync() => CargarAsync();
+    protected override Task OnInitializedAsync()
+    {
+        _mes = new DateOnly(Hoy.Year, Hoy.Month, 1);
+        return CargarAsync();
+    }
 
     private async Task CargarAsync()
     {
@@ -235,7 +257,13 @@ else
         _error = null;
     }
 
-    private Task GuardarAsync() =>
+    private Task GuardarAsync()
+    {
+        _diaPasado = null;
+        return GuardarSinAvisoAsync();
+    }
+
+    private Task GuardarSinAvisoAsync() =>
         EjecutarAsync(async () =>
         {
             if (!TryImporte(out var importe)) throw new ApiException(System.Net.HttpStatusCode.BadRequest, "Introduce un importe mayor que 0 con máximo 2 decimales.");
@@ -251,6 +279,8 @@ else
             }
 
             await Api.CrearRecurrenteAsync(peticion);
+            if (activo && _dia < Hoy.Day)
+                _diaPasado = (string.IsNullOrWhiteSpace(_concepto) ? NombreCategoria(_categoria) : _concepto.Trim(), _dia);
             _importe = "";
             _concepto = "";
             return "Plantilla añadida";
@@ -280,6 +310,14 @@ else
             if (_editando == p.Id) ReiniciarFormulario();
             return "Plantilla eliminada";
         });
+
+    /// <summary>Genera los gastos pendientes del mes en curso (idempotente: solo crea los que faltan) desde el aviso de día pasado.</summary>
+    private async Task GenerarMesActualAsync()
+    {
+        _mes = new DateOnly(Hoy.Year, Hoy.Month, 1);
+        _diaPasado = null;
+        await GenerarAsync();
+    }
 
     private async Task GenerarAsync()
     {

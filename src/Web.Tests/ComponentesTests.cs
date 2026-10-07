@@ -18,6 +18,7 @@ public class ComponentesTests : TestContext
         Services.AddSingleton(new CoreApiClient(new HttpClient(api) { BaseAddress = new Uri("http://localhost:5001/") }));
         Services.AddSingleton(new EstadoHogar(new AlmacenMemoria()));
         Services.AddSingleton<ServicioAvisos>();
+        Services.AddSingleton<TimeProvider>(new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 10, 7, 10, 0, 0, TimeSpan.Zero)));
     }
 
     private static ApiFalsa ApiConHogar(bool soyAdmin)
@@ -340,7 +341,6 @@ public class ComponentesTests : TestContext
     }
 
     [Fact]
-    [Fact]
     public void Resumen_indica_lo_que_la_cuenta_comun_debe_a_quien_adelanto_gastos()
     {
         var resumen = new ResumenMensualResponse("2026-10", 100m,
@@ -353,6 +353,7 @@ public class ComponentesTests : TestContext
         Assert.Single(c.FindAll(".catrow .chip"));
     }
 
+    [Fact]
     public void Resumen_sin_gastos_invita_a_anadir_uno_y_dice_que_no_hay_nada_que_liquidar()
     {
         Registrar(ApiResumen(new ResumenMensualResponse("2026-10", 0m, [], []), new LiquidacionResponse("2026-10", [], [], [])));
@@ -487,6 +488,40 @@ public class ComponentesTests : TestContext
         Assert.Contains($"\"pagadoPor\":\"{AnaId}\"", cuerpo);
         Assert.Contains($"\"perfilRepartoId\":\"{Perfil6040.Id}\"", cuerpo);
         Assert.Contains("\"activo\":true", cuerpo);
+    }
+
+    [Fact]
+    public void Recurrentes_crear_con_dia_ya_pasado_avisa_y_ofrece_crear_el_gasto_del_mes()
+    {
+        var api = ApiRecurrentes()
+            .Responde("POST /api/gastos-recurrentes", HttpStatusCode.Created, Alquiler())
+            .Responde("POST /api/gastos-recurrentes/generar", HttpStatusCode.OK, new GenerarRecurrentesResponse("2026-10", 1, 0));
+        Registrar(api);
+        var c = RenderComponent<VistaRecurrentes>();
+
+        c.FindAll("#form-recurrente input")[0].Input("Alquiler");
+        c.FindAll("#form-recurrente input")[1].Input("850");
+        c.FindAll("#form-recurrente input")[2].Input("6"); // hoy es 7
+        c.Find("#form-recurrente").Submit();
+
+        Assert.Contains("El día 6", c.Find("#aviso-dia-pasado").TextContent);
+        c.Find("#crear-gasto-pasado").Click();
+
+        Assert.Contains("POST /api/gastos-recurrentes/generar", api.Recibidas);
+        Assert.Empty(c.FindAll("#aviso-dia-pasado"));
+    }
+
+    [Fact]
+    public void Recurrentes_crear_con_dia_futuro_o_de_hoy_no_avisa()
+    {
+        Registrar(ApiRecurrentes().Responde("POST /api/gastos-recurrentes", HttpStatusCode.Created, Alquiler()));
+        var c = RenderComponent<VistaRecurrentes>();
+
+        c.FindAll("#form-recurrente input")[1].Input("850");
+        c.FindAll("#form-recurrente input")[2].Input("7"); // hoy es 7
+        c.Find("#form-recurrente").Submit();
+
+        Assert.Empty(c.FindAll("#aviso-dia-pasado"));
     }
 
     [Fact]

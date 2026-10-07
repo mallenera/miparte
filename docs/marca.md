@@ -52,7 +52,7 @@ Cada miembro tiene color + inicial (`--m0..--m7`): burdeos, naranja, verde azula
 Símbolo blanco/crema sobre burdeos con esquinas redondeadas (`rx` ≈ 22 %). Ya generados en `src/Web/wwwroot/` (`favicon.*`, `apple-touch-icon.png`, `icon-192/512.png`, `icon-maskable-512.png`).
 
 ## Modo oscuro
-Propio, no una inversión automática: se activa con `prefers-color-scheme` y con `data-theme="dark|light"` en `<html>`.
+Propio, no una inversión automática: sin `data-tema` en `<html>` se sigue `prefers-color-scheme`; con `data-tema` se fuerza el tema elegido (ver «Temas»).
 
 ## Adaptación a pantallas (responsive)
 

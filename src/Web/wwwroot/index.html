@@ -16,7 +16,8 @@
         window.miparteTema = {
             aplicar: function (id) {
                 var r = document.documentElement;
-                if (!id || id === 'sistema') r.removeAttribute('data-tema'); else r.setAttribute('data-tema', id);
+                // Solo temas conocidos (los de ServicioTema.Todos); cualquier otro valor equivale a "sistema".
+                if (['claro', 'oscuro', 'oceano', 'bosque', 'medianoche', 'grafito'].indexOf(id) < 0) r.removeAttribute('data-tema'); else r.setAttribute('data-tema', id);
                 var estilo = getComputedStyle(r);
                 var meta = document.querySelector('meta[name="theme-color"]');
                 var color = (estilo.colorScheme.indexOf('dark') >= 0 ? estilo.getPropertyValue('--bg') : estilo.getPropertyValue('--wine')).trim();

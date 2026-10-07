@@ -1,0 +1,1575 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Mi parte, tu parte</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&display=swap">
+<style>
+/* Layout: cabecera con selector de hogar y menú de usuario, barra "Asume" fija en burdeos con un chip por miembro,
+   y pestañas de trabajo. Cada miembro tiene color + inicial (paleta de 8 tonos --m0..--m7). */
+:root {
+  --bg: #FBF5EF;
+  --surface: #FFFFFF;
+  --surface-2: #F5EAE1;
+  --ink: #24161A;
+  --ink-2: #6B5A5E;
+  --line: #E6D8CC;
+  --wine: #7A1F33;
+  --wine-text: #7A1F33;
+  --wine-soft: #F3DDE2;
+  --on-wine: #FFFFFF;
+  --on-wine-dim: rgba(255, 255, 255, .72);
+  --orange: #E8742A;
+  --orange-text: #A8480F;
+  --orange-soft: #FDE7D6;
+  --on-orange: #24161A;
+  --bar-amt: #FFC083;
+  --err: #C62828;
+  --ok: #2E7D5B;
+  --ok-soft: #E6F2EC;
+  --m0: #7A1F33; --m0-on: #FFFFFF;
+  --m1: #E8742A; --m1-on: #24161A;
+  --m2: #0F766E; --m2-on: #FFFFFF;
+  --m3: #2F5DA8; --m3-on: #FFFFFF;
+  --m4: #7B3FA0; --m4-on: #FFFFFF;
+  --m5: #6B7D1E; --m5-on: #FFFFFF;
+  --m6: #C2185B; --m6-on: #FFFFFF;
+  --m7: #5C5148; --m7-on: #FFFFFF;
+  --shadow: 0 1px 2px rgba(60, 15, 25, .06), 0 8px 24px rgba(60, 15, 25, .05);
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --font-body: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --radius: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1C1114;
+    --surface: #2A1A1F;
+    --surface-2: #35222A;
+    --ink: #F5ECE6;
+    --ink-2: #C8A9AD;
+    --line: #47282F;
+    --wine: #A32D40;
+    --wine-text: #E08A9C;
+    --wine-soft: #44202A;
+    --orange: #F2904A;
+    --orange-text: #F8A862;
+    --orange-soft: #3F2813;
+    --err: #FF8F86;
+    --ok: #7FD39B;
+    --ok-soft: #173424;
+    --m0: #E08A9C; --m0-on: #1C1114;
+    --m1: #F2904A; --m1-on: #1C1114;
+    --m2: #3DBFB2; --m2-on: #1C1114;
+    --m3: #7DA7F0; --m3-on: #1C1114;
+    --m4: #C38DE8; --m4-on: #1C1114;
+    --m5: #B6CA5C; --m5-on: #1C1114;
+    --m6: #F27BA9; --m6-on: #1C1114;
+    --m7: #C4B8AC; --m7-on: #1C1114;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1C1114;
+  --surface: #2A1A1F;
+  --surface-2: #35222A;
+  --ink: #F5ECE6;
+  --ink-2: #C8A9AD;
+  --line: #47282F;
+  --wine: #A32D40;
+  --wine-text: #E08A9C;
+  --wine-soft: #44202A;
+  --orange: #F2904A;
+  --orange-text: #F8A862;
+  --orange-soft: #3F2813;
+  --err: #FF8F86;
+  --ok: #7FD39B;
+  --ok-soft: #173424;
+  --m0: #E08A9C; --m0-on: #1C1114;
+  --m1: #F2904A; --m1-on: #1C1114;
+  --m2: #3DBFB2; --m2-on: #1C1114;
+  --m3: #7DA7F0; --m3-on: #1C1114;
+  --m4: #C38DE8; --m4-on: #1C1114;
+  --m5: #B6CA5C; --m5-on: #1C1114;
+  --m6: #F27BA9; --m6-on: #1C1114;
+  --m7: #C4B8AC; --m7-on: #1C1114;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  padding-inline: 16px;
+  padding-block: 0 56px;
+  font: 15px/1.5 var(--font-body);
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, p, ul { margin: 0; }
+h2, h3 { text-wrap: balance; }
+button { font: inherit; }
+.wrap { max-width: 1080px; margin-inline: auto; }
+.muted { color: var(--ink-2); }
+[hidden] { display: none !important; }
+.fieldrow .err { min-height: 0; }
+.fieldrow .err:empty { display: none; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Cabecera */
+.top {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 14px 24px; padding-block: 22px 16px;
+}
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.logo { flex: none; }
+.logo .h1 { fill: var(--orange); }
+.logo .h2 { fill: var(--wine); }
+:root[data-theme="dark"] .logo .h2 { fill: var(--wine-text); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .logo .h2 { fill: var(--wine-text); } }
+.brand h1 { font: 600 1.6rem/1.1 var(--font-display); letter-spacing: -.015em; white-space: nowrap; }
+.brand h1 .w1 { color: var(--wine-text); }
+.brand h1 .dot { color: var(--orange); padding-inline: .3em; font-weight: 400; }
+.brand h1 .w2 { color: var(--orange-text); font-style: italic; font-weight: 400; }
+.brand p { margin-top: 3px; color: var(--ink-2); font-size: .85rem; }
+.right { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
+.chip {
+  font-size: .7rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--orange-text); background: var(--orange-soft); padding: 5px 11px; border-radius: 999px; white-space: nowrap;
+}
+.monthnav { display: flex; align-items: center; gap: 8px; }
+.mlabel { min-width: 8.5rem; text-align: center; font-weight: 600; }
+.iconbtn {
+  width: 36px; height: 36px; display: grid; place-items: center; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  border-radius: 50%; font-size: 1.2rem; line-height: 1; padding: 0;
+}
+.iconbtn:hover:not([disabled]) { background: var(--surface-2); }
+.iconbtn[disabled] { opacity: .35; cursor: not-allowed; }
+
+/* Menús desplegables */
+.dd { position: relative; }
+.menubtn {
+  display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; max-width: 15rem;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; cursor: pointer; font-weight: 600; font-size: .9rem;
+}
+.menubtn:hover { background: var(--surface-2); }
+.menubtn .mb-lab { font-size: .65rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
+.menubtn .mb-val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.menubtn .caret { font-size: .7rem; color: var(--ink-2); }
+.menubtn.user { padding: 0 10px 0 4px; }
+.menu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 30; min-width: 15rem; max-width: calc(100vw - 32px);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 12px 32px rgba(40, 10, 20, .22);
+  padding: 6px; display: grid; gap: 2px;
+}
+.mhead { padding: 8px 10px 6px; font-size: .78rem; color: var(--ink-2); overflow-wrap: anywhere; }
+.mhead b { display: block; color: var(--ink); font-size: .9rem; }
+.mitem {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 0; background: none; color: var(--ink);
+  padding: 9px 10px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: .92rem;
+}
+.mitem:hover, .mitem:focus-visible { background: var(--surface-2); }
+.mitem .tick { width: 1em; color: var(--wine-text); font-weight: 700; flex: none; }
+.mitem small { margin-left: auto; color: var(--ink-2); font-weight: 500; font-size: .76rem; white-space: nowrap; }
+.msep { height: 1px; background: var(--line); margin: 4px 2px; }
+
+/* Avatares de miembro: color + inicial */
+.av {
+  display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; flex: none;
+  font-size: .72rem; font-weight: 700; line-height: 1; font-family: var(--font-body);
+}
+.av.sm { width: 18px; height: 18px; font-size: .62rem; }
+.av.lg { width: 34px; height: 34px; font-size: .95rem; }
+.who { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; min-width: 0; }
+
+/* Barra de resumen */
+.bar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 22px;
+  background: var(--wine); color: var(--on-wine);
+  border-radius: var(--radius); padding: 12px 18px; box-shadow: var(--shadow);
+}
+.bar .grp { display: flex; align-items: center; gap: 6px 14px; min-width: 0; }
+.bar .grp.asume { flex: 1 1 18rem; }
+.bar .grp.saldo { flex: 1 1 18rem; }
+.bar .grp:last-child:not(:first-child) { margin-inline-start: auto; }
+.bar .lab { font-size: .68rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--on-wine-dim); flex: none; }
+.bar .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; min-width: 0; }
+.bar .bit { display: inline-flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bar .amt { font-weight: 700; font-variant-numeric: tabular-nums; }
+.bar .av { box-shadow: 0 0 0 2px rgba(255, 255, 255, .85); }
+.bar .debt {
+  display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 6px;
+  background: rgba(255, 255, 255, .14); padding: 5px 14px; border-radius: 999px; font-weight: 600; font-variant-numeric: tabular-nums;
+}
+.bar .debt .amt { color: var(--bar-amt); }
+.bar .soft { color: var(--on-wine-dim); font-size: .85rem; }
+@media (max-width: 640px) {
+  .bar .grp.asume, .bar .grp.saldo { flex-basis: 100%; }
+  .bar .chips { flex-wrap: nowrap; overflow-x: auto; padding: 3px 3px 5px; margin: -3px; scrollbar-width: thin; }
+}
+
+/* Pestañas */
+.tabs { display: flex; gap: 4px; margin-top: 20px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tab {
+  appearance: none; border: 0; background: none; cursor: pointer; white-space: nowrap;
+  color: var(--ink-2); font-weight: 600; padding: 11px 16px; border-bottom: 3px solid transparent; margin-bottom: -1px;
+}
+.tab:hover:not([disabled]) { color: var(--ink); }
+.tab[aria-selected="true"] { color: var(--wine-text); border-bottom-color: var(--orange); }
+.tab[disabled] { cursor: not-allowed; opacity: .75; }
+.tab .soon { margin-left: 6px; font-size: .62rem; letter-spacing: .08em; text-transform: uppercase; background: var(--surface-2); color: var(--ink-2); padding: 2px 7px; border-radius: 999px; }
+.panel { padding-block: 22px 0; display: grid; gap: 18px; }
+.panel:focus { outline: none; }
+
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+
+/* Tarjetas y estructura */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; min-width: 0; box-shadow: var(--shadow); }
+.card h2 { font: 600 1.2rem/1.25 var(--font-display); }
+.card h3 { font-size: .8rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); margin-top: 20px; }
+.card > p.muted { margin-top: 4px; font-size: .88rem; }
+.card-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-bottom: 8px; }
+.cols2 { display: grid; gap: 18px; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: start; }
+.cols-form { display: grid; gap: 18px; grid-template-columns: minmax(0, 24rem) minmax(0, 1fr); align-items: start; }
+.cols-even { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+@media (max-width: 880px) { .cols2, .cols-form, .cols-even { grid-template-columns: minmax(0, 1fr); } }
+
+.stats {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px;
+  background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+}
+.stat { background: var(--surface); padding: 13px 18px; min-width: 0; }
+.stat span { display: block; font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+.stat strong { display: block; font-size: 1.3rem; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.stat strong.neg { color: var(--err); }
+@media (max-width: 480px) { .stat { padding: 11px 12px; } .stat strong { font-size: 1.02rem; } }
+
+/* Controles */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; background: var(--surface-2); max-width: 100%; }
+.seg button { border: 0; background: none; color: var(--ink-2); padding: 6px 14px; border-radius: 999px; font-weight: 600; font-size: .85rem; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--wine); color: var(--on-wine); }
+.seg.wide { display: flex; }
+.seg.wide button { flex: 1 1 0; padding-block: 8px; }
+
+label { display: grid; gap: 6px; font-size: .8rem; font-weight: 600; color: var(--ink-2); min-width: 0; }
+input, select {
+  font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line);
+  border-radius: 8px; padding: 0 12px; height: 42px; width: 100%; min-width: 0;
+}
+input[disabled], select[disabled] { opacity: .6; }
+input[aria-invalid="true"] { border-color: var(--err); }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.full { grid-column: 1 / -1; }
+@media (max-width: 430px) { .fields { grid-template-columns: minmax(0, 1fr); } }
+.form { display: grid; gap: 4px; align-content: start; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 14px; }
+.err { color: var(--err); font-size: .85rem; min-height: 1.2em; }
+.chk { display: flex; align-items: center; gap: 10px; font-size: .9rem; font-weight: 600; color: var(--ink); cursor: pointer; margin-top: 10px; }
+.chk input { width: 20px; height: 20px; padding: 0; accent-color: var(--wine); flex: none; }
+.tbl td.neg { color: var(--err); }
+.tbl td.pos { color: var(--ok); }
+.card-stack { display: grid; gap: 18px; min-width: 0; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 0 18px;
+  border-radius: 8px; border: 1px solid transparent; font-weight: 700; cursor: pointer; background: var(--wine); color: var(--on-wine);
+}
+.btn:hover:not([disabled]) { filter: brightness(1.1); }
+.btn-orange { background: var(--orange); color: var(--on-orange); }
+.btn-ghost { background: transparent; color: var(--wine-text); border-color: var(--line); }
+.btn-sm { min-height: 34px; padding: 0 12px; font-size: .85rem; }
+.btn-block { width: 100%; }
+.btn[disabled] { opacity: .4; cursor: not-allowed; }
+.linkbtn { border: 0; background: none; color: var(--wine-text); font-weight: 600; text-decoration: underline; cursor: pointer; padding: 4px 0; font-size: .88rem; }
+
+.preview {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 14px; min-height: 46px;
+  background: var(--surface-2); border-radius: 8px; padding: 10px 14px; font-size: .9rem; font-variant-numeric: tabular-nums;
+}
+.pv-lab { font-size: .68rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
+.pv-it { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+
+/* Lista de gastos */
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--ink-2); font-size: .82rem; margin-block: 8px 6px; align-items: center; }
+.legend .who { font-weight: 600; color: var(--ink); }
+.expsum { color: var(--ink-2); font-size: .85rem; }
+.listhead select { width: auto; max-width: 100%; height: 38px; font-size: .88rem; }
+.exp-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.exp { display: grid; grid-template-columns: minmax(0, 1fr) auto 34px; gap: 4px 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+.exp:first-child { border-top: 0; }
+.exp-title { font-weight: 600; overflow-wrap: anywhere; }
+.exp-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; color: var(--ink-2); font-size: .82rem; }
+.exp-amt { text-align: right; font-variant-numeric: tabular-nums; min-width: 0; }
+.exp-amt strong { display: block; }
+.split { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 2px 10px; font-size: .78rem; color: var(--ink-2); max-width: 15rem; margin-left: auto; }
+.sp { display: inline-flex; align-items: center; gap: 5px; }
+.del { width: 34px; height: 34px; border-radius: 50%; border: 1px solid transparent; background: none; color: var(--ink-2); cursor: pointer; font-size: 1.25rem; line-height: 1; padding: 0; flex: none; }
+.del:hover:not([disabled]) { background: var(--surface-2); color: var(--wine-text); }
+.del[disabled] { opacity: .3; cursor: not-allowed; }
+.empty { padding: 28px 8px; text-align: center; display: grid; gap: 14px; justify-items: center; color: var(--ink-2); }
+@media (max-width: 520px) { .exp { grid-template-columns: minmax(0, 1fr) 34px; } .exp-amt { grid-column: 1; grid-row: 2; text-align: left; } .split { justify-content: flex-start; margin-left: 0; max-width: none; } .exp .del { grid-column: 2; grid-row: 1; } }
+
+/* Gráficos */
+.chart { display: grid; gap: 2px; }
+.crow { display: grid; grid-template-columns: minmax(0, 9rem) minmax(0, 1fr) 6rem; gap: 12px; align-items: center; padding-block: 7px; }
+.cname { overflow-wrap: anywhere; font-size: .9rem; }
+.track { height: 20px; background: var(--surface-2); border-radius: 7px; overflow: hidden; }
+.fill { height: 100%; display: flex; border-radius: 7px; overflow: hidden; }
+.seg-m { height: 100%; display: grid; place-items: center; font-size: .66rem; font-weight: 700; overflow: hidden; border-right: 1px solid var(--surface); min-width: 0; }
+.seg-m:last-child { border-right: 0; }
+.fill-one { height: 100%; border-radius: 7px; }
+.cval { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; font-size: .9rem; }
+.crow.stack { grid-template-columns: minmax(0, 1fr) auto; row-gap: 4px; }
+.crow.stack .cname { grid-row: 1; grid-column: 1; }
+.crow.stack .cval { grid-row: 1; grid-column: 2; }
+.crow.stack .track { grid-row: 2; grid-column: 1 / -1; }
+@media (max-width: 520px) {
+  .crow { grid-template-columns: minmax(0, 1fr) auto; row-gap: 4px; }
+  .crow .cname { grid-row: 1; grid-column: 1; }
+  .crow .cval { grid-row: 1; grid-column: 2; }
+  .crow .track { grid-row: 2; grid-column: 1 / -1; }
+}
+.pcols { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 24px; margin-top: 8px; }
+@media (max-width: 640px) { .pcols { grid-template-columns: minmax(0, 1fr); } }
+.phead { display: flex; justify-content: space-between; align-items: center; gap: 10px; font: 600 1rem var(--font-body); margin: 0 0 2px; letter-spacing: 0; text-transform: none; color: var(--ink); }
+.ptot { font-variant-numeric: tabular-nums; font-weight: 700; }
+.psub { font-size: .82rem; color: var(--ink-2); margin-bottom: 6px; }
+
+/* Tablas y liquidación */
+.tblwrap { overflow-x: auto; margin-top: 10px; }
+.tbl { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: .9rem; }
+.tbl th { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-2); text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.tbl td { padding: 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.tbl .num { text-align: right; }
+.tbl tfoot td { font-weight: 700; border-bottom: 0; }
+.settle { margin-top: 16px; padding: 16px 18px; border-radius: var(--radius); background: var(--orange-soft); }
+.settle.ok { background: var(--wine-soft); }
+.settle-line { font: 500 1.3rem/1.35 var(--font-display); font-variant-numeric: lining-nums tabular-nums; }
+.settle-line .who { font: inherit; font-weight: 600; }
+.settle-line b { color: var(--orange-text); font-weight: 600; white-space: nowrap; }
+.settle.ok .settle-line { font-size: 1.15rem; }
+.settle.ok .settle-line b { color: var(--wine-text); }
+.xfers { list-style: none; padding: 0; margin: 16px 0 0; display: grid; gap: 10px; }
+.xfer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 14px; padding: 12px 16px; border-radius: var(--radius); background: var(--orange-soft); }
+.xfer .settle-line { font-size: 1.08rem; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; }
+.paylist { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 2px; }
+.paylist li { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: .88rem; padding: 4px 0; }
+.paylist .l { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; min-width: 0; }
+.note { margin-top: 12px; font-size: .85rem; color: var(--ink-2); }
+.note .who { color: var(--ink); }
+
+/* Hogar y categorías */
+.tag { display: inline-block; font-size: .66rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); white-space: nowrap; }
+.tag.admin { background: var(--orange-soft); color: var(--orange-text); }
+.tag.off { background: transparent; border: 1px solid var(--line); }
+.tag.cur { background: var(--wine-soft); color: var(--wine-text); }
+.mlist { display: grid; margin-top: 10px; }
+.mrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.mrow:first-child { border-top: 0; }
+.mrow.inactive .av, .mrow.inactive input { opacity: .55; }
+.mrow .mname { flex: 1 1 9rem; min-width: 0; }
+.mrow .mmeta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: .82rem; color: var(--ink-2); flex: 1 1 10rem; min-width: 0; }
+.mrow select { width: auto; max-width: 100%; height: 36px; font-size: .85rem; }
+.addm { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-top: 14px; padding-top: 16px; border-top: 1px solid var(--line); }
+.addm label { flex: 1 1 9rem; }
+.invite { margin-top: 14px; border-radius: var(--radius); background: var(--surface-2); padding: 14px 16px; display: grid; gap: 10px; min-width: 0; }
+.token { display: block; font: 600 .9rem/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--surface); border: 1px dashed var(--line); border-radius: 8px; padding: 8px 10px; overflow-wrap: anywhere; user-select: all; }
+.invite .lab, .lab2 { font-size: .68rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
+.warnbox { font-size: .85rem; color: var(--orange-text); background: var(--orange-soft); border-radius: 8px; padding: 8px 12px; }
+details.prof { border-top: 1px solid var(--line); padding-block: 4px; }
+details.prof:first-of-type { border-top: 0; }
+details.prof summary { list-style: none; cursor: pointer; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 10px 0; border-radius: 8px; }
+details.prof summary::-webkit-details-marker { display: none; }
+details.prof summary .pn { font-weight: 600; display: inline-flex; gap: 8px; align-items: center; }
+details.prof summary .pn::before { content: '▸'; color: var(--ink-2); font-size: .8rem; transition: transform .15s; }
+details.prof[open] summary .pn::before { transform: rotate(90deg); }
+.psum { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--ink-2); font-size: .82rem; font-variant-numeric: tabular-nums; }
+.pbody { padding-bottom: 12px; display: grid; gap: 4px; }
+.pbody .fields { margin-top: 4px; }
+.sumline { font-size: .85rem; font-weight: 600; margin-top: 6px; }
+.sumline.ok { color: var(--ok); }
+.sumline.bad { color: var(--err); }
+.catrow {
+  display: grid; gap: 8px 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line);
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.2fr) 9rem 8rem 36px;
+  grid-template-areas: "name sel chk amt del";
+}
+.catrow:first-of-type { border-top: 0; }
+.catrow .c-name { grid-area: name; }
+.catrow .c-sel { grid-area: sel; }
+.catrow .c-chk { grid-area: chk; margin: 0; font-size: .82rem; }
+.catrow .c-amt { grid-area: amt; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.catrow .c-del { grid-area: del; }
+.cathead { display: grid; gap: 12px; padding-bottom: 8px; margin-top: 14px; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.2fr) 9rem 8rem 36px; font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+.cathead span:nth-child(4) { text-align: right; }
+@media (max-width: 640px) {
+  .cathead { display: none; }
+  .catrow { grid-template-columns: minmax(0, 1fr) 36px; grid-template-areas: "name del" "sel sel" "chk chk" "amt amt"; }
+  .catrow .c-amt { text-align: left; color: var(--ink-2); font-weight: 500; font-size: .85rem; }
+}
+.addcat { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-top: 14px; padding-top: 16px; border-top: 1px solid var(--line); }
+.addcat label { flex: 1 1 11rem; }
+
+/* Cuenta común */
+.kv { display: grid; gap: 2px; margin-top: 10px; }
+.kv > div { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 7px 0; border-top: 1px solid var(--line); font-size: .9rem; }
+.kv > div:first-child { border-top: 0; }
+.kv b { font-variant-numeric: tabular-nums; }
+.reimb { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+.reimb label { flex: 1 1 7rem; }
+.reimb .who { flex: 1 1 100%; }
+.calc { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 6px; }
+.calc summary { cursor: pointer; font-weight: 600; padding: 8px 0; color: var(--wine-text); }
+
+/* Acceso, sin hogar, mis hogares */
+.auth { max-width: 460px; width: 100%; margin-inline: auto; display: grid; gap: 16px; }
+.auth .card { display: grid; gap: 14px; }
+.auth h2 { font: 600 1.45rem/1.2 var(--font-display); }
+.divider { display: flex; align-items: center; gap: 12px; color: var(--ink-2); font-size: .8rem; }
+.divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.gbtn .g { width: 22px; height: 22px; border-radius: 50%; background: var(--surface-2); display: grid; place-items: center; font-weight: 700; color: var(--ink); font-size: .8rem; }
+.fieldrow { display: grid; gap: 4px; }
+.okmsg { background: var(--ok-soft); color: var(--ok); border-radius: 8px; padding: 10px 12px; font-size: .9rem; font-weight: 600; }
+.hogar-list { list-style: none; padding: 0; display: grid; gap: 12px; }
+.hcard { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); }
+.hcard.cur { border-color: var(--wine); }
+.hcard h3 { font: 600 1.1rem var(--font-display); margin: 0; text-transform: none; letter-spacing: 0; color: var(--ink); display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.hcard .hinfo { min-width: 0; display: grid; gap: 6px; }
+.avs { display: flex; flex-wrap: wrap; gap: 4px; }
+.avs .av { box-shadow: 0 0 0 2px var(--surface); }
+.spinbox { display: grid; justify-items: center; gap: 14px; padding: 70px 8px; color: var(--ink-2); }
+.spin { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--orange); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.foot { margin-top: 30px; color: var(--ink-2); font-size: .82rem; }
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: 999px;
+  font-weight: 600; font-size: .9rem; z-index: 40; max-width: calc(100% - 32px); text-align: center;
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } .spin { animation: none; border-top-color: var(--wine); } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg class="logo" width="40" height="40" viewBox="0 0 100 100" aria-hidden="true">
+        <g transform="rotate(45 50 50)"><path class="h1" d="M42 11 A33 33 0 0 0 42 77 Z"></path><path class="h2" d="M48 14 A40 40 0 0 1 48 94 Z"></path></g>
+      </svg>
+      <div>
+        <h1 aria-label="Mi parte, tu parte"><span class="w1">mi parte</span><span class="dot" aria-hidden="true">·</span><span class="w2">tu parte</span></h1>
+        <p>Gastos e ingresos del hogar, cada uno con su parte</p>
+      </div>
+    </div>
+    <div class="right" id="topright"></div>
+  </header>
+
+  <div id="bar" class="bar" role="status" aria-live="polite" hidden></div>
+  <div id="tabs" class="tabs" role="tablist" aria-label="Secciones" hidden></div>
+  <main id="panel" class="panel" role="main" tabindex="-1"></main>
+  <p class="foot">Maqueta con datos de ejemplo. Lo que cambies aquí no se guarda al cerrar la página.</p>
+</div>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+'use strict';
+/* ---------- Datos y lógica ---------- */
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+const CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const MONTHS = ['2026-08', '2026-09', '2026-10'];
+const MAX_HOGARES = 10;
+const MODOS = { ingresos: 'Proporcional a ingresos', partes: 'Por partes', porcentaje: 'Porcentaje fijo', individual: 'Individual (quien paga)', cc: 'Cuenta común (100 %)' };
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+const state = {
+  screen: 'login', user: null, loading: null, menu: null,
+  login: { modo: 'entrar', email: '', forgot: false, sent: false },
+  hogares: [], hid: null,
+  tab: 'resumen', month: '2026-09', view: 'categoria', filter: '',
+  invite: null, openProf: null, merr: null, sinHogarModo: 'crear'
+};
+let seq = 100;
+const nid = p => p + (seq++);
+const hog = () => state.hogares.find(x => x.id === state.hid);
+const CUENTA = { id: 'c', nombre: 'Cuenta común', color: 7, activo: true, tipo: 'cuenta' };
+const M = id => id === 'c' ? CUENTA : hog().miembros.find(x => x.id === id) || { id, nombre: 'Persona', color: 7, activo: false, tipo: 'adulto' };
+const adultosDe = H => H.miembros.filter(x => x.tipo === 'adulto' && x.activo);
+const esMono = H => adultosDe(H).length === 1;
+const esAdmin = H => { const yo = H.miembros.find(x => x.yo); return !!yo && yo.rol === 'admin'; };
+
+function parseCents(s) {
+  s = String(s).trim().replace(/\s|€/g, '');
+  if (!s) return NaN;
+  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  if (!/^\d+(\.\d{1,2})?$/.test(s)) return NaN;
+  return Math.round(parseFloat(s) * 100);
+}
+// Pesos por adulto activo según el perfil. Sin pesos válidos se reparte a partes iguales.
+function pesos(H, prof, mes, payer) {
+  const ads = adultosDe(H);
+  let w;
+  if (prof.modo === 'ingresos') w = ads.map(a => Number(H.prop[a.id]) || 0);
+  else if (prof.modo === 'partes' || prof.modo === 'porcentaje') w = ads.map(a => Number(prof.detalle[a.id]) || 0);
+  else w = ads.map(a => (a.id === payer ? 1 : 0));
+  if (!w.some(x => x > 0)) w = ads.map(() => 1);
+  return { ads, w };
+}
+// El último adulto con peso absorbe el céntimo sobrante, como en Reparto.Dividir del servidor.
+function repartir(H, importe, prof, mes, payer) {
+  const { ads, w } = pesos(H, prof, mes, payer);
+  const t = w.reduce((s, x) => s + x, 0);
+  let last = -1; w.forEach((x, i) => { if (x > 0) last = i; });
+  const rep = {}, pct = {}; let acc = 0;
+  ads.forEach((a, i) => {
+    let v = i === last ? importe - acc : Math.round(importe * w[i] / t);
+    if (w[i] <= 0) v = 0;
+    rep[a.id] = v; acc += v; pct[a.id] = w[i] / t * 100;
+  });
+  return { rep, pct };
+}
+function addGasto(H, o) {
+  const prof = H.perfiles.find(p => p.id === o.pid);
+  const cargo = (o.payer === 'c' || (H.cuenta.activa && o.cargo)) ? 'c' : 'p';
+  if (cargo === 'c') {
+    // La cuenta común asume el 100 %: el reparto proporcional ya se hizo con las aportaciones.
+    H.gastos.push({ id: nid('e'), fecha: o.fecha, concepto: o.concepto, importe: o.importe, cat: o.cat, payer: o.payer, cargo: 'c', pid: null, pn: MODOS.cc, modo: 'cc', rep: {}, pct: {} });
+    return;
+  }
+  const r = repartir(H, o.importe, prof, o.fecha.slice(0, 7), o.payer);
+  // Se guarda el reparto y el nombre del perfil de ese momento: si luego cambian, el gasto no se altera.
+  H.gastos.push({ id: nid('e'), fecha: o.fecha, concepto: o.concepto, importe: o.importe, cat: o.cat, payer: o.payer, cargo: 'p', pid: prof.id, pn: prof.nombre, modo: prof.modo, rep: r.rep, pct: r.pct });
+}
+function nuevoMiembro(H, nombre, tipo, resp, rol) {
+  const used = new Set(H.miembros.map(x => x.color)); let c = 0;
+  while (used.has(c) && c < 8) c++;
+  if (c >= 8) c = H.miembros.length % 8;
+  const m = { id: nid('m'), nombre, tipo, resp: resp || null, activo: true, rol: rol || 'miembro', color: c };
+  H.miembros.push(m);
+  if (tipo === 'adulto') { H.prop[m.id] = 0; H.perfiles.forEach(p => { if (p.modo === 'partes') p.detalle[m.id] = 1; if (p.modo === 'porcentaje') p.detalle[m.id] = 0; }); }
+  return m;
+}
+// Semilla al crear hogar, igual que la API: 4 perfiles, 6 categorías, el creador admin y adulto.
+function nuevoHogar(nombre, yo) {
+  const me = { id: nid('m'), nombre: yo, tipo: 'adulto', resp: null, activo: true, rol: 'admin', color: 0, yo: true };
+  const H = { id: nid('h'), nombre, miembros: [me], perfiles: [], cats: [], prop: { [me.id]: 100 }, cuenta: { activa: false, aport: {} }, gastos: [], pagos: [] };
+  H.perfiles = [
+    { id: nid('p'), nombre: 'Proporcional a ingresos', modo: 'ingresos', detalle: {} },
+    { id: nid('p'), nombre: 'Por partes', modo: 'partes', detalle: { [me.id]: 1 } },
+    { id: nid('p'), nombre: 'Porcentaje fijo', modo: 'porcentaje', detalle: { [me.id]: 100 } },
+    { id: nid('p'), nombre: 'Individual', modo: 'individual', detalle: {} }
+  ];
+  const P = modo => H.perfiles.find(p => p.modo === modo).id;
+  H.cats = [['Hipoteca/Alquiler', 'ingresos', true], ['Alimentación', 'ingresos', true], ['Suministros', 'ingresos', true], ['Gastos varios de casa', 'ingresos', true], ['Hijo', 'partes', false], ['Ocio personal', 'individual', false]]
+    .map(([n, m, c]) => ({ id: nid('c'), nombre: n, pid: P(m), cargo: c }));
+  return H;
+}
+function gasto(H, f, c, eu, cat, payer, cargo) {
+  const ct = H.cats.find(x => x.nombre === cat), pg = payer === 'Cuenta' ? { id: 'c' } : H.miembros.find(x => x.nombre === payer);
+  addGasto(H, { fecha: f, concepto: c, importe: Math.round(eu * 100), cat: ct.id, payer: pg.id, pid: ct.pid, cargo: !!cargo });
+}
+function seedDemo() {
+  // Casa: 2 adultos + 1 hijo a cargo (responsable Luis) y cuenta común
+  const casa = nuevoHogar('Casa', 'Ana');
+  const ana = casa.miembros[0];
+  const luis = nuevoMiembro(casa, 'Luis', 'adulto', null, 'miembro');
+  const leo = nuevoMiembro(casa, 'Leo', 'a_cargo', luis.id, 'miembro');
+  casa.perfiles[1].detalle = { [ana.id]: 1, [luis.id]: 2 };
+  casa.perfiles[2].detalle = { [ana.id]: 50, [luis.id]: 50 };
+  casa.prop = { [ana.id]: 200, [luis.id]: 100 };
+  casa.cats[0].nombre = 'Hipoteca';
+  casa.cats[1].pid = casa.perfiles[1].id;
+  casa.cats[4].pid = casa.perfiles[2].id;
+  casa.cuenta = { activa: true, aport: {} };
+  MONTHS.forEach(m => { casa.cuenta.aport[m] = { [ana.id]: 90000, [luis.id]: 45000 }; });
+  [['2026-08-01', 'Hipoteca', 780, 'Hipoteca', 'Ana', true], ['2026-08-04', 'Supermercado', 151.20, 'Alimentación', 'Luis'], ['2026-08-09', 'Luz', 74.10, 'Suministros', 'Cuenta'],
+    ['2026-08-15', 'Cena de cumpleaños', 62, 'Ocio personal', 'Ana'], ['2026-08-18', 'Supermercado', 109.45, 'Alimentación', 'Ana'], ['2026-08-24', 'Material escolar', 71.30, 'Hijo', 'Luis'],
+    ['2026-09-01', 'Hipoteca', 780, 'Hipoteca', 'Ana', true], ['2026-09-03', 'Supermercado', 142.35, 'Alimentación', 'Cuenta'], ['2026-09-05', 'Luz', 68.40, 'Suministros', 'Cuenta'],
+    ['2026-09-07', 'Extraescolares', 85, 'Hijo', 'Luis'], ['2026-09-09', 'Supermercado', 96.80, 'Alimentación', 'Luis'], ['2026-09-12', 'Internet y móvil', 59.90, 'Suministros', 'Cuenta'],
+    ['2026-09-14', 'Fontanero', 120, 'Gastos varios de casa', 'Ana'], ['2026-09-16', 'Cena con amigos', 54, 'Ocio personal', 'Ana'], ['2026-09-19', 'Supermercado', 118.20, 'Alimentación', 'Cuenta'],
+    ['2026-09-22', 'Ropa de otoño', 64.50, 'Hijo', 'Luis'], ['2026-09-26', 'Gimnasio', 39, 'Ocio personal', 'Luis'], ['2026-09-28', 'Supermercado', 131.05, 'Alimentación', 'Luis'],
+    ['2026-10-01', 'Hipoteca', 780, 'Hipoteca', 'Ana', true], ['2026-10-02', 'Supermercado', 88.60, 'Alimentación', 'Luis'], ['2026-10-03', 'Internet y móvil', 59.90, 'Suministros', 'Cuenta'],
+    ['2026-10-04', 'Comedor escolar', 96, 'Hijo', 'Luis']].forEach(a => gasto(casa, ...a));
+  casa.pagos.push({ id: nid('p'), month: '2026-08', from: luis.id, to: ana.id, amount: 15000, fecha: '2026-08-20' });
+  casa.pagos.push({ id: nid('p'), month: '2026-08', from: 'c', to: ana.id, amount: 78000, fecha: '2026-08-05' });
+
+  // Piso de estudiantes: 4 adultos, sin personas a cargo ni cuenta común
+  const piso = nuevoHogar('Piso de estudiantes', 'Ana');
+  const a2 = piso.miembros[0];
+  const marta = nuevoMiembro(piso, 'Marta', 'adulto', null, 'miembro');
+  const pablo = nuevoMiembro(piso, 'Pablo', 'adulto', null, 'miembro');
+  const ivan = nuevoMiembro(piso, 'Iván', 'adulto', null, 'miembro');
+  piso.perfiles[1].nombre = 'A partes iguales';
+  piso.perfiles[1].detalle = { [a2.id]: 1, [marta.id]: 1, [pablo.id]: 1, [ivan.id]: 1 };
+  piso.perfiles[2].detalle = { [a2.id]: 25, [marta.id]: 25, [pablo.id]: 25, [ivan.id]: 25 };
+  piso.prop = { [a2.id]: 6, [marta.id]: 5, [pablo.id]: 4, [ivan.id]: 3 };
+  const pp = piso.perfiles[1].id;
+  piso.cats = [['Alquiler', pp], ['Suministros', pp], ['Compra', pp], ['Limpieza', pp], ['Ocio compartido', piso.perfiles[2].id], ['Gastos personales', piso.perfiles[3].id]]
+    .map(([n, p]) => ({ id: nid('c'), nombre: n, pid: p, cargo: false }));
+  [['2026-08-01', 'Alquiler de agosto', 1600, 'Alquiler', 'Marta'], ['2026-08-05', 'Luz', 88.30, 'Suministros', 'Pablo'], ['2026-08-08', 'Internet', 39.90, 'Suministros', 'Iván'],
+    ['2026-08-10', 'Compra semanal', 74.20, 'Compra', 'Ana'], ['2026-08-12', 'Gimnasio', 29, 'Gastos personales', 'Ana'], ['2026-08-17', 'Compra semanal', 61.85, 'Compra', 'Iván'],
+    ['2026-08-22', 'Productos de limpieza', 18.75, 'Limpieza', 'Marta'], ['2026-08-25', 'Pizzas del viernes', 38, 'Ocio compartido', 'Pablo'],
+    ['2026-09-01', 'Alquiler de septiembre', 1600, 'Alquiler', 'Marta'], ['2026-09-04', 'Luz', 96.40, 'Suministros', 'Pablo'], ['2026-09-08', 'Internet', 39.90, 'Suministros', 'Iván'],
+    ['2026-09-11', 'Compra semanal', 82.10, 'Compra', 'Ana'], ['2026-09-14', 'Libros de texto', 35, 'Gastos personales', 'Pablo'], ['2026-09-19', 'Compra semanal', 55.60, 'Compra', 'Pablo'],
+    ['2026-09-23', 'Fregona y bayetas', 21.40, 'Limpieza', 'Iván'], ['2026-09-27', 'Cena de piso', 72, 'Ocio compartido', 'Marta'],
+    ['2026-10-01', 'Alquiler de octubre', 1600, 'Alquiler', 'Marta'], ['2026-10-02', 'Compra semanal', 67.45, 'Compra', 'Ana'], ['2026-10-03', 'Internet', 39.90, 'Suministros', 'Iván']].forEach(a => gasto(piso, ...a));
+  piso.pagos.push({ id: nid('p'), month: '2026-09', from: ivan.id, to: marta.id, amount: 20000, fecha: '2026-09-29' });
+
+  // Mis gastos: hogar de una persona
+  const mis = nuevoHogar('Mis gastos', 'Ana');
+  [['2026-08-01', 'Alquiler', 720, 'Hipoteca/Alquiler', 'Ana'], ['2026-08-06', 'Supermercado', 96.30, 'Alimentación', 'Ana'], ['2026-08-12', 'Luz y agua', 64.20, 'Suministros', 'Ana'], ['2026-08-20', 'Cine y cena', 35, 'Ocio personal', 'Ana'],
+    ['2026-09-01', 'Alquiler', 720, 'Hipoteca/Alquiler', 'Ana'], ['2026-09-05', 'Supermercado', 104.55, 'Alimentación', 'Ana'], ['2026-09-10', 'Internet y móvil', 49.90, 'Suministros', 'Ana'], ['2026-09-18', 'Cerrajero', 42.10, 'Gastos varios de casa', 'Ana'], ['2026-09-21', 'Concierto', 48, 'Ocio personal', 'Ana'],
+    ['2026-10-01', 'Alquiler', 720, 'Hipoteca/Alquiler', 'Ana'], ['2026-10-03', 'Supermercado', 71.20, 'Alimentación', 'Ana']].forEach(a => gasto(mis, ...a));
+  return [casa, piso, mis];
+}
+
+function monthData(m) {
+  const H = hog();
+  const ex = H.gastos.filter(e => e.fecha.startsWith(m));
+  const paid = {}, assumed = {}, byCat = {}, reimb = {}; let total = 0, spent = 0, direct = 0;
+  ex.forEach(e => {
+    total += e.importe;
+    if (e.payer !== 'c') paid[e.payer] = (paid[e.payer] || 0) + e.importe;
+    const c = byCat[e.cat] || (byCat[e.cat] = { t: 0, by: {} }); c.t += e.importe;
+    for (const id in e.rep) { assumed[id] = (assumed[id] || 0) + e.rep[id]; c.by[id] = (c.by[id] || 0) + e.rep[id]; }
+    if (e.cargo === 'c') {
+      // A cargo de la cuenta común: la cuenta asume el 100 % y no se genera deuda entre personas.
+      spent += e.importe; assumed.c = (assumed.c || 0) + e.importe; c.by.c = (c.by.c || 0) + e.importe;
+      if (e.payer === 'c') direct += e.importe; else reimb[e.payer] = (reimb[e.payer] || 0) + e.importe;
+    }
+  });
+  const pays = H.pagos.filter(p => p.month === m);
+  const mem = H.miembros.filter(x => x.tipo === 'adulto' && (x.activo || paid[x.id] || assumed[x.id]));
+  const bal = {};
+  mem.forEach(x => { bal[x.id] = 0; });
+  ex.forEach(e => {
+    if (e.cargo === 'c') return;
+    bal[e.payer] = (bal[e.payer] || 0) + e.importe;
+    for (const id in e.rep) bal[id] = (bal[id] || 0) - e.rep[id];
+  });
+  pays.forEach(p => { if (p.from === 'c') return; bal[p.from] = (bal[p.from] || 0) + p.amount; bal[p.to] = (bal[p.to] || 0) - p.amount; });
+  const contrib = H.cuenta.activa ? (H.cuenta.aport[m] || {}) : {};
+  const contribTotal = Object.values(contrib).reduce((s, x) => s + x, 0);
+  return { ex, paid, assumed, total, byCat, pays, bal, mem, xfers: transferencias(bal), spent, direct, reimb, contrib, contribTotal };
+}
+// Estado acumulado de la cuenta común hasta el mes m.
+// saldo = aportaciones - gastos a cargo de la cuenta (incluye lo pendiente de reembolsar)
+// cash = dinero que hay ahora en la cuenta; pend = lo que la cuenta debe a cada persona
+function accountState(m) {
+  let contrib = 0, charged = 0, direct = 0, back = 0; const pend = {};
+  for (const k of MONTHS) {
+    const d = monthData(k);
+    contrib += d.contribTotal; charged += d.spent; direct += d.direct;
+    for (const id in d.reimb) pend[id] = (pend[id] || 0) + d.reimb[id];
+    d.pays.forEach(p => { if (p.from === 'c') { pend[p.to] = (pend[p.to] || 0) - p.amount; back += p.amount; } });
+    if (k === m) break;
+  }
+  const pendTotal = Object.values(pend).reduce((s, x) => s + x, 0);
+  return { saldo: contrib - charged, cash: contrib - direct - back, pend, pendTotal };
+}
+// Saldo de cada persona (positivo = dinero a su favor): lo que la cuenta le debe + lo que le deben las otras personas.
+function saldos(m) {
+  const d = monthData(m), acc = accountState(m), total = {};
+  d.mem.forEach(x => { total[x.id] = (d.bal[x.id] || 0) + (acc.pend[x.id] || 0); });
+  return { total, acc };
+}
+// Transferencias mínimas: el mayor deudor paga al mayor acreedor hasta saldar.
+function transferencias(bal) {
+  const c = [], d = [], out = [];
+  for (const id in bal) { if (bal[id] > 0) c.push([id, bal[id]]); else if (bal[id] < 0) d.push([id, -bal[id]]); }
+  while (c.length && d.length) {
+    c.sort((x, y) => y[1] - x[1]); d.sort((x, y) => y[1] - x[1]);
+    const t = Math.min(c[0][1], d[0][1]);
+    out.push({ de: d[0][0], a: c[0][0], importe: t });
+    c[0][1] -= t; d[0][1] -= t;
+    if (!c[0][1]) c.shift();
+    if (!d[0][1]) d.shift();
+  }
+  return out;
+}
+
+/* ---------- Utilidades de interfaz ---------- */
+const $ = s => document.querySelector(s);
+const fmtEur = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
+const eur = c => fmtEur.format(c / 100);
+const sgn = v => (v > 0 ? '+' : '') + eur(v);
+const fmtPct = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 1 });
+const monthLabel = k => { const n = MESES[+k.slice(5) - 1]; return n[0].toUpperCase() + n.slice(1) + ' ' + k.slice(0, 4); };
+const dayLabel = f => (+f.slice(8)) + ' ' + CORTOS[+f.slice(5, 7) - 1];
+const inpVal = c => (c / 100).toFixed(2).replace('.', ',');
+const lastDay = m => { const p = m.split('-').map(Number); return new Date(p[0], p[1], 0).getDate(); };
+const defaultDate = m => { const t = new Date().toISOString().slice(0, 10); return t.startsWith(m) ? t : m + '-' + String(lastDay(m)).padStart(2, '0'); };
+const plural = (n, a, b) => n + ' ' + (n === 1 ? a : b);
+
+function h(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k === 'class') e.className = v;
+    else if (k === 'style') Object.assign(e.style, v);
+    else if (k === 'text') e.textContent = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v === true ? '' : v);
+  }
+  kids.flat(Infinity).forEach(c => { if (c == null || c === false) return; e.append(c.nodeType ? c : document.createTextNode(c)); });
+  return e;
+}
+const ini = m => ((m.nombre || '?').trim()[0] || '?').toUpperCase();
+const colorOf = m => 'var(--m' + (m.color % 8) + ')';
+const onOf = m => 'var(--m' + (m.color % 8) + '-on)';
+const av = (m, size) => h('span', { class: 'av' + (size ? ' ' + size : ''), 'aria-hidden': 'true', style: { background: colorOf(m), color: onOf(m) } }, ini(m));
+const who = m => h('span', { class: 'who' }, av(m), h('span', { text: m.nombre }));
+const whoId = id => who(M(id));
+let toastTimer;
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 2800);
+}
+function copiar(text, el) {
+  const fallback = () => {
+    const r = document.createRange(); r.selectNodeContents(el);
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+    toast('Selecciona el texto y cópialo con Ctrl+C');
+  };
+  try { navigator.clipboard.writeText(text).then(() => toast('Copiado'), fallback); } catch (e) { fallback(); }
+}
+function focusPanel() { const p = $('#panel'); p.focus({ preventScroll: true }); }
+function load(msg, fn, ms) {
+  state.loading = msg; state.menu = null; render();
+  setTimeout(() => {
+    const out = fn(); state.loading = null; render(); focusPanel();
+    if (typeof out === 'string') toast(out);
+  }, ms || 650);
+}
+function profileOptions(H) { return H.perfiles.map(p => h('option', { value: p.id, text: p.nombre })); }
+
+/* ---------- Cabecera ---------- */
+function dropdown(id, btnClass, btnKids, items, label) {
+  const open = state.menu === id;
+  const btn = h('button', {
+    class: 'menubtn ' + btnClass, type: 'button', id: 'mb-' + id, 'aria-haspopup': 'menu', 'aria-expanded': String(open), 'aria-label': label,
+    onclick: ev => { ev.stopPropagation(); state.menu = open ? null : id; renderHeader(); if (!open) { const f = document.querySelector('#mn-' + id + ' [role^=menuitem]'); if (f) f.focus(); } }
+  }, btnKids);
+  const menu = open ? h('div', { class: 'menu', role: 'menu', id: 'mn-' + id, 'aria-labelledby': 'mb-' + id }, items) : null;
+  return h('div', { class: 'dd' }, btn, menu);
+}
+const mitem = (label, onclick, o) => h('button', {
+  class: 'mitem', type: 'button', role: (o && o.radio) ? 'menuitemradio' : 'menuitem', 'aria-checked': (o && o.radio) ? String(!!o.current) : null,
+  onclick: () => { state.menu = null; onclick(); }
+}, (o && o.radio) ? h('span', { class: 'tick', 'aria-hidden': 'true', text: o.current ? '✓' : '' }) : null, label, (o && o.small) ? h('small', { text: o.small }) : null);
+
+function renderHeader() {
+  const logged = !!state.user, hasH = state.hogares.length > 0, inApp = logged && hasH && (state.screen === 'app' || state.screen === 'hogares');
+  const parts = [];
+  if (inApp && state.screen === 'app') {
+    const i = MONTHS.indexOf(state.month);
+    const go = k => () => { state.month = MONTHS[i + k]; render(); };
+    parts.push(h('div', { class: 'monthnav' },
+      h('button', { class: 'iconbtn', type: 'button', 'aria-label': 'Mes anterior', disabled: i === 0, onclick: go(-1) }, '‹'),
+      h('span', { class: 'mlabel', text: monthLabel(state.month) }),
+      h('button', { class: 'iconbtn', type: 'button', 'aria-label': 'Mes siguiente', disabled: i === MONTHS.length - 1, onclick: go(1) }, '›')));
+  }
+  // El selector de hogar solo aparece con más de un hogar.
+  if (logged && state.hogares.length > 1 && state.screen === 'app') {
+    const H = hog();
+    const items = state.hogares.map(x => mitem(x.nombre, () => cambiarHogar(x.id), { radio: true, current: x.id === state.hid, small: plural(x.miembros.filter(y => y.activo).length, 'persona', 'personas') }));
+    items.push(h('div', { class: 'msep', role: 'separator' }));
+    items.push(mitem('Crear otro hogar', () => irCrearHogar()));
+    parts.push(dropdown('hogar', 'hogarbtn', [h('span', { class: 'mb-lab', text: 'Hogar' }), h('span', { class: 'mb-val', text: H.nombre }), h('span', { class: 'caret', 'aria-hidden': 'true', text: '▾' })], items, 'Cambiar de hogar. Hogar actual: ' + H.nombre));
+  }
+  parts.push(h('span', { class: 'chip', text: 'Datos de ejemplo' }));
+  if (logged) {
+    const items = [h('div', { class: 'mhead' }, 'Sesión iniciada como', h('b', { text: state.user.email }))];
+    if (hasH) items.push(mitem('Mis hogares', () => { state.screen = 'hogares'; render(); focusPanel(); }));
+    items.push(mitem('Cerrar sesión', cerrarSesion));
+    const me = { nombre: state.user.email, color: 0 };
+    parts.push(dropdown('user', 'user', [av(me), h('span', { class: 'caret', 'aria-hidden': 'true', text: '▾' })], items, 'Menú de usuario'));
+  }
+  $('#topright').replaceChildren(...parts);
+  if (state.menu) {
+    const btn = $('#mb-' + state.menu), menu = $('#mn-' + state.menu);
+    if (btn && menu) {
+      const r = btn.getBoundingClientRect(), w = menu.offsetWidth;
+      const x = Math.max(16, Math.min(r.left, window.innerWidth - 16 - w));
+      menu.style.left = (x - r.left) + 'px';
+    }
+  }
+}
+document.addEventListener('click', () => { if (state.menu) { state.menu = null; renderHeader(); } });
+document.addEventListener('keydown', ev => {
+  if (!state.menu) return;
+  const id = state.menu;
+  if (ev.key === 'Escape') { state.menu = null; renderHeader(); const b = $('#mb-' + id); if (b) b.focus(); return; }
+  if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+    const items = [...document.querySelectorAll('#mn-' + id + ' [role^=menuitem]')];
+    if (!items.length) return;
+    ev.preventDefault();
+    let i = items.indexOf(document.activeElement);
+    i = ev.key === 'ArrowDown' ? (i + 1) % items.length : (i - 1 + items.length) % items.length;
+    items[i].focus();
+  }
+});
+
+/* ---------- Barra, pestañas y render principal ---------- */
+function renderBar() {
+  const H = hog(), d = monthData(state.month), mono = esMono(H), act = H.cuenta.activa;
+  const chips = d.mem.map(m => h('span', { class: 'bit' }, who(m), h('span', { class: 'amt', text: '(' + eur(d.assumed[m.id] || 0) + ')' })));
+  if (act) chips.push(h('span', { class: 'bit' }, who(M('c')), h('span', { class: 'amt', text: '(' + eur(d.assumed.c || 0) + ')' })));
+  const groups = [h('div', { class: 'grp asume' }, h('span', { class: 'lab', text: 'Asume' }), h('div', { class: 'chips' }, chips))];
+  if (mono) groups.push(h('div', { class: 'grp' }, h('span', { class: 'soft', text: 'Sin liquidación' })));
+  else {
+    if (act) {
+      const sd = saldos(state.month);
+      groups.push(h('div', { class: 'grp saldo', title: 'Positivo: dinero a favor. Negativo: dinero que debe.' }, h('span', { class: 'lab', text: 'Saldo' }),
+        h('div', { class: 'chips' }, h('span', { class: 'bit' }, who(M('c')), h('span', { class: 'amt', text: '(' + eur(sd.acc.saldo) + ')' })),
+          d.mem.map(m => h('span', { class: 'bit' }, who(m), h('span', { class: 'amt', text: '(' + sgn(sd.total[m.id] || 0) + ')' }))))));
+    }
+    const n = d.xfers.length, tot = d.xfers.reduce((s, x) => s + x.importe, 0);
+    groups.push(h('div', { class: 'grp' }, h('span', { class: 'lab', text: act ? 'Entre personas' : 'Saldo' }),
+      h('span', { class: 'debt' }, n ? [plural(n, 'transferencia pendiente', 'transferencias pendientes'), h('span', { class: 'amt', text: '(' + eur(tot) + ')' })] : 'Estáis a mano')));
+  }
+  $('#bar').replaceChildren(...groups);
+}
+const TABS = [['resumen', 'Resumen'], ['gastos', 'Gastos'], ['hogar', 'Hogar'], ['categorias', 'Categorías'], ['chat', 'Chat']];
+function selectTab(id) { state.tab = id; renderTabs(); renderPanel(); }
+function renderTabs() {
+  $('#tabs').replaceChildren(...TABS.map(([id, l]) => id === 'chat'
+    ? h('button', { class: 'tab', type: 'button', role: 'tab', id: 'tab-chat', disabled: true, 'aria-selected': 'false', title: 'Próximamente' }, 'Chat', h('span', { class: 'soon', text: 'Próximamente' }))
+    : h('button', {
+      class: 'tab', type: 'button', role: 'tab', id: 'tab-' + id,
+      'aria-selected': String(state.tab === id), 'aria-controls': 'panel', tabindex: state.tab === id ? '0' : '-1',
+      onclick: () => selectTab(id)
+    }, l)));
+}
+function renderPanel() {
+  const p = $('#panel');
+  p.removeAttribute('aria-labelledby'); p.removeAttribute('aria-busy');
+  p.setAttribute('role', 'main');
+  let node;
+  if (state.loading) { p.setAttribute('aria-busy', 'true'); node = h('div', { class: 'spinbox', role: 'status' }, h('div', { class: 'spin', 'aria-hidden': 'true' }), h('p', { text: state.loading })); }
+  else if (state.screen === 'login') node = panelLogin();
+  else if (state.screen === 'sinhogar') node = panelSinHogar();
+  else if (state.screen === 'hogares') node = panelHogares();
+  else {
+    p.setAttribute('role', 'tabpanel'); p.setAttribute('aria-labelledby', 'tab-' + state.tab);
+    node = PANELS[state.tab]();
+  }
+  p.replaceChildren(node);
+}
+function render() {
+  const inApp = state.screen === 'app' && !state.loading && hog();
+  $('#bar').hidden = !inApp; $('#tabs').hidden = !inApp;
+  renderHeader();
+  if (inApp) { renderBar(); renderTabs(); }
+  renderPanel();
+}
+
+/* ---------- Sesión y hogares ---------- */
+function iniciar(email, existente) {
+  load('Entrando…', () => {
+    state.user = { email };
+    if (existente) { state.hogares = seedDemo(); state.hid = state.hogares[0].id; state.screen = 'app'; state.tab = 'resumen'; state.month = '2026-09'; }
+    else { state.hogares = []; state.hid = null; state.screen = 'sinhogar'; state.sinHogarModo = 'crear'; }
+    state.invite = null; state.filter = '';
+  }, 800);
+}
+function cerrarSesion() {
+  state.user = null; state.hogares = []; state.hid = null; state.screen = 'login'; state.menu = null;
+  state.login = { modo: 'entrar', email: '', forgot: false, sent: false };
+  render(); focusPanel(); toast('Sesión cerrada');
+}
+function cambiarHogar(id) {
+  const x = state.hogares.find(y => y.id === id);
+  if (!x) return;
+  if (id === state.hid && state.screen === 'app') return;
+  load('Cargando «' + x.nombre + '»…', () => { state.hid = id; state.screen = 'app'; state.filter = ''; state.invite = null; state.openProf = null; state.merr = null; });
+}
+function irCrearHogar() {
+  state.screen = 'hogares'; render(); focusPanel();
+  const f = $('#hc-hn'); if (f) { f.scrollIntoView({ block: 'center' }); f.focus(); }
+}
+function crearHogar(nombre, yo) {
+  load('Creando «' + nombre + '»…', () => {
+    const H = nuevoHogar(nombre, yo);
+    state.hogares.push(H); state.hid = H.id; state.screen = 'app'; state.tab = 'resumen'; state.invite = null; state.filter = ''; state.openProf = null;
+    return 'Hogar «' + nombre + '» creado';
+  }, 750);
+}
+function unirseHogar(yo) {
+  load('Uniéndote al hogar…', () => {
+    const H = nuevoHogar('Casa de Carmen', 'Carmen');
+    H.miembros[0].yo = false;
+    const me = nuevoMiembro(H, yo, 'adulto', null, 'miembro'); me.yo = true;
+    H.prop = { [H.miembros[0].id]: 57, [me.id]: 43 };
+    state.hogares.push(H); state.hid = H.id; state.screen = 'app'; state.tab = 'resumen'; state.invite = null; state.filter = '';
+    return 'Te has unido a «' + H.nombre + '»';
+  }, 750);
+}
+function formCrear(idp) {
+  const nh = h('input', { id: idp + '-hn', type: 'text', maxlength: '100', placeholder: 'Ej. Casa de Ana', autocomplete: 'off' });
+  const nm = h('input', { id: idp + '-mn', type: 'text', maxlength: '100', placeholder: 'Ej. Ana', autocomplete: 'off' });
+  const err = h('p', { class: 'err', role: 'alert' });
+  const lleno = state.hogares.length >= MAX_HOGARES;
+  return h('form', {
+    class: 'form', novalidate: true,
+    onsubmit: ev => {
+      ev.preventDefault();
+      if (!nh.value.trim() || !nm.value.trim()) { err.textContent = 'Escribe el nombre del hogar y tu nombre.'; (nh.value.trim() ? nm : nh).focus(); return; }
+      if (state.hogares.length >= MAX_HOGARES) { err.textContent = 'Has alcanzado el máximo de ' + MAX_HOGARES + ' hogares.'; return; }
+      crearHogar(nh.value.trim(), nm.value.trim());
+    }
+  },
+  h('div', { class: 'fields' }, h('label', { class: 'full' }, 'Nombre del hogar', nh), h('label', { class: 'full' }, 'Tu nombre en este hogar', nm)),
+  h('div', { class: 'actions' }, h('button', { class: 'btn btn-orange', type: 'submit', disabled: lleno }, 'Crear hogar'), err),
+  lleno ? h('p', { class: 'note', text: 'Has llegado al máximo de ' + MAX_HOGARES + ' hogares.' }) : null);
+}
+function formUnir(idp) {
+  const code = h('input', { id: idp + '-code', type: 'text', placeholder: 'Pega aquí el código', autocomplete: 'off', spellcheck: 'false' });
+  const nm = h('input', { id: idp + '-name', type: 'text', maxlength: '100', placeholder: 'Ej. Ana', autocomplete: 'off' });
+  const err = h('p', { class: 'err', role: 'alert' });
+  return h('form', {
+    class: 'form', novalidate: true,
+    onsubmit: ev => {
+      ev.preventDefault();
+      const c = code.value.trim();
+      if (!c) { err.textContent = 'Pega el código de invitación.'; code.focus(); return; }
+      if (!nm.value.trim()) { err.textContent = 'Escribe tu nombre.'; nm.focus(); return; }
+      if (state.hogares.length >= MAX_HOGARES) { err.textContent = 'Has alcanzado el máximo de ' + MAX_HOGARES + ' hogares.'; return; }
+      if (c.toUpperCase() === 'CADUCADA') { err.textContent = 'Esta invitación ha caducado. Pide otra a quien administra el hogar.'; return; }
+      if (c.toUpperCase() === 'USADA') { err.textContent = 'Esta invitación ya se ha usado. Pide otra a quien administra el hogar.'; return; }
+      if (c.length < 8) { err.textContent = 'No encontramos esa invitación. Revisa que hayas copiado el código completo.'; return; }
+      unirseHogar(nm.value.trim());
+    }
+  },
+  h('div', { class: 'fields' }, h('label', { class: 'full' }, 'Código de invitación', code), h('label', { class: 'full' }, 'Tu nombre en este hogar', nm)),
+  h('div', { class: 'actions' }, h('button', { class: 'btn btn-orange', type: 'submit' }, 'Unirme'), err),
+  h('p', { class: 'note', text: 'En la maqueta vale cualquier código de 8 o más caracteres. Prueba CADUCADA o USADA para ver los errores.' }));
+}
+
+/* ---------- Pantalla de acceso ---------- */
+function panelLogin() {
+  const L = state.login;
+  if (L.forgot) return panelOlvido();
+  const crear = L.modo === 'crear';
+  const email = h('input', { id: 'lg-email', type: 'email', autocomplete: 'email', placeholder: 'nombre@correo.com', value: L.email, oninput: e => { L.email = e.target.value; } });
+  const pass = h('input', { id: 'lg-pass', type: 'password', autocomplete: crear ? 'new-password' : 'current-password', placeholder: crear ? 'Mínimo 8 caracteres' : 'Tu contraseña' });
+  const eEmail = h('p', { class: 'err', id: 'lg-email-err' }), ePass = h('p', { class: 'err', id: 'lg-pass-err' }), eForm = h('p', { class: 'err', role: 'alert' });
+  email.setAttribute('aria-describedby', 'lg-email-err'); pass.setAttribute('aria-describedby', 'lg-pass-err');
+  const show = h('label', { class: 'chk' }, h('input', { id: 'lg-show', type: 'checkbox', onchange: e => { pass.type = e.target.checked ? 'text' : 'password'; } }), 'Mostrar contraseña');
+  const form = h('form', {
+    novalidate: true, class: 'fieldrow', style: { gap: '12px' },
+    onsubmit: ev => {
+      ev.preventDefault();
+      const em = email.value.trim(), pw = pass.value; let first = null;
+      eForm.textContent = '';
+      if (!EMAIL_RE.test(em)) { eEmail.textContent = 'Escribe un correo válido, por ejemplo nombre@correo.com.'; email.setAttribute('aria-invalid', 'true'); first = first || email; }
+      else { eEmail.textContent = ''; email.removeAttribute('aria-invalid'); }
+      if (!pw) { ePass.textContent = 'Escribe tu contraseña.'; pass.setAttribute('aria-invalid', 'true'); first = first || pass; }
+      else if (crear && pw.length < 8) { ePass.textContent = 'La contraseña debe tener al menos 8 caracteres.'; pass.setAttribute('aria-invalid', 'true'); first = first || pass; }
+      else { ePass.textContent = ''; pass.removeAttribute('aria-invalid'); }
+      if (first) { first.focus(); return; }
+      if (!crear && pw.toLowerCase() === 'incorrecta') { eForm.textContent = 'Correo o contraseña incorrectos. Inténtalo de nuevo.'; return; }
+      iniciar(em, !crear);
+    }
+  },
+  h('label', {}, 'Correo electrónico', email), eEmail,
+  h('label', {}, 'Contraseña', pass), ePass, show, eForm,
+  h('button', { class: 'btn btn-block', type: 'submit' }, crear ? 'Crear cuenta' : 'Entrar'));
+  const seg = h('div', { class: 'seg wide', role: 'group', 'aria-label': 'Acceso' },
+    [['entrar', 'Entrar'], ['crear', 'Crear cuenta']].map(([v, l]) => h('button', { type: 'button', 'aria-pressed': String(L.modo === v), onclick: () => { L.modo = v; renderPanel(); } }, l)));
+  return h('div', { class: 'auth' },
+    h('section', { class: 'card' },
+      h('h2', { text: crear ? 'Crea tu cuenta' : 'Accede a tu hogar' }),
+      h('p', { class: 'muted', text: crear ? 'Basta con Google o con correo y contraseña. Después crearás tu hogar o te unirás a uno.' : 'Reparte gastos por ingresos, por partes o a porcentaje y liquida cada mes sin hacer cuentas.' }),
+      seg,
+      h('button', { class: 'btn btn-ghost btn-block gbtn', type: 'button', onclick: () => iniciar('ana@gmail.com', !crear) }, h('span', { class: 'g', 'aria-hidden': 'true' }, 'G'), 'Continuar con Google'),
+      h('div', { class: 'divider', text: 'o con tu correo' }),
+      form,
+      crear ? null : h('button', { class: 'linkbtn', type: 'button', onclick: () => { L.forgot = true; L.sent = false; renderPanel(); } }, '¿Olvidaste tu contraseña?')),
+    h('section', { class: 'card' },
+      h('h2', { text: 'Solo quiero ver la app' }),
+      h('p', { class: 'muted', text: 'Entra con tres hogares de ejemplo: una casa con hijo, un piso de estudiantes y un hogar de una persona.' }),
+      h('button', { class: 'btn btn-orange btn-block', type: 'button', onclick: () => iniciar('ana@ejemplo.com', true) }, 'Entrar con datos de ejemplo'),
+      h('p', { class: 'note', text: 'En la maqueta vale cualquier correo válido y una contraseña de 8 o más caracteres. Con la contraseña "incorrecta" verás el error de acceso.' })));
+}
+function panelOlvido() {
+  const L = state.login;
+  const email = h('input', { id: 'fg-email', type: 'email', autocomplete: 'email', placeholder: 'nombre@correo.com', value: L.email, oninput: e => { L.email = e.target.value; } });
+  const err = h('p', { class: 'err', role: 'alert' });
+  const ok = L.sent ? h('p', { class: 'okmsg', role: 'status', text: 'Listo. Si existe una cuenta con ' + L.email.trim() + ', recibirás un enlace para elegir una contraseña nueva. En la maqueta no se envía nada.' }) : null;
+  return h('div', { class: 'auth' }, h('section', { class: 'card' },
+    h('h2', { text: 'Recupera tu contraseña' }),
+    h('p', { class: 'muted', text: 'Escribe el correo de tu cuenta y te enviaremos un enlace para crear una contraseña nueva.' }),
+    h('form', {
+      novalidate: true, class: 'fieldrow', style: { gap: '12px' },
+      onsubmit: ev => {
+        ev.preventDefault();
+        if (!EMAIL_RE.test(email.value.trim())) { err.textContent = 'Escribe un correo válido, por ejemplo nombre@correo.com.'; email.setAttribute('aria-invalid', 'true'); email.focus(); return; }
+        L.email = email.value.trim(); L.sent = true; renderPanel(); toast('Enlace simulado enviado');
+      }
+    }, h('label', {}, 'Correo electrónico', email), err, ok, h('button', { class: 'btn btn-block', type: 'submit' }, 'Enviar enlace')),
+    h('button', { class: 'linkbtn', type: 'button', onclick: () => { L.forgot = false; renderPanel(); } }, 'Volver a entrar')));
+}
+
+/* ---------- Sin hogar ---------- */
+function panelSinHogar() {
+  const crear = state.sinHogarModo === 'crear';
+  const seg = h('div', { class: 'seg wide', role: 'group', 'aria-label': 'Opciones' },
+    [['crear', 'Crea tu hogar'], ['unir', 'Unirme con invitación']].map(([v, l]) => h('button', { type: 'button', 'aria-pressed': String(state.sinHogarModo === v), onclick: () => { state.sinHogarModo = v; renderPanel(); } }, l)));
+  return h('div', { class: 'auth' },
+    h('section', { class: 'card' },
+      h('h2', { text: 'Todavía no tienes hogar' }),
+      h('p', { class: 'muted', text: crear ? 'Crea uno nuevo con su propio reparto de gastos. Después podrás invitar a más personas.' : 'Pega el código que te ha enviado quien administra el hogar.' }),
+      seg,
+      crear ? formCrear('sh') : formUnir('sh')),
+    h('div', {}, h('button', { class: 'linkbtn', type: 'button', onclick: cerrarSesion }, 'Cerrar sesión')));
+}
+
+/* ---------- Mis hogares ---------- */
+function panelHogares() {
+  const lista = state.hogares.map(H => {
+    const act = H.miembros.filter(x => x.activo), ads = act.filter(x => x.tipo === 'adulto').length, cur = H.id === state.hid;
+    return h('li', { class: 'hcard' + (cur ? ' cur' : '') },
+      h('div', { class: 'hinfo' },
+        h('h3', {}, H.nombre, cur ? h('span', { class: 'tag cur', text: 'Hogar actual' }) : null),
+        h('span', { class: 'muted', style: { fontSize: '.85rem' }, text: plural(act.length, 'miembro', 'miembros') + ' · ' + plural(ads, 'adulto', 'adultos') + (act.length > ads ? ' y ' + (act.length - ads) + ' a cargo' : '') }),
+        h('div', { class: 'avs' }, act.map(x => h('span', { class: 'who', title: x.nombre }, av(x), h('span', { class: 'sr', text: x.nombre }))))),
+      h('button', { class: cur ? 'btn btn-ghost' : 'btn', type: 'button', onclick: () => cambiarHogar(H.id), 'aria-label': (cur ? 'Volver a ' : 'Entrar en ') + H.nombre }, cur ? 'Volver' : 'Entrar'));
+  });
+  return h('div', { style: { display: 'grid', gap: '18px' } },
+    h('section', { class: 'card' },
+      h('div', { class: 'card-head' }, h('h2', { text: 'Mis hogares' }), h('span', { class: 'tag', text: state.hogares.length + ' de ' + MAX_HOGARES })),
+      h('p', { class: 'muted', text: 'Cada hogar tiene sus propios miembros, categorías, perfiles, proporción de ingresos, cuenta común, gastos y pagos.' }),
+      h('ul', { class: 'hogar-list', style: { marginTop: '14px' } }, lista)),
+    h('div', { class: 'cols-even' },
+      h('section', { class: 'card' }, h('h2', { text: 'Crear otro hogar' }), formCrear('hc')),
+      h('section', { class: 'card' }, h('h2', { text: 'Unirme con invitación' }), formUnir('hu'))));
+}
+
+/* ---------- Resumen ---------- */
+function legend(d) {
+  return h('div', { class: 'legend' }, [d.mem.map(who), hog().cuenta.activa ? who(M('c')) : null], h('span', { text: 'Cada barra se divide según lo que asume cada persona o la cuenta común.' }));
+}
+function chartCategoria(d) {
+  const rows = Object.entries(d.byCat).sort((x, y) => y[1].t - x[1].t);
+  const max = rows[0][1].t;
+  const wrap = h('div', { class: 'chart' });
+  rows.forEach(([id, v]) => {
+    const segs = [...d.mem, ...(v.by.c > 0 ? [M('c')] : [])].filter(m => v.by[m.id] > 0).map(m => {
+      const abs = v.by[m.id] / max * 100;
+      return h('span', {
+        class: 'seg-m', title: m.nombre + ': ' + eur(v.by[m.id]),
+        style: { width: (v.by[m.id] / v.t * 100) + '%', background: colorOf(m), color: onOf(m) }
+      }, abs >= 8 ? ini(m) : null);
+    });
+    wrap.append(h('div', { class: 'crow' },
+      h('span', { class: 'cname', text: catName(id) }),
+      h('div', { class: 'track' }, h('div', { class: 'fill', style: { width: (v.t / max * 100) + '%' } }, segs)),
+      h('span', { class: 'cval', text: eur(v.t) })));
+  });
+  return wrap;
+}
+const catName = id => { const c = hog().cats.find(x => x.id === id); return c ? c.nombre : 'Sin categoría'; };
+function chartPersona(d, mono) {
+  let max = 1;
+  const mem = hog().cuenta.activa ? [...d.mem, M('c')] : d.mem;
+  mem.forEach(m => Object.values(d.byCat).forEach(v => { max = Math.max(max, v.by[m.id] || 0); }));
+  const cols = h('div', { class: 'pcols' });
+  mem.forEach(m => {
+    const col = h('div', { class: 'pcol' },
+      h('h3', { class: 'phead' }, who(m), h('span', { class: 'ptot', text: eur(d.assumed[m.id] || 0) })),
+      m.id === 'c' ? h('p', { class: 'psub', text: 'Asume el 100 % de los gastos a su cargo' }) : mono ? null : h('p', { class: 'psub', text: 'Ha pagado ' + eur(d.paid[m.id] || 0) + ' de su bolsillo' }));
+    Object.entries(d.byCat).filter(([, v]) => v.by[m.id] > 0).sort((x, y) => y[1].by[m.id] - x[1].by[m.id]).forEach(([id, v]) => {
+      col.append(h('div', { class: 'crow stack' },
+        h('span', { class: 'cname', text: catName(id) }),
+        h('div', { class: 'track' }, h('div', { class: 'fill-one', style: { width: (v.by[m.id] / max * 100) + '%', background: colorOf(m) } })),
+        h('span', { class: 'cval', text: eur(v.by[m.id]) })));
+    });
+    if (!d.assumed[m.id]) col.append(h('p', { class: 'muted', text: 'Sin gastos este mes.' }));
+    cols.append(col);
+  });
+  return cols;
+}
+function addPago(m, from, to, amount) {
+  hog().pagos.push({ id: nid('p'), month: m, from, to, amount, fecha: defaultDate(m) });
+  renderBar(); renderPanel(); toast(from === 'c' ? 'Reembolso registrado' : 'Pago registrado');
+}
+function cuentaCard(H, d, m) {
+  const acc = accountState(m), sd = saldos(m);
+  const kv = (l, v, cls) => h('div', {}, h('span', { text: l }), h('b', { class: cls || '', text: v }));
+  const err = h('p', { class: 'err', role: 'alert' });
+  const deben = d.mem.filter(x => (acc.pend[x.id] || 0) > 0);
+  const reimbRows = deben.map(x => {
+    const amt = h('input', { type: 'text', inputmode: 'decimal', autocomplete: 'off', value: inpVal(acc.pend[x.id]), 'aria-label': 'Importe a reembolsar a ' + x.nombre });
+    return h('div', { class: 'reimb' }, whoId(x.id),
+      h('label', {}, 'Pendiente ' + eur(acc.pend[x.id]), amt),
+      h('button', { class: 'btn btn-orange btn-sm', type: 'button', onclick: () => {
+        const c = parseCents(amt.value);
+        if (!(c > 0)) { err.textContent = 'Introduce un importe mayor que 0.'; amt.focus(); return; }
+        if (c > acc.cash) { err.textContent = 'La cuenta no tiene tanto efectivo: hay ' + eur(acc.cash) + '.'; return; }
+        addPago(m, 'c', x.id, c);
+      } }, 'Reembolsar desde la cuenta'));
+  });
+  const back = d.pays.filter(p => p.from === 'c');
+  const backList = back.length ? h('ul', { class: 'paylist' }, back.map(p => h('li', {},
+    h('span', { class: 'l' }, h('span', { class: 'muted', text: dayLabel(p.fecha) }), 'La cuenta reembolsó', h('b', { text: eur(p.amount) }), 'a', whoId(p.to)),
+    h('button', { class: 'del', type: 'button', 'aria-label': 'Eliminar reembolso', onclick: () => { H.pagos = H.pagos.filter(x => x.id !== p.id); renderBar(); renderPanel(); toast('Reembolso eliminado'); } }, '×')))) : null;
+  return h('section', { class: 'card' }, h('h2', { text: 'Cuenta común' }),
+    h('p', { class: 'muted', text: 'Cada persona aporta un importe fijo. Los gastos a su cargo los asume la cuenta al 100 %, porque el reparto proporcional ya se hizo al aportar.' }),
+    h('div', { class: 'kv' },
+      kv('Aportado en ' + monthLabel(m).toLowerCase(), eur(d.contribTotal)),
+      kv('Gastos a cargo de la cuenta este mes', eur(d.spent)),
+      kv('Saldo de la cuenta (acumulado)', eur(acc.saldo), acc.saldo < 0 ? 'neg' : ''),
+      kv('En efectivo ahora', eur(acc.cash)),
+      kv('Pendiente de reembolsar a personas', eur(acc.pendTotal))),
+    h('p', { class: 'note', text: 'El saldo descuenta lo pendiente de reembolsar; el efectivo es lo que hay realmente en la cuenta. Lo que sobra se queda y se acumula.' }),
+    deben.length ? [h('h3', { text: 'Reembolsos pendientes' }), reimbRows, err] : h('p', { class: 'note', text: 'No hay reembolsos pendientes.' }),
+    back.length ? [h('h3', { text: 'Reembolsos del mes' }), backList] : null);
+}
+function panelResumen() {
+  const H = hog(), m = state.month, d = monthData(m), mono = esMono(H), act = H.cuenta.activa;
+  const acc = act ? accountState(m) : null;
+  const top = Object.entries(d.byCat).sort((x, y) => y[1].t - x[1].t)[0];
+  const stat = (l, v, neg) => h('div', { class: 'stat' }, h('span', { text: l }), h('strong', { class: neg ? 'neg' : '', text: v }));
+  const stats = h('div', { class: 'stats' }, stat('Gastos', eur(d.total)),
+    act ? stat('Aportado a la cuenta', eur(d.contribTotal)) : stat('Nº de gastos', String(d.ex.length)),
+    act ? stat('Saldo de la cuenta', eur(acc.saldo), acc.saldo < 0) : stat('Mayor categoría', top ? catName(top[0]) : '—'));
+
+  const seg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Tipo de gráfico' },
+    [['categoria', 'Por categoría'], ['persona', 'Por persona']].map(([v, l]) =>
+      h('button', { type: 'button', 'aria-pressed': String(state.view === v), onclick: () => { state.view = v; renderPanel(); } }, l)));
+  let body;
+  if (!d.ex.length) {
+    body = h('div', { class: 'empty' }, h('p', { text: 'Todavía no hay gastos en este mes.' }),
+      h('button', { class: 'btn btn-orange', type: 'button', onclick: () => selectTab('gastos') }, 'Añadir el primer gasto'));
+  } else body = state.view === 'categoria' ? [legend(d), chartCategoria(d)] : chartPersona(d, mono);
+  const chart = h('section', { class: 'card' }, h('div', { class: 'card-head' }, h('h2', { text: 'Gasto de ' + monthLabel(m) }), seg), body);
+
+  const sd = act ? saldos(m) : null;
+  const th = (t, num) => h('th', { class: num ? 'num' : '', text: t });
+  const td = (t, cls) => h('td', { class: 'num' + (cls ? ' ' + cls : ''), text: t });
+  const sg = v => v < 0 ? 'neg' : v > 0 ? 'pos' : '';
+  const sumPaid = d.mem.reduce((s, x) => s + (d.paid[x.id] || 0), 0);
+  const tbl = h('div', { class: 'tblwrap' }, h('table', { class: 'tbl' },
+    h('thead', {}, h('tr', {}, th('Persona'), mono ? null : th('Ha pagado', true), th('Asume', true),
+      mono ? null : th(act ? 'Entre personas' : 'Saldo', true), act ? th('Le debe la cuenta', true) : null, act ? th('Saldo', true) : null)),
+    h('tbody', {}, d.mem.map(x => h('tr', {}, h('td', {}, who(x)), mono ? null : td(eur(d.paid[x.id] || 0)), td(eur(d.assumed[x.id] || 0)),
+      mono ? null : td(sgn(d.bal[x.id] || 0), sg(d.bal[x.id] || 0)),
+      act ? td(eur(acc.pend[x.id] || 0)) : null, act ? td(sgn(sd.total[x.id] || 0), sg(sd.total[x.id] || 0)) : null)),
+      act ? h('tr', {}, h('td', {}, who(M('c'))), td(eur(d.direct)), td(eur(d.assumed.c || 0)), td('—'), td('—'), td(sgn(acc.saldo), sg(acc.saldo))) : null),
+    h('tfoot', {}, h('tr', {}, h('td', { text: 'Total' }), mono ? null : td(eur(sumPaid + d.direct)), td(eur(d.total)), mono ? null : td(eur(0)), act ? td('') : null, act ? td('') : null))));
+  const cuentas = h('section', { class: 'card' }, h('h2', { text: 'Cuentas del mes' }), tbl,
+    mono ? null : h('p', { class: 'note', text: act
+      ? 'Saldo positivo: dinero a su favor. Negativo: debe dinero. Suma lo que le debe la cuenta y lo que queda entre personas, con los pagos ya registrados.'
+      : 'Saldo positivo: le deben dinero. Negativo: debe dinero. Incluye los pagos ya registrados.' }));
+
+  let liq;
+  const persPays = d.pays.filter(p => p.from !== 'c');
+  if (mono) {
+    liq = h('section', { class: 'card' }, h('h2', { text: 'Liquidación' }),
+      h('div', { class: 'settle ok' }, h('p', { class: 'settle-line', text: 'Hogar de una persona: no hay liquidación.' })),
+      h('p', { class: 'note', text: 'Si compartes gastos con alguien, añade a esa persona al hogar y verás cuánto se debe cada mes.' }),
+      h('div', { class: 'actions' }, h('button', { class: 'btn btn-orange', type: 'button', disabled: !esAdmin(H), onclick: invitarDesdeResumen }, 'Invitar')));
+  } else {
+    const xf = d.xfers.length
+      ? h('ul', { class: 'xfers' }, d.xfers.map(x => h('li', { class: 'xfer' },
+        h('p', { class: 'settle-line' }, whoId(x.de), ' paga ', h('b', { text: eur(x.importe) }), ' a ', whoId(x.a)),
+        h('button', { class: 'btn btn-orange btn-sm', type: 'button', onclick: () => addPago(m, x.de, x.a, x.importe), 'aria-label': 'Registrar pago de ' + M(x.de).nombre + ' a ' + M(x.a).nombre }, 'Registrar pago'))))
+      : h('div', { class: 'settle ok' }, h('p', { class: 'settle-line', text: 'Estáis a mano este mes.' }));
+    const pays = persPays.length
+      ? h('ul', { class: 'paylist' }, persPays.map(p => h('li', {},
+        h('span', { class: 'l' }, h('span', { class: 'muted', text: dayLabel(p.fecha) }), whoId(p.from), 'pagó', h('b', { text: eur(p.amount) }), 'a', whoId(p.to)),
+        h('button', { class: 'del', type: 'button', 'aria-label': 'Eliminar pago de ' + M(p.from).nombre + ' a ' + M(p.to).nombre, onclick: () => { H.pagos = H.pagos.filter(x => x.id !== p.id); renderBar(); renderPanel(); toast('Pago eliminado'); } }, '×'))))
+      : h('p', { class: 'note', text: 'Aún no hay pagos registrados este mes.' });
+    liq = h('section', { class: 'card' }, h('h2', { text: 'Liquidación entre personas de ' + monthLabel(m) }),
+      h('p', { class: 'muted', text: act ? 'Solo cuenta lo que no va a cargo de la cuenta común. Transferencias mínimas para saldar.' : 'Transferencias mínimas para saldar: quien más debe paga a quien más se le debe.' }),
+      xf, h('h3', { text: 'Pagos del mes' }), pays);
+  }
+  return h('div', { style: { display: 'grid', gap: '18px' } }, stats, act ? cuentas : null,
+    h('div', { class: 'cols2' }, chart, h('div', { class: 'card-stack' }, act ? null : cuentas, act ? cuentaCard(H, d, m) : null, liq)));
+}
+function invitarDesdeResumen() { crearInvitacion(); selectTab('hogar'); const c = $('#card-invite'); if (c) c.scrollIntoView({ block: 'center' }); }
+
+/* ---------- Gastos ---------- */
+function updatePreview(form) {
+  const H = hog(), box = form.querySelector('#pv'), el = form.elements;
+  box.replaceChildren();
+  const c = parseCents(el.importe.value);
+  if (!(c > 0)) { box.append('Escribe un importe para ver cómo se reparte.'); return; }
+  const payer = el.payer ? el.payer.value : adultosDe(H)[0].id;
+  const toAcc = H.cuenta.activa && (payer === 'c' || (el.cargo && el.cargo.checked));
+  if (toAcc) {
+    box.append(h('span', { class: 'pv-lab', text: 'Reparto' }), h('span', { class: 'pv-it' }, who(M('c')), h('b', { text: eur(c) }), '(100 %, ya repartido con las aportaciones)'));
+    if (payer !== 'c') box.append(h('span', { class: 'pv-lab', text: 'Reembolso' }), 'La cuenta común devuelve ', h('b', { text: eur(c) }), ' a ', whoId(payer));
+    return;
+  }
+  const prof = H.perfiles.find(p => p.id === el.pid.value);
+  const r = repartir(H, c, prof, state.month, payer);
+  box.append(h('span', { class: 'pv-lab', text: 'Reparto' }));
+  adultosDe(H).filter(a => r.pct[a.id] > 0).forEach(a => box.append(h('span', { class: 'pv-it' }, who(a), h('b', { text: eur(r.rep[a.id]) }), '(' + fmtPct.format(r.pct[a.id]) + ' %)')));
+}
+function fillExpList(ul) {
+  const H = hog(), m = state.month, mono = esMono(H);
+  const list = monthData(m).ex.filter(e => !state.filter || e.cat === state.filter)
+    .sort((x, y) => y.fecha.localeCompare(x.fecha) || y.id.localeCompare(x.id, undefined, { numeric: true }));
+  const sum = ul.closest('section').querySelector('.expsum');
+  const tot = list.reduce((s, e) => s + e.importe, 0);
+  sum.textContent = plural(list.length, 'gasto', 'gastos') + ' · ' + eur(tot);
+  if (!list.length) {
+    ul.replaceChildren(h('li', { class: 'empty' }, state.filter ? 'No hay gastos de esta categoría en este mes.' : 'No hay gastos en este mes. Añade el primero con el formulario.'));
+    return;
+  }
+  ul.replaceChildren(...list.map(e => h('li', { class: 'exp' },
+    h('div', { style: { minWidth: 0 } },
+      h('div', { class: 'exp-title', text: e.concepto }),
+      h('div', { class: 'exp-meta' }, dayLabel(e.fecha) + ' · ' + catName(e.cat), (mono && e.payer !== 'c') ? null : ['· pagó', whoId(e.payer)], e.cargo === 'c' && e.payer !== 'c' ? '· a cargo de la cuenta común' : null, '· ' + e.pn)),
+    h('div', { class: 'exp-amt' }, h('strong', { text: eur(e.importe) }),
+      h('span', { class: 'split' }, e.cargo === 'c'
+        ? h('span', { class: 'sp', title: 'Cuenta común' }, av(M('c'), 'sm'), eur(e.importe))
+        : Object.keys(e.rep).filter(id => e.rep[id] > 0).map(id => h('span', { class: 'sp', title: M(id).nombre }, av(M(id), 'sm'), eur(e.rep[id]))))),
+    h('button', {
+      class: 'del', type: 'button', 'aria-label': 'Eliminar gasto ' + e.concepto,
+      onclick: () => { H.gastos = H.gastos.filter(x => x.id !== e.id); fillExpList(ul); renderBar(); toast('Gasto eliminado'); }
+    }, '×'))));
+}
+function panelGastos() {
+  const H = hog(), m = state.month, mono = esMono(H), ads = adultosDe(H);
+  if (!H.cats.length) return h('section', { class: 'card' }, h('h2', { text: 'Nuevo gasto' }), h('p', { class: 'muted', text: 'Crea al menos una categoría en la pestaña Categorías para registrar gastos.' }));
+  const first = H.cats[0];
+  const f = {
+    concepto: h('input', { id: 'f-concepto', name: 'concepto', type: 'text', maxlength: '200', placeholder: 'Ej. Supermercado', autocomplete: 'off' }),
+    importe: h('input', { id: 'f-importe', name: 'importe', type: 'text', inputmode: 'decimal', placeholder: '0,00', autocomplete: 'off' }),
+    fecha: h('input', { id: 'f-fecha', name: 'fecha', type: 'date', min: m + '-01', max: m + '-' + String(lastDay(m)).padStart(2, '0') }),
+    cat: h('select', { id: 'f-cat', name: 'cat' }, H.cats.map(c => h('option', { value: c.id, text: c.nombre }))),
+    payer: mono ? null : h('select', { id: 'f-payer', name: 'payer' }, [...ads.map(a => h('option', { value: a.id, text: a.nombre })), H.cuenta.activa ? h('option', { value: 'c', text: 'Cuenta común' }) : null]),
+    cargo: (!mono && H.cuenta.activa) ? h('input', { id: 'f-cargo', name: 'cargo', type: 'checkbox' }) : null,
+    pid: h('select', { id: 'f-pid', name: 'pid' }, profileOptions(H))
+  };
+  f.fecha.value = defaultDate(m); f.cat.value = first.id; f.pid.value = first.pid;
+  if (f.payer) { const yo = ads.find(a => a.yo); f.payer.value = (yo || ads[0]).id; }
+  const cargoLab = f.cargo ? h('label', { class: 'chk full' }, f.cargo, 'A cargo de la cuenta común (se reembolsa a quien paga)') : null;
+  const syncCargo = fromCat => {
+    if (!f.cargo) return;
+    if (fromCat) f.cargo.checked = !!H.cats.find(c => c.id === f.cat.value).cargo;
+    const c = f.payer.value === 'c';
+    cargoLab.hidden = c; if (c) f.cargo.checked = false;
+    f.pid.disabled = c || f.cargo.checked;
+  };
+  syncCargo(true);
+  const err = h('p', { class: 'err', id: 'f-err', role: 'alert' });
+  const pv = h('div', { class: 'preview', id: 'pv', 'aria-live': 'polite' });
+  const form = h('form', { id: 'expform', class: 'card form', novalidate: true },
+    h('h2', { text: 'Nuevo gasto' }),
+    h('div', { class: 'fields' },
+      h('label', { class: 'full' }, 'Concepto', f.concepto),
+      h('label', {}, 'Importe (€)', f.importe),
+      h('label', {}, 'Fecha', f.fecha),
+      h('label', { class: mono ? 'full' : '' }, 'Categoría', f.cat),
+      f.payer ? h('label', {}, 'Pagado por', f.payer) : null,
+      h('label', { class: 'full' }, 'Reparto', f.pid),
+      cargoLab),
+    pv,
+    h('div', { class: 'actions' }, h('button', { class: 'btn btn-orange', type: 'submit' }, 'Añadir gasto'), err));
+  form.addEventListener('input', () => { err.textContent = ''; updatePreview(form); });
+  form.addEventListener('change', ev => {
+    if (ev.target === f.cat) f.pid.value = H.cats.find(c => c.id === f.cat.value).pid;
+    syncCargo(ev.target === f.cat);
+    updatePreview(form);
+  });
+  form.addEventListener('submit', ev => {
+    ev.preventDefault();
+    const c = parseCents(f.importe.value);
+    if (!(c > 0)) { err.textContent = 'Introduce un importe mayor que 0, con un máximo de 2 decimales.'; f.importe.focus(); return; }
+    if (!f.fecha.value || !f.fecha.value.startsWith(state.month)) { err.textContent = 'La fecha debe estar en ' + monthLabel(state.month) + '.'; return; }
+    addGasto(H, { fecha: f.fecha.value, concepto: f.concepto.value.trim() || catName(f.cat.value), importe: c, cat: f.cat.value, payer: f.payer ? f.payer.value : ads[0].id, pid: f.pid.value, cargo: f.cargo ? f.cargo.checked : false });
+    f.importe.value = ''; f.concepto.value = '';
+    updatePreview(form); fillExpList($('#explist')); renderBar();
+    toast('Gasto añadido'); f.concepto.focus();
+  });
+
+  const filter = h('select', { id: 'f-filter', 'aria-label': 'Filtrar por categoría', onchange: ev => { state.filter = ev.target.value; fillExpList($('#explist')); } },
+    h('option', { value: '', text: 'Todas las categorías' }), H.cats.map(c => h('option', { value: c.id, text: c.nombre })));
+  filter.value = H.cats.some(c => c.id === state.filter) ? state.filter : '';
+  if (filter.value === '') state.filter = '';
+  const ul = h('ul', { class: 'exp-list', id: 'explist' });
+  const list = h('section', { class: 'card' },
+    h('div', { class: 'card-head listhead' }, h('h2', { text: 'Gastos de ' + monthLabel(m) }), filter),
+    h('p', { class: 'expsum' }),
+    h('div', { class: 'legend' }, ads.map(who), H.cuenta.activa ? who(M('c')) : null, h('span', { text: 'Importe que asume cada persona o la cuenta común' })),
+    ul);
+  fillExpList(ul);
+  updatePreview(form);
+  return h('div', { class: 'cols-form' }, form, list);
+}
+
+/* ---------- Hogar ---------- */
+function crearInvitacion() {
+  const abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  let t = ''; for (let i = 0; i < 32; i++) t += abc[Math.floor(Math.random() * abc.length)];
+  state.invite = { token: t, caduca: new Date(Date.now() + 7 * 864e5) };
+}
+function cambiarActivo(H, mb) {
+  if (mb.activo) {
+    const admins = H.miembros.filter(x => x.activo && x.rol === 'admin');
+    if (mb.rol === 'admin' && admins.length === 1) return 'No se puede desactivar al último administrador: el hogar necesita al menos uno activo.';
+    if (H.cuenta.activa && mb.tipo === 'adulto') { const p = accountState(MONTHS[MONTHS.length - 1]).pend[mb.id] || 0; if (p > 0) return mb.nombre + ' tiene ' + eur(p) + ' pendientes de reembolso desde la cuenta común. Reembólsalos antes de desactivarlo.'; }
+    const deps = H.miembros.filter(x => x.activo && x.tipo === 'a_cargo' && x.resp === mb.id);
+    if (deps.length) return mb.nombre + ' es responsable de ' + deps.map(x => x.nombre).join(', ') + ' (a cargo activo). Desactívalo antes o cambia su responsable.';
+    mb.activo = false;
+  } else {
+    if (mb.tipo === 'a_cargo') { const r = H.miembros.find(x => x.id === mb.resp); if (!r || !r.activo) return 'Activa antes a su responsable (' + (r ? r.nombre : 'sin responsable') + ').'; }
+    mb.activo = true;
+  }
+  return null;
+}
+function panelHogar() {
+  const H = hog(), m = state.month, adm = esAdmin(H), ads = adultosDe(H);
+  const merr = state.merr; state.merr = null;
+  const notAdm = adm ? null : h('p', { class: 'note', text: 'Solo quien administra el hogar puede cambiar miembros, proporción, cuenta común y perfiles, e invitar.' });
+
+  const row = x => {
+    const resp = H.miembros.find(y => y.id === x.resp);
+    const nameIn = h('input', {
+      type: 'text', value: x.nombre, maxlength: '100', autocomplete: 'off', 'aria-label': 'Nombre de ' + x.nombre, disabled: !adm && !x.yo,
+      oninput: ev => { x.nombre = ev.target.value; },
+      onchange: ev => { if (!ev.target.value.trim()) { x.nombre = 'Sin nombre'; } renderBar(); renderPanel(); }
+    });
+    let respSel = null;
+    if (x.tipo === 'a_cargo' && x.activo) {
+      respSel = h('select', { 'aria-label': 'Responsable de ' + x.nombre, disabled: !adm, onchange: ev => { x.resp = ev.target.value; renderPanel(); } }, ads.map(a => h('option', { value: a.id, text: 'Responsable: ' + a.nombre })));
+      respSel.value = x.resp;
+    }
+    return h('div', { class: 'mrow' + (x.activo ? '' : ' inactive') },
+      av(x, 'lg'),
+      h('div', { class: 'mname' }, nameIn),
+      h('div', { class: 'mmeta' },
+        h('span', { class: 'tag', text: x.tipo === 'adulto' ? 'Adulto' : 'A cargo' }),
+        x.tipo === 'adulto' ? h('span', { class: 'tag' + (x.rol === 'admin' ? ' admin' : ''), text: x.rol === 'admin' ? 'Administrador' : 'Miembro' }) : null,
+        x.yo ? h('span', { class: 'tag', text: 'Tú' }) : null,
+        x.activo ? null : h('span', { class: 'tag off', text: 'Inactivo' }),
+        x.tipo === 'a_cargo' && !x.activo && resp ? h('span', { text: 'Responsable: ' + resp.nombre }) : null),
+      respSel,
+      h('button', {
+        class: 'btn btn-ghost btn-sm', type: 'button', disabled: !adm,
+        'aria-label': (x.activo ? 'Desactivar a ' : 'Activar a ') + x.nombre,
+        onclick: () => { const e = cambiarActivo(H, x); if (e) { state.merr = e; } else toast(x.activo ? x.nombre + ' activado' : x.nombre + ' desactivado'); renderBar(); renderPanel(); if (e) { const el = $('#merr'); if (el) el.focus(); } }
+      }, x.activo ? 'Desactivar' : 'Activar'));
+  };
+  const nn = h('input', { id: 'nm-name', type: 'text', maxlength: '100', placeholder: 'Ej. Leo', autocomplete: 'off', disabled: !adm });
+  const nt = h('select', { id: 'nm-tipo', disabled: !adm }, h('option', { value: 'adulto', text: 'Adulto' }), h('option', { value: 'a_cargo', text: 'A cargo' }));
+  const nr = h('select', { id: 'nm-resp', disabled: !adm }, ads.map(a => h('option', { value: a.id, text: a.nombre })));
+  const nrl = h('label', {}, 'Responsable', nr); nrl.hidden = true;
+  nt.addEventListener('change', () => { nrl.hidden = nt.value !== 'a_cargo'; });
+  const nerr = h('p', { class: 'err', role: 'alert' });
+  const add = h('form', {
+    class: 'addm', novalidate: true,
+    onsubmit: ev => {
+      ev.preventDefault();
+      if (!nn.value.trim()) { nerr.textContent = 'Escribe un nombre.'; nn.focus(); return; }
+      if (nt.value === 'a_cargo' && !ads.length) { nerr.textContent = 'Una persona a cargo necesita un adulto responsable activo.'; return; }
+      nuevoMiembro(H, nn.value.trim(), nt.value, nt.value === 'a_cargo' ? nr.value : null, 'miembro');
+      renderBar(); renderPanel(); toast('Miembro añadido');
+    }
+  }, h('label', {}, 'Añadir persona', nn), h('label', {}, 'Tipo', nt), nrl, h('button', { class: 'btn btn-ghost', type: 'submit', disabled: !adm }, 'Añadir'));
+  const miembros = h('section', { class: 'card' },
+    h('h2', { text: 'Miembros del hogar' }),
+    h('p', { class: 'muted', text: 'Los adultos pagan y reparten gastos. Cada persona a cargo tiene un adulto responsable. Quien se desactiva deja de repartir gastos nuevos, pero conserva su historial.' }),
+    h('p', { class: 'err', id: 'merr', role: 'alert', tabindex: '-1', text: merr || '' }),
+    h('div', { class: 'mlist' }, H.miembros.map(row)), add, nerr, notAdm);
+
+  // Invitación
+  const inv = state.invite;
+  let invBox = null;
+  if (inv) {
+    const link = 'https://miparte.example/invitacion/' + inv.token;
+    const tk = h('code', { class: 'token', id: 'inv-token', text: inv.token }), lk = h('code', { class: 'token', id: 'inv-link', text: link });
+    invBox = h('div', { class: 'invite', role: 'status' },
+      h('span', { class: 'lab', text: 'Código de invitación' }), tk,
+      h('span', { class: 'lab', text: 'Enlace' }), lk,
+      h('p', { text: 'Caduca el ' + inv.caduca.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) + ' (en 7 días) y solo sirve una vez.' }),
+      h('p', { class: 'warnbox', text: 'Solo se muestra esta vez. Cópialo ahora: al cerrar este aviso no podrás volver a verlo.' }),
+      h('div', { class: 'actions', style: { marginTop: 0 } },
+        h('button', { class: 'btn btn-sm', type: 'button', onclick: () => copiar(inv.token, tk) }, 'Copiar código'),
+        h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => copiar(link, lk) }, 'Copiar enlace'),
+        h('button', { class: 'linkbtn', type: 'button', onclick: () => { state.invite = null; renderPanel(); toast('Invitación oculta'); } }, 'Cerrar aviso')));
+  }
+  const invitar = h('section', { class: 'card', id: 'card-invite' },
+    h('h2', { text: 'Invitar miembro' }),
+    h('p', { class: 'muted', text: 'Genera un código de un solo uso para que otra persona se una al hogar como adulto.' }),
+    h('div', { class: 'actions' }, h('button', { class: 'btn btn-orange', type: 'button', disabled: !adm, onclick: () => { crearInvitacion(); renderPanel(); toast('Invitación creada'); } }, inv ? 'Generar otro código' : 'Invitar miembro')),
+    invBox);
+
+  // Proporción de ingresos (no se guardan los ingresos, solo el porcentaje de cada adulto)
+  const propNote = h('p', { class: 'note', id: 'prop-note' });
+  const setProp = () => {
+    const t = ads.reduce((s, a) => s + (Number(H.prop[a.id]) || 0), 0);
+    propNote.textContent = t > 0 ? 'Reparto proporcional: ' + ads.map(a => a.nombre + ' ' + fmtPct.format((Number(H.prop[a.id]) || 0) / t * 100) + ' %').join(' · ') + '.' : 'Algún peso debe ser mayor que 0.';
+  };
+  const propField = a => h('label', {}, h('span', { class: 'who' }, av(a, 'sm'), a.nombre, h('span', { class: 'muted', text: ' · peso' })), h('input', {
+    id: 'prop-' + a.id, type: 'text', inputmode: 'decimal', autocomplete: 'off', value: fmtPct.format(H.prop[a.id] || 0), disabled: !adm,
+    oninput: ev => { const t = ev.target.value.trim().replace(',', '.'), v = t === '' ? 0 : Number(t); if (Number.isFinite(v) && v >= 0) { H.prop[a.id] = v; ev.target.removeAttribute('aria-invalid'); setProp(); } else ev.target.setAttribute('aria-invalid', 'true'); }
+  }));
+  setProp();
+  const calcIn = {};
+  const calc = h('details', { class: 'calc' }, h('summary', { text: 'Calcular a partir de los ingresos (no se guardan)' }),
+    h('div', { class: 'fields' }, ads.map(a => h('label', {}, h('span', { class: 'who' }, av(a, 'sm'), a.nombre, h('span', { class: 'muted', text: ' · ingresos €' })),
+      (calcIn[a.id] = h('input', { type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: '0,00', disabled: !adm }))))),
+    h('div', { class: 'actions' }, h('button', { class: 'btn btn-ghost btn-sm', type: 'button', disabled: !adm, onclick: () => {
+      const v = ads.map(a => { const t = calcIn[a.id].value.trim(); return t === '' ? 0 : parseCents(t); });
+      const tot = v.reduce((x, y) => x + (Number.isFinite(y) ? y : 0), 0);
+      if (v.some(x => !Number.isFinite(x)) || !(tot > 0)) { toast('Escribe los ingresos de cada adulto'); return; }
+      ads.forEach((a, i) => { H.prop[a.id] = Math.round(v[i] / tot * 1000) / 10; });
+      renderPanel(); toast('Proporción aplicada; los ingresos no se han guardado');
+    } }, 'Usar esta proporción')));
+  const ingresos = h('section', { class: 'card' },
+    h('h2', { text: 'Proporción de ingresos' }),
+    h('p', { class: 'muted', text: 'Lo que asume cada adulto en los gastos proporcionales. Solo se guarda el porcentaje, nunca los ingresos.' }),
+    h('div', { class: 'fields' }, ads.map(propField)), propNote, calc,
+    h('p', { class: 'note', text: 'Los gastos ya registrados conservan su reparto.' }));
+
+  // Cuenta común
+  const C = H.cuenta, can = ads.length >= 2;
+  const usada = H.gastos.some(e => e.cargo === 'c') || H.pagos.some(p => p.from === 'c');
+  const onChk = h('input', { id: 'cuenta-on', type: 'checkbox', checked: C.activa, disabled: !adm || !can || (C.activa && usada),
+    onchange: ev => { C.activa = ev.target.checked; if (C.activa) MONTHS.forEach(k => { if (!C.aport[k]) C.aport[k] = {}; }); renderBar(); renderPanel(); toast(C.activa ? 'Cuenta común activada' : 'Cuenta común desactivada'); } });
+  const aport = C.aport[m] || (C.aport[m] = {});
+  const aTotal = h('p', { class: 'note' });
+  const setA = () => { aTotal.textContent = 'Total aportado en ' + monthLabel(m) + ': ' + eur(ads.reduce((s, a) => s + (aport[a.id] || 0), 0)) + '.'; };
+  const aField = a => h('label', {}, h('span', { class: 'who' }, av(a, 'sm'), a.nombre, h('span', { class: 'muted', text: ' · € al mes' })), h('input', {
+    id: 'ap-' + a.id, type: 'text', inputmode: 'decimal', autocomplete: 'off', value: inpVal(aport[a.id] || 0), disabled: !adm,
+    oninput: ev => {
+      const t = ev.target.value.trim(), c = t === '' ? 0 : parseCents(t);
+      if (Number.isFinite(c)) { MONTHS.filter(k => k >= m).forEach(k => { (C.aport[k] || (C.aport[k] = {}))[a.id] = c; }); ev.target.removeAttribute('aria-invalid'); setA(); } else ev.target.setAttribute('aria-invalid', 'true');
+    }
+  }));
+  setA();
+  const cuenta = h('section', { class: 'card' },
+    h('h2', { text: 'Cuenta común' }),
+    h('p', { class: 'muted', text: 'Cada adulto aporta un importe fijo al mes y la cuenta paga los gastos que elijas. Lo que sobra se queda y se acumula.' }),
+    h('label', { class: 'chk' }, onChk, 'Usar cuenta común'),
+    !can ? h('p', { class: 'note', text: 'Hacen falta al menos dos adultos activos.' }) : null,
+    C.activa && usada ? h('p', { class: 'note', text: 'No se puede desactivar mientras haya gastos o reembolsos a cargo de la cuenta.' }) : null,
+    C.activa ? [h('div', { class: 'fields' }, ads.map(aField)), aTotal,
+      h('p', { class: 'note', text: 'Un cambio vale desde ' + monthLabel(m) + ' en adelante; los meses anteriores no se tocan.' })] : null);
+
+  // Perfiles
+  const perfiles = h('section', { class: 'card' },
+    h('h2', { text: 'Perfiles de reparto' }),
+    h('p', { class: 'muted', text: 'Cada categoría usa uno por defecto y puedes cambiarlo en cada gasto. Los hijos o personas a cargo suman partes a su adulto responsable.' }),
+    h('div', { style: { marginTop: '8px' } }, H.perfiles.map(p => perfilItem(H, p, adm))));
+  return h('div', { class: 'cols-even' }, h('div', { class: 'card-stack' }, miembros, invitar), h('div', { class: 'card-stack' }, cuenta, ingresos, perfiles));
+}
+function resumenPerfil(H, p) {
+  if (p.modo === 'individual') return [h('span', { text: '100 % para quien paga' })];
+  const { ads, w } = pesos(H, p, state.month, null), t = w.reduce((s, x) => s + x, 0);
+  return ads.map((a, i) => h('span', { class: 'sp' }, av(a, 'sm'), p.modo === 'partes' ? plural(w[i], 'parte', 'partes').replace(/^(\d+(\.\d+)?)/, x => fmtPct.format(+x)) : fmtPct.format(w[i] / t * 100) + ' %'));
+}
+function perfilItem(H, p, adm) {
+  const ads = adultosDe(H), inputs = {};
+  const sum = h('p', { class: 'sumline', role: 'status' }), err = h('p', { class: 'err', role: 'alert' });
+  const editable = p.modo === 'porcentaje' || p.modo === 'partes';
+  const leer = () => {
+    const vals = {}; let bad = false;
+    ads.forEach(a => {
+      const t = inputs[a.id].value.trim().replace(',', '.'), v = t === '' ? 0 : Number(t);
+      if (!Number.isFinite(v) || v < 0) { bad = true; inputs[a.id].setAttribute('aria-invalid', 'true'); } else inputs[a.id].removeAttribute('aria-invalid');
+      vals[a.id] = v;
+    });
+    return { vals, bad, total: Object.values(vals).reduce((s, x) => s + x, 0) };
+  };
+  const upd = () => {
+    const r = leer(); err.textContent = '';
+    if (r.bad) { sum.textContent = 'Usa números de 0 o más.'; sum.className = 'sumline bad'; return; }
+    if (p.modo === 'porcentaje') {
+      const ok = Math.abs(r.total - 100) < 1e-4;
+      sum.textContent = ok ? 'Suma 100 %' : 'Suman ' + fmtPct.format(r.total) + ' %: deben sumar 100';
+      sum.className = 'sumline ' + (ok ? 'ok' : 'bad');
+    } else {
+      sum.textContent = r.total > 0 ? 'Total: ' + fmtPct.format(r.total) + ' partes' : 'Alguna parte debe ser mayor que 0';
+      sum.className = 'sumline ' + (r.total > 0 ? 'ok' : 'bad');
+    }
+  };
+  let body;
+  if (editable) {
+    const fields = ads.map(a => {
+      const inp = h('input', { id: 'pf-' + p.id + '-' + a.id, type: 'text', inputmode: 'decimal', autocomplete: 'off', value: fmtPct.format(p.detalle[a.id] || 0), disabled: !adm, oninput: upd });
+      inputs[a.id] = inp;
+      return h('label', {}, h('span', { class: 'who' }, av(a, 'sm'), a.nombre, h('span', { class: 'muted', text: p.modo === 'porcentaje' ? ' · %' : ' · partes' })), inp);
+    });
+    body = h('form', {
+      class: 'pbody', novalidate: true,
+      onsubmit: ev => {
+        ev.preventDefault();
+        const r = leer();
+        if (r.bad) { err.textContent = 'Los valores deben ser números de 0 o más.'; return; }
+        if (p.modo === 'porcentaje' && Math.abs(r.total - 100) >= 1e-4) { err.textContent = 'Los porcentajes deben sumar 100 (ahora suman ' + fmtPct.format(r.total) + ').'; return; }
+        if (p.modo === 'partes' && !(r.total > 0)) { err.textContent = 'Alguna parte debe ser mayor que 0.'; return; }
+        Object.assign(p.detalle, r.vals); state.openProf = p.id; renderPanel(); toast('Perfil guardado');
+      }
+    }, h('div', { class: 'fields' }, fields), sum, err, h('div', { class: 'actions', style: { marginTop: '8px' } }, h('button', { class: 'btn btn-sm', type: 'submit', disabled: !adm }, 'Guardar')));
+    setTimeout(upd, 0);
+  } else {
+    body = h('div', { class: 'pbody' }, h('p', { class: 'muted', style: { fontSize: '.88rem' }, text: p.modo === 'ingresos' ? 'Sin detalle: usa la proporción de ingresos del hogar.' : 'Sin detalle: el gasto lo asume entero quien lo paga.' }));
+  }
+  return h('details', { class: 'prof', open: state.openProf === p.id, ontoggle: ev => { if (ev.target.open) state.openProf = p.id; else if (state.openProf === p.id) state.openProf = null; } },
+    h('summary', {}, h('span', { class: 'pn' }, p.nombre, h('span', { class: 'tag', text: MODOS[p.modo] })), h('span', { class: 'psum' }, resumenPerfil(H, p))), body);
+}
+
+/* ---------- Categorías ---------- */
+function panelCategorias() {
+  const H = hog(), d = monthData(state.month);
+  const used = id => H.gastos.some(e => e.cat === id);
+  const row = c => {
+    const sel = h('select', { class: 'c-sel', 'aria-label': 'Reparto por defecto de ' + c.nombre, onchange: ev => { c.pid = ev.target.value; } }, profileOptions(H));
+    sel.value = c.pid;
+    const inUse = used(c.id);
+    return h('div', { class: 'catrow' },
+      h('input', { class: 'c-name', type: 'text', value: c.nombre, maxlength: '100', 'aria-label': 'Nombre de la categoría', autocomplete: 'off', oninput: ev => { c.nombre = ev.target.value; } }),
+      sel,
+      h('label', { class: 'chk c-chk' }, h('input', { type: 'checkbox', checked: !!c.cargo, 'aria-label': 'A cargo de la cuenta común por defecto: ' + c.nombre, onchange: ev => { c.cargo = ev.target.checked; } }), 'A cargo de la cuenta'),
+      h('span', { class: 'c-amt', text: (d.byCat[c.id] ? eur(d.byCat[c.id].t) : eur(0)) + ' este mes' }),
+      h('button', {
+        class: 'del c-del', type: 'button', disabled: inUse, 'aria-label': 'Eliminar ' + c.nombre,
+        title: inUse ? 'Tiene gastos y no se puede eliminar' : 'Eliminar categoría',
+        onclick: () => { H.cats = H.cats.filter(x => x.id !== c.id); renderPanel(); toast('Categoría eliminada'); }
+      }, '×'));
+  };
+  const newName = h('input', { id: 'nc-name', type: 'text', maxlength: '100', placeholder: 'Ej. Transporte', autocomplete: 'off' });
+  const newPid = h('select', { id: 'nc-pid' }, profileOptions(H));
+  const newCargo = h('input', { id: 'nc-cargo', type: 'checkbox' });
+  const err = h('p', { class: 'err', role: 'alert' });
+  const add = h('form', {
+    class: 'addcat', novalidate: true,
+    onsubmit: ev => {
+      ev.preventDefault();
+      const n = newName.value.trim();
+      if (!n) { err.textContent = 'Escribe un nombre para la categoría.'; newName.focus(); return; }
+      if (H.cats.some(c => c.nombre.trim().toLowerCase() === n.toLowerCase())) { err.textContent = 'Ya existe una categoría con ese nombre.'; return; }
+      H.cats.push({ id: nid('c'), nombre: n, pid: newPid.value, cargo: newCargo.checked });
+      renderPanel(); toast('Categoría añadida');
+    }
+  }, h('label', {}, 'Nueva categoría', newName), h('label', {}, 'Reparto por defecto', newPid), h('label', { class: 'chk' }, newCargo, 'A cargo de la cuenta'), h('button', { class: 'btn', type: 'submit' }, 'Añadir categoría'));
+  return h('section', { class: 'card' },
+    h('h2', { text: 'Categorías de ' + H.nombre }),
+    h('p', { class: 'muted', text: 'Define cómo se reparte por defecto cada tipo de gasto. Los cambios afectan a los gastos nuevos; los ya registrados conservan su reparto. «A cargo de la cuenta» solo se aplica si el hogar usa cuenta común.' }),
+    h('div', { class: 'cathead', 'aria-hidden': 'true' }, h('span', { text: 'Categoría' }), h('span', { text: 'Reparto por defecto' }), h('span', { text: 'Cuenta común' }), h('span', { text: 'Gastado' }), h('span')),
+    H.cats.length ? H.cats.map(row) : h('div', { class: 'empty' }, h('p', { text: 'Este hogar no tiene categorías. Crea la primera abajo.' })),
+    add, err);
+}
+
+const PANELS = { resumen: panelResumen, gastos: panelGastos, hogar: panelHogar, categorias: panelCategorias };
+
+$('#tabs').addEventListener('keydown', ev => {
+  const ids = TABS.map(t => t[0]).filter(x => x !== 'chat');
+  let i = ids.indexOf(state.tab);
+  if (ev.key === 'ArrowRight') i = (i + 1) % ids.length;
+  else if (ev.key === 'ArrowLeft') i = (i + ids.length - 1) % ids.length;
+  else return;
+  ev.preventDefault();
+  selectTab(ids[i]);
+  $('#tab-' + ids[i]).focus();
+});
+
+render();
+</script>
+
+
+</body></html>

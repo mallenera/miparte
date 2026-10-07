@@ -2,7 +2,7 @@
 @using System.Globalization
 @inject CoreApiClient Api
 
-<form @onsubmit="GuardarAsync">
+<form @onsubmit="GuardarAsync" @onsubmit:preventDefault>
     <div class="fields">
         <label>Nombre
             <input maxlength="100" @bind="_edicion.Nombre" @bind:event="oninput" />

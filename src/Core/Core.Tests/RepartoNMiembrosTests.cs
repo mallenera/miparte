@@ -34,6 +34,11 @@ public class RepartoNMiembrosTests
     }
 
     [Fact]
+    public void CuentaComun_NoSeRepartiTampocoConUnSoloMiembro()
+        => Assert.Throws<ArgumentException>(() =>
+            RepartoMiembros.Repartir(100m, ModoReparto.CuentaComun, [new(A, 1m)], A));
+
+    [Fact]
     public void Individual_100PorCientoAQuienPaga()
     {
         var r = RepartoMiembros.Repartir(45m, ModoReparto.Individual, [new(A, 1m), new(B, 1m), new(C, 1m)], B);
@@ -48,7 +53,7 @@ public class RepartoNMiembrosTests
     [Fact]
     public void Monopersonal_100PorCiento()
     {
-        foreach (var modo in Enum.GetValues<ModoReparto>())
+        foreach (var modo in Enum.GetValues<ModoReparto>().Where(m => m != ModoReparto.CuentaComun))
         {
             var r = RepartoMiembros.Repartir(57.31m, modo, [new(A, 0m)], A);
             Assert.Equal([57.31m], Importes(r));

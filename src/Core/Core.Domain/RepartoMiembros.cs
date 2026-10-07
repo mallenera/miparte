@@ -27,7 +27,11 @@ public static class RepartoMiembros
         if (modo == ModoReparto.Individual && miembros.All(m => m.MiembroId != pagadoPor))
             throw new ArgumentException("Quien paga debe ser uno de los miembros.", nameof(pagadoPor));
 
-        // Hogar monopersonal: 100% para el único miembro, sea cual sea el modo.
+        // Antes del caso monopersonal: la cuenta común nunca se reparte entre personas.
+        if (modo == ModoReparto.CuentaComun)
+            throw new ArgumentException("Un gasto de la cuenta común no se reparte entre personas.", nameof(modo));
+
+        // Hogar monopersonal: 100% para el único miembro, salvo cuenta común.
         if (miembros.Count == 1) return [new ParteAsumida(miembros[0].MiembroId, importe)];
 
         IReadOnlyList<decimal> pesos;
@@ -38,8 +42,6 @@ public static class RepartoMiembros
                     throw new ArgumentException("Quien paga debe ser uno de los miembros.", nameof(pagadoPor));
                 pesos = miembros.Select(m => m.MiembroId == pagadoPor ? 1m : 0m).ToList();
                 break;
-            case ModoReparto.CuentaComun:
-                throw new ArgumentException("Un gasto de la cuenta común no se reparte entre personas.", nameof(modo));
             case ModoReparto.Porcentaje:
             case ModoReparto.Partes:
                 pesos = miembros.Select(m => m.Valor).ToList();

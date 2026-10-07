@@ -408,3 +408,9 @@ form { display: grid; gap: 14px; }
 .auth .card:hover { transform: none; }
 .auth h1, .auth h2 { font: 600 1.6rem/1.2 var(--font-display); }
 .acceso .auth { margin-inline: 0 auto; max-width: 440px; }
+
+/* Resumen: navegación de mes común a liquidación y resumen, y aire entre bloques */
+.mesbar { display: flex; justify-content: flex-end; }
+.mesbar .mesnav { padding: 4px 8px; border: 1px solid var(--line); border-radius: 999px; background: rgba(11, 18, 36, .7); }
+.mesbar + .aviso { margin-top: -8px; }
+section.card + section.card { margin-top: 24px; }

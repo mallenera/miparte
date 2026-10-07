@@ -5,6 +5,7 @@ namespace MiParte.Web.Tests;
 
 public class ServicioTemaTests
 {
+    /// <summary>Crea el servicio con un almacén en memoria y un JS simulado.</summary>
     private static (ServicioTema servicio, AlmacenMemoria almacen, BunitJSInterop js) Crear()
     {
         var contexto = new TestContext();
@@ -12,6 +13,7 @@ public class ServicioTemaTests
         return (new ServicioTema(almacen, contexto.JSInterop.JSRuntime), almacen, contexto.JSInterop);
     }
 
+    /// <summary>Sin nada guardado se sigue el tema del sistema.</summary>
     [Fact]
     public async Task Sin_tema_guardado_sigue_al_sistema()
     {
@@ -20,6 +22,7 @@ public class ServicioTemaTests
         Assert.Equal(ServicioTema.Sistema, servicio.Actual);
     }
 
+    /// <summary>Un valor guardado que no es un tema conocido no se aplica.</summary>
     [Fact]
     public async Task Un_tema_desconocido_guardado_se_trata_como_sistema()
     {
@@ -29,6 +32,7 @@ public class ServicioTemaTests
         Assert.Equal(ServicioTema.Sistema, servicio.Actual);
     }
 
+    /// <summary>Elegir un tema lo aplica en la página, lo guarda y avisa a los suscriptores.</summary>
     [Fact]
     public async Task Elegir_un_tema_lo_aplica_lo_guarda_y_avisa()
     {
@@ -45,6 +49,7 @@ public class ServicioTemaTests
         js.VerifyInvoke("miparteTema.aplicar");
     }
 
+    /// <summary>Un id que no es de ningún tema no cambia nada ni se guarda.</summary>
     [Fact]
     public async Task Un_tema_inexistente_se_ignora()
     {
@@ -54,6 +59,7 @@ public class ServicioTemaTests
         Assert.Empty(almacen.Datos);
     }
 
+    /// <summary>Al iniciar se recupera el tema guardado en la sesión anterior.</summary>
     [Fact]
     public async Task El_tema_guardado_se_recupera_al_iniciar()
     {

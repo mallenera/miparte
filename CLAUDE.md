@@ -19,7 +19,7 @@ Si el código y el diseño chocan, manda el código; si te apartas del diseño a
 
 ## Comandos
 
-.NET SDK 8.0 (solución `MiParte.sln`).
+.NET SDK 10.0 (solución `MiParte.sln`).
 
 ```bash
 dotnet build

@@ -110,7 +110,10 @@ public class GastosLiquidacionTests
         Assert.Empty(liq.Transferencias);
         var resumen = await Leer<ResumenMensualResponse>(await e.Cliente.GetAsync("/api/resumen?mes=2026-09"));
         Assert.Equal(100m, resumen.GastosTotales);
-        Assert.All(resumen.Miembros, m => Assert.Equal((0m, 0m), (m.Pagado, m.Asumido)));
+        // Ana adelantó los 100 €: figura como pagado y la cuenta común se los debe.
+        var ana = resumen.Miembros.Single(m => m.Pagado > 0);
+        Assert.Equal((100m, 0m, 100m), (ana.Pagado, ana.Asumido, ana.DebeCuentaComun));
+        Assert.All(resumen.Miembros.Where(m => m != ana), m => Assert.Equal((0m, 0m, 0m), (m.Pagado, m.Asumido, m.DebeCuentaComun)));
     }
 
     [Fact]

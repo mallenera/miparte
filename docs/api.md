@@ -304,8 +304,8 @@ Total: 43 endpoints de negocio (4 hogares/yo, 6 miembros/invitaciones, 4 categor
 {
   "mes": "2026-10", "gastosTotales": 1200.00,
   "miembros": [
-    { "miembroId": "b0000000-0000-4000-8000-0000000000aa", "nombre": "Ana", "pagado": 1000.00, "asumido": 700.00 },
-    { "miembroId": "b0000000-0000-4000-8000-0000000000dd", "nombre": "Luis", "pagado": 200.00, "asumido": 500.00 }
+    { "miembroId": "b0000000-0000-4000-8000-0000000000aa", "nombre": "Ana", "pagado": 1000.00, "asumido": 700.00, "debeCuentaComun": 0.00 },
+    { "miembroId": "b0000000-0000-4000-8000-0000000000dd", "nombre": "Luis", "pagado": 200.00, "asumido": 500.00, "debeCuentaComun": 0.00 }
   ],
   "categorias": [
     {
@@ -318,6 +318,8 @@ Total: 43 endpoints de negocio (4 hogares/yo, 6 miembros/invitaciones, 4 categor
   ]
 }
 ```
+
+`pagado` incluye lo que el miembro adelantó para gastos de la cuenta común; `debeCuentaComun` es lo que la cuenta le debe aún (acumulado hasta el fin del mes, descontados los reembolsos).
 
 ### Liquidación
 

@@ -340,6 +340,19 @@ public class ComponentesTests : TestContext
     }
 
     [Fact]
+    [Fact]
+    public void Resumen_indica_lo_que_la_cuenta_comun_debe_a_quien_adelanto_gastos()
+    {
+        var resumen = new ResumenMensualResponse("2026-10", 100m,
+            [new ResumenMiembroDto(AnaId, "Ana", 100m, 0m, 100m), new ResumenMiembroDto(LuisId, "Luis", 0m, 0m)], []);
+        Registrar(ApiResumen(resumen, Liquidacion(0m)));
+
+        var c = RenderComponent<VistaResumen>();
+
+        Assert.Contains("La cuenta común le debe", c.Markup);
+        Assert.Single(c.FindAll(".catrow .chip"));
+    }
+
     public void Resumen_sin_gastos_invita_a_anadir_uno_y_dice_que_no_hay_nada_que_liquidar()
     {
         Registrar(ApiResumen(new ResumenMensualResponse("2026-10", 0m, [], []), new LiquidacionResponse("2026-10", [], [], [])));

@@ -63,12 +63,15 @@ public static class GastosEndpoints
         if (e is not null) return (null, e, false);
         if (r.Fecha == default) return (null, "La fecha es obligatoria.", false);
         if (!await db.Categorias.AnyAsync(c => c.Id == r.CategoriaId, ct)) return (null, "La categoría no existe en el hogar.", false);
-        if (!await ApiComun.EsAdultoActivo(db, r.PagadoPor, ct)) return (null, "Quien paga debe ser un adulto activo del hogar.", false);
+        if (r.PagadoPor is { } pagador && !await ApiComun.EsAdultoActivo(db, pagador, ct))
+            return (null, "Quien paga debe ser un adulto activo del hogar.", false);
         var perfil = await db.PerfilesReparto.Include(p => p.Detalles).FirstOrDefaultAsync(p => p.Id == r.PerfilRepartoId, ct);
         if (perfil is null) return (null, "El perfil de reparto no existe en el hogar.", false);
+        if (r.PagadoPor is null && perfil.Modo != ModoReparto.CuentaComun)
+            return (null, "La cuenta común solo paga gastos con el perfil de cuenta común.", false);
 
         var adultos = await ApiComun.AdultosActivos(db, ct);
-        var partes = ApiComun.Repartir(perfil, adultos, r.Importe, r.PagadoPor, out var error);
+        var partes = ApiComun.Repartir(perfil, adultos, r.Importe, r.PagadoPor ?? Guid.Empty, out var error);
         return (partes, error, perfil.Modo == ModoReparto.CuentaComun);
     }
 

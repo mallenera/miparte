@@ -158,7 +158,7 @@ La cuenta común es un pagador más: los gastos que paga no entran en la deuda e
 
 **Saldos en el resumen** (positivo = a favor):
 
-- Cuenta común: aportaciones acumuladas menos gastos a cargo de la cuenta. El efectivo es el saldo menos los reembolsos pendientes.
+- Cuenta común: aportaciones acumuladas menos gastos a cargo de la cuenta. El efectivo es el saldo más los reembolsos pendientes (los gastos los adelantan personas: el dinero de la cuenta no baja hasta reembolsarlos).
 - Persona A y Persona B: lo que la cuenta les debe por reembolsos pendientes, más o menos la deuda entre personas del mes.
 
 - **Aportaciones:** cada adulto aporta un importe fijo al mes, guardado por mes y persona. Es lo único que se guarda del dinero que entra en el hogar.

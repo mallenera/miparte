@@ -42,7 +42,8 @@ public static class LiquidacionEndpoints
         var gastosTotales = gastos.Sum(g => g.Importe);
 
         var implicados = miembros.Where(m => m.Activo && m.Tipo == TipoMiembro.Adulto).Select(m => m.Id)
-            .Concat(gastos.Select(g => g.PagadoPor)).Concat(gastos.SelectMany(g => g.Repartos).Select(r => r.MiembroId))
+            .Concat(gastos.Where(g => g.PagadoPor is not null).Select(g => g.PagadoPor!.Value))
+            .Concat(gastos.SelectMany(g => g.Repartos).Select(r => r.MiembroId))
             .ToHashSet();
         var porMiembro = miembros.Where(m => implicados.Contains(m.Id)).OrderBy(m => m.Nombre).ThenBy(m => m.Id)
             .Select(m => new ResumenMiembroDto(
@@ -71,18 +72,18 @@ public static class LiquidacionEndpoints
     /// <summary>Calcula los saldos del mes a partir de gastos y pagos de liquidación registrados, y las transferencias que los saldan.</summary>
     private static async Task<Calculo> Calcular(MiParteDbContext db, DateOnly inicio, CancellationToken ct)
     {
-        // Lo que asume la cuenta común no entra en la deuda entre personas.
+        // Lo que asume la cuenta común no entra en la deuda entre personas (y es lo único que puede pagar la cuenta: PagadoPor nulo).
         var gastos = (await GastosDelMes(db, inicio, ct)).Where(g => !g.ACargoCuentaComun).ToList();
         var pagos = await db.PagosLiquidacion.Where(p => p.Mes == inicio).OrderBy(p => p.Fecha).ThenBy(p => p.Id).ToListAsync(ct);
         var miembros = await db.Miembros.ToListAsync(ct);
 
         var ids = miembros.Where(m => m.Activo && m.Tipo == TipoMiembro.Adulto).Select(m => m.Id)
-            .Concat(gastos.Select(g => g.PagadoPor)).Concat(gastos.SelectMany(g => g.Repartos).Select(r => r.MiembroId))
+            .Concat(gastos.Select(g => g.PagadoPor!.Value)).Concat(gastos.SelectMany(g => g.Repartos).Select(r => r.MiembroId))
             .Concat(pagos.SelectMany(p => new[] { p.DeMiembroId, p.AMiembroId }))
             .Distinct().OrderBy(id => id).ToList();
 
         var calculados = gastos.Select(g => new GastoCalculado(
-            g.PagadoPor, g.Importe, g.Repartos.Select(r => new ParteAsumida(r.MiembroId, r.ImporteAsumido)).ToList()));
+            g.PagadoPor!.Value, g.Importe, g.Repartos.Select(r => new ParteAsumida(r.MiembroId, r.ImporteAsumido)).ToList()));
         var saldos = Liquidacion.CalcularSaldos(ids, calculados, pagos.Select(p => new PagoLiquidacion(p.DeMiembroId, p.AMiembroId, p.Importe)));
         var transferencias = Liquidacion.Liquidar(saldos); // un solo miembro: sin transferencias
 

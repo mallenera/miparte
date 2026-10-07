@@ -92,6 +92,38 @@ public class PagoLiquidacionRegistro
     public string? Concepto { get; set; }
 }
 
+/// <summary>Aportación fija mensual de un adulto a la cuenta común, vigente desde un mes (tabla aportacion_cuenta).</summary>
+public class AportacionCuenta
+{
+    /// <summary>Identificador de la aportación.</summary>
+    public Guid Id { get; set; }
+    /// <summary>Hogar al que pertenece.</summary>
+    public Guid HogarId { get; set; }
+    /// <summary>Adulto que aporta.</summary>
+    public Guid MiembroId { get; set; }
+    /// <summary>Primer día del mes desde el que vale el importe.</summary>
+    public DateOnly Desde { get; set; }
+    /// <summary>Importe mensual; 0 deja de aportar.</summary>
+    public decimal Importe { get; set; }
+}
+
+/// <summary>Pago de la cuenta común a quien adelantó un gasto cargado a ella (tabla reembolso_cuenta).</summary>
+public class ReembolsoCuenta
+{
+    /// <summary>Identificador del reembolso.</summary>
+    public Guid Id { get; set; }
+    /// <summary>Hogar al que pertenece.</summary>
+    public Guid HogarId { get; set; }
+    /// <summary>Miembro reembolsado.</summary>
+    public Guid MiembroId { get; set; }
+    /// <summary>Fecha del reembolso.</summary>
+    public DateOnly Fecha { get; set; }
+    /// <summary>Importe reembolsado (positivo).</summary>
+    public decimal Importe { get; set; }
+    /// <summary>Nota opcional.</summary>
+    public string? Concepto { get; set; }
+}
+
 /// <summary>Perfil de reparto reutilizable: un modo y los valores por miembro (detalles).</summary>
 public class PerfilReparto
 {
@@ -173,8 +205,8 @@ public class Gasto
     public decimal Importe { get; set; }
     /// <summary>Categoría del gasto.</summary>
     public Guid CategoriaId { get; set; }
-    /// <summary>Miembro que adelantó el pago.</summary>
-    public Guid PagadoPor { get; set; }
+    /// <summary>Miembro que adelantó el pago; null si lo paga directamente la cuenta común.</summary>
+    public Guid? PagadoPor { get; set; }
     /// <summary>Perfil de reparto con el que se calcularon las partes.</summary>
     public Guid PerfilRepartoId { get; set; }
     /// <summary>Descripción opcional.</summary>

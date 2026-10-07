@@ -337,4 +337,87 @@ public class GastosLiquidacionTests
 
         Assert.Equal(HttpStatusCode.NotFound, (await otro.Cliente.GetAsync($"/api/gastos/{g.Id}")).StatusCode);
     }
+
+    [Fact]
+    public async Task CuentaComun_AportacionesGastoYReembolso_DanSaldoYEfectivo()
+    {
+        var e = await Montar();
+        foreach (var (miembro, importe) in new[] { (e.Ana, 600m), (e.Beto!.Value, 400m) })
+            Assert.Equal(HttpStatusCode.OK, (await e.Cliente.PutAsJsonAsync(
+                "/api/cuenta-comun/aportaciones", new FijarAportacionRequest(miembro, new DateOnly(2026, 9, 1), importe))).StatusCode);
+        await CrearGasto(e, Gasto(e, 900m, e.PerfilCuentaComun)); // lo adelanta Ana
+
+        var antes = await Leer<CuentaComunResponse>(await e.Cliente.GetAsync("/api/cuenta-comun?mes=2026-09"));
+        Assert.Equal((1000m, 1000m, 900m, 100m, 1000m), (antes.AportadoMes, antes.Aportado, antes.Gastado, antes.Saldo, antes.Efectivo));
+        Assert.Equal(900m, Assert.Single(antes.Pendientes).Importe);
+
+        var r = await e.Cliente.PostAsJsonAsync("/api/cuenta-comun/reembolsos",
+            new CrearReembolsoRequest(e.Ana, 400m, new DateOnly(2026, 9, 20), null));
+        Assert.Equal(HttpStatusCode.Created, r.StatusCode);
+
+        var despues = await Leer<CuentaComunResponse>(await e.Cliente.GetAsync("/api/cuenta-comun?mes=2026-09"));
+        Assert.Equal((100m, 600m), (despues.Saldo, despues.Efectivo));
+        Assert.Equal(500m, Assert.Single(despues.Pendientes).Importe);
+        Assert.Single(despues.Reembolsos);
+    }
+
+    [Fact]
+    public async Task CuentaComun_Reembolso_NoPuedeSuperarLoPendiente()
+    {
+        var e = await Montar();
+        await CrearGasto(e, Gasto(e, 100m, e.PerfilCuentaComun));
+
+        var r = await e.Cliente.PostAsJsonAsync("/api/cuenta-comun/reembolsos",
+            new CrearReembolsoRequest(e.Ana, 100.01m, null, null));
+
+        Assert.Equal(HttpStatusCode.Conflict, r.StatusCode);
+    }
+
+    [Fact]
+    public async Task CuentaComun_Aportacion_SustituyeLaDelMismoMesYValidaDatos()
+    {
+        var e = await Montar();
+        var mes = new DateOnly(2026, 9, 1);
+        await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, mes, 500m));
+        await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, mes, 0m));
+
+        var estado = await Leer<CuentaComunResponse>(await e.Cliente.GetAsync("/api/cuenta-comun?mes=2026-09"));
+        Assert.Equal(0m, Assert.Single(estado.Aportaciones).Importe);
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await e.Cliente.PutAsJsonAsync(
+            "/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, new DateOnly(2026, 9, 2), 10m))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await e.Cliente.PutAsJsonAsync(
+            "/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, mes, -1m))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await e.Cliente.PutAsJsonAsync(
+            "/api/cuenta-comun/aportaciones", new FijarAportacionRequest(Guid.NewGuid(), mes, 10m))).StatusCode);
+    }
+
+    [Fact]
+    public async Task CuentaComun_GastoPagadoPorLaCuenta_BajaElEfectivoYNoDejaPendiente()
+    {
+        var e = await Montar();
+        await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, new DateOnly(2026, 9, 1), 1000m));
+
+        var g = await CrearGasto(e, Gasto(e, 300m, e.PerfilCuentaComun) with { PagadoPor = null });
+
+        Assert.Null(g.PagadoPor);
+        Assert.True(g.ACargoCuentaComun);
+        var estado = await Leer<CuentaComunResponse>(await e.Cliente.GetAsync("/api/cuenta-comun?mes=2026-09"));
+        Assert.Equal((700m, 700m), (estado.Saldo, estado.Efectivo));
+        Assert.Empty(estado.Pendientes);
+        var liq = await Leer<LiquidacionResponse>(await e.Cliente.GetAsync("/api/liquidacion?mes=2026-09"));
+        Assert.Empty(liq.Transferencias);
+        var resumen = await Leer<ResumenMensualResponse>(await e.Cliente.GetAsync("/api/resumen?mes=2026-09"));
+        Assert.Equal(300m, resumen.GastosTotales);
+    }
+
+    [Fact]
+    public async Task Gasto_PagadoPorLaCuenta_ExigeElPerfilDeCuentaComun()
+    {
+        var e = await Montar();
+
+        var r = await e.Cliente.PostAsJsonAsync("/api/gastos", Gasto(e, 50m, e.Perfil6040) with { PagadoPor = null });
+
+        Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
+    }
 }

@@ -59,6 +59,7 @@ app.MapHogares();
 app.MapGastos();
 app.MapGastosRecurrentes();
 app.MapLiquidacion();
+app.MapCuentaComun();
 app.MapCategorias();
 app.MapPerfiles();
 app.MapMiembros();

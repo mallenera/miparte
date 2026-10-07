@@ -25,10 +25,10 @@ Actualizado el 2026-10-07. Mantén esta tabla al día cuando cierres o cambies a
 
 | Tema del diseño | Estado en el código |
 |---|---|
-| Ingresos del hogar **no se guardan**; perfiles = individual, porcentajes, partes y cuenta común | **Hecho** (sin commitear): migración `20261007000000_perfiles_cuenta_comun_sin_ingresos.sql` (elimina `ingreso`, convierte los perfiles con modo `ingresos` en `partes`, añade el modo nuevo `cuenta_comun`, añade `gasto.a_cargo_cuenta_comun`; no ejecutada contra Postgres real en local). Un gasto con perfil de cuenta común no se reparte ni genera deuda. |
-| Cuenta común: aportaciones, saldo, reembolsos | **Sin implementar**; solo existe el modo de perfil y el marcado del gasto. |
+| Ingresos del hogar **no se guardan**; perfiles = individual, porcentajes, partes y cuenta común | **Hecho** (sin commitear): migración `20261007000000_perfiles_cuenta_comun_sin_ingresos.sql` (elimina `ingreso`, sustituye el modo `ingresos` por `cuenta_comun`, añade `gasto.a_cargo_cuenta_comun`; no ejecutada contra Postgres real en local). Un gasto con perfil de cuenta común no se reparte ni genera deuda. |
+| Cuenta común: aportaciones, saldo, reembolsos | **Hecho** (sin commitear): migración `20261008000000_cuenta_comun_aportaciones_reembolsos.sql` (no ejecutada contra Postgres real en local), `Core.Domain/CuentaComun.cs`, endpoints `/api/cuenta-comun` (`docs/api.md` §3.9) y tests. Front hecho: pestaña «Cuenta común» (`VistaCuentaComun`: saldo, efectivo, aportaciones por adulto y reembolsos). El formulario de gastos ofrece «Cuenta común» como pagador si hay aportaciones (migración `20261009000000_gasto_pagado_por_cuenta_comun.sql`, `gasto.pagado_por` nulo). **Pendiente**: indicador «a cargo de la cuenta» por categoría, activación por hogar y «su parte» por persona; resumen con saldos de la cuenta. |
 | Categorías con subcategorías y perfil por defecto | Esquema con `categoria_padre_id`; la UI aún no gestiona subcategorías. |
-| Gastos, recurrentes, pagos de liquidación y resumen | API hecha. Front: solo Gastos; faltan recurrentes, resumen y liquidación. |
+| Gastos, recurrentes, pagos de liquidación y resumen | API hecha. Front: Gastos y pestaña Resumen (`VistaResumen`: resumen del mes por persona y categoría, saldos, transferencias sugeridas con «Registrar pago» por el importe completo y pagos registrados con borrado). Faltan recurrentes, pago parcial/personalizado y filtros. |
 | Gastos personales fuera de la liquidación, cierre de mes | Sin implementar. |
 | Chatbot con tool calling (5 funciones) | `Assistant.Api` es un esqueleto (`/health`). |
 | Invitación al hogar | Hecha (token de un solo uso, 7 días, hash en BD). |

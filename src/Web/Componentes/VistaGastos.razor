@@ -42,7 +42,7 @@ else
                     <div class="g-main">
                         <div class="g-concepto">@(string.IsNullOrWhiteSpace(g.Concepto) ? NombreCategoria(g.CategoriaId) : g.Concepto)</div>
                         <div class="muted g-meta">
-                            @g.Fecha.ToString("dd/MM/yyyy", Es) · @NombreCategoria(g.CategoriaId) · paga @NombreMiembro(g.PagadoPor)
+                            @g.Fecha.ToString("dd/MM/yyyy", Es) · @NombreCategoria(g.CategoriaId) · paga @(g.PagadoPor is { } quien ? NombreMiembro(quien) : "la cuenta común")
                             @if (g.GastoRecurrenteId is not null) { <span class="tag off">recurrente</span> }
                         </div>
                         <div class="g-reparto">
@@ -102,10 +102,14 @@ else
                     </select>
                 </label>
                 <label>Paga
-                    <select @bind="_pagador">
+                    <select @bind="_pagador" @bind:after="AlCambiarPagador">
                         @foreach (var m in _adultos)
                         {
                             <option value="@m.Id">@m.Nombre</option>
+                        }
+                        @if (_cuentaConfigurada && PerfilCuentaComun is not null)
+                        {
+                            <option value="">Cuenta común (la paga directamente)</option>
                         }
                     </select>
                 </label>
@@ -145,7 +149,12 @@ else
     private Guid? _editando, _confirmandoEliminar;
     private DateOnly _fecha = DateOnly.FromDateTime(DateTime.Today);
     private string _importe = "", _concepto = "";
-    private Guid _categoria, _pagador, _perfil;
+    private Guid _categoria, _perfil;
+    private Guid? _pagador;
+    private bool _cuentaConfigurada;
+
+    /// <summary>Perfil de modo cuenta común del hogar, el único con el que puede pagar la cuenta directamente.</summary>
+    private PerfilRepartoDto? PerfilCuentaComun => _perfiles.FirstOrDefault(p => p.Modo == "cuenta_comun");
 
     private string NombreMes => _mes.ToString("MMMM yyyy", Es);
 
@@ -168,6 +177,7 @@ else
             _categorias = categorias.Result;
             _perfiles = perfiles.Result;
             _arbol = ArbolCategorias.Aplanar(_categorias);
+            _cuentaConfigurada = await CuentaConfiguradaAsync();
             await RecargarGastosAsync();
             ReiniciarFormulario();
         }
@@ -177,6 +187,25 @@ else
         }
 
         _cargando = false;
+    }
+
+    /// <summary>La cuenta común está configurada si algún adulto tiene aportación definida; si la consulta falla se trata como no configurada.</summary>
+    private async Task<bool> CuentaConfiguradaAsync()
+    {
+        try
+        {
+            return (await Api.ObtenerCuentaComunAsync(_mes.ToString("yyyy-MM", CultureInfo.InvariantCulture))).Aportaciones.Count > 0;
+        }
+        catch (ApiException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>La cuenta común solo paga gastos con su perfil: al elegirla como pagador se selecciona ese perfil.</summary>
+    private void AlCambiarPagador()
+    {
+        if (_pagador is null && PerfilCuentaComun is { } p) _perfil = p.Id;
     }
 
     private async Task RecargarGastosAsync() =>

@@ -98,7 +98,7 @@ Validación de perfiles (400): nombre obligatorio (≤ 100); `modo` en `porcenta
 
 ### 3.5 Ingresos
 
-Los ingresos del hogar **no se guardan** y no hay endpoints de ingresos. Los perfiles de reparto son cuatro modos: `individual` (100 % de quien paga), `porcentaje` (por porcentajes, suman 100), `partes` (por número de personas/partes) y `cuenta_comun`. Un gasto con perfil `cuenta_comun` lo asume la cuenta común: `GastoResponse.aCargoCuentaComun` es `true`, `repartos` va vacío, no genera deuda entre personas y no entra en la liquidación ni en el «pagado» del resumen (sí en `gastosTotales` y en el total por categoría). Aún no existen aportaciones, saldo ni reembolsos de la cuenta común.
+Los ingresos del hogar **no se guardan** y no hay endpoints de ingresos. Los perfiles de reparto son cuatro modos: `individual` (100 % de quien paga), `porcentaje` (por porcentajes, suman 100), `partes` (por número de personas/partes) y `cuenta_comun`. Un gasto con perfil `cuenta_comun` lo asume la cuenta común: `GastoResponse.aCargoCuentaComun` es `true`, `repartos` va vacío, no genera deuda entre personas y no entra en la liquidación ni en el «pagado» del resumen (sí en `gastosTotales` y en el total por categoría). Su saldo, aportaciones y reembolsos están en §3.9.
 
 ### 3.6 Gastos
 
@@ -130,7 +130,18 @@ Los ingresos del hogar **no se guardan** y no hay endpoints de ingresos. Los per
 | `POST /api/pagos-liquidacion` | Registra un pago entre dos miembros del mes | `CrearPagoLiquidacionRequest` | `PagoLiquidacionDto` 201 | 400 mes no es día 1, mismo miembro, importe, miembros fuera del hogar; 409 importe mayor que la deuda pendiente (`{ error, pendiente }`) o sin hogar | miembro |
 | `DELETE /api/pagos-liquidacion/{id}` | Elimina un pago | - | 204 | 404; 409 sin hogar | miembro |
 
-Total: 39 endpoints de negocio (4 hogares/yo, 6 miembros/invitaciones, 4 categorías, 5 perfiles, 5 gastos, 6 recurrentes, 4 resumen/liquidación/pagos) más `GET /health`.
+### 3.9 Cuenta común
+
+| Método y ruta | Descripción | Request | Response | Errores | Permisos |
+|---|---|---|---|---|---|
+| `GET /api/cuenta-comun?mes=YYYY-MM` | Estado al final del mes: aportado (mes y acumulado), gastado, saldo, reembolsos pendientes por miembro, efectivo, aportaciones configuradas y reembolsos del mes. `mes` obligatorio | - | `CuentaComunResponse` 200 | 400 mes inválido; 409 sin hogar | miembro |
+| `PUT /api/cuenta-comun/aportaciones` | Fija lo que aporta un adulto desde un mes (`desde` = día 1); si ya había una de ese mes la sustituye. Importe 0 = deja de aportar | `FijarAportacionRequest` | `AportacionCuentaDto` 200 | 400 `desde` no es día 1, importe negativo o con más de 2 decimales, miembro no adulto activo; 409 sin hogar | miembro |
+| `POST /api/cuenta-comun/reembolsos` | Registra un pago de la cuenta a quien adelantó gastos cargados a ella (`fecha` opcional, por defecto hoy UTC) | `CrearReembolsoRequest` | `ReembolsoCuentaDto` 201 | 400 importe o miembro fuera del hogar; 409 importe mayor que lo pendiente (`{ error, pendiente }`) o sin hogar | miembro |
+| `DELETE /api/cuenta-comun/reembolsos/{id}` | Elimina un reembolso | - | 204 | 404; 409 sin hogar | miembro |
+
+El importe de un mes es el de la aportación con `desde` más reciente que no pase de ese mes. **Saldo** = aportado acumulado − gastos cargados a la cuenta hasta el mes (negativo si no los cubre). **Pendiente** de un miembro = gastos de la cuenta que adelantó − reembolsos recibidos. **Efectivo** = saldo + pendientes (el dinero de la cuenta no baja hasta reembolsar un gasto que adelantó una persona). Un gasto también puede pagarlo **directamente la cuenta**: `GastoRequest.pagadoPor = null`, solo con perfil `cuenta_comun` (400 en otro caso); no genera pendiente y baja el efectivo. `GastoResponse.pagadoPor` es `null` en esos gastos. Ejemplo: aportan 600 + 400, Ana adelanta una hipoteca de 900 a cargo de la cuenta → saldo 100, pendiente de Ana 900, efectivo 1000; tras reembolsarle 400 → saldo 100, pendiente 500, efectivo 600.
+
+Total: 43 endpoints de negocio (4 hogares/yo, 6 miembros/invitaciones, 4 categorías, 5 perfiles, 5 gastos, 6 recurrentes, 4 resumen/liquidación/pagos, 4 cuenta común) más `GET /health`.
 
 ## 4. Ejemplos JSON
 

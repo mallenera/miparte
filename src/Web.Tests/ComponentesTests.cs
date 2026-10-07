@@ -205,4 +205,217 @@ public class ComponentesTests : TestContext
         Assert.Contains(ana.Id.ToString(), cuerpo);
         Assert.Contains(perfil.Id.ToString(), cuerpo);
     }
+
+    private static CuentaComunResponse Cuenta(decimal saldo, params PendienteCuentaDto[] pendientes) =>
+        new("2026-10", 1000m, 1000m, 1000m - saldo, saldo, pendientes, saldo + pendientes.Sum(p => p.Importe), [], []);
+
+    [Fact]
+    public void Cuenta_comun_muestra_saldo_y_avisa_si_no_cubre_los_gastos()
+    {
+        var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, Cuenta(-50m));
+        Registrar(api);
+
+        var c = RenderComponent<VistaCuentaComun>();
+
+        Assert.Contains("La cuenta no cubre los gastos", c.Markup);
+        Assert.Contains("50,00", c.Find("#saldo").TextContent);
+    }
+
+    [Fact]
+    public void Cuenta_comun_fijar_aportacion_envia_adulto_mes_e_importe()
+    {
+        var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, Cuenta(0m))
+            .Responde("PUT /api/cuenta-comun/aportaciones", HttpStatusCode.OK,
+                new AportacionCuentaDto(Guid.NewGuid(), AnaId, new DateOnly(DateTime.Today.Year, DateTime.Today.Month, 1), 600m));
+        Registrar(api);
+        var c = RenderComponent<VistaCuentaComun>();
+
+        c.Find("#form-aportacion input").Input("600,50");
+        c.Find("#form-aportacion").Submit();
+
+        var cuerpo = api.Cuerpos["PUT /api/cuenta-comun/aportaciones"];
+        Assert.Contains(AnaId.ToString(), cuerpo);
+        Assert.Contains("\"importe\":600.5", cuerpo);
+        Assert.Contains($"\"desde\":\"{DateTime.Today:yyyy-MM}-01\"", cuerpo);
+    }
+
+    [Fact]
+    public void Cuenta_comun_reembolso_solo_aparece_con_pendientes_y_envia_importe()
+    {
+        var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, Cuenta(100m, new PendienteCuentaDto(AnaId, "Ana", 900m)))
+            .Responde("POST /api/cuenta-comun/reembolsos", HttpStatusCode.Created,
+                new ReembolsoCuentaDto(Guid.NewGuid(), AnaId, DateOnly.FromDateTime(DateTime.Today), 400m, null));
+        Registrar(api);
+        var c = RenderComponent<VistaCuentaComun>();
+
+        Assert.Contains("La cuenta le debe", c.Markup);
+        c.Find("#form-reembolso input").Input("400");
+        c.Find("#form-reembolso").Submit();
+
+        var cuerpo = api.Cuerpos["POST /api/cuenta-comun/reembolsos"];
+        Assert.Contains(AnaId.ToString(), cuerpo);
+        Assert.Contains("\"importe\":400", cuerpo);
+    }
+
+    [Fact]
+    public void Cuenta_comun_sin_pendientes_no_ofrece_reembolsar()
+    {
+        var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, Cuenta(0m));
+        Registrar(api);
+
+        var c = RenderComponent<VistaCuentaComun>();
+
+        Assert.Empty(c.FindAll("#form-reembolso"));
+        Assert.Contains("No hay reembolsos pendientes", c.Markup);
+    }
+
+    [Fact]
+    public void Gasto_con_cuenta_configurada_permite_que_pague_la_cuenta_y_envia_pagador_nulo()
+    {
+        var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
+        var perfil = new PerfilRepartoDto(Guid.NewGuid(), "Cuenta común", "cuenta_comun", []);
+        var cat = new CategoriaDto(Guid.NewGuid(), "Casa", null, null);
+        var aportacion = new AportacionCuentaDto(Guid.NewGuid(), AnaId, new DateOnly(2026, 1, 1), 500m);
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
+            .Responde("GET /api/categorias", HttpStatusCode.OK, new[] { cat })
+            .Responde("GET /api/perfiles", HttpStatusCode.OK, new[] { perfil })
+            .Responde("GET /api/gastos", HttpStatusCode.OK, Array.Empty<GastoResponse>())
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK,
+                new CuentaComunResponse("2026-10", 500m, 500m, 0m, 500m, [], 500m, [aportacion], []))
+            .Responde("POST /api/gastos", HttpStatusCode.Created,
+                new GastoResponse(Guid.NewGuid(), DateOnly.FromDateTime(DateTime.Today), 80m, cat.Id, null, perfil.Id, null, null, [], true));
+        Registrar(api);
+        var c = RenderComponent<VistaGastos>();
+
+        c.FindAll("form.addcat select")[1].Change(""); // Paga: cuenta común
+        c.Find("form.addcat input[inputmode=decimal]").Input("80");
+        c.Find("form.addcat").Submit();
+
+        var cuerpo = api.Cuerpos["POST /api/gastos"];
+        Assert.Contains("\"pagadoPor\":null", cuerpo);
+        Assert.Contains(perfil.Id.ToString(), cuerpo);
+    }
+
+    private static ApiFalsa ApiResumen(ResumenMensualResponse resumen, LiquidacionResponse liquidacion) =>
+        new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK,
+                new[] { ApiFalsa.Miembro("Ana", esYo: true, id: AnaId), ApiFalsa.Miembro("Luis", id: LuisId) })
+            .Responde("GET /api/resumen", HttpStatusCode.OK, resumen)
+            .Responde("GET /api/liquidacion", HttpStatusCode.OK, liquidacion);
+
+    private static LiquidacionResponse Liquidacion(decimal deuda, params PagoLiquidacionDto[] pagos) =>
+        new("2026-10",
+            [new SaldoMiembroDto(AnaId, "Ana", deuda), new SaldoMiembroDto(LuisId, "Luis", -deuda)],
+            deuda > 0 ? [new TransferenciaDto(LuisId, AnaId, deuda)] : [],
+            pagos);
+
+    [Fact]
+    public void Resumen_muestra_totales_por_persona_y_categoria_con_la_transferencia_sugerida()
+    {
+        var resumen = new ResumenMensualResponse("2026-10", 1200m,
+            [new ResumenMiembroDto(AnaId, "Ana", 1000m, 700m), new ResumenMiembroDto(LuisId, "Luis", 200m, 500m)],
+            [new ResumenCategoriaDto(Guid.NewGuid(), "Hipoteca", 850m, [new ImporteMiembroDto(AnaId, 500m), new ImporteMiembroDto(LuisId, 350m)])]);
+        Registrar(ApiResumen(resumen, Liquidacion(300m)));
+
+        var c = RenderComponent<VistaResumen>();
+
+        Assert.Contains("1200,00", c.Find("#total").TextContent.Replace(".", ""));
+        Assert.Contains("Hipoteca", c.Markup);
+        Assert.Contains("Luis paga a Ana", c.Markup);
+        Assert.Contains("+", c.Find(".saldo.pos").TextContent); // el signo acompaña al color
+        Assert.NotEmpty(c.FindAll(".saldo.neg"));
+    }
+
+    [Fact]
+    public void Resumen_sin_gastos_invita_a_anadir_uno_y_dice_que_no_hay_nada_que_liquidar()
+    {
+        Registrar(ApiResumen(new ResumenMensualResponse("2026-10", 0m, [], []), new LiquidacionResponse("2026-10", [], [], [])));
+
+        var c = RenderComponent<VistaResumen>();
+
+        Assert.Contains("No hay gastos", c.Markup);
+        Assert.Contains("nada que liquidar", c.Markup);
+        Assert.DoesNotContain(c.FindAll("button"), b => b.TextContent == "Registrar pago");
+    }
+
+    [Fact]
+    public void Resumen_registrar_pago_envia_mes_pagador_receptor_e_importe_de_la_transferencia()
+    {
+        var api = ApiResumen(new ResumenMensualResponse("2026-10", 600m, [], []), Liquidacion(300m))
+            .Responde("POST /api/pagos-liquidacion", HttpStatusCode.Created,
+                new PagoLiquidacionDto(Guid.NewGuid(), new DateOnly(2026, 10, 1), LuisId, AnaId, 300m, new DateOnly(2026, 10, 20), null));
+        Registrar(api);
+        var c = RenderComponent<VistaResumen>();
+
+        c.FindAll("button").First(b => b.TextContent == "Registrar pago").Click();
+
+        var cuerpo = api.Cuerpos["POST /api/pagos-liquidacion"];
+        Assert.Contains($"\"deMiembroId\":\"{LuisId}\"", cuerpo);
+        Assert.Contains($"\"aMiembroId\":\"{AnaId}\"", cuerpo);
+        Assert.Contains("\"importe\":300", cuerpo);
+        Assert.Contains($"\"mes\":\"{DateTime.Today:yyyy-MM}-01\"", cuerpo);
+    }
+
+    [Fact]
+    public void Resumen_muestra_el_error_de_la_api_si_el_pago_supera_la_deuda()
+    {
+        var api = ApiResumen(new ResumenMensualResponse("2026-10", 600m, [], []), Liquidacion(300m))
+            .Error("POST /api/pagos-liquidacion", HttpStatusCode.Conflict, "El importe supera la deuda pendiente entre ambos miembros (150.00).");
+        Registrar(api);
+        var c = RenderComponent<VistaResumen>();
+
+        c.FindAll("button").First(b => b.TextContent == "Registrar pago").Click();
+
+        Assert.Contains("supera la deuda pendiente", c.Find("[role=alert]").TextContent);
+    }
+
+    [Fact]
+    public void Resumen_eliminar_un_pago_pide_confirmacion_y_llama_a_la_api()
+    {
+        var pago = new PagoLiquidacionDto(Guid.NewGuid(), new DateOnly(2026, 10, 1), LuisId, AnaId, 150m, new DateOnly(2026, 10, 20), "Bizum");
+        var api = ApiResumen(new ResumenMensualResponse("2026-10", 600m, [], []), Liquidacion(150m, pago))
+            .Responde($"DELETE /api/pagos-liquidacion/{pago.Id}", HttpStatusCode.NoContent);
+        Registrar(api);
+        var c = RenderComponent<VistaResumen>();
+
+        Assert.Contains("Bizum", c.Markup);
+        c.FindAll("button").First(b => b.TextContent == "Eliminar").Click();
+        Assert.DoesNotContain($"DELETE /api/pagos-liquidacion/{pago.Id}", api.Recibidas);
+        c.FindAll("button").First(b => b.TextContent == "Sí").Click();
+
+        Assert.Contains($"DELETE /api/pagos-liquidacion/{pago.Id}", api.Recibidas);
+    }
+
+    [Fact]
+    public void Gasto_sin_cuenta_configurada_no_ofrece_a_la_cuenta_como_pagador()
+    {
+        var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
+        var perfil = new PerfilRepartoDto(Guid.NewGuid(), "Cuenta común", "cuenta_comun", []);
+        var cat = new CategoriaDto(Guid.NewGuid(), "Casa", null, null);
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
+            .Responde("GET /api/categorias", HttpStatusCode.OK, new[] { cat })
+            .Responde("GET /api/perfiles", HttpStatusCode.OK, new[] { perfil })
+            .Responde("GET /api/gastos", HttpStatusCode.OK, Array.Empty<GastoResponse>())
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK,
+                new CuentaComunResponse("2026-10", 0m, 0m, 0m, 0m, [], 0m, [], []));
+        Registrar(api);
+
+        var c = RenderComponent<VistaGastos>();
+
+        Assert.DoesNotContain("la paga directamente", c.Markup);
+    }
 }

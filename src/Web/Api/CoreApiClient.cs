@@ -5,7 +5,7 @@ using MiParte.Contracts;
 
 namespace MiParte.Web.Api;
 
-/// <summary>Cliente tipado de Core.Api. Cubre usuario, hogares, miembros, invitaciones, categorías, perfiles y gastos; el resto se añadirá con cada pantalla.</summary>
+/// <summary>Cliente tipado de Core.Api. Cubre usuario, hogares, miembros, invitaciones, categorías, perfiles, gastos, cuenta común, resumen y liquidación; el resto se añadirá con cada pantalla.</summary>
 public sealed class CoreApiClient
 {
     private readonly HttpClient _http;
@@ -126,6 +126,54 @@ public sealed class CoreApiClient
     /// <param name="ct">Token de cancelación.</param>
     public Task EliminarGastoAsync(Guid id, CancellationToken ct = default) =>
         EnviarSinRespuestaAsync(HttpMethod.Delete, $"api/gastos/{id}", ct);
+
+    /// <summary>Estado de la cuenta común al final de un mes (<c>GET /api/cuenta-comun</c>).</summary>
+    /// <param name="mes">Mes en formato YYYY-MM.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<CuentaComunResponse> ObtenerCuentaComunAsync(string mes, CancellationToken ct = default) =>
+        ObtenerAsync<CuentaComunResponse>($"api/cuenta-comun?mes={Uri.EscapeDataString(mes)}", ct);
+
+    /// <summary>Fija lo que aporta un adulto a la cuenta común desde un mes (<c>PUT /api/cuenta-comun/aportaciones</c>).</summary>
+    /// <param name="peticion">Adulto, mes de inicio (día 1) e importe.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<AportacionCuentaDto> FijarAportacionAsync(FijarAportacionRequest peticion, CancellationToken ct = default) =>
+        EnviarAsync<AportacionCuentaDto>(HttpMethod.Put, "api/cuenta-comun/aportaciones", peticion, ct);
+
+    /// <summary>Registra un reembolso de la cuenta común a quien adelantó gastos (<c>POST /api/cuenta-comun/reembolsos</c>).</summary>
+    /// <param name="peticion">Miembro, importe, fecha y concepto.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<ReembolsoCuentaDto> CrearReembolsoAsync(CrearReembolsoRequest peticion, CancellationToken ct = default) =>
+        EnviarAsync<ReembolsoCuentaDto>(HttpMethod.Post, "api/cuenta-comun/reembolsos", peticion, ct);
+
+    /// <summary>Elimina un reembolso (<c>DELETE /api/cuenta-comun/reembolsos/{id}</c>).</summary>
+    /// <param name="id">Reembolso a eliminar.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task EliminarReembolsoAsync(Guid id, CancellationToken ct = default) =>
+        EnviarSinRespuestaAsync(HttpMethod.Delete, $"api/cuenta-comun/reembolsos/{id}", ct);
+
+    /// <summary>Resumen del mes: pagado y asumido por miembro y total por categoría (<c>GET /api/resumen</c>).</summary>
+    /// <param name="mes">Mes en formato YYYY-MM.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<ResumenMensualResponse> ObtenerResumenAsync(string mes, CancellationToken ct = default) =>
+        ObtenerAsync<ResumenMensualResponse>($"api/resumen?mes={Uri.EscapeDataString(mes)}", ct);
+
+    /// <summary>Saldos, transferencias sugeridas y pagos del mes (<c>GET /api/liquidacion</c>).</summary>
+    /// <param name="mes">Mes en formato YYYY-MM.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<LiquidacionResponse> ObtenerLiquidacionAsync(string mes, CancellationToken ct = default) =>
+        ObtenerAsync<LiquidacionResponse>($"api/liquidacion?mes={Uri.EscapeDataString(mes)}", ct);
+
+    /// <summary>Registra un pago entre dos miembros para saldar un mes (<c>POST /api/pagos-liquidacion</c>).</summary>
+    /// <param name="peticion">Mes (día 1), pagador, receptor, importe, fecha y concepto.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<PagoLiquidacionDto> CrearPagoLiquidacionAsync(CrearPagoLiquidacionRequest peticion, CancellationToken ct = default) =>
+        EnviarAsync<PagoLiquidacionDto>(HttpMethod.Post, "api/pagos-liquidacion", peticion, ct);
+
+    /// <summary>Elimina un pago de liquidación (<c>DELETE /api/pagos-liquidacion/{id}</c>).</summary>
+    /// <param name="id">Pago a eliminar.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task EliminarPagoLiquidacionAsync(Guid id, CancellationToken ct = default) =>
+        EnviarSinRespuestaAsync(HttpMethod.Delete, $"api/pagos-liquidacion/{id}", ct);
 
     private Task<T> ObtenerAsync<T>(string ruta, CancellationToken ct) => EnviarAsync<T>(HttpMethod.Get, ruta, null, ct);
 

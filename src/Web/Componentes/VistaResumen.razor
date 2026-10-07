@@ -1,0 +1,249 @@
+@* Pestaña Resumen: gastos del mes por miembro y categoría, y liquidación (saldos, transferencias sugeridas y pagos registrados). *@
+@using System.Globalization
+@inject CoreApiClient Api
+@inject EstadoHogar Hogar
+@inject ServicioAvisos Avisos
+
+<h1 class="sr">Resumen de @Hogar.HogarActual?.Nombre</h1>
+
+@if (_cargando)
+{
+    <div class="spinbox" role="status"><div class="spin"></div><span>Cargando el resumen…</span></div>
+}
+else if (_errorCarga is not null)
+{
+    <div class="aviso err" role="alert">
+        @_errorCarga
+        <button class="linkbtn" type="button" @onclick="CargarAsync">Reintentar</button>
+    </div>
+}
+else if (_resumen is not null && _liquidacion is not null)
+{
+    <section class="card" aria-labelledby="t-resumen">
+        <div class="card-head">
+            <h2 id="t-resumen">Resumen del mes</h2>
+            <div class="mesnav">
+                <button class="linkbtn" type="button" aria-label="Mes anterior" @onclick="() => CambiarMesAsync(-1)">‹</button>
+                <span class="tag cur" aria-live="polite">@NombreMes</span>
+                <button class="linkbtn" type="button" aria-label="Mes siguiente" @onclick="() => CambiarMesAsync(1)">›</button>
+            </div>
+        </div>
+
+        @if (_error is not null)
+        {
+            <div class="aviso err" role="alert" style="margin-top: 12px">@_error</div>
+        }
+
+        @if (_resumen.GastosTotales == 0)
+        {
+            <div class="empty">
+                <span>No hay gastos en @NombreMes.</span>
+                <a class="btn" href="gastos">Añadir un gasto</a>
+            </div>
+        }
+        else
+        {
+            <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px">
+                <span class="chip">Gastos del mes&nbsp;<b id="total">@Euros(_resumen.GastosTotales)</b></span>
+            </div>
+
+            <h3 style="margin: 16px 0 0">Por persona</h3>
+            @foreach (var m in _resumen.Miembros)
+            {
+                <div class="catrow">
+                    <div class="c-name"><Avatar Nombre="@m.Nombre" Color="@ColorMiembro.De(m.MiembroId, _miembros)" Tamano="sm" /> @m.Nombre</div>
+                    <div class="c-sel">Ha pagado @Euros(m.Pagado) · le corresponden @Euros(m.Asumido)</div>
+                </div>
+            }
+
+            <h3 style="margin: 16px 0 0">Por categoría</h3>
+            @foreach (var c in _resumen.Categorias)
+            {
+                <div class="catrow">
+                    <div class="c-name">@c.Nombre</div>
+                    <div class="c-sel">
+                        <b class="g-importe">@Euros(c.Total)</b>
+                        @if (c.PorMiembro.Count > 0)
+                        {
+                            <span class="g-reparto">
+                                @foreach (var p in c.PorMiembro)
+                                {
+                                    <span class="chip">
+                                        <Avatar Nombre="@NombreMiembro(p.MiembroId)" Color="@ColorMiembro.De(p.MiembroId, _miembros)" Tamano="sm" />
+                                        @Euros(p.Importe)
+                                    </span>
+                                }
+                            </span>
+                        }
+                    </div>
+                </div>
+            }
+        }
+    </section>
+
+    <section class="card" aria-labelledby="t-liquidacion">
+        <div class="card-head"><h2 id="t-liquidacion">Liquidación</h2></div>
+        <p class="muted">Quién debe a quién para quedar en paz este mes. Los pagos que registres se descuentan de los saldos.</p>
+
+        @foreach (var s in _liquidacion.Saldos)
+        {
+            <div class="catrow">
+                <div class="c-name"><Avatar Nombre="@s.Nombre" Color="@ColorMiembro.De(s.MiembroId, _miembros)" Tamano="sm" /> @s.Nombre</div>
+                <div class="c-sel">
+                    <b class="g-importe saldo @(s.Saldo > 0 ? "pos" : s.Saldo < 0 ? "neg" : "")">@Saldo(s.Saldo)</b>
+                    <span>@(s.Saldo > 0 ? "le deben" : s.Saldo < 0 ? "debe" : "en paz")</span>
+                </div>
+            </div>
+        }
+
+        @if (_liquidacion.Transferencias.Count == 0)
+        {
+            <div class="aviso ok" role="status" style="margin-top: 12px">
+                @(_liquidacion.Saldos.Count == 0 ? "Todavía no hay nada que liquidar este mes." : "Este mes está saldado: nadie debe nada.")
+            </div>
+        }
+        else
+        {
+            <h3 style="margin: 16px 0 0">Transferencias sugeridas</h3>
+            @foreach (var t in _liquidacion.Transferencias)
+            {
+                <div class="gastorow">
+                    <div class="g-main">
+                        <div class="g-concepto">@NombreMiembro(t.De) paga a @NombreMiembro(t.A)</div>
+                    </div>
+                    <div class="g-importe">@Euros(t.Importe)</div>
+                    <div class="c-acc">
+                        <button class="btn" type="button" aria-label="Registrar el pago de @Euros(t.Importe) de @NombreMiembro(t.De) a @NombreMiembro(t.A)"
+                                disabled="@_guardando" @onclick="() => RegistrarPagoAsync(t)">Registrar pago</button>
+                    </div>
+                </div>
+            }
+        }
+
+        @if (_liquidacion.Pagos.Count > 0)
+        {
+            <h3 style="margin: 16px 0 0">Pagos registrados</h3>
+            @foreach (var p in _liquidacion.Pagos.OrderByDescending(p => p.Fecha))
+            {
+                <div class="gastorow">
+                    <div class="g-main">
+                        <div class="g-concepto">@NombreMiembro(p.DeMiembroId) pagó a @NombreMiembro(p.AMiembroId)</div>
+                        <div class="muted g-meta">@p.Fecha.ToString("dd/MM/yyyy", Es)@(string.IsNullOrWhiteSpace(p.Concepto) ? "" : " · " + p.Concepto)</div>
+                    </div>
+                    <div class="g-importe">@Euros(p.Importe)</div>
+                    <div class="c-acc">
+                        @if (_confirmandoEliminar == p.Id)
+                        {
+                            <span class="muted">¿Eliminar?</span>
+                            <button class="linkbtn danger" type="button" @onclick="() => EliminarPagoAsync(p)">Sí</button>
+                            <button class="linkbtn" type="button" @onclick="() => _confirmandoEliminar = null">No</button>
+                        }
+                        else
+                        {
+                            <button class="linkbtn danger" type="button" aria-label="Eliminar el pago de @NombreMiembro(p.DeMiembroId) a @NombreMiembro(p.AMiembroId)" @onclick="() => _confirmandoEliminar = p.Id">Eliminar</button>
+                        }
+                    </div>
+                </div>
+            }
+        }
+    </section>
+}
+
+@code {
+    private static readonly CultureInfo Es = new("es-ES");
+
+    private ResumenMensualResponse? _resumen;
+    private LiquidacionResponse? _liquidacion;
+    private List<MiembroDto> _miembros = [];
+    private bool _cargando = true, _guardando;
+    private string? _errorCarga, _error;
+    private DateOnly _mes = new(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private Guid? _confirmandoEliminar;
+
+    private string NombreMes => _mes.ToString("MMMM yyyy", Es);
+
+    protected override Task OnInitializedAsync() => CargarAsync();
+
+    private async Task CargarAsync()
+    {
+        _cargando = true;
+        _errorCarga = null;
+        try
+        {
+            _miembros = await Api.ListarMiembrosAsync();
+            await RecargarAsync();
+        }
+        catch (ApiException e)
+        {
+            _errorCarga = e.Message;
+        }
+
+        _cargando = false;
+    }
+
+    private async Task RecargarAsync()
+    {
+        var mes = _mes.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+        _resumen = await Api.ObtenerResumenAsync(mes);
+        _liquidacion = await Api.ObtenerLiquidacionAsync(mes);
+    }
+
+    private async Task CambiarMesAsync(int delta)
+    {
+        _mes = _mes.AddMonths(delta);
+        _error = null;
+        _confirmandoEliminar = null;
+        try
+        {
+            await RecargarAsync();
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+    }
+
+    private string NombreMiembro(Guid id) => _miembros.FirstOrDefault(m => m.Id == id)?.Nombre ?? "—";
+
+    private static string Euros(decimal importe) => importe.ToString("C2", Es);
+
+    /// <summary>Saldo con signo explícito, para que no dependa solo del color.</summary>
+    private static string Saldo(decimal saldo) => (saldo > 0 ? "+" : "") + Euros(saldo);
+
+    private Task RegistrarPagoAsync(TransferenciaDto t) =>
+        EjecutarAsync(async () =>
+        {
+            await Api.CrearPagoLiquidacionAsync(new CrearPagoLiquidacionRequest(_mes, t.De, t.A, t.Importe, null, null));
+            return "Pago registrado";
+        });
+
+    private Task EliminarPagoAsync(PagoLiquidacionDto p) =>
+        EjecutarAsync(async () =>
+        {
+            await Api.EliminarPagoLiquidacionAsync(p.Id);
+            _confirmandoEliminar = null;
+            return "Pago eliminado";
+        });
+
+    /// <summary>Ejecuta una operación, recarga el mes y muestra el aviso; los errores de la API salen en pantalla.</summary>
+    private async Task EjecutarAsync(Func<Task<string>> accion)
+    {
+        _error = null;
+        _guardando = true;
+        try
+        {
+            var aviso = await accion();
+            await RecargarAsync();
+            Avisos.Mostrar(aviso);
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+            _confirmandoEliminar = null;
+        }
+        finally
+        {
+            _guardando = false;
+        }
+    }
+}

@@ -36,6 +36,11 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
     /// <summary>Conjunto de <see cref="PagoLiquidacionRegistro"/> del hogar actual.</summary>
     public DbSet<PagoLiquidacionRegistro> PagosLiquidacion => Set<PagoLiquidacionRegistro>();
 
+    /// <summary>Conjunto de <see cref="AportacionCuenta"/> del hogar actual.</summary>
+    public DbSet<AportacionCuenta> AportacionesCuenta => Set<AportacionCuenta>();
+    /// <summary>Conjunto de <see cref="ReembolsoCuenta"/> del hogar actual.</summary>
+    public DbSet<ReembolsoCuenta> ReembolsosCuenta => Set<ReembolsoCuenta>();
+
     /// <summary>
     /// Fija tablas, precisiones y conversiones de enums a texto, y aplica a cada entidad el
     /// filtro global por hogar (toda entidad nueva con HogarId necesita su HasQueryFilter).
@@ -74,6 +79,20 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
         {
             e.ToTable("pago_liquidacion");
             e.HasKey(x => x.Id);
+            e.Property(x => x.Importe).HasPrecision(12, 2);
+            e.HasQueryFilter(x => x.HogarId == HogarId);
+        });
+
+        b.Entity<AportacionCuenta>(e =>
+        {
+            e.ToTable("aportacion_cuenta");
+            e.Property(x => x.Importe).HasPrecision(12, 2);
+            e.HasQueryFilter(x => x.HogarId == HogarId);
+        });
+
+        b.Entity<ReembolsoCuenta>(e =>
+        {
+            e.ToTable("reembolso_cuenta");
             e.Property(x => x.Importe).HasPrecision(12, 2);
             e.HasQueryFilter(x => x.HogarId == HogarId);
         });

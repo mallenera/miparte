@@ -315,6 +315,8 @@ input.invalid, input[aria-invalid="true"] { border-color: var(--err); outline: 0
 .g-reparto { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .chip { display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; padding: 2px 8px 2px 2px; border: 1px solid var(--line); border-radius: 999px; }
 .g-importe { font-weight: 700; font-variant-numeric: tabular-nums; }
+.saldo.pos { color: var(--ok); }
+.saldo.neg { color: var(--err); }
 .gastorow .c-acc { display: flex; gap: 12px; justify-content: flex-end; }
 @media (max-width: 640px) {
     .gastorow { grid-template-columns: minmax(0, 1fr) auto; }

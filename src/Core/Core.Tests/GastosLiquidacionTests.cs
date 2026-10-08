@@ -19,7 +19,7 @@ public class GastosLiquidacionTests
         HttpClient Cliente, WebApplicationFactory<Program> F, Guid Hogar, Guid Ana, Guid? Beto, Guid Categoria,
         Guid Perfil5050, Guid Perfil6040, Guid PerfilCuentaComun, Guid PerfilIndividual);
 
-    private static async Task<Escenario> Montar(bool conBeto = true)
+    private static async Task<Escenario> Montar(bool conBeto = true, bool cuentaActiva = true, bool admin = true)
     {
         var f = Crear(Secreto);
         var user = Guid.NewGuid();
@@ -35,8 +35,8 @@ public class GastosLiquidacionTests
         using (var scope = f.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<MiParteDbContext>();
-            db.Hogares.Add(new Hogar { Id = hogar, Nombre = "Casa" });
-            db.Miembros.Add(new Miembro { Id = ana, HogarId = hogar, Nombre = "Ana", Tipo = TipoMiembro.Adulto, UserId = user });
+            db.Hogares.Add(new Hogar { Id = hogar, Nombre = "Casa", CuentaComunActiva = cuentaActiva });
+            db.Miembros.Add(new Miembro { Id = ana, HogarId = hogar, Nombre = "Ana", Tipo = TipoMiembro.Adulto, UserId = user, Rol = admin ? RolMiembro.Admin : RolMiembro.Miembro });
             if (beto is not null)
                 db.Miembros.Add(new Miembro { Id = beto.Value, HogarId = hogar, Nombre = "Beto", Tipo = TipoMiembro.Adulto });
             db.Categorias.Add(new Categoria { Id = cat, HogarId = hogar, Nombre = "Comida" });
@@ -207,6 +207,63 @@ public class GastosLiquidacionTests
     }
 
     [Fact]
+    public async Task Gastos_FiltroPorMiembro_ConsideraPagadorYReparto()
+    {
+        var e = await Montar();
+        var beto = e.Beto!.Value;
+        var compartido = await CrearGasto(e, Gasto(e, 10m, e.Perfil5050)); // Ana paga, ambos asumen
+        var soloAna = await CrearGasto(e, Gasto(e, 20m, e.PerfilIndividual)); // Ana paga y asume todo
+        var pagaBeto = await CrearGasto(e, Gasto(e, 30m, e.Perfil5050, pagador: beto));
+
+        var deBeto = await Leer<List<GastoResponse>>(await e.Cliente.GetAsync($"/api/gastos?miembroId={beto}"));
+        Assert.Equal(new[] { compartido.Id, pagaBeto.Id }.Order(), deBeto.Select(g => g.Id).Order());
+        var deAna = await Leer<List<GastoResponse>>(await e.Cliente.GetAsync($"/api/gastos?miembroId={e.Ana}"));
+        Assert.Equal(3, deAna.Count);
+        Assert.Contains(deAna, g => g.Id == soloAna.Id);
+        Assert.Empty(await Leer<List<GastoResponse>>(await e.Cliente.GetAsync($"/api/gastos?miembroId={Guid.NewGuid()}")));
+    }
+
+    [Fact]
+    public async Task Gastos_FiltroPorTextoDelConcepto_IgnoraMayusculas_Y_SeCombinaConOtrosFiltros()
+    {
+        var e = await Montar();
+        await CrearGasto(e, Gasto(e, 10m, e.Perfil5050) with { Concepto = "Factura de la LUZ" });
+        await CrearGasto(e, Gasto(e, 20m, e.Perfil5050, "2026-10-02") with { Concepto = "Luz octubre" });
+        await CrearGasto(e, Gasto(e, 30m, e.Perfil5050) with { Concepto = "Supermercado" });
+
+        Assert.Equal(2, (await Leer<List<GastoResponse>>(await e.Cliente.GetAsync("/api/gastos?buscar=luz"))).Count);
+        var soloSep = await Leer<List<GastoResponse>>(await e.Cliente.GetAsync("/api/gastos?buscar=luz&mes=2026-09"));
+        Assert.Equal(10m, Assert.Single(soloSep).Importe);
+        Assert.Equal(3, (await Leer<List<GastoResponse>>(await e.Cliente.GetAsync("/api/gastos?buscar=%20"))).Count);
+        Assert.Equal(HttpStatusCode.BadRequest, (await e.Cliente.GetAsync("/api/gastos?buscar=" + new string('a', 201))).StatusCode);
+    }
+
+    [Fact]
+    public async Task Liquidacion_PagosParciales_RecalculanLoPendienteHastaSaldar()
+    {
+        var e = await Montar();
+        var c = e.Cliente;
+        var beto = e.Beto!.Value;
+        var mes = new DateOnly(2026, 9, 1);
+        await CrearGasto(e, Gasto(e, 100m, e.Perfil5050)); // Beto debe 50 a Ana
+
+        async Task<decimal> Pendiente() =>
+            (await Leer<LiquidacionResponse>(await c.GetAsync("/api/liquidacion?mes=2026-09"))).Transferencias.SingleOrDefault()?.Importe ?? 0m;
+
+        // Importes distintos del sugerido (50): 12,34 y luego 20,01; cada uno recalcula lo pendiente.
+        Assert.Equal(HttpStatusCode.Created, (await c.PostAsJsonAsync("/api/pagos-liquidacion", new CrearPagoLiquidacionRequest(mes, beto, e.Ana, 12.34m, null, null))).StatusCode);
+        Assert.Equal(37.66m, await Pendiente());
+        Assert.Equal(HttpStatusCode.Created, (await c.PostAsJsonAsync("/api/pagos-liquidacion", new CrearPagoLiquidacionRequest(mes, beto, e.Ana, 20.01m, null, null))).StatusCode);
+        Assert.Equal(17.65m, await Pendiente());
+
+        // Más de 2 decimales se rechaza; el resto exacto salda el mes.
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync("/api/pagos-liquidacion", new CrearPagoLiquidacionRequest(mes, beto, e.Ana, 1.005m, null, null))).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await c.PostAsJsonAsync("/api/pagos-liquidacion", new CrearPagoLiquidacionRequest(mes, beto, e.Ana, 17.65m, null, null))).StatusCode);
+        Assert.Equal(0m, await Pendiente());
+        Assert.Equal(3, (await Leer<LiquidacionResponse>(await c.GetAsync("/api/liquidacion?mes=2026-09"))).Pagos.Count);
+    }
+
+    [Fact]
     public async Task Recurrentes_Generar_EsIdempotente_YNoDuplica()
     {
         var e = await Montar();
@@ -339,6 +396,104 @@ public class GastosLiquidacionTests
         var otro = await Montar();
 
         Assert.Equal(HttpStatusCode.NotFound, (await otro.Cliente.GetAsync($"/api/gastos/{g.Id}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task CuentaComun_SinActivar_BloqueaEscriturasYGastosAsuCargo_PeroLaConsultaFunciona()
+    {
+        var e = await Montar(cuentaActiva: false);
+        var mes = new DateOnly(2026, 9, 1);
+
+        var estado = await Leer<CuentaComunResponse>(await e.Cliente.GetAsync("/api/cuenta-comun?mes=2026-09"));
+        Assert.False(estado.Activa);
+
+        Assert.Equal(HttpStatusCode.Conflict, (await e.Cliente.PutAsJsonAsync(
+            "/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, mes, 100m))).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await e.Cliente.PostAsJsonAsync(
+            "/api/cuenta-comun/depositos-ahorro", new CrearDepositoAhorroRequest(e.Ana, 10m, mes, null))).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await e.Cliente.PostAsJsonAsync("/api/gastos", Gasto(e, 50m, e.PerfilCuentaComun))).StatusCode);
+
+        // Los gastos que no van a cargo de la cuenta siguen funcionando.
+        Assert.Equal(HttpStatusCode.Created, (await e.Cliente.PostAsJsonAsync("/api/gastos", Gasto(e, 50m, e.Perfil5050))).StatusCode);
+    }
+
+    [Fact]
+    public async Task CuentaComun_Activacion_SoloAdmin_YDesbloqueaLaCuenta()
+    {
+        var noAdmin = await Montar(cuentaActiva: false, admin: false);
+        var prohibido = await noAdmin.Cliente.PutAsJsonAsync("/api/cuenta-comun/activacion", new ActivarCuentaComunRequest(true));
+        Assert.Equal(HttpStatusCode.Forbidden, prohibido.StatusCode);
+        Assert.False((await Leer<CuentaComunResponse>(await noAdmin.Cliente.GetAsync("/api/cuenta-comun?mes=2026-09"))).Activa);
+
+        var e = await Montar(cuentaActiva: false);
+        Assert.Equal(HttpStatusCode.OK, (await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/activacion", new ActivarCuentaComunRequest(true))).StatusCode);
+        Assert.True((await Leer<CuentaComunResponse>(await e.Cliente.GetAsync("/api/cuenta-comun?mes=2026-09"))).Activa);
+        Assert.Equal(HttpStatusCode.OK, (await e.Cliente.PutAsJsonAsync(
+            "/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, new DateOnly(2026, 9, 1), 100m))).StatusCode);
+
+        // Desactivar no borra nada: la aportación sigue en el estado.
+        await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/activacion", new ActivarCuentaComunRequest(false));
+        var tras = await Leer<CuentaComunResponse>(await e.Cliente.GetAsync("/api/cuenta-comun?mes=2026-09"));
+        Assert.False(tras.Activa);
+        Assert.Equal(100m, tras.Aportado);
+    }
+
+    [Fact]
+    public async Task CuentaComun_RecurrenteAsuCargo_NoSeGeneraSinActivarLaCuenta()
+    {
+        var e = await Montar(cuentaActiva: false);
+        var plantilla = new GastoRecurrenteRequest(30m, e.Categoria, e.Ana, e.PerfilCuentaComun, 5, "Internet");
+        Assert.Equal(HttpStatusCode.Created, (await e.Cliente.PostAsJsonAsync("/api/gastos-recurrentes", plantilla)).StatusCode);
+
+        Assert.Equal(HttpStatusCode.Conflict, (await e.Cliente.PostAsync("/api/gastos-recurrentes/generar?mes=2026-09", null)).StatusCode);
+        Assert.Empty(await Leer<List<GastoResponse>>(await e.Cliente.GetAsync("/api/gastos?mes=2026-09")));
+
+        await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/activacion", new ActivarCuentaComunRequest(true));
+        var generado = await Leer<GenerarRecurrentesResponse>(await e.Cliente.PostAsync("/api/gastos-recurrentes/generar?mes=2026-09", null));
+        Assert.Equal(1, generado.Creados);
+    }
+
+    [Fact]
+    public async Task CuentaComun_SuParte_RepartePorLoAportadoYSumaElSaldoYElAhorro()
+    {
+        var e = await Montar();
+        var mes = new DateOnly(2026, 9, 1);
+        // Ana: 600 al mes con 200 de ahorro (400 para gastos); Beto: 400 con 0 de ahorro (400 para gastos). Más un ingreso de ahorro de Beto de 100.
+        await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, mes, 600m, 200m));
+        await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Beto!.Value, mes, 400m));
+        await e.Cliente.PostAsJsonAsync("/api/cuenta-comun/depositos-ahorro", new CrearDepositoAhorroRequest(e.Beto.Value, 100m, mes, null));
+        await CrearGasto(e, Gasto(e, 101m, e.PerfilCuentaComun)); // saldo: 800 - 101 = 699
+
+        var estado = await Leer<CuentaComunResponse>(await e.Cliente.GetAsync("/api/cuenta-comun?mes=2026-09"));
+        var partes = estado.Partes!;
+        Assert.Equal(2, partes.Count);
+        Assert.Equal(estado.Saldo, partes.Sum(p => p.ParteSaldo));
+        Assert.Equal(estado.AhorroDisponible, partes.Sum(p => p.ParteAhorro));
+
+        var ana = partes.Single(p => p.MiembroId == e.Ana);
+        var beto = partes.Single(p => p.MiembroId == e.Beto.Value);
+        Assert.Equal((400m, 200m, 50m), (ana.Aportado, ana.Ahorrado, ana.PorcentajeGastos));
+        Assert.Equal((400m, 100m), (beto.Aportado, beto.Ahorrado));
+        Assert.Equal("Ana", ana.Nombre);
+        Assert.Equal(101m, ana.Pendiente); // lo adelantó Ana
+        Assert.Equal((200m, 100m), (ana.ParteAhorro, beto.ParteAhorro)); // 300 de ahorro: 2/3 para Ana y 1/3 para Beto
+        Assert.Equal((349.50m, 349.50m), (ana.ParteSaldo, beto.ParteSaldo));
+    }
+
+    [Fact]
+    public async Task Resumen_IncluyeLosSaldosDeLaCuentaSoloSiEstaActivada()
+    {
+        var e = await Montar();
+        await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, new DateOnly(2026, 9, 1), 500m, 100m));
+        await CrearGasto(e, Gasto(e, 120m, e.PerfilCuentaComun));
+
+        var resumen = await Leer<ResumenMensualResponse>(await e.Cliente.GetAsync("/api/resumen?mes=2026-09"));
+        var cuenta = resumen.CuentaComun!;
+        Assert.Equal((500m, 120m, 280m, 400m, 120m), (cuenta.AportadoMes, cuenta.GastadoMes, cuenta.Saldo, cuenta.Efectivo, cuenta.Pendiente));
+        Assert.Equal((100m, 100m), (cuenta.AhorroMes, cuenta.AhorroDisponible));
+
+        await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/activacion", new ActivarCuentaComunRequest(false));
+        Assert.Null((await Leer<ResumenMensualResponse>(await e.Cliente.GetAsync("/api/resumen?mes=2026-09"))).CuentaComun);
     }
 
     [Fact]

@@ -51,6 +51,10 @@ declare
 begin
     -- ───── Usuario de Supabase Auth ─────
     -- Se borra y se recrea para que la contraseña y la identidad siempre queden como se espera.
+    -- Antes se desvincula la cuenta demo de los hogares ajenos a los que se haya unido, para que no se los lleve
+    -- por delante el borrado del usuario. No se borra ningún hogar ajeno: otros miembros pueden no tener
+    -- usuario vinculado y no hay forma fiable de saber que el hogar es solo de la demo.
+    update public.miembro set user_id = null where user_id = v_user and hogar_id <> v_hogar;
     delete from auth.users where id = v_user;
     insert into auth.users (
         instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -69,7 +73,8 @@ begin
 
     -- ───── Hogar demo (se recrea entero: el borrado en cascada limpia todo lo demás) ─────
     delete from public.hogar where id = v_hogar;
-    insert into public.hogar (id, nombre) values (v_hogar, 'Casa de Ana y Marcos');
+    -- La demo usa la cuenta común (aportaciones y gastos a su cargo), así que el hogar la tiene activada.
+    insert into public.hogar (id, nombre, cuenta_comun_activa) values (v_hogar, 'Casa de Ana y Marcos', true);
 
     insert into public.miembro (id, hogar_id, nombre, tipo, responsable_id, user_id, rol) values
         (v_ana,    v_hogar, 'Ana',    'adulto', null,  v_user, 'admin'),

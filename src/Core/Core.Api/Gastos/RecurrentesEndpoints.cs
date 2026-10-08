@@ -135,6 +135,11 @@ public static class RecurrentesEndpoints
                 var adultos = await ApiComun.AdultosActivos(db, ct);
                 var perfiles = await db.PerfilesReparto.Include(p => p.Detalles).ToDictionaryAsync(p => p.Id, ct);
 
+                // Una plantilla a cargo de la cuenta común no genera gastos mientras el hogar no la tenga activada.
+                if (pendientes.Any(p => perfiles[p.PerfilRepartoId].Modo == ModoReparto.CuentaComun)
+                    && await CuentaComunEndpoints.ExigirActivaAsync(db, ct) is { } inactiva)
+                    return inactiva;
+
                 foreach (var p in pendientes)
                 {
                     var partes = ApiComun.Repartir(perfiles[p.PerfilRepartoId], adultos, p.Importe, p.PagadoPor, out var error);

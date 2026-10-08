@@ -85,6 +85,9 @@ Antes de registrar gastos, el hogar se configura una vez; después, cada pantall
 - Importe fijo que aporta cada adulto a la cuenta cada mes, guardado por mes y persona.
 - Al registrar un gasto se elige la cuenta común como pagador; ese gasto no genera deuda entre personas.
 - Tarjeta en el resumen con lo que aporta cada persona, su parte de los gastos de la cuenta, la diferencia y el saldo acumulado.
+- Cada hogar decide si la usa: un admin la activa (`hogar.cuenta_comun_activa`); sin activar no se pueden registrar aportaciones ni gastos a su cargo.
+- Una categoría puede marcarse «a cargo de la cuenta común»: sus gastos usan por defecto el perfil de cuenta común, sin reparto entre personas.
+- «Su parte» de cada persona es la porción del saldo (y del ahorro disponible) proporcional a lo que ha aportado (y ahorrado).
 
 **Mantenimiento de categorías:**
 

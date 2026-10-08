@@ -72,8 +72,25 @@ public static class LiquidacionEndpoints
                     .OrderBy(x => x.MiembroId).ToList()))
             .OrderBy(c => c.Nombre).ThenBy(c => c.CategoriaId).ToList();
 
+        // Saldos de la cuenta al final del mes, solo si el hogar la ha activado.
+        ResumenCuentaComunDto? resumenCuenta = null;
+        if (await db.Hogares.AnyAsync(h => h.CuentaComunActiva, ct))
+        {
+            var aportaciones = await db.AportacionesCuenta.ToListAsync(ct);
+            var retiradas = await db.RetiradasAhorro.Select(r => new RetiradaDeAhorro(r.Fecha, r.Importe)).ToListAsync(ct);
+            var depositos = await db.DepositosAhorro.Select(d => new DepositoDeAhorro(d.Fecha, d.Importe, d.MiembroId)).ToListAsync(ct);
+            var gastosCuenta = await GastosDeCuenta(db, ct);
+            var estado = CuentaComun.Calcular(
+                inicio, aportaciones.Select(a => new AportacionVigente(a.MiembroId, a.Desde, a.Importe, a.Ahorro)).ToList(),
+                gastosCuenta, reembolsos.Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe)), retiradas, depositos);
+            resumenCuenta = new ResumenCuentaComunDto(
+                estado.AportadoMes, gastosCuenta.Where(g => g.Fecha >= inicio && g.Fecha < fin).Sum(g => g.Importe), estado.Saldo,
+                estado.Efectivo, estado.Pendientes.Where(p => p.Importe > 0m).Sum(p => p.Importe),
+                estado.AhorroMes, estado.AhorroDisponible);
+        }
+
         return Results.Ok(new ResumenMensualResponse(
-            ApiComun.FormatoMes(inicio), gastosTotales, porMiembro, porCategoria));
+            ApiComun.FormatoMes(inicio), gastosTotales, porMiembro, porCategoria, resumenCuenta));
     }
 
     /// <summary>Resultado del cálculo de liquidación de un mes: saldos, transferencias propuestas, pagos registrados, nombres de miembros y si el mes tiene gastos.</summary>

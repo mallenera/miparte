@@ -340,6 +340,24 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 }
 .av.sm { width: 18px; height: 18px; font-size: .62rem; }
 .av.lg { width: 34px; height: 34px; font-size: .95rem; }
+/* Un color por clase (no style="" en línea): permite una CSP sin 'unsafe-inline' en style-src-attr */
+.av.c0 { background: var(--m0); color: var(--m0-on); }
+.av.c1 { background: var(--m1); color: var(--m1-on); }
+.av.c2 { background: var(--m2); color: var(--m2-on); }
+.av.c3 { background: var(--m3); color: var(--m3-on); }
+.av.c4 { background: var(--m4); color: var(--m4-on); }
+.av.c5 { background: var(--m5); color: var(--m5-on); }
+.av.c6 { background: var(--m6); color: var(--m6-on); }
+.av.c7 { background: var(--m7); color: var(--m7-on); }
+
+/* Utilidades de espaciado que antes eran style="" en línea; !important porque deben ganar a reglas como .card h3 */
+.u-mt0 { margin-top: 0 !important; }
+.u-mt10 { margin-top: 10px !important; }
+.u-mt12 { margin-top: 12px !important; }
+.u-mt14 { margin-top: 14px !important; }
+.u-sec { margin: 16px 0 0 !important; }
+.u-titulo-form { flex: 1 1 100%; margin: 0 !important; }
+.u-fila-mt10 { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
 .who { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; min-width: 0; }
 
 /* Pestañas: píldoras sueltas en lugar de una barra con subrayado */

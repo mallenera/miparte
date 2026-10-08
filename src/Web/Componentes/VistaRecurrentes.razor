@@ -30,12 +30,12 @@ else
             </div>
         </div>
         <p class="muted">Crea el gasto de cada plantilla activa que aún no lo tenga en el mes. Se puede repetir sin duplicar gastos.</p>
-        <div class="actions" style="margin-top: 10px">
+        <div class="actions u-mt10">
             <button class="btn" id="generar" type="button" disabled="@(_generando || _plantillas.All(p => !p.Activo))" @onclick="GenerarAsync">Generar gastos de @NombreMes</button>
         </div>
         @if (_resultado is not null)
         {
-            <div class="aviso ok" role="status" style="margin-top: 12px">@_resultado</div>
+            <div class="aviso ok u-mt12" role="status">@_resultado</div>
         }
     </section>
 
@@ -45,12 +45,12 @@ else
 
         @if (_error is not null)
         {
-            <div class="aviso err" role="alert" style="margin-top: 12px">@_error</div>
+            <div class="aviso err u-mt12" role="alert">@_error</div>
         }
 
         @if (_diaPasado is { } dp)
         {
-            <div class="aviso warn" role="status" id="aviso-dia-pasado" style="margin-top: 12px">
+            <div class="aviso warn u-mt12" role="status" id="aviso-dia-pasado">
                 El día @dp.Dia de este mes ya ha pasado, así que «@dp.Nombre» no se ha creado como gasto de @NombreMesActual.
                 ¿Quieres crearlo ahora?
                 <button class="linkbtn" type="button" id="crear-gasto-pasado" disabled="@_generando" @onclick="GenerarMesActualAsync">Crear gasto de @NombreMesActual</button>
@@ -58,7 +58,7 @@ else
             </div>
         }
 
-        <div style="margin-top: 10px">
+        <div class="u-mt10">
             @foreach (var p in _plantillas)
             {
                 <div class="gastorow">
@@ -95,12 +95,12 @@ else
 
         @if (_adultos.Count == 0 || _categorias.Count == 0 || _perfiles.Count == 0)
         {
-            <div class="aviso warn" style="margin-top: 14px">Para crear plantillas hace falta al menos un adulto, una categoría y un perfil de reparto.</div>
+            <div class="aviso warn u-mt14">Para crear plantillas hace falta al menos un adulto, una categoría y un perfil de reparto.</div>
         }
         else
         {
             <form class="addcat" id="form-recurrente" @onsubmit="GuardarAsync">
-                <h3 style="flex: 1 1 100%; margin: 0">@(_editando is null ? "Nueva plantilla" : "Editar plantilla")</h3>
+                <h3 class="u-titulo-form">@(_editando is null ? "Nueva plantilla" : "Editar plantilla")</h3>
                 <label>Concepto
                     <input maxlength="200" placeholder="Opcional" @bind="_concepto" @bind:event="oninput" />
                 </label>

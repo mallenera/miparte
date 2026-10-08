@@ -73,7 +73,7 @@ MIPARTE_TEST_DB="Host=localhost;Database=miparte;Username=postgres" dotnet test
 
 ## Seguridad del front (CSP)
 
-`src/Web/default.conf.template` (nginx) fija la CSP y demás cabeceras; la imagen las aplica con envsubst a partir de `SUPABASE_URL` y `CORE_URL` (en `docker compose` salen de `Supabase__Url` y `CoreUrl`), que deben coincidir con `Supabase:Url` y `Api:CoreUrl` del `appsettings.json` del front. Consecuencias al desarrollar: **no añadas scripts en línea** a `index.html` (ponlos en `wwwroot/js/`), ni cargues JavaScript de otro origen, ni hables con otros hosts desde el front sin añadirlos a `connect-src`. Para comprobar un cambio con CSP real no hace falta Docker: publica el front (`dotnet publish src/Web`) y sírvelo con las cabeceras de la plantilla; la consola del navegador mostrará las violaciones.
+`src/Web/default.conf.template` (nginx) fija la CSP y demás cabeceras; la imagen las aplica con envsubst a partir de `SUPABASE_URL` y `CORE_URL` (en `docker compose` salen de `Supabase__Url` y `CoreUrl`), que deben coincidir con `Supabase:Url` y `Api:CoreUrl` del `appsettings.json` del front. Consecuencias al desarrollar: **no añadas scripts en línea** a `index.html` (ponlos en `wwwroot/js/`), **ni atributos `style=""`** (la CSP usa `style-src-attr 'none'`; usa clases de `app.css`, p. ej. `u-mt12` o `av c0..c7`), ni cargues JavaScript de otro origen, ni hables con otros hosts desde el front sin añadirlos a `connect-src`. Para comprobar un cambio con CSP real no hace falta Docker: publica el front (`dotnet publish src/Web`) y sírvelo con las cabeceras de la plantilla; la consola del navegador mostrará las violaciones.
 
 ## Arquitectura
 

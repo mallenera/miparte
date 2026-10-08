@@ -27,10 +27,10 @@ else
 
         @if (_error is not null)
         {
-            <div class="aviso err" role="alert" style="margin-top: 12px">@_error</div>
+            <div class="aviso err u-mt12" role="alert">@_error</div>
         }
 
-        <div style="margin-top: 10px">
+        <div class="u-mt10">
             @foreach (var nodo in _arbol)
             {
                 var c = nodo.Categoria;

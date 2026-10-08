@@ -161,16 +161,27 @@ else if (_resumen is not null && _liquidacion is not null)
             }
 
             <h3 style="margin: 16px 0 0">Por categoría</h3>
-            @foreach (var c in _resumen.Categorias)
+            @foreach (var f in FilasCategorias())
             {
-                <div class="catrow">
-                    <div class="c-name">@c.Nombre</div>
+                var n = f.Nodo;
+                var importe = f.Directo ? n.Propio : n.Total;
+                <div class="catrow resrow" style="padding-left: @(f.Nivel * 22)px">
+                    <div class="c-name @(f.Nivel > 0 ? "sub" : "")">
+                        @if (!f.Directo && n.Hijos.Count > 0)
+                        {
+                            var abierto = _abiertas.Contains(n.CategoriaId);
+                            <button class="linkbtn" type="button" aria-expanded="@(abierto ? "true" : "false")"
+                                    aria-label="@(abierto ? "Contraer" : "Desplegar") @n.Nombre" @onclick="() => Alternar(n.CategoriaId)">@(abierto ? "▾" : "▸")</button>
+                        }
+                        @(f.Directo ? "Sin subcategoría" : n.Nombre)
+                    </div>
                     <div class="c-sel">
-                        <b class="g-importe">@Euros(c.Total)</b>
-                        @if (c.PorMiembro.Count > 0)
+                        <b class="g-importe">@Euros(importe)</b> <span class="muted">@Porcentaje(importe) %</span>
+                        <div class="barra" role="img" aria-label="@Porcentaje(importe) % del total del mes"><span style="width: @(Porcentaje(importe))%"></span></div>
+                        @if (!f.Directo && n.PorMiembro.Count > 0)
                         {
                             <span class="g-reparto">
-                                @foreach (var p in c.PorMiembro)
+                                @foreach (var p in n.PorMiembro)
                                 {
                                     <span class="chip">
                                         <Avatar Nombre="@NombreMiembro(p.MiembroId)" Color="@ColorMiembro.De(p.MiembroId, _miembros)" Tamano="sm" />
@@ -187,11 +198,40 @@ else if (_resumen is not null && _liquidacion is not null)
 }
 
 @code {
+    /// <summary>Fila visible del árbol «Por categoría»; <c>Directo</c> es el gasto propio de una madre desplegada.</summary>
+    private sealed record FilaCat(NodoResumen Nodo, int Nivel, bool Directo);
+
+    /// <summary>Aplana el árbol según las madres desplegadas.</summary>
+    private IEnumerable<FilaCat> FilasCategorias()
+    {
+        IEnumerable<FilaCat> Recorrer(NodoResumen n, int nivel)
+        {
+            yield return new FilaCat(n, nivel, false);
+            if (n.Hijos.Count == 0 || !_abiertas.Contains(n.CategoriaId)) yield break;
+            if (n.Propio > 0) yield return new FilaCat(n, nivel + 1, true);
+            foreach (var h in n.Hijos)
+                foreach (var f in Recorrer(h, nivel + 1)) yield return f;
+        }
+
+        return ArbolCategorias.ResumenEnArbol(_categorias, _resumen!.Categorias).SelectMany(n => Recorrer(n, 0));
+    }
+
+    private string Porcentaje(decimal total) =>
+        (_resumen!.GastosTotales > 0 ? Math.Round(total / _resumen.GastosTotales * 100m, 0) : 0m).ToString("0", CultureInfo.InvariantCulture);
+
+    private readonly HashSet<Guid> _abiertas = [];
+
+    private void Alternar(Guid id)
+    {
+        if (!_abiertas.Remove(id)) _abiertas.Add(id);
+    }
+
     private static readonly CultureInfo Es = new("es-ES");
 
     private ResumenMensualResponse? _resumen;
     private LiquidacionResponse? _liquidacion;
     private List<MiembroDto> _miembros = [];
+    private List<CategoriaDto> _categorias = [];
     private bool _cargando = true, _guardando;
     private string? _errorCarga, _error;
     private DateOnly _mes = new(DateTime.Today.Year, DateTime.Today.Month, 1);
@@ -208,6 +248,16 @@ else if (_resumen is not null && _liquidacion is not null)
         try
         {
             _miembros = await Api.ListarMiembrosAsync();
+            try
+            {
+                _categorias = await Api.ListarCategoriasAsync();
+            }
+            catch (ApiException)
+            {
+                // Solo sirven para mostrar la ruta de las subcategorías: sin ellas el resumen usa el nombre suelto.
+                _categorias = [];
+            }
+
             await RecargarAsync();
         }
         catch (ApiException e)
@@ -239,6 +289,10 @@ else if (_resumen is not null && _liquidacion is not null)
             _error = e.Message;
         }
     }
+
+    /// <summary>Ruta «Padre › Hija» de la categoría del resumen; si no se pudo cargar el árbol, su nombre.</summary>
+    private string NombreCategoria(ResumenCategoriaDto c) =>
+        _categorias.Any(x => x.Id == c.CategoriaId) ? ArbolCategorias.Ruta(_categorias, c.CategoriaId) : c.Nombre;
 
     private string NombreMiembro(Guid id) => _miembros.FirstOrDefault(m => m.Id == id)?.Nombre ?? "—";
 

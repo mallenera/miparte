@@ -269,7 +269,7 @@ else
 
     private int ColorDe(Guid id) => ColorMiembro.De(id, _miembros);
 
-    private string NombreCategoria(Guid id) => _categorias.FirstOrDefault(c => c.Id == id)?.Nombre ?? "—";
+    private string NombreCategoria(Guid id) => ArbolCategorias.Ruta(_categorias, id);
 
     private static string Euros(decimal importe) => importe.ToString("C2", Es);
 

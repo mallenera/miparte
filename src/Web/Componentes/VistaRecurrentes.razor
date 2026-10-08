@@ -215,7 +215,7 @@ else
 
     private string NombreMiembro(Guid id) => _miembros.FirstOrDefault(m => m.Id == id)?.Nombre ?? "—";
 
-    private string NombreCategoria(Guid id) => _categorias.FirstOrDefault(c => c.Id == id)?.Nombre ?? "—";
+    private string NombreCategoria(Guid id) => ArbolCategorias.Ruta(_categorias, id);
 
     private string NombrePerfil(Guid id) => _perfiles.FirstOrDefault(p => p.Id == id)?.Nombre ?? "—";
 

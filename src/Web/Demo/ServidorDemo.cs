@@ -59,7 +59,7 @@ public sealed partial class ServidorDemo
             ("hogares", 2, "POST") => Mal(HttpStatusCode.Conflict, "En el modo demo no se pueden crear hogares."),
             ("invitaciones", 3, "POST") when subruta == "aceptar" => Mal(HttpStatusCode.Conflict, "En el modo demo no se pueden aceptar invitaciones."),
 
-            ("miembros", 2, "GET") => Ok(_miembros.Where(m => m.Activo).OrderBy(m => m.Nombre).Select(ADto).ToList()),
+            ("miembros", 2, "GET") => Ok(_miembros.Where(m => m.Activo || Consulta(uri, "incluirInactivos") == "true").OrderBy(m => m.Nombre).Select(ADto).ToList()),
             ("miembros", 2, "POST") => CrearMiembro((await Cuerpo<CrearMiembroRequest>())!),
             ("miembros", 3, "PUT") when id is { } i => ActualizarMiembro(i, (await Cuerpo<ActualizarMiembroRequest>())!),
             ("invitaciones", 2, "POST") => CrearInvitacion(await Cuerpo<CrearInvitacionRequest>()),
@@ -84,6 +84,9 @@ public sealed partial class ServidorDemo
             ("gastos-recurrentes", 3, "POST") when subruta == "generar" => Generar(mes),
             ("gastos-recurrentes", 3, "PUT") when id is { } i => GuardarRecurrente(i, (await Cuerpo<GastoRecurrenteRequest>())!),
             ("gastos-recurrentes", 3, "DELETE") when id is { } i => EliminarRecurrente(i),
+
+            // El modo demo no registra cambios: el historial siempre sale vacío.
+            ("auditoria", 2, "GET") => Ok(new List<EventoAuditoriaDto>()),
 
             ("cuenta-comun", 2, "GET") => EstadoCuentaComun(mes),
             ("cuenta-comun", 3, "PUT") when subruta == "activacion" => Activar((await Cuerpo<ActivarCuentaComunRequest>())!),

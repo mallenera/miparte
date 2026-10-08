@@ -54,6 +54,26 @@ public static class CuentaComunEndpoints
         return ahorrado - retirado - gastado;
     }
 
+    /// <summary>
+    /// Lo que sobraría de ahorro en el último mes en que se retiró o se gastó desde el ahorro si las aportaciones y los depósitos fueran los dados
+    /// (null si no hay retiradas ni gastos desde el ahorro). Un valor negativo es la cantidad que faltaría: el cambio dejaría sin respaldo dinero ya usado.
+    /// </summary>
+    private static async Task<decimal?> HolguraDeAhorroAsync(
+        MiParteDbContext db, IReadOnlyList<AportacionVigente> aportaciones, IEnumerable<DepositoDeAhorro> depositos, CancellationToken ct)
+    {
+        var retiradas = await db.RetiradasAhorro.Select(r => new { r.Fecha, r.Importe }).ToListAsync(ct);
+        var gastos = await db.Gastos.Where(g => g.PagadoDesdeAhorro).Select(g => new { g.Fecha, g.Importe }).ToListAsync(ct);
+        if (retiradas.Count == 0 && gastos.Count == 0) return null;
+
+        var ultimo = retiradas.Select(r => r.Fecha).Concat(gastos.Select(g => g.Fecha)).Max();
+        var ahorrado = CuentaComun.Calcular(CuentaComun.InicioMes(ultimo), aportaciones, [], [], null, depositos).AhorroAcumulado;
+        return ahorrado - retiradas.Sum(r => r.Importe) - gastos.Sum(g => g.Importe);
+    }
+
+    /// <summary>Respuesta 409 cuando un cambio dejaría el ahorro en negativo, con lo que faltaría.</summary>
+    private static IResult AhorroSinRespaldo(string accion, decimal falta)
+        => Results.Conflict(new { error = $"No se puede {accion}: ya se ha retirado o gastado ese ahorro (faltarían {-falta:0.00}).", falta = -falta });
+
     /// <summary>Gastos cargados a la cuenta común, para el cálculo de saldo.</summary>
     private static async Task<List<GastoDeCuenta>> GastosDeCuenta(MiParteDbContext db, CancellationToken ct)
         => await db.Gastos.Where(g => g.ACargoCuentaComun)
@@ -90,7 +110,7 @@ public static class CuentaComunEndpoints
             e.AhorroGastado));
     }
 
-    /// <summary>PUT /api/cuenta-comun/aportaciones: fija la aportación de un adulto desde un mes, con la parte que va a ahorro (si ya había una de ese mes, la sustituye). 400 si el mes no es día 1, el importe o el ahorro son inválidos (el ahorro no puede superar el importe) o el miembro no es adulto activo; 409 sin hogar.</summary>
+    /// <summary>PUT /api/cuenta-comun/aportaciones: fija la aportación de un adulto desde un mes, con la parte que va a ahorro (si ya había una de ese mes, la sustituye). 400 si el mes no es día 1, el importe o el ahorro son inválidos (el ahorro no puede superar el importe) o el miembro no es adulto activo; 409 sin hogar o si la rebaja del ahorro dejaría sin respaldo lo ya retirado o gastado desde el ahorro (<c>{ error, falta }</c>).</summary>
     private static async Task<IResult> FijarAportacionAsync(
         FijarAportacionRequest req, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
@@ -106,6 +126,14 @@ public static class CuentaComunEndpoints
         if (errorAhorro is not null) return ApiComun.Invalido(errorAhorro);
         if (!await ApiComun.EsAdultoActivo(db, req.MiembroId, ct))
             return ApiComun.Invalido("Solo los adultos activos del hogar aportan a la cuenta común.");
+
+        // Rebajar el ahorro no puede dejar sin respaldo lo que ya se retiró o se gastó desde el ahorro.
+        var existentes = await db.AportacionesCuenta.AsNoTracking().ToListAsync(ct);
+        var tras = Vigentes(existentes.Where(x => !(x.MiembroId == req.MiembroId && x.Desde == req.Desde)))
+            .Append(new AportacionVigente(req.MiembroId, req.Desde, req.Importe, req.Ahorro)).ToList();
+        var depositosActuales = await db.DepositosAhorro.Select(d => new DepositoDeAhorro(d.Fecha, d.Importe)).ToListAsync(ct);
+        if (await HolguraDeAhorroAsync(db, tras, depositosActuales, ct) is < 0m and var falta)
+            return AhorroSinRespaldo("rebajar el ahorro de esta aportación", falta);
 
         var a = await db.AportacionesCuenta.FirstOrDefaultAsync(x => x.MiembroId == req.MiembroId && x.Desde == req.Desde, ct);
         if (a is null)
@@ -176,13 +204,20 @@ public static class CuentaComunEndpoints
         return Results.Created($"/api/cuenta-comun/depositos-ahorro/{d.Id}", A(d));
     }
 
-    /// <summary>DELETE /api/cuenta-comun/depositos-ahorro/{id}: borra un depósito de ahorro. 409 sin hogar; 404 si no existe; 204 si se borra.</summary>
+    /// <summary>DELETE /api/cuenta-comun/depositos-ahorro/{id}: borra un depósito de ahorro. 409 sin hogar o si dejaría sin respaldo lo ya retirado o gastado desde el ahorro (<c>{ error, falta }</c>); 404 si no existe; 204 si se borra.</summary>
     private static async Task<IResult> BorrarDepositoAsync(
         Guid id, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
         var d = await db.DepositosAhorro.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (d is null) return Results.NotFound();
+
+        // Sin este ingreso el ahorro no puede quedar por debajo de lo ya retirado o gastado desde él.
+        var aportaciones = await db.AportacionesCuenta.ToListAsync(ct);
+        var resto = await db.DepositosAhorro.Where(x => x.Id != id).Select(x => new DepositoDeAhorro(x.Fecha, x.Importe)).ToListAsync(ct);
+        if (await HolguraDeAhorroAsync(db, Vigentes(aportaciones), resto, ct) is < 0m and var falta)
+            return AhorroSinRespaldo("eliminar este ingreso", falta);
+
         db.DepositosAhorro.Remove(d);
         await db.SaveChangesAsync(ct);
         return Results.NoContent();

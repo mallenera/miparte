@@ -79,7 +79,7 @@ public record PendienteCuentaDto(Guid MiembroId, string Nombre, decimal Importe)
 /// <param name="AhorroMes">Ahorro del mes: la parte de ahorro de las aportaciones más los depósitos del mes.</param>
 /// <param name="AhorroAcumulado">Ahorro acumulado hasta el mes: aportaciones más depósitos.</param>
 /// <param name="AhorroRetirado">Ahorro retirado hasta el mes.</param>
-/// <param name="AhorroDisponible">Ahorro acumulado menos retirado y menos gastado desde el ahorro; negativo si una aportación se rebajó tras retirar.</param>
+/// <param name="AhorroDisponible">Ahorro acumulado menos retirado y menos gastado desde el ahorro; no baja de 0: la API rechaza los cambios que lo dejarían en negativo.</param>
 /// <param name="RetiradasAhorro">Retiradas de ahorro registradas en el mes.</param>
 /// <param name="AhorroDepositado">Parte del ahorro acumulado que entró como depósitos aparte de las aportaciones.</param>
 /// <param name="DepositosAhorro">Depósitos de ahorro registrados en el mes.</param>

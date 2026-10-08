@@ -167,6 +167,7 @@ La cuenta común es un pagador más: los gastos que paga no entran en la deuda e
 - Además de lo apartado en las aportaciones, se puede ingresar dinero aparte (`deposito_ahorro`): el ahorro inicial al empezar a usar la app, un premio de lotería, un regalo... Suma al ahorro sin tocar el saldo de gastos.
 - Un gasto puede pagarse desde el ahorro (`gasto.pagado_desde_ahorro`): se descuenta del ahorro disponible y no del saldo, no lo adelanta nadie (sin reembolso pendiente), va a cargo de la cuenta común (sin reparto ni deuda entre personas) y no puede superar el ahorro disponible.
 - El ahorro disponible es el acumulado (aportaciones más ingresos aparte) menos las retiradas (`retirada_ahorro`) y lo gastado desde el ahorro: sacar dinero del ahorro (por ejemplo, para unas vacaciones) baja solo el ahorro, y no se puede retirar más de lo ahorrado.
+- El ahorro disponible nunca queda en negativo: la API rechaza rebajar el ahorro de una aportación o eliminar un ingreso si ya se retiró o se gastó ese dinero.
 - Fuera de alcance por ahora: objetivos de ahorro (meta e importe objetivo) e intereses.
 
 - **Aportaciones:** cada adulto aporta un importe fijo al mes, guardado por mes y persona. Es lo único que se guarda del dinero que entra en el hogar.

@@ -463,9 +463,14 @@ public class GastosLiquidacionTests
         Assert.Equal((1000m, 1000m, 1000m, 0m), (estado.AhorroMes, estado.AhorroAcumulado, estado.AhorroDisponible, estado.Saldo));
         Assert.Equal("Ahorro inicial", Assert.Single(estado.DepositosAhorro!).Concepto);
 
-        Assert.Equal(HttpStatusCode.Created, (await e.Cliente.PostAsJsonAsync("/api/cuenta-comun/retiradas-ahorro",
-            new CrearRetiradaAhorroRequest(e.Ana, 1000m, new DateOnly(2026, 9, 2), null))).StatusCode);
+        var r = await e.Cliente.PostAsJsonAsync("/api/cuenta-comun/retiradas-ahorro",
+            new CrearRetiradaAhorroRequest(e.Ana, 1000m, new DateOnly(2026, 9, 2), null));
+        Assert.Equal(HttpStatusCode.Created, r.StatusCode);
+        var retirada = (await r.Content.ReadFromJsonAsync<RetiradaAhorroDto>(Web))!;
 
+        // Ya retirado, el ingreso no se puede borrar; al deshacer la retirada, sí.
+        Assert.Equal(HttpStatusCode.Conflict, (await e.Cliente.DeleteAsync($"/api/cuenta-comun/depositos-ahorro/{deposito.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await e.Cliente.DeleteAsync($"/api/cuenta-comun/retiradas-ahorro/{retirada.Id}")).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await e.Cliente.DeleteAsync($"/api/cuenta-comun/depositos-ahorro/{deposito.Id}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await e.Cliente.DeleteAsync($"/api/cuenta-comun/depositos-ahorro/{deposito.Id}")).StatusCode);
     }
@@ -520,6 +525,46 @@ public class GastosLiquidacionTests
         var conPagador = await e.Cliente.PostAsJsonAsync("/api/gastos",
             Gasto(e, 50m, e.PerfilCuentaComun) with { PagadoDesdeAhorro = true });
         Assert.Equal(HttpStatusCode.BadRequest, conPagador.StatusCode);
+    }
+
+    [Fact]
+    public async Task CuentaComun_NoSePuedeRebajarElAhorroSiYaSeRetiroOGastoDesdeEl()
+    {
+        var e = await Montar();
+        var mes = new DateOnly(2026, 9, 1);
+        await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, mes, 500m, 200m));
+        await e.Cliente.PostAsJsonAsync("/api/cuenta-comun/retiradas-ahorro", new CrearRetiradaAhorroRequest(e.Ana, 120m, new DateOnly(2026, 9, 10), null));
+        await CrearGasto(e, Gasto(e, 50m, e.PerfilCuentaComun) with { PagadoPor = null, PagadoDesdeAhorro = true });
+
+        // Queda respaldo para 170 (120 + 50): bajar a 169,99 no se permite, a 170 sí.
+        var rechazada = await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, mes, 500m, 169.99m));
+        Assert.Equal(HttpStatusCode.Conflict, rechazada.StatusCode);
+        Assert.Contains("0.01", await rechazada.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.OK, (await e.Cliente.PutAsJsonAsync(
+            "/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, mes, 500m, 170m))).StatusCode);
+
+        // Subirlo, o cambiar solo el importe de gastos, siempre se puede.
+        Assert.Equal(HttpStatusCode.OK, (await e.Cliente.PutAsJsonAsync(
+            "/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, mes, 300m, 250m))).StatusCode);
+
+        var estado = await Leer<CuentaComunResponse>(await e.Cliente.GetAsync("/api/cuenta-comun?mes=2026-09"));
+        Assert.Equal(80m, estado.AhorroDisponible); // 250 - 120 - 50
+    }
+
+    [Fact]
+    public async Task CuentaComun_NoSePuedeBorrarUnIngresoDeAhorroQueYaSeUso()
+    {
+        var e = await Montar();
+        var d = await e.Cliente.PostAsJsonAsync("/api/cuenta-comun/depositos-ahorro",
+            new CrearDepositoAhorroRequest(e.Ana, 500m, new DateOnly(2026, 9, 1), "Lotería"));
+        var deposito = (await d.Content.ReadFromJsonAsync<DepositoAhorroDto>(Web))!;
+        await CrearGasto(e, Gasto(e, 300m, e.PerfilCuentaComun) with { PagadoPor = null, PagadoDesdeAhorro = true });
+
+        Assert.Equal(HttpStatusCode.Conflict, (await e.Cliente.DeleteAsync($"/api/cuenta-comun/depositos-ahorro/{deposito.Id}")).StatusCode);
+
+        // Con otro ingreso que lo respalde, ya se puede borrar el primero.
+        await e.Cliente.PostAsJsonAsync("/api/cuenta-comun/depositos-ahorro", new CrearDepositoAhorroRequest(e.Ana, 300m, new DateOnly(2026, 9, 2), null));
+        Assert.Equal(HttpStatusCode.NoContent, (await e.Cliente.DeleteAsync($"/api/cuenta-comun/depositos-ahorro/{deposito.Id}")).StatusCode);
     }
 
     [Fact]

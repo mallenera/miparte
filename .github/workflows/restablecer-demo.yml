@@ -1,0 +1,31 @@
+name: Restablecer demo
+# Restablece a mano la cuenta demo de Supabase ejecutando supabase/seed/demo.sql (idempotente). La programación diaria
+# la hace pg_cron dentro de Supabase (supabase/seed/demo_cron.sql); este workflow es el botón manual y el plan B si
+# pg_cron no está disponible. Requiere el secreto DEMO_DB_URL (cadena URI del Session pooler, puerto 5432) y que el
+# entorno «demo» exista en GitHub (permite exigir aprobación antes de tocar el proyecto real).
+# Nunca escribas la cadena de conexión en el repositorio.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: restablecer-demo
+  cancel-in-progress: false
+jobs:
+  restablecer:
+    runs-on: ubuntu-latest
+    environment: demo
+    steps:
+      - uses: actions/checkout@v4
+      - name: Comprobar el secreto
+        env:
+          DEMO_DB_URL: ${{ secrets.DEMO_DB_URL }}
+        run: |
+          if [ -z "$DEMO_DB_URL" ]; then
+            echo "Falta el secreto DEMO_DB_URL (ver docs/demo.md)." >&2
+            exit 1
+          fi
+      - name: Ejecutar demo.sql
+        env:
+          DEMO_DB_URL: ${{ secrets.DEMO_DB_URL }}
+        run: psql "$DEMO_DB_URL" -v ON_ERROR_STOP=1 -f supabase/seed/demo.sql

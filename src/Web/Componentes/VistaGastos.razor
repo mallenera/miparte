@@ -28,7 +28,34 @@ else
                 <button class="linkbtn" type="button" aria-label="Mes siguiente" @onclick="() => CambiarMesAsync(1)"><Icono Nombre="chevron-right" /></button>
             </div>
         </div>
-        <p class="muted">Total del mes: <b>@Euros(_gastos.Where(g => !g.Personal).Sum(g => g.Importe))</b> en @_gastos.Count(g => !g.Personal) @(_gastos.Count(g => !g.Personal) == 1 ? "gasto" : "gastos").
+        <div class="filtros" role="search" aria-label="Filtrar gastos">
+            <label>Persona
+                <select @bind="_filtroMiembro" @bind:after="AplicarFiltrosAsync">
+                    <option value="">Todas</option>
+                    @foreach (var m in _miembros.Where(m => m.Activo))
+                    {
+                        <option value="@m.Id">@m.Nombre</option>
+                    }
+                </select>
+            </label>
+            <label>Categoría
+                <select @bind="_filtroCategoria" @bind:after="AplicarFiltrosAsync">
+                    <option value="">Todas</option>
+                    @foreach (var n in _arbol)
+                    {
+                        <option value="@n.Categoria.Id">@(new string(' ', n.Nivel * 3))@n.Categoria.Nombre</option>
+                    }
+                </select>
+            </label>
+            <label>Concepto
+                <input type="search" maxlength="200" placeholder="Buscar…" @bind="_filtroTexto" @bind:event="onchange" @bind:after="AplicarFiltrosAsync" />
+            </label>
+            @if (HayFiltros)
+            {
+                <button class="linkbtn" type="button" @onclick="LimpiarFiltrosAsync">Quitar filtros</button>
+            }
+        </div>
+        <p class="muted">@(HayFiltros ? "Total filtrado" : "Total del mes"): <b>@Euros(_gastos.Where(g => !g.Personal).Sum(g => g.Importe))</b> en @_gastos.Count(g => !g.Personal) @(_gastos.Count(g => !g.Personal) == 1 ? "gasto" : "gastos").
             @if (_gastos.Any(g => g.Personal))
             {
                 <span>Personales (fuera de la liquidación): <b>@Euros(_gastos.Where(g => g.Personal).Sum(g => g.Importe))</b>.</span>
@@ -88,7 +115,7 @@ else
 
             @if (_gastos.Count == 0)
             {
-                <div class="empty">No hay gastos en este mes. Añade el primero abajo.</div>
+                <div class="empty">@(HayFiltros ? "Ningún gasto de este mes coincide con los filtros." : "No hay gastos en este mes. Añade el primero abajo.")</div>
             }
         </div>
 
@@ -170,6 +197,7 @@ else
     private DateOnly _mes = new(DateTime.Today.Year, DateTime.Today.Month, 1);
 
     private Guid? _editando, _confirmandoEliminar;
+    private string _filtroMiembro = "", _filtroCategoria = "", _filtroTexto = "";
     private DateOnly _fecha = DateOnly.FromDateTime(DateTime.Today);
     private string _importe = "", _concepto = "";
     private Guid _categoria, _perfil;
@@ -251,9 +279,49 @@ else
         if (_pagador is null && PerfilCuentaComun is { } p) _perfil = p.Id;
     }
 
-    private async Task RecargarGastosAsync() =>
-        _gastos = (await Api.ListarGastosAsync(_mes.ToString("yyyy-MM", CultureInfo.InvariantCulture)))
-            .OrderByDescending(g => g.Fecha).ToList();
+    private bool HayFiltros => _filtroMiembro != "" || _filtroCategoria != "" || !string.IsNullOrWhiteSpace(_filtroTexto);
+
+    /// <summary>Versión de la última petición de gastos: una respuesta tardía de otra selección no pisa la actual.</summary>
+    private int _versionCarga;
+
+    private async Task RecargarGastosAsync()
+    {
+        var version = ++_versionCarga;
+        try
+        {
+            var gastos = await Api.ListarGastosAsync(
+                    _mes.ToString("yyyy-MM", CultureInfo.InvariantCulture),
+                    Guid.TryParse(_filtroCategoria, out var categoria) ? categoria : null,
+                    Guid.TryParse(_filtroMiembro, out var miembro) ? miembro : null,
+                    _filtroTexto);
+            if (version == _versionCarga) _gastos = gastos.OrderByDescending(g => g.Fecha).ToList();
+        }
+        catch (ApiException) when (version != _versionCarga)
+        {
+            // Un fallo de una petición ya superada no debe mostrar un error junto a los resultados de la nueva.
+        }
+    }
+
+    /// <summary>Vuelve a pedir los gastos del mes con los filtros elegidos; los errores salen en pantalla.</summary>
+    private async Task AplicarFiltrosAsync()
+    {
+        _error = null;
+        _confirmandoEliminar = null;
+        try
+        {
+            await RecargarGastosAsync();
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+    }
+
+    private Task LimpiarFiltrosAsync()
+    {
+        _filtroMiembro = _filtroCategoria = _filtroTexto = "";
+        return AplicarFiltrosAsync();
+    }
 
     private async Task CambiarMesAsync(int delta)
     {
@@ -275,7 +343,7 @@ else
 
     private int ColorDe(Guid id) => ColorMiembro.De(id, _miembros);
 
-    private string NombreCategoria(Guid id) => _categorias.FirstOrDefault(c => c.Id == id)?.Nombre ?? "—";
+    private string NombreCategoria(Guid id) => ArbolCategorias.Ruta(_categorias, id);
 
     private static string Euros(decimal importe) => importe.ToString("C2", Es);
 

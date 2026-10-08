@@ -81,7 +81,7 @@ Permisos: "miembro" = cualquier miembro activo del hogar (incluye admin). "admin
 
 | Método y ruta | Descripción | Request | Response | Errores | Permisos |
 |---|---|---|---|---|---|
-| `GET /api/miembros` | Miembros activos del hogar, por nombre | - | `MiembroDto[]` 200 | - | miembro |
+| `GET /api/miembros?incluirInactivos=` | Miembros activos del hogar, por nombre; con `incluirInactivos=true` también los desactivados (el historial los necesita para poner nombre a quien ya no está) | - | `MiembroDto[]` 200 | - | miembro |
 | `POST /api/miembros` | Alta de persona sin cuenta (`tipo`: `adulto` o `a_cargo`) | `CrearMiembroRequest` | `MiembroDto` 201 | 400 nombre vacío/> 100, tipo inválido, `a_cargo` sin responsable adulto activo, adulto con responsable; 403 no admin | admin |
 | `PUT /api/miembros/{id}` | Edita; campos `null` = sin cambios | `ActualizarMiembroRequest` | `MiembroDto` 200 | 400 nombre vacío, rol inválido, responsable no válido o miembro no `a_cargo`; 403; 404; 409 último admin vinculado, o responsable de miembros a cargo activos | admin; un miembro solo puede cambiar su propio `nombre` |
 | `DELETE /api/miembros/{id}` | Borrado lógico (= PUT `activo=false`, mismas reglas) | - | `MiembroDto` 200 | igual que PUT | admin (un no admin recibe 403) |
@@ -117,7 +117,7 @@ Los ingresos del hogar **no se guardan** y no hay endpoints de ingresos. Los per
 
 | Método y ruta | Descripción | Request | Response | Errores | Permisos |
 |---|---|---|---|---|---|
-| `GET /api/gastos?mes=YYYY-MM&categoriaId=` | Lista con repartos; filtros opcionales | - | `GastoResponse[]` 200 | 400 mes inválido; 409 | miembro |
+| `GET /api/gastos?mes=YYYY-MM&categoriaId=&miembroId=&buscar=` | Lista con repartos; filtros opcionales y combinables. `miembroId` deja los gastos que paga ese miembro o en cuyo reparto asume un importe > 0; `buscar` es un texto contenido en el concepto (sin distinguir mayúsculas, máx. 200 caracteres; vacío = sin filtro) | - | `GastoResponse[]` 200 | 400 mes inválido o `buscar` demasiado largo; 409 | miembro |
 | `GET /api/gastos/{id}` | Uno | - | `GastoResponse` 200 | 404; 409 | miembro |
 | `POST /api/gastos` | Crea; el servidor calcula y guarda el reparto | `GastoRequest` | `GastoResponse` 201 | 400 importe, concepto, fecha, categoría o perfil inexistente, pagador no adulto activo, perfil sin valores para los adultos, sin adultos, `pagadoDesdeAhorro` con pagador; 409 sin hogar o ahorro disponible insuficiente (`{ error, disponible }`) | miembro |
 | `PUT /api/gastos/{id}` | Edita y recalcula el reparto de este gasto | `GastoRequest` | `GastoResponse` 200 | 400, 404, 409 (también si el ahorro no cubre el gasto) | miembro |
@@ -144,7 +144,7 @@ Los gastos personales (§3.6) no entran en la liquidación ni en `gastosTotales`
 |---|---|---|---|---|---|
 | `GET /api/resumen?mes=YYYY-MM` | Gastos del mes, por miembro y por categoría. `mes` obligatorio | - | `ResumenMensualResponse` 200 | 400 mes inválido; 409 sin hogar | miembro |
 | `GET /api/liquidacion?mes=YYYY-MM` | Saldos (ya descontando pagos), transferencias sugeridas y pagos registrados. `mes` obligatorio | - | `LiquidacionResponse` 200 | 400; 409 | miembro |
-| `POST /api/pagos-liquidacion` | Registra un pago entre dos miembros del mes | `CrearPagoLiquidacionRequest` | `PagoLiquidacionDto` 201 | 400 mes no es día 1, mismo miembro, importe, miembros fuera del hogar; 409 importe mayor que la deuda pendiente (`{ error, pendiente }`) o sin hogar | miembro |
+| `POST /api/pagos-liquidacion` | Registra un pago entre dos miembros del mes. El importe puede ser parcial o distinto del sugerido: cualquier valor > 0 (máx. 2 decimales) hasta la deuda pendiente del par; `GET /api/liquidacion` recalcula saldos y transferencias descontándolo, y se pueden registrar varios pagos hasta saldar | `CrearPagoLiquidacionRequest` | `PagoLiquidacionDto` 201 | 400 mes no es día 1, mismo miembro, importe (≤ 0 o más de 2 decimales), miembros fuera del hogar; 409 importe mayor que la deuda pendiente (`{ error, pendiente }`) o sin hogar | miembro |
 | `DELETE /api/pagos-liquidacion/{id}` | Elimina un pago | - | 204 | 404; 409 sin hogar | miembro |
 
 ### 3.9 Cuenta común

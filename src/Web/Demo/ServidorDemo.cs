@@ -58,7 +58,7 @@ public sealed partial class ServidorDemo
             ("hogares", 2, "POST") => Mal(HttpStatusCode.Conflict, "En el modo demo no se pueden crear hogares."),
             ("invitaciones", 3, "POST") when subruta == "aceptar" => Mal(HttpStatusCode.Conflict, "En el modo demo no se pueden aceptar invitaciones."),
 
-            ("miembros", 2, "GET") => Ok(_miembros.Where(m => m.Activo).OrderBy(m => m.Nombre).Select(ADto).ToList()),
+            ("miembros", 2, "GET") => Ok(_miembros.Where(m => m.Activo || Consulta(uri, "incluirInactivos") == "true").OrderBy(m => m.Nombre).Select(ADto).ToList()),
             ("miembros", 2, "POST") => CrearMiembro((await Cuerpo<CrearMiembroRequest>())!),
             ("miembros", 3, "PUT") when id is { } i => ActualizarMiembro(i, (await Cuerpo<ActualizarMiembroRequest>())!),
             ("invitaciones", 2, "POST") => CrearInvitacion(await Cuerpo<CrearInvitacionRequest>()),
@@ -73,7 +73,7 @@ public sealed partial class ServidorDemo
             ("perfiles", 3, "PUT") when id is { } i => GuardarPerfil(i, (await Cuerpo<GuardarPerfilRequest>())!),
             ("perfiles", 3, "DELETE") when id is { } i => EliminarPerfil(i),
 
-            ("gastos", 2, "GET") => ListarGastos(mes),
+            ("gastos", 2, "GET") => ListarGastos(mes, Consulta(uri, "categoriaId"), Consulta(uri, "miembroId"), Consulta(uri, "buscar")),
             ("gastos", 2, "POST") => GuardarGasto(null, (await Cuerpo<GastoRequest>())!),
             ("gastos", 3, "PUT") when id is { } i => GuardarGasto(i, (await Cuerpo<GastoRequest>())!),
             ("gastos", 3, "DELETE") when id is { } i => _gastos.RemoveAll(x => x.Id == i) > 0 ? Sin() : NoEncontrado(),
@@ -83,6 +83,9 @@ public sealed partial class ServidorDemo
             ("gastos-recurrentes", 3, "POST") when subruta == "generar" => Generar(mes),
             ("gastos-recurrentes", 3, "PUT") when id is { } i => GuardarRecurrente(i, (await Cuerpo<GastoRecurrenteRequest>())!),
             ("gastos-recurrentes", 3, "DELETE") when id is { } i => EliminarRecurrente(i),
+
+            // El modo demo no registra cambios: el historial siempre sale vacío.
+            ("auditoria", 2, "GET") => Ok(new List<EventoAuditoriaDto>()),
 
             ("cuenta-comun", 2, "GET") => EstadoCuentaComun(mes),
             ("cuenta-comun", 3, "PUT") when subruta == "aportaciones" => FijarAportacion((await Cuerpo<FijarAportacionRequest>())!),
@@ -287,9 +290,13 @@ public sealed partial class ServidorDemo
         g.Id, g.Fecha, g.Importe, g.CategoriaId, g.PagadoPor, g.PerfilRepartoId, g.Concepto, g.GastoRecurrenteId,
         g.Repartos.OrderBy(r => r.MiembroId).ToList(), g.ACargoCuentaComun, false, g.EsPersonal);
 
-    private HttpResponseMessage ListarGastos(string? mes)
+    private HttpResponseMessage ListarGastos(string? mes, string? categoriaId, string? miembroId, string? buscar)
     {
         var lista = _gastos.AsEnumerable();
+        if (Guid.TryParse(categoriaId, out var cat)) lista = lista.Where(g => g.CategoriaId == cat);
+        if (Guid.TryParse(miembroId, out var mie)) lista = lista.Where(g => g.PagadoPor == mie || g.Repartos.Any(r => r.MiembroId == mie && r.ImporteAsumido > 0m));
+        if (!string.IsNullOrWhiteSpace(buscar))
+            lista = lista.Where(g => g.Concepto?.Contains(buscar.Trim(), StringComparison.OrdinalIgnoreCase) == true);
         if (mes is not null)
         {
             if (!TryMes(mes, out var inicio)) return MesInvalido();

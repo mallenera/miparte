@@ -158,7 +158,7 @@ public static class CuentaComun
         foreach (var id in aportado.Keys) ahorrado.TryAdd(id, 0m);
 
         var ids = aportado.Keys.OrderBy(id => id).ToList();
-        var porSaldo = Prorratear(estado.Saldo, ids.Select(id => aportado[id]).ToList());
+        var porSaldo = Prorratear(estado.Saldo, ids.Select(id => aportado[id]).ToList(), igualSiSinPesos: true);
         var porAhorro = Prorratear(estado.AhorroDisponible, ids.Select(id => ahorrado[id]).ToList());
         var totalAportado = aportado.Values.Sum();
         var totalAhorrado = ahorrado.Values.Sum();
@@ -171,12 +171,19 @@ public static class CuentaComun
             estado.Pendientes.FirstOrDefault(p => p.MiembroId == id)?.Importe ?? 0m)).ToList();
     }
 
-    /// <summary>Reparte un importe (de cualquier signo) según pesos no negativos; el último con peso absorbe el céntimo sobrante. Sin pesos, todo a cero.</summary>
-    private static decimal[] Prorratear(decimal importe, IReadOnlyList<decimal> pesos)
+    /// <summary>Reparte un importe (de cualquier signo) según pesos no negativos; el último con peso absorbe el céntimo sobrante. Si todos los pesos son cero, con <paramref name="igualSiSinPesos"/> se reparte a partes iguales (la suma sigue siendo el importe) y sin él todo queda a cero.</summary>
+    private static decimal[] Prorratear(decimal importe, IReadOnlyList<decimal> pesos, bool igualSiSinPesos = false)
     {
         var resultado = new decimal[pesos.Count];
+        if (pesos.Count == 0 || importe == 0) return resultado;
+        if (pesos.Sum() <= 0)
+        {
+            // Sin aportaciones que ponderar (p. ej. solo depósitos de ahorro) el saldo se reparte a partes iguales.
+            if (!igualSiSinPesos) return resultado;
+            pesos = pesos.Select(_ => 1m).ToList();
+        }
+
         var total = pesos.Sum();
-        if (total <= 0 || importe == 0) return resultado;
 
         var ultimo = pesos.Select((p, i) => (p, i)).Last(x => x.p > 0).i;
         var acumulado = 0m;

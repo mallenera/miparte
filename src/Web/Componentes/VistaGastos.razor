@@ -177,7 +177,17 @@ else
     private PerfilRepartoDto? PerfilCuentaComun => _perfiles.FirstOrDefault(p => p.Modo == "cuenta_comun");
 
     /// <summary>Perfiles que se ofrecen: el de cuenta común solo con la cuenta activada (si no, la API rechazaría el gasto).</summary>
-    private IEnumerable<PerfilRepartoDto> PerfilesOfrecidos => _cuentaActiva ? _perfiles : _perfiles.Where(p => p.Modo != "cuenta_comun");
+    private IEnumerable<PerfilRepartoDto> PerfilesOfrecidos
+    {
+        get
+        {
+            var ofrecidos = _cuentaActiva ? _perfiles : _perfiles.Where(p => p.Modo != "cuenta_comun").ToList();
+            // Al editar un gasto cuyo perfil ya no se ofrece se mantiene como opción, para que el formulario muestre lo que envía.
+            return _editando is not null && _perfiles.FirstOrDefault(p => p.Id == _perfil) is { } actual && !ofrecidos.Contains(actual)
+                ? ofrecidos.Append(actual)
+                : ofrecidos;
+        }
+    }
 
     /// <summary>La categoría elegida está marcada «a cargo de la cuenta común» y la cuenta está activada.</summary>
     private bool CategoriaACargoDeLaCuenta => _cuentaActiva && _categorias.FirstOrDefault(c => c.Id == _categoria)?.ACargoCuentaComun == true;

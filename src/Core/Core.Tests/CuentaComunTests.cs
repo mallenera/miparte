@@ -208,6 +208,20 @@ public class CuentaComunTests
     }
 
     [Fact]
+    public void SuParte_SinAportacionesParaGastosElDescubiertoSeReparteEnPartesIgualesYSuma()
+    {
+        // Solo aportan ahorro (todo va a ahorro): el peso de cada uno para el saldo es 0, pero el descubierto no puede perderse.
+        var ap = new[] { new AportacionVigente(Ana, D("2026-01-01"), 100, 100), new AportacionVigente(Beto, D("2026-01-01"), 100, 100) };
+        var mes = D("2026-01-01");
+        var e = CuentaComun.Calcular(mes, ap, [new GastoDeCuenta(null, D("2026-01-02"), 50)], []); // saldo -50
+
+        var partes = CuentaComun.PartesPorPersona(mes, ap, e);
+
+        Assert.Equal(-50m, partes.Sum(p => p.ParteSaldo));
+        Assert.All(partes, p => Assert.Equal(-25m, p.ParteSaldo));
+    }
+
+    [Fact]
     public void SuParte_ElDepositoSinMiembroNoSeAtribuyeANadie()
     {
         var ap = new[] { new AportacionVigente(Ana, D("2026-01-01"), 100, 100) };

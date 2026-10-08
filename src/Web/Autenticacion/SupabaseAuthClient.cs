@@ -59,6 +59,23 @@ public sealed class SupabaseAuthClient
     public async Task ReenviarCodigoAsync(string email, CancellationToken ct = default) =>
         await EnviarAsync("resend", new { type = "signup", email }, null, ct);
 
+    /// <summary>URL a la que enviar al usuario para iniciar sesión con Google (flujo PKCE); Supabase vuelve a <paramref name="redirectTo"/> con un <c>?code=</c>.</summary>
+    /// <param name="redirectTo">URL absoluta de retorno (debe estar en las Redirect URLs de Supabase).</param>
+    /// <param name="codeChallenge">SHA-256 en base64url del verificador que guarda este navegador.</param>
+    public Uri UrlGoogle(string redirectTo, string codeChallenge) =>
+        new(_http.BaseAddress!, $"authorize?provider=google&redirect_to={Uri.EscapeDataString(redirectTo)}&code_challenge={codeChallenge}&code_challenge_method=s256");
+
+    /// <summary>Canjea el código del retorno de Google por la sesión; solo vale con el verificador que originó el <c>code_challenge</c>.</summary>
+    /// <param name="codigo">Valor de <c>code</c> recibido en la URL de retorno.</param>
+    /// <param name="verificador">Verificador PKCE guardado al iniciar el flujo.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    /// <exception cref="AuthException">Código o verificador no válidos.</exception>
+    public async Task<SesionSupabase> IntercambiarCodigoAsync(string codigo, string verificador, CancellationToken ct = default)
+    {
+        var json = await EnviarAsync("token?grant_type=pkce", new { auth_code = codigo, code_verifier = verificador }, null, ct);
+        return LeerSesion(json) ?? throw new AuthException("Respuesta de autenticación no válida.", 502);
+    }
+
     /// <summary>Renueva la sesión con el refresh token.</summary>
     /// <param name="refreshToken">Refresh token vigente.</param>
     /// <param name="ct">Token de cancelación.</param>

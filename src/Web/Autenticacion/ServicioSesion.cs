@@ -10,6 +10,7 @@ namespace MiParte.Web.Autenticacion;
 public sealed class ServicioSesion
 {
     private const string ClaveAlmacen = "miparte.sesion";
+    private const string ClaveVerificador = "miparte.pkce";
     private static readonly TimeSpan MargenRenovacion = TimeSpan.FromSeconds(60);
 
     private readonly SupabaseAuthClient _auth;
@@ -74,6 +75,53 @@ public sealed class ServicioSesion
     /// <summary>Reenvía el código de confirmación al correo.</summary>
     /// <param name="email">Correo.</param>
     public async Task ReenviarCodigoAsync(string email) => await _auth.ReenviarCodigoAsync(email);
+
+    /// <summary>
+    /// Prepara el login con Google (PKCE): guarda en este navegador un verificador aleatorio y devuelve la URL de Supabase
+    /// con su <c>code_challenge</c>. Así el retorno solo se acepta en el navegador que inició el flujo (evita el CSRF de login).
+    /// </summary>
+    /// <param name="redirectTo">URL absoluta a la que vuelve el usuario.</param>
+    public async Task<Uri> UrlGoogleAsync(string redirectTo)
+    {
+        var verificador = Base64Url(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        await _almacen.EscribirAsync(ClaveVerificador, verificador);
+        var desafio = Base64Url(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.ASCII.GetBytes(verificador)));
+        return _auth.UrlGoogle(redirectTo, desafio);
+    }
+
+    /// <summary>
+    /// Completa el login con Google a partir de la URL de retorno (<c>?code=…</c>, o <c>error=…</c>), en forma de query y/o fragmento.
+    /// Devuelve false si no trae ni código ni error (visita normal).
+    /// </summary>
+    /// <param name="parametros">Query y/o fragmento de la URL, con o sin <c>?</c> / <c>#</c>.</param>
+    /// <exception cref="AuthException">Google o Supabase devolvieron un error, no hay un login iniciado en este navegador o el código no es válido.</exception>
+    public async Task<bool> CompletarGoogleAsync(string? parametros)
+    {
+        var valores = new Dictionary<string, string>();
+        foreach (var par in (parametros ?? "").TrimStart('?', '#').Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var i = par.IndexOf('=');
+            if (i > 0) valores[Uri.UnescapeDataString(par[..i].TrimStart('?', '#'))] = Uri.UnescapeDataString(par[(i + 1)..].Replace('+', ' '));
+        }
+
+        var hayError = valores.TryGetValue("error", out var error);
+        if (!hayError && !valores.ContainsKey("code")) return false;
+
+        // El verificador es de un solo uso: se consume antes de seguir, tenga éxito o no el canje.
+        var verificador = await _almacen.LeerAsync(ClaveVerificador);
+        await _almacen.EliminarAsync(ClaveVerificador);
+
+        if (hayError)
+            throw new AuthException(error == "access_denied" ? "Has cancelado el acceso con Google." : "No se pudo iniciar sesión con Google.", 400);
+        if (string.IsNullOrEmpty(verificador))
+            throw new AuthException("El acceso con Google no se inició en este navegador. Vuelve a intentarlo.", 400);
+
+        await InicializarAsync();
+        await EstablecerAsync(await _auth.IntercambiarCodigoAsync(valores["code"], verificador));
+        return true;
+    }
+
+    private static string Base64Url(byte[] datos) => Convert.ToBase64String(datos).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
     /// <summary>Cierra la sesión en Supabase (mejor esfuerzo) y la descarta localmente.</summary>
     public async Task CerrarSesionAsync()

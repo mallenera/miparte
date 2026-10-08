@@ -49,12 +49,23 @@ public class SupabaseAuthClientTests
     [Fact]
     public async Task Verificar_codigo_envia_tipo_signup_y_devuelve_la_sesion()
     {
-        var manejador = new ManejadorFalso(_ => ManejadorFalso.RespuestaJson(HttpStatusCode.OK, TokenJson));
+        string? cuerpo = null;
+        var manejador = new ManejadorFalso(r =>
+        {
+            cuerpo = r.Content!.ReadAsStringAsync().Result;
+            return ManejadorFalso.RespuestaJson(HttpStatusCode.OK, TokenJson);
+        });
 
         var sesion = await Crear(manejador).VerificarCodigoAsync("a@b.com", "123456");
 
         Assert.Equal("acc", sesion.AccessToken);
-        Assert.Equal("https://x.supabase.co/auth/v1/verify", manejador.Peticiones[0].RequestUri!.ToString());
+        var peticion = manejador.Peticiones[0];
+        Assert.Equal(HttpMethod.Post, peticion.Method);
+        Assert.Equal("https://x.supabase.co/auth/v1/verify", peticion.RequestUri!.ToString());
+        using var json = System.Text.Json.JsonDocument.Parse(cuerpo!);
+        Assert.Equal("signup", json.RootElement.GetProperty("type").GetString());
+        Assert.Equal("a@b.com", json.RootElement.GetProperty("email").GetString());
+        Assert.Equal("123456", json.RootElement.GetProperty("token").GetString());
     }
 
     [Fact]

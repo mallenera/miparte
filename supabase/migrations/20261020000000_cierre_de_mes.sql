@@ -1,8 +1,8 @@
 -- Cierre de mes.
 --
 -- Un mes cerrado congela sus gastos (y con ellos su reparto, su resumen y su liquidación): no se pueden crear,
--- editar ni borrar gastos con fecha en ese mes, ni generar recurrentes en él. Solo un admin cierra o reabre
--- (lo comprueba Core.Api). Los pagos de liquidación siguen permitidos: saldan lo congelado, no lo cambian.
+-- editar ni borrar gastos con fecha en ese mes, ni generar recurrentes en él. Cualquier miembro activo cierra y solo un
+-- admin reabre (lo comprueba Core.Api). Los pagos de liquidación siguen permitidos: saldan lo congelado, no lo cambian.
 -- mes es siempre el primer día del mes. Reabrir = borrar la fila.
 
 create table public.mes_cerrado (

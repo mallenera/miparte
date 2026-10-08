@@ -234,7 +234,7 @@ public sealed class CoreApiClient
     public Task<List<MesCerradoDto>> ListarCierresMesAsync(CancellationToken ct = default) =>
         ObtenerAsync<List<MesCerradoDto>>("api/cierres-mes", ct);
 
-    /// <summary>Cierra un mes; solo admin (<c>POST /api/cierres-mes</c>).</summary>
+    /// <summary>Cierra un mes; puede cualquier miembro activo (<c>POST /api/cierres-mes</c>).</summary>
     /// <param name="mes">Mes en formato YYYY-MM.</param>
     /// <param name="ct">Token de cancelación.</param>
     public Task<MesCerradoDto> CerrarMesAsync(string mes, CancellationToken ct = default) =>

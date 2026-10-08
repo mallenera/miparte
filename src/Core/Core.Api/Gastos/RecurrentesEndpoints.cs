@@ -171,6 +171,6 @@ public static class RecurrentesEndpoints
     }
 
     /// <summary>Indica si la excepción es una violación de unicidad de PostgreSQL (SqlState 23505).</summary>
-    private static bool EsUnicidadViolada(DbUpdateException ex)
+    internal static bool EsUnicidadViolada(DbUpdateException ex)
         => ex.InnerException is Npgsql.PostgresException { SqlState: "23505" };
 }

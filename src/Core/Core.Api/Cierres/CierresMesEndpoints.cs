@@ -71,7 +71,15 @@ public static class CierresMesEndpoints
 
         var cierre = new MesCerrado { Id = Guid.NewGuid(), HogarId = hogarId, Mes = inicio, CerradoEn = DateTimeOffset.UtcNow, CerradoPor = yo!.UserId };
         db.MesesCerrados.Add(cierre);
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (RecurrentesEndpoints.EsUnicidadViolada(ex))
+        {
+            // Dos cierres simultáneos del mismo mes: gana el primero y el índice único rechaza al segundo.
+            return Results.Conflict(new { error = "Ese mes ya está cerrado." });
+        }
         return Results.Created($"/api/cierres-mes/{ApiComun.FormatoMes(inicio)}", A(cierre, new Dictionary<Guid, string> { [yo.UserId!.Value] = yo.Nombre }));
     }
 

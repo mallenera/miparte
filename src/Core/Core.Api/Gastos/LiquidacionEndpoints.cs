@@ -40,7 +40,9 @@ public static class LiquidacionEndpoints
         if (!ApiComun.TryMes(mes, out var inicio)) return ApiComun.MesInvalido();
         var fin = inicio.AddMonths(1);
 
-        var gastos = await GastosDelMes(db, inicio, ct);
+        var delMes = await GastosDelMes(db, inicio, ct);
+        var gastos = delMes.Where(g => !g.EsPersonal).ToList(); // los personales van aparte: no entran en pagado, asumido ni totales
+        var personales = delMes.Where(g => g.EsPersonal).ToList();
         var miembros = await db.Miembros.ToListAsync(ct);
         var categorias = await db.Categorias.ToDictionaryAsync(c => c.Id, c => c.Nombre, ct);
 
@@ -55,13 +57,15 @@ public static class LiquidacionEndpoints
             .Concat(gastos.Where(g => g.PagadoPor is not null).Select(g => g.PagadoPor!.Value))
             .Concat(gastos.SelectMany(g => g.Repartos).Select(r => r.MiembroId))
             .Concat(cuenta.Pendientes.Where(p => p.Importe > 0m).Select(p => p.MiembroId))
+            .Concat(personales.Select(g => g.PagadoPor!.Value))
             .ToHashSet();
         var porMiembro = miembros.Where(m => implicados.Contains(m.Id)).OrderBy(m => m.Nombre).ThenBy(m => m.Id)
             .Select(m => new ResumenMiembroDto(
                 m.Id, m.Nombre,
                 gastos.Where(g => g.PagadoPor == m.Id).Sum(g => g.Importe),
                 gastos.SelectMany(g => g.Repartos).Where(r => r.MiembroId == m.Id).Sum(r => r.ImporteAsumido),
-                Math.Max(0m, cuenta.Pendientes.FirstOrDefault(p => p.MiembroId == m.Id)?.Importe ?? 0m)))
+                Math.Max(0m, cuenta.Pendientes.FirstOrDefault(p => p.MiembroId == m.Id)?.Importe ?? 0m),
+                personales.Where(g => g.PagadoPor == m.Id).Sum(g => g.Importe)))
             .ToList();
 
         var porCategoria = gastos.GroupBy(g => g.CategoriaId)
@@ -90,7 +94,7 @@ public static class LiquidacionEndpoints
         }
 
         return Results.Ok(new ResumenMensualResponse(
-            ApiComun.FormatoMes(inicio), gastosTotales, porMiembro, porCategoria, resumenCuenta));
+            ApiComun.FormatoMes(inicio), gastosTotales, porMiembro, porCategoria, resumenCuenta, personales.Sum(g => g.Importe)));
     }
 
     /// <summary>Resultado del cálculo de liquidación de un mes: saldos, transferencias propuestas, pagos registrados, nombres de miembros y si el mes tiene gastos.</summary>
@@ -102,7 +106,8 @@ public static class LiquidacionEndpoints
     private static async Task<Calculo> Calcular(MiParteDbContext db, DateOnly inicio, CancellationToken ct)
     {
         // Lo que asume la cuenta común no entra en la deuda entre personas (y es lo único que puede pagar la cuenta: PagadoPor nulo).
-        var gastos = (await GastosDelMes(db, inicio, ct)).Where(g => !g.ACargoCuentaComun).ToList();
+        // Los gastos personales tampoco: los asume íntegros quien los paga.
+        var gastos = (await GastosDelMes(db, inicio, ct)).Where(g => !g.ACargoCuentaComun && !g.EsPersonal).ToList();
         var pagos = await db.PagosLiquidacion.Where(p => p.Mes == inicio).OrderBy(p => p.Fecha).ThenBy(p => p.Id).ToListAsync(ct);
         var miembros = await db.Miembros.ToListAsync(ct);
 

@@ -123,6 +123,8 @@ Los ingresos del hogar **no se guardan** y no hay endpoints de ingresos. Los per
 | `PUT /api/gastos/{id}` | Edita y recalcula el reparto de este gasto | `GastoRequest` | `GastoResponse` 200 | 400, 404, 409 (también si el ahorro no cubre el gasto) | miembro |
 | `DELETE /api/gastos/{id}` | Elimina gasto y reparto | - | 204 | 404; 409 | miembro |
 
+**Gastos personales**: con `GastoRequest.personal = true` el gasto es solo de `pagadoPor` (obligatorio, adulto activo; 400 sin pagador o con `pagadoDesdeAhorro`). El servidor guarda un único reparto del 100 % para el pagador, ignora el modo del perfil (que debe existir igualmente) y nunca lo marca `aCargoCuentaComun`. `GastoResponse.personal` lo devuelve. No genera deuda: queda fuera de `/api/liquidacion` y de `gastosTotales`, `pagado`, `asumido` y totales por categoría del resumen, que lo informa aparte (§3.8). Se ve en `GET /api/gastos` como cualquier otro gasto y cualquier miembro del hogar puede verlo y editarlo; al editarlo con `personal = false` vuelve a ser un gasto del hogar y se reparte según el perfil.
+
 ### 3.7 Gastos recurrentes
 
 | Método y ruta | Descripción | Request | Response | Errores | Permisos |
@@ -135,6 +137,8 @@ Los ingresos del hogar **no se guardan** y no hay endpoints de ingresos. Los per
 | `POST /api/gastos-recurrentes/generar?mes=YYYY-MM` | Crea los gastos del mes de las plantillas activas sin gasto ese mes (idempotente, todo o nada). Sin cuerpo | - | `GenerarRecurrentesResponse` 200 | 400 mes inválido o plantilla no repartible; 409 sin hogar | miembro |
 
 ### 3.8 Resumen, liquidación y pagos
+
+Los gastos personales (§3.6) no entran en la liquidación ni en `gastosTotales`, `miembros[].pagado`, `miembros[].asumido` ni `categorias`; el resumen los da aparte en `gastosPersonales` (total del mes) y `miembros[].personal` (por quien los pagó).
 
 | Método y ruta | Descripción | Request | Response | Errores | Permisos |
 |---|---|---|---|---|---|
@@ -298,7 +302,7 @@ Categoría a cargo de la cuenta común (con la cuenta activada; el servidor asig
   "categoriaId": "d0000000-0000-4000-8000-000000000002",
   "pagadoPor": "b0000000-0000-4000-8000-0000000000aa",
   "perfilRepartoId": "e0000000-0000-4000-8000-000000000007",
-  "concepto": "Compra semanal", "gastoRecurrenteId": null, "aCargoCuentaComun": false,
+  "concepto": "Compra semanal", "gastoRecurrenteId": null, "aCargoCuentaComun": false, "pagadoDesdeAhorro": false, "personal": false,
   "repartos": [
     { "miembroId": "b0000000-0000-4000-8000-0000000000aa", "importeAsumido": 60.00 },
     { "miembroId": "b0000000-0000-4000-8000-0000000000dd", "importeAsumido": 40.00 }
@@ -340,10 +344,10 @@ Categoría a cargo de la cuenta común (con la cuenta activada; el servidor asig
 
 ```json
 {
-  "mes": "2026-10", "gastosTotales": 1200.00,
+  "mes": "2026-10", "gastosTotales": 1200.00, "gastosPersonales": 35.00,
   "miembros": [
-    { "miembroId": "b0000000-0000-4000-8000-0000000000aa", "nombre": "Ana", "pagado": 1000.00, "asumido": 700.00, "debeCuentaComun": 0.00 },
-    { "miembroId": "b0000000-0000-4000-8000-0000000000dd", "nombre": "Luis", "pagado": 200.00, "asumido": 500.00, "debeCuentaComun": 0.00 }
+    { "miembroId": "b0000000-0000-4000-8000-0000000000aa", "nombre": "Ana", "pagado": 1000.00, "asumido": 700.00, "debeCuentaComun": 0.00, "personal": 0.00 },
+    { "miembroId": "b0000000-0000-4000-8000-0000000000dd", "nombre": "Luis", "pagado": 200.00, "asumido": 500.00, "debeCuentaComun": 0.00, "personal": 35.00 }
   ],
   "categorias": [
     {

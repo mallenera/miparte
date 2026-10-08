@@ -272,6 +272,8 @@ public class Gasto
     public bool ACargoCuentaComun { get; set; }
     /// <summary>Si se paga con el ahorro de la cuenta común: se descuenta del ahorro disponible, no del saldo de gastos.</summary>
     public bool PagadoDesdeAhorro { get; set; }
+    /// <summary>Si es un gasto personal de quien lo paga: se asume al 100 % y queda fuera de la liquidación y de los totales del hogar.</summary>
+    public bool EsPersonal { get; set; }
     /// <summary>Importe asumido por cada miembro.</summary>
     public List<GastoReparto> Repartos { get; set; } = [];
 }

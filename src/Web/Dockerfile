@@ -3,7 +3,11 @@ WORKDIR /src
 COPY . .
 RUN dotnet publish src/Web -c Release -o /app
 
-FROM nginx:alpine
+# Sin privilegios (usuario nginx, puerto 8080). La plantilla se procesa al arrancar con envsubst.
+FROM nginxinc/nginx-unprivileged:alpine
+# Orígenes a los que la CSP permite conectar (connect-src). Deben coincidir con Supabase:Url y Api:CoreUrl del
+# appsettings.json del front; vacíos, el front no podrá hablar con ninguno.
+ENV SUPABASE_URL="" CORE_URL=""
 COPY --from=build /app/wwwroot /usr/share/nginx/html
-COPY src/Web/nginx.conf /etc/nginx/conf.d/default.conf
-EXPOSE 80
+COPY src/Web/default.conf.template /etc/nginx/templates/default.conf.template
+EXPOSE 8080

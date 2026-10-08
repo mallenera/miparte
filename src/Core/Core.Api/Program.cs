@@ -13,6 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSupabaseAuth(builder.Configuration);
 builder.AddLimitacionPeticiones();
+builder.AddCabecerasSeguridad();
 
 // Cadena de conexión: variable de entorno ConnectionStrings__Default (nunca en el repo).
 var connectionString = builder.Configuration.GetConnectionString("Default");
@@ -50,6 +51,7 @@ if (!string.IsNullOrWhiteSpace(supabase.Url)
         supabase.Url);
 }
 
+app.UseCabecerasSeguridad(); // el primero: también cubre los rechazos del CORS, la autenticación y el limitador
 app.UseCors();
 app.UseAuthentication();
 // Entre autenticar y autorizar: la partición es el usuario ya validado (un sub falsificado no cuenta) y

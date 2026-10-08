@@ -23,7 +23,7 @@ else
             <h2 id="t-categorias">Categorías de @Hogar.HogarActual?.Nombre</h2>
             <span class="tag">@_categorias.Count @(_categorias.Count == 1 ? "categoría" : "categorías")</span>
         </div>
-        <p class="muted">El perfil por defecto decide cómo se reparte un gasto de esa categoría. Las subcategorías cuelgan de otra categoría.</p>
+        <p class="muted">El perfil por defecto decide cómo se reparte un gasto de esa categoría. Si la marcas «a cargo de la cuenta común», sus gastos la usan por defecto (sin reparto entre personas); hace falta tener la cuenta común activada. Las subcategorías cuelgan de otra categoría.</p>
 
         @if (_error is not null)
         {
@@ -36,7 +36,13 @@ else
                 var c = nodo.Categoria;
                 <div class="catrow">
                     <div class="c-name @(nodo.Nivel > 0 ? "sub" : "")">@c.Nombre</div>
-                    <div class="c-sel">@NombrePerfil(c.PerfilRepartoId)</div>
+                    <div class="c-sel">
+                        @NombrePerfil(c.PerfilRepartoId)
+                        @if (c.ACargoCuentaComun)
+                        {
+                            <span class="tag cur">A cargo de la cuenta común</span>
+                        }
+                    </div>
                     <div class="c-acc">
                         @if (_confirmandoEliminar == c.Id)
                         {
@@ -75,6 +81,10 @@ else
                                     }
                                 </select>
                             </label>
+                            <label class="chk">
+                                <input type="checkbox" @bind="_aCargo" />
+                                A cargo de la cuenta común
+                            </label>
                             <button class="btn btn-sm" type="submit" disabled="@string.IsNullOrWhiteSpace(_nombre)">Guardar</button>
                             <button class="linkbtn" type="button" @onclick="() => _editando = null">Cancelar</button>
                         </form>
@@ -110,6 +120,10 @@ else
                     }
                 </select>
             </label>
+            <label class="chk">
+                <input type="checkbox" @bind="_nuevoACargo" />
+                A cargo de la cuenta común
+            </label>
             <button class="btn" type="submit" disabled="@string.IsNullOrWhiteSpace(_nuevoNombre)">Añadir</button>
         </form>
     </section>
@@ -125,6 +139,7 @@ else
     private Guid? _editando, _confirmandoEliminar;
     private string _nombre = "", _padre = "", _perfil = "";
     private string _nuevoNombre = "", _nuevoPadre = "", _nuevoPerfil = "";
+    private bool _aCargo, _nuevoACargo;
 
     protected override Task OnInitializedAsync() => CargarAsync();
 
@@ -173,13 +188,14 @@ else
         _nombre = c.Nombre;
         _padre = c.CategoriaPadreId?.ToString() ?? "";
         _perfil = c.PerfilRepartoId?.ToString() ?? "";
+        _aCargo = c.ACargoCuentaComun;
         _error = null;
     }
 
     private Task GuardarEdicionAsync(CategoriaDto c) =>
         EjecutarAsync(async () =>
         {
-            await Api.GuardarCategoriaAsync(c.Id, new GuardarCategoriaRequest(_nombre.Trim(), ComoGuid(_padre), ComoGuid(_perfil)));
+            await Api.GuardarCategoriaAsync(c.Id, new GuardarCategoriaRequest(_nombre.Trim(), ComoGuid(_padre), ComoGuid(_perfil), _aCargo));
             _editando = null;
             return "Categoría guardada";
         });
@@ -195,8 +211,9 @@ else
     private Task AnadirAsync() =>
         EjecutarAsync(async () =>
         {
-            await Api.CrearCategoriaAsync(new GuardarCategoriaRequest(_nuevoNombre.Trim(), ComoGuid(_nuevoPadre), ComoGuid(_nuevoPerfil)));
+            await Api.CrearCategoriaAsync(new GuardarCategoriaRequest(_nuevoNombre.Trim(), ComoGuid(_nuevoPadre), ComoGuid(_nuevoPerfil), _nuevoACargo));
             _nuevoNombre = "";
+            _nuevoACargo = false;
             return string.IsNullOrEmpty(_nuevoPadre) ? "Categoría añadida" : "Subcategoría añadida";
         });
 

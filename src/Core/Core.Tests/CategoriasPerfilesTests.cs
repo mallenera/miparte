@@ -262,6 +262,59 @@ public class CategoriasPerfilesTests
             new GuardarCategoriaRequest("X", null, null))).StatusCode);
     }
 
+    private static async Task ActivarCuenta(Contexto x)
+        => Assert.Equal(HttpStatusCode.OK, (await x.C.PutAsJsonAsync("/api/cuenta-comun/activacion", new ActivarCuentaComunRequest(true))).StatusCode);
+
+    [Fact]
+    public async Task Categoria_ACargoDeLaCuenta_ExigeLaCuentaActivadaYAsignaElPerfilDeCuentaComun()
+    {
+        using var x = await Preparar();
+        var cuenta = await IdPerfil(x.C, "Cuenta común", "cuenta_comun");
+
+        var inactiva = await x.C.PostAsJsonAsync("/api/categorias", new GuardarCategoriaRequest("Luz", null, null, true));
+        Assert.Equal(HttpStatusCode.Conflict, inactiva.StatusCode);
+
+        await ActivarCuenta(x);
+        var r = await x.C.PostAsJsonAsync("/api/categorias", new GuardarCategoriaRequest("Luz", null, null, true));
+        Assert.Equal(HttpStatusCode.Created, r.StatusCode);
+        var dto = (await r.Content.ReadFromJsonAsync<CategoriaDto>(Web))!;
+        Assert.True(dto.ACargoCuentaComun);
+        Assert.Equal(cuenta, dto.PerfilRepartoId); // sin perfil en la petición, se asigna el de cuenta común
+
+        // Quitar el indicador con un perfil que no es de cuenta común la deja normal.
+        var otro = await IdPerfil(x.C, "Individual", "individual");
+        var put = await x.C.PutAsJsonAsync($"/api/categorias/{dto.Id}", new GuardarCategoriaRequest("Luz", null, otro, false));
+        var editada = (await put.Content.ReadFromJsonAsync<CategoriaDto>(Web))!;
+        Assert.False(editada.ACargoCuentaComun);
+        Assert.Equal(otro, editada.PerfilRepartoId);
+    }
+
+    [Fact]
+    public async Task Categoria_ACargoDeLaCuenta_RechazaOtroPerfilYNecesitaPerfilDeCuentaComun()
+    {
+        using var x = await Preparar();
+        await ActivarCuenta(x);
+        var individual = await IdPerfil(x.C, "Individual", "individual");
+
+        var sinPerfil = await x.C.PostAsJsonAsync("/api/categorias", new GuardarCategoriaRequest("Luz", null, null, true));
+        Assert.Equal(HttpStatusCode.BadRequest, sinPerfil.StatusCode); // el hogar no tiene perfil de cuenta común
+
+        await IdPerfil(x.C, "Cuenta común", "cuenta_comun");
+        var conOtro = await x.C.PostAsJsonAsync("/api/categorias", new GuardarCategoriaRequest("Luz", null, individual, true));
+        Assert.Equal(HttpStatusCode.BadRequest, conOtro.StatusCode);
+    }
+
+    [Fact]
+    public async Task Categoria_ConPerfilDeCuentaComun_QuedaMarcadaACargoDeLaCuenta()
+    {
+        using var x = await Preparar();
+        var cuenta = await IdPerfil(x.C, "Cuenta común", "cuenta_comun");
+        var id = await IdCategoria(x.C, "Comunidad", perfil: cuenta);
+
+        var lista = await (await x.C.GetAsync("/api/categorias")).Content.ReadFromJsonAsync<List<CategoriaDto>>(Web);
+        Assert.True(lista!.Single(c => c.Id == id).ACargoCuentaComun);
+    }
+
     [Fact]
     public async Task Categoria_Validaciones_400()
     {

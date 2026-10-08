@@ -18,8 +18,22 @@ public sealed record ReembolsoDeCuenta(Guid MiembroId, DateOnly Fecha, decimal I
 /// <summary>Dinero que el hogar saca del ahorro de la cuenta común.</summary>
 public sealed record RetiradaDeAhorro(DateOnly Fecha, decimal Importe);
 
-/// <summary>Dinero que entra al ahorro de la cuenta común fuera de la aportación mensual (ahorro inicial, lotería...).</summary>
-public sealed record DepositoDeAhorro(DateOnly Fecha, decimal Importe);
+/// <summary>
+/// Dinero que entra al ahorro de la cuenta común fuera de la aportación mensual (ahorro inicial, lotería...).
+/// <paramref name="MiembroId"/> es quien lo registra y a quien se atribuye en «su parte» (null: no se atribuye a nadie).
+/// </summary>
+public sealed record DepositoDeAhorro(DateOnly Fecha, decimal Importe, Guid? MiembroId = null);
+
+/// <summary>
+/// Lo que le corresponde a un miembro de la cuenta común: lo que ha puesto y su parte proporcional del saldo y del ahorro.
+/// <paramref name="Aportado"/> es lo aportado para gastos (sin ahorro) y <paramref name="Ahorrado"/> lo apartado a ahorro
+/// (aportaciones más depósitos suyos). <paramref name="PorcentajeGastos"/> y <paramref name="PorcentajeAhorro"/> son su peso sobre el total (0-100, 2 decimales).
+/// <paramref name="ParteSaldo"/> es su porción del saldo de gastos y <paramref name="ParteAhorro"/> la del ahorro disponible.
+/// <paramref name="Pendiente"/> es lo que la cuenta le debe por gastos que adelantó.
+/// </summary>
+public sealed record PartePersona(
+    Guid MiembroId, decimal Aportado, decimal Ahorrado, decimal PorcentajeGastos, decimal PorcentajeAhorro,
+    decimal ParteSaldo, decimal ParteAhorro, decimal Pendiente);
 
 /// <summary>Lo que la cuenta común debe a un miembro por gastos que adelantó y aún no le ha reembolsado.</summary>
 public sealed record PendienteMiembro(Guid MiembroId, decimal Importe);
@@ -105,5 +119,74 @@ public static class CuentaComun
         return new EstadoCuentaComun(
             aportadoMes, aportado, gastado, saldo, pendientes, saldo + pendientes.Sum(p => p.Importe),
             ahorroMes + depositadoMes, ahorro + depositado, retirado, ahorro + depositado - retirado - ahorroGastado, depositado, ahorroGastado);
+    }
+
+    /// <summary>
+    /// «Su parte» de cada miembro con aportaciones o depósitos hasta <paramref name="mes"/>: el saldo de gastos se reparte
+    /// en proporción a lo aportado para gastos y el ahorro disponible, en proporción a lo ahorrado. El céntimo sobrante lo
+    /// absorbe el último miembro (por id), de modo que las partes suman siempre el saldo y el ahorro disponible.
+    /// Un saldo negativo se reparte igual: es la parte de cada uno en el descubierto.
+    /// </summary>
+    /// <param name="mes">Primer día del mes hasta el que se calcula.</param>
+    /// <param name="aportaciones">Aportaciones vigentes de todos los miembros.</param>
+    /// <param name="estado">Estado de la cuenta ya calculado para ese mes (saldo, ahorro disponible y pendientes).</param>
+    /// <param name="depositos">Depósitos de ahorro; solo se atribuyen los que llevan miembro.</param>
+    public static IReadOnlyList<PartePersona> PartesPorPersona(
+        DateOnly mes, IReadOnlyList<AportacionVigente> aportaciones, EstadoCuentaComun estado,
+        IEnumerable<DepositoDeAhorro>? depositos = null)
+    {
+        var fin = mes.AddMonths(1);
+        var aportado = new Dictionary<Guid, decimal>();
+        var ahorrado = new Dictionary<Guid, decimal>();
+        foreach (var m in aportaciones.Select(a => a.MiembroId).Distinct())
+        {
+            var primera = aportaciones.Where(a => a.MiembroId == m).Min(a => a.Desde);
+            for (var d = primera; d <= mes; d = d.AddMonths(1))
+            {
+                var vigente = Vigente(m, d, aportaciones)!;
+                aportado[m] = aportado.GetValueOrDefault(m) + vigente.Importe - vigente.Ahorro;
+                ahorrado[m] = ahorrado.GetValueOrDefault(m) + vigente.Ahorro;
+            }
+        }
+
+        foreach (var dep in (depositos ?? []).Where(d => d.MiembroId is not null && d.Fecha < fin))
+        {
+            ahorrado[dep.MiembroId!.Value] = ahorrado.GetValueOrDefault(dep.MiembroId!.Value) + dep.Importe;
+            aportado.TryAdd(dep.MiembroId!.Value, 0m);
+        }
+
+        foreach (var id in aportado.Keys) ahorrado.TryAdd(id, 0m);
+
+        var ids = aportado.Keys.OrderBy(id => id).ToList();
+        var porSaldo = Prorratear(estado.Saldo, ids.Select(id => aportado[id]).ToList());
+        var porAhorro = Prorratear(estado.AhorroDisponible, ids.Select(id => ahorrado[id]).ToList());
+        var totalAportado = aportado.Values.Sum();
+        var totalAhorrado = ahorrado.Values.Sum();
+
+        return ids.Select((id, i) => new PartePersona(
+            id, aportado[id], ahorrado[id],
+            totalAportado > 0 ? Math.Round(100m * aportado[id] / totalAportado, 2, MidpointRounding.AwayFromZero) : 0m,
+            totalAhorrado > 0 ? Math.Round(100m * ahorrado[id] / totalAhorrado, 2, MidpointRounding.AwayFromZero) : 0m,
+            porSaldo[i], porAhorro[i],
+            estado.Pendientes.FirstOrDefault(p => p.MiembroId == id)?.Importe ?? 0m)).ToList();
+    }
+
+    /// <summary>Reparte un importe (de cualquier signo) según pesos no negativos; el último con peso absorbe el céntimo sobrante. Sin pesos, todo a cero.</summary>
+    private static decimal[] Prorratear(decimal importe, IReadOnlyList<decimal> pesos)
+    {
+        var resultado = new decimal[pesos.Count];
+        var total = pesos.Sum();
+        if (total <= 0 || importe == 0) return resultado;
+
+        var ultimo = pesos.Select((p, i) => (p, i)).Last(x => x.p > 0).i;
+        var acumulado = 0m;
+        for (var i = 0; i < ultimo; i++)
+        {
+            resultado[i] = Math.Round(importe * pesos[i] / total, 2, MidpointRounding.AwayFromZero);
+            acumulado += resultado[i];
+        }
+
+        resultado[ultimo] = importe - acumulado;
+        return resultado;
     }
 }

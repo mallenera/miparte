@@ -108,4 +108,60 @@ public class ServicioSesionTests
         Assert.Equal("a1", servicio.SesionActual!.AccessToken);
         Assert.True(almacen.Datos.ContainsKey("miparte.sesion"));
     }
+
+    private static string Jwt(string sub, string email)
+    {
+        static string B64(string t) => Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(t)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        return $"{B64("{}")}.{B64($$"""{"sub":"{{sub}}","email":"{{email}}"}""")}.firma";
+    }
+
+    [Fact]
+    public async Task Google_con_fragmento_valido_inicia_sesion()
+    {
+        var (servicio, almacen, _) = Crear(ManejadorFalso.Json(HttpStatusCode.OK, "{}"));
+
+        var ok = await servicio.CompletarGoogleAsync($"#access_token={Jwt("u9", "g@gmail.com")}&refresh_token=r9&expires_in=3600&token_type=bearer");
+
+        Assert.True(ok);
+        Assert.Equal("u9", servicio.SesionActual!.UserId);
+        Assert.Equal("g@gmail.com", servicio.SesionActual.Email);
+        Assert.True(almacen.Datos.ContainsKey("miparte.sesion"));
+    }
+
+    [Fact]
+    public async Task Google_sin_tokens_no_hace_nada()
+    {
+        var (servicio, _, _) = Crear(ManejadorFalso.Json(HttpStatusCode.OK, "{}"));
+
+        Assert.False(await servicio.CompletarGoogleAsync(""));
+        Assert.Null(servicio.SesionActual);
+    }
+
+    [Fact]
+    public async Task Google_cancelado_lanza_error_en_espanol()
+    {
+        var (servicio, _, _) = Crear(ManejadorFalso.Json(HttpStatusCode.OK, "{}"));
+
+        var e = await Assert.ThrowsAsync<AuthException>(() => servicio.CompletarGoogleAsync("#error=access_denied&error_description=x"));
+
+        Assert.Contains("cancelado", e.Message);
+    }
+
+    [Fact]
+    public async Task Google_con_token_corrupto_se_rechaza()
+    {
+        var (servicio, _, _) = Crear(ManejadorFalso.Json(HttpStatusCode.OK, "{}"));
+
+        await Assert.ThrowsAsync<AuthException>(() => servicio.CompletarGoogleAsync("#access_token=basura&refresh_token=r"));
+        Assert.Null(servicio.SesionActual);
+    }
+
+    [Fact]
+    public void Url_de_google_apunta_a_authorize_con_el_retorno_codificado()
+    {
+        var (servicio, _, _) = Crear(ManejadorFalso.Json(HttpStatusCode.OK, "{}"));
+
+        Assert.Equal("https://x.supabase.co/auth/v1/authorize?provider=google&redirect_to=http%3A%2F%2Flocalhost%3A5211%2Flogin",
+            servicio.UrlGoogle("http://localhost:5211/login").ToString());
+    }
 }

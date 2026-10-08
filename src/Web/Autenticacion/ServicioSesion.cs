@@ -75,6 +75,37 @@ public sealed class ServicioSesion
     /// <param name="email">Correo.</param>
     public async Task ReenviarCodigoAsync(string email) => await _auth.ReenviarCodigoAsync(email);
 
+    /// <summary>URL de Supabase para iniciar sesión con Google.</summary>
+    /// <param name="redirectTo">URL absoluta a la que vuelve el usuario.</param>
+    public Uri UrlGoogle(string redirectTo) => _auth.UrlGoogle(redirectTo);
+
+    /// <summary>
+    /// Completa el login con Google a partir del fragmento de la URL de retorno (<c>#access_token=…</c>).
+    /// Devuelve false si el fragmento no trae sesión ni error (visita normal).
+    /// </summary>
+    /// <param name="fragmento">Fragmento de la URL, con o sin <c>#</c>.</param>
+    /// <exception cref="AuthException">Google o Supabase devolvieron un error, o los tokens no son válidos.</exception>
+    public async Task<bool> CompletarGoogleAsync(string? fragmento)
+    {
+        var valores = new Dictionary<string, string>();
+        foreach (var par in (fragmento ?? "").TrimStart('#').Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var i = par.IndexOf('=');
+            if (i > 0) valores[Uri.UnescapeDataString(par[..i])] = Uri.UnescapeDataString(par[(i + 1)..].Replace('+', ' '));
+        }
+
+        if (valores.ContainsKey("error"))
+            throw new AuthException(valores["error"] == "access_denied"
+                ? "Has cancelado el acceso con Google."
+                : "No se pudo iniciar sesión con Google.", 400);
+        if (!valores.TryGetValue("access_token", out var acceso) || !valores.TryGetValue("refresh_token", out var refresco)) return false;
+
+        await InicializarAsync();
+        var segundos = valores.TryGetValue("expires_in", out var exp) && int.TryParse(exp, out var s) ? s : 3600;
+        await EstablecerAsync(_auth.CrearSesion(acceso, refresco, segundos));
+        return true;
+    }
+
     /// <summary>Cierra la sesión en Supabase (mejor esfuerzo) y la descarta localmente.</summary>
     public async Task CerrarSesionAsync()
     {

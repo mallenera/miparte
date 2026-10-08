@@ -59,6 +59,36 @@ public sealed class SupabaseAuthClient
     public async Task ReenviarCodigoAsync(string email, CancellationToken ct = default) =>
         await EnviarAsync("resend", new { type = "signup", email }, null, ct);
 
+    /// <summary>URL a la que enviar al usuario para iniciar sesión con Google; Supabase vuelve a <paramref name="redirectTo"/> con la sesión en el fragmento.</summary>
+    /// <param name="redirectTo">URL absoluta de retorno (debe estar en las Redirect URLs de Supabase).</param>
+    public Uri UrlGoogle(string redirectTo) =>
+        new(_http.BaseAddress!, $"authorize?provider=google&redirect_to={Uri.EscapeDataString(redirectTo)}");
+
+    /// <summary>Construye la sesión a partir de los tokens que Supabase devuelve en el fragmento tras el login con Google.</summary>
+    /// <param name="accessToken">JWT de acceso.</param>
+    /// <param name="refreshToken">Token de renovación.</param>
+    /// <param name="segundos">Vigencia del token en segundos.</param>
+    /// <exception cref="AuthException">El token no es un JWT con <c>sub</c>.</exception>
+    public SesionSupabase CrearSesion(string accessToken, string refreshToken, int segundos)
+    {
+        string? userId = null, email = null;
+        try
+        {
+            var partes = accessToken.Split('.');
+            var b64 = partes[1].Replace('-', '+').Replace('_', '/');
+            using var doc = JsonDocument.Parse(Convert.FromBase64String(b64.PadRight(b64.Length + (4 - b64.Length % 4) % 4, '=')));
+            userId = doc.RootElement.TryGetProperty("sub", out var sub) ? sub.GetString() : null;
+            email = doc.RootElement.TryGetProperty("email", out var e) ? e.GetString() : null;
+        }
+        catch (Exception ex) when (ex is IndexOutOfRangeException or FormatException or JsonException)
+        {
+            // Se trata abajo como token no válido.
+        }
+
+        if (string.IsNullOrEmpty(userId)) throw new AuthException("Respuesta de autenticación no válida.", 502);
+        return new SesionSupabase(accessToken, refreshToken, _reloj.GetUtcNow().AddSeconds(segundos), userId, email);
+    }
+
     /// <summary>Renueva la sesión con el refresh token.</summary>
     /// <param name="refreshToken">Refresh token vigente.</param>
     /// <param name="ct">Token de cancelación.</param>

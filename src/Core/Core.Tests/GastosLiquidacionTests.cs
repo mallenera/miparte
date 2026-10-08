@@ -552,6 +552,26 @@ public class GastosLiquidacionTests
     }
 
     [Fact]
+    public async Task CuentaComun_LaRebajaDelAhorroSeComprueba_EnCadaMesConUsos_NoSoloEnElUltimo()
+    {
+        var e = await Montar();
+        var enero = new DateOnly(2026, 1, 1);
+        await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, enero, 500m, 200m));
+        await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, new DateOnly(2026, 2, 1), 500m, 200m));
+        // Retirada de enero (cubierta por los 200 de enero) y un gasto pequeño desde el ahorro en junio.
+        Assert.Equal(HttpStatusCode.Created, (await e.Cliente.PostAsJsonAsync("/api/cuenta-comun/retiradas-ahorro",
+            new CrearRetiradaAhorroRequest(e.Ana, 200m, new DateOnly(2026, 1, 15), null))).StatusCode);
+        await CrearGasto(e, Gasto(e, 10m, e.PerfilCuentaComun) with { Fecha = new DateOnly(2026, 6, 10), PagadoPor = null, PagadoDesdeAhorro = true });
+
+        // Junio seguiría cubierto (1000 ahorrados desde febrero frente a 210), pero la retirada de enero se quedaría sin respaldo.
+        var rechazada = await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, enero, 500m, 0m));
+
+        Assert.Equal(HttpStatusCode.Conflict, rechazada.StatusCode);
+        var estado = await Leer<CuentaComunResponse>(await e.Cliente.GetAsync("/api/cuenta-comun?mes=2026-01"));
+        Assert.Equal(0m, estado.AhorroDisponible);
+    }
+
+    [Fact]
     public async Task CuentaComun_NoSePuedeBorrarUnIngresoDeAhorroQueYaSeUso()
     {
         var e = await Montar();

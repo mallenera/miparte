@@ -55,8 +55,9 @@ public static class CuentaComunEndpoints
     }
 
     /// <summary>
-    /// Lo que sobraría de ahorro en el último mes en que se retiró o se gastó desde el ahorro si las aportaciones y los depósitos fueran los dados
-    /// (null si no hay retiradas ni gastos desde el ahorro). Un valor negativo es la cantidad que faltaría: el cambio dejaría sin respaldo dinero ya usado.
+    /// Lo que sobraría de ahorro, en el peor de los meses en que se retiró o se gastó desde el ahorro, si las aportaciones y los depósitos fueran los dados
+    /// (null si no hay retiradas ni gastos desde el ahorro). En cada uno de esos meses se compara lo ahorrado hasta él con todo lo usado hasta él;
+    /// un valor negativo es la cantidad que faltaría: el cambio dejaría sin respaldo dinero ya usado.
     /// </summary>
     private static async Task<decimal?> HolguraDeAhorroAsync(
         MiParteDbContext db, IReadOnlyList<AportacionVigente> aportaciones, IEnumerable<DepositoDeAhorro> depositos, CancellationToken ct)
@@ -65,9 +66,19 @@ public static class CuentaComunEndpoints
         var gastos = await db.Gastos.Where(g => g.PagadoDesdeAhorro).Select(g => new { g.Fecha, g.Importe }).ToListAsync(ct);
         if (retiradas.Count == 0 && gastos.Count == 0) return null;
 
-        var ultimo = retiradas.Select(r => r.Fecha).Concat(gastos.Select(g => g.Fecha)).Max();
-        var ahorrado = CuentaComun.Calcular(CuentaComun.InicioMes(ultimo), aportaciones, [], [], null, depositos).AhorroAcumulado;
-        return ahorrado - retiradas.Sum(r => r.Importe) - gastos.Sum(g => g.Importe);
+        // Mirar solo el último mes no basta: una rebaja en enero podría dejar sin respaldo una retirada de enero aunque junio siga cubierto.
+        var usos = retiradas.Select(r => (r.Fecha, r.Importe)).Concat(gastos.Select(g => (g.Fecha, g.Importe))).ToList();
+        var depositosLista = depositos.ToList();
+        decimal? peor = null;
+        foreach (var mes in usos.Select(u => CuentaComun.InicioMes(u.Fecha)).Distinct())
+        {
+            var fin = mes.AddMonths(1);
+            var ahorrado = CuentaComun.Calcular(mes, aportaciones, [], [], null, depositosLista).AhorroAcumulado;
+            var holgura = ahorrado - usos.Where(u => u.Fecha < fin).Sum(u => u.Importe);
+            peor = peor is null ? holgura : Math.Min(peor.Value, holgura);
+        }
+
+        return peor;
     }
 
     /// <summary>Respuesta 409 cuando un cambio dejaría el ahorro en negativo, con lo que faltaría.</summary>

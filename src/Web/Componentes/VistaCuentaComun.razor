@@ -86,7 +86,7 @@ else if (_estado is not null)
                 <label>De ese importe, a ahorro (€)
                     <input id="ahorro-aportacion" inputmode="decimal" placeholder="0,00" @bind="_ahorroAportacion" @bind:event="oninput" />
                 </label>
-                <button class="btn" type="submit" disabled="@(!AportacionValida)">Fijar desde @NombreMes</button>
+                <button class="btn" type="submit" disabled="@(!AportacionValida || _enviando)">Fijar desde @NombreMes</button>
             </form>
         }
     </section>
@@ -148,7 +148,7 @@ else if (_estado is not null)
                 <label>Concepto
                     <input maxlength="200" placeholder="Opcional" @bind="_conceptoReembolso" @bind:event="oninput" />
                 </label>
-                <button class="btn" type="submit" disabled="@(!ReembolsoValido)">Reembolsar</button>
+                <button class="btn" type="submit" disabled="@(!ReembolsoValido || _enviando)">Reembolsar</button>
             </form>
         }
     </section>
@@ -212,7 +212,7 @@ else if (_estado is not null)
                 <label>Concepto
                     <input maxlength="200" placeholder="Ahorro inicial, lotería…" @bind="_conceptoDeposito" @bind:event="oninput" />
                 </label>
-                <button class="btn" type="submit" disabled="@(!DepositoValido)">Añadir</button>
+                <button class="btn" type="submit" disabled="@(!DepositoValido || _enviando)">Añadir</button>
             </form>
         }
 
@@ -257,7 +257,7 @@ else if (_estado is not null)
                 <label>Concepto
                     <input maxlength="200" placeholder="Opcional" @bind="_conceptoRetirada" @bind:event="oninput" />
                 </label>
-                <button class="btn" type="submit" disabled="@(!RetiradaValida)">Retirar</button>
+                <button class="btn" type="submit" disabled="@(!RetiradaValida || _enviando)">Retirar</button>
             </form>
         }
         else if (_estado.AhorroDisponible <= 0)
@@ -272,7 +272,7 @@ else if (_estado is not null)
 
     private CuentaComunResponse? _estado;
     private List<MiembroDto> _miembros = [], _adultos = [];
-    private bool _cargando = true;
+    private bool _cargando = true, _enviando;
     private string? _errorCarga, _error;
     private DateOnly _mes = new(DateTime.Today.Year, DateTime.Today.Month, 1);
     private Guid? _confirmandoEliminar;
@@ -429,9 +429,14 @@ else if (_estado is not null)
             return "Reembolso eliminado";
         });
 
-    /// <summary>Ejecuta una operación, recarga el estado y muestra el aviso; los errores de la API salen en pantalla.</summary>
+    /// <summary>
+    /// Ejecuta una operación, recarga el estado y muestra el aviso; los errores de la API salen en pantalla.
+    /// Mientras hay una en curso se ignoran las demás (un doble clic crearía el registro dos veces).
+    /// </summary>
     private async Task EjecutarAsync(Func<Task<string>> accion)
     {
+        if (_enviando) return;
+        _enviando = true;
         _error = null;
         try
         {
@@ -443,6 +448,10 @@ else if (_estado is not null)
         {
             _error = e.Message;
             _confirmandoEliminar = null;
+        }
+        finally
+        {
+            _enviando = false;
         }
     }
 }

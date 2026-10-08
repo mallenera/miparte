@@ -65,6 +65,7 @@ internal sealed class DatosFalsos : IDatosHogar
     public Task<IReadOnlyList<CategoriaDto>> CategoriasAsync(CancellationToken ct)
     {
         Consultas.Add("categorias");
+        if (Fallo is not null) throw Fallo;
         IReadOnlyList<CategoriaDto> l =
         [
             new(Alimentacion, NombreCategoria, null, null),

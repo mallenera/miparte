@@ -8,7 +8,7 @@ using MiParte.Core.Infrastructure.Persistencia;
 namespace MiParte.Core.Api.Cierres;
 
 /// <summary>
-/// Cierre de mes: un admin congela los gastos de un mes (y con ellos su reparto y su liquidación) y puede reabrirlo.
+/// Cierre de mes: cualquier miembro congela los gastos de un mes (y con ellos su reparto y su liquidación) y solo un admin puede reabrirlo.
 /// Los demás endpoints consultan <see cref="CierreMes"/> antes de tocar gastos.
 /// </summary>
 public static class CierresMesEndpoints
@@ -23,14 +23,22 @@ public static class CierresMesEndpoints
         return app;
     }
 
-    /// <summary>Resuelve el miembro activo vinculado al usuario de la petición y comprueba que sea admin; devuelve el 401/403 si no.</summary>
-    private static async Task<(Miembro? Yo, IResult? Error)> ExigirAdminAsync(HttpContext ctx, MiParteDbContext db, CancellationToken ct)
+    /// <summary>Resuelve el miembro activo vinculado al usuario de la petición; devuelve el 401/403 si no hay o no es del hogar.</summary>
+    private static async Task<(Miembro? Yo, IResult? Error)> ExigirMiembroAsync(HttpContext ctx, MiParteDbContext db, CancellationToken ct)
     {
         if (!Guid.TryParse(ctx.User.FindFirst("sub")?.Value, out var userId)) return (null, Results.Unauthorized());
         var yo = await db.Miembros.FirstOrDefaultAsync(m => m.UserId == userId && m.Activo, ct);
-        return yo is null || yo.Rol != RolMiembro.Admin
-            ? (null, Results.Json(new { error = "Solo un administrador puede cerrar o reabrir un mes." }, statusCode: StatusCodes.Status403Forbidden))
+        return yo is null
+            ? (null, Results.Json(new { error = "Solo un miembro activo del hogar puede cerrar un mes." }, statusCode: StatusCodes.Status403Forbidden))
             : (yo, null);
+    }
+
+    /// <summary>Como <see cref="ExigirMiembroAsync"/>, pero además exige rol admin: reabrir un mes es más delicado que cerrarlo.</summary>
+    private static async Task<(Miembro? Yo, IResult? Error)> ExigirAdminAsync(HttpContext ctx, MiParteDbContext db, CancellationToken ct)
+    {
+        var (yo, error) = await ExigirMiembroAsync(ctx, db, ct);
+        if (error is not null || yo!.Rol == RolMiembro.Admin) return (yo, error);
+        return (null, Results.Json(new { error = "Solo un administrador puede reabrir un mes." }, statusCode: StatusCodes.Status403Forbidden));
     }
 
     /// <summary>Convierte un cierre en su DTO, con el nombre de quien lo cerró.</summary>
@@ -47,12 +55,12 @@ public static class CierresMesEndpoints
         return Results.Ok(cierres.Select(c => A(c, autores)).ToList());
     }
 
-    /// <summary>POST /api/cierres-mes: cierra un mes. Solo admin (403). 400 si el mes es inválido o aún no ha terminado; 409 sin hogar o si ya está cerrado. 201 si se cierra.</summary>
+    /// <summary>POST /api/cierres-mes: cierra un mes. Cualquier miembro activo vinculado (403 si no). 400 si el mes es inválido o aún no ha terminado; 409 sin hogar o si ya está cerrado. 201 si se cierra.</summary>
     private static async Task<IResult> CerrarAsync(
         CerrarMesRequest req, HttpContext ctx, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
-        var (yo, error) = await ExigirAdminAsync(ctx, db, ct);
+        var (yo, error) = await ExigirMiembroAsync(ctx, db, ct);
         if (error is not null) return error;
         if (!ApiComun.TryMes(req?.Mes, out var inicio)) return ApiComun.MesInvalido();
         // No se puede cerrar un mes que no ha terminado: se seguirían añadiendo gastos.

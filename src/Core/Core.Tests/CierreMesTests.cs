@@ -18,7 +18,7 @@ public class CierreMesTests
 
     private sealed record Escenario(HttpClient Cliente, Guid Categoria, Guid Perfil, Guid Ana);
 
-    private static async Task<Escenario> Montar(RolMiembro rol)
+    private static async Task<Escenario> Montar(RolMiembro rol, bool activo = true)
     {
         var f = Crear(Secreto);
         var user = Guid.NewGuid();
@@ -30,7 +30,7 @@ public class CierreMesTests
         {
             var db = scope.ServiceProvider.GetRequiredService<MiParteDbContext>();
             db.Hogares.Add(new Hogar { Id = hogar, Nombre = "Casa" });
-            db.Miembros.Add(new Miembro { Id = ana, HogarId = hogar, Nombre = "Ana", Tipo = TipoMiembro.Adulto, UserId = user, Rol = rol });
+            db.Miembros.Add(new Miembro { Id = ana, HogarId = hogar, Nombre = "Ana", Tipo = TipoMiembro.Adulto, UserId = user, Rol = rol, Activo = activo });
             db.Categorias.Add(new Categoria { Id = cat, HogarId = hogar, Nombre = "Comida" });
             db.PerfilesReparto.Add(new PerfilReparto { Id = perfil, HogarId = hogar, Nombre = "Individual", Modo = ModoReparto.Individual });
             await db.SaveChangesAsync();
@@ -75,13 +75,25 @@ public class CierreMesTests
     }
 
     [Fact]
-    public async Task NoAdmin_NoPuedeCerrarNiReabrir_403()
+    public async Task MiembroNoAdmin_PuedeCerrar_PeroNoReabrir()
     {
         var e = await Montar(RolMiembro.Miembro);
-        Assert.Equal(HttpStatusCode.Forbidden, (await Cerrar(e, Marzo)).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await e.Cliente.DeleteAsync($"/api/cierres-mes/{Marzo}")).StatusCode);
-        // Listar sí puede cualquier miembro.
-        Assert.Equal(HttpStatusCode.OK, (await e.Cliente.GetAsync("/api/cierres-mes")).StatusCode);
+
+        var r = await Cerrar(e, Marzo);
+        Assert.Equal(HttpStatusCode.Created, r.StatusCode);
+        Assert.Equal("Ana", (await r.Content.ReadFromJsonAsync<MesCerradoDto>(Web))!.CerradoPor);
+
+        var reabrir = await e.Cliente.DeleteAsync($"/api/cierres-mes/{Marzo}");
+        Assert.Equal(HttpStatusCode.Forbidden, reabrir.StatusCode);
+        Assert.Contains("administrador", await reabrir.Content.ReadAsStringAsync());
+        Assert.Single((await e.Cliente.GetFromJsonAsync<List<MesCerradoDto>>("/api/cierres-mes", Web))!); // sigue cerrado
+    }
+
+    [Fact]
+    public async Task UsuarioSinMiembroActivo_NoPuedeCerrar_409()
+    {
+        var e = await Montar(RolMiembro.Miembro, activo: false);
+        Assert.Equal(HttpStatusCode.Conflict, (await Cerrar(e, Marzo)).StatusCode);
     }
 
     [Theory]

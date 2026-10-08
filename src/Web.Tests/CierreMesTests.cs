@@ -23,14 +23,14 @@ public class CierreMesTests : TestContext
     }
 
     [Fact]
-    public void Admin_cierra_un_mes_tras_confirmar()
+    public void Cualquier_miembro_cierra_un_mes_tras_confirmar()
     {
         var api = new ApiFalsa().Responde("POST /api/cierres-mes", HttpStatusCode.Created, Cierre);
         Registrar(api);
         var cambios = 0;
 
         var c = RenderComponent<TarjetaCierreMes>(p => p
-            .Add(x => x.Mes, Marzo).Add(x => x.EsAdmin, true)
+            .Add(x => x.Mes, Marzo).Add(x => x.EsAdmin, false)
             .Add(x => x.Cambiado, () => cambios++));
         c.FindAll("button").First(b => b.TextContent.Trim() == "Cerrar mes").Click();
         Assert.DoesNotContain("POST /api/cierres-mes", api.Recibidas); // pide confirmación antes
@@ -55,14 +55,16 @@ public class CierreMesTests : TestContext
     }
 
     [Fact]
-    public void Quien_no_es_admin_no_ve_botones_de_cierre()
+    public void Quien_no_es_admin_ve_cerrar_pero_no_reabrir()
     {
         Registrar(new ApiFalsa());
 
-        var c = RenderComponent<TarjetaCierreMes>(p => p.Add(x => x.Mes, Marzo).Add(x => x.EsAdmin, false));
+        var abierto = RenderComponent<TarjetaCierreMes>(p => p.Add(x => x.Mes, Marzo).Add(x => x.EsAdmin, false));
+        Assert.Contains(abierto.FindAll("button"), b => b.TextContent.Trim() == "Cerrar mes");
 
-        Assert.Empty(c.FindAll("button"));
-        Assert.Contains("administrador", c.Markup);
+        var cerrado = RenderComponent<TarjetaCierreMes>(p => p.Add(x => x.Mes, Marzo).Add(x => x.EsAdmin, false).Add(x => x.Cierre, Cierre));
+        Assert.Empty(cerrado.FindAll("button"));
+        Assert.Contains("administrador", cerrado.Markup);
     }
 
     [Fact]
@@ -84,7 +86,7 @@ public class CierreMesTests : TestContext
         var api = new ApiFalsa().Error("POST /api/cierres-mes", HttpStatusCode.Conflict, "Ese mes ya está cerrado.");
         Registrar(api);
 
-        var c = RenderComponent<TarjetaCierreMes>(p => p.Add(x => x.Mes, Marzo).Add(x => x.EsAdmin, true));
+        var c = RenderComponent<TarjetaCierreMes>(p => p.Add(x => x.Mes, Marzo).Add(x => x.EsAdmin, false));
         c.FindAll("button").First(b => b.TextContent.Trim() == "Cerrar mes").Click();
         c.FindAll("button").First(b => b.TextContent.Contains("Sí, cerrar")).Click();
 

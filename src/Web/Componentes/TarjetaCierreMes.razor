@@ -1,4 +1,4 @@
-@* Cierre del mes mostrado: estado y, para admins, botón de cerrar o reabrir. Un mes cerrado congela sus gastos. *@
+@* Cierre del mes mostrado: estado y botón de cerrar (cualquier miembro) o reabrir (solo admin). Un mes cerrado congela sus gastos. *@
 @using System.Globalization
 @inject CoreApiClient Api
 @inject ServicioAvisos Avisos
@@ -24,28 +24,25 @@
         <div class="aviso err" role="alert">@_error</div>
     }
 
-    @if (EsAdmin)
+    @if (Cierre is null && !HaTerminado)
     {
-        @if (_confirmando)
-        {
-            <span class="muted">@(Cierre is null ? "¿Cerrar" : "¿Reabrir") @NombreMes?</span>
-            <button class="btn" type="button" disabled="@_trabajando" @onclick="CambiarAsync">Sí, @(Cierre is null ? "cerrar" : "reabrir")</button>
-            <button class="linkbtn" type="button" @onclick="() => _confirmando = false">No</button>
-        }
-        else if (Cierre is null && !HaTerminado)
-        {
-            <p class="muted">Solo se puede cerrar un mes que ya ha terminado.</p>
-        }
-        else
-        {
-            <button class="btn" type="button" aria-label="@(Cierre is null ? "Cerrar" : "Reabrir") @NombreMes" @onclick="() => _confirmando = true">
-                @(Cierre is null ? "Cerrar mes" : "Reabrir mes")
-            </button>
-        }
+        <p class="muted">Solo se puede cerrar un mes que ya ha terminado.</p>
+    }
+    else if (Cierre is not null && !EsAdmin)
+    {
+        <p class="muted">Solo un administrador puede reabrir el mes.</p>
+    }
+    else if (_confirmando)
+    {
+        <span class="muted">@(Cierre is null ? "¿Cerrar" : "¿Reabrir") @NombreMes?</span>
+        <button class="btn" type="button" disabled="@_trabajando" @onclick="CambiarAsync">Sí, @(Cierre is null ? "cerrar" : "reabrir")</button>
+        <button class="linkbtn" type="button" @onclick="() => _confirmando = false">No</button>
     }
     else
     {
-        <p class="muted">Solo un administrador puede cerrar o reabrir el mes.</p>
+        <button class="btn" type="button" aria-label="@(Cierre is null ? "Cerrar" : "Reabrir") @NombreMes" @onclick="() => _confirmando = true">
+            @(Cierre is null ? "Cerrar mes" : "Reabrir mes")
+        </button>
     }
 </section>
 
@@ -61,7 +58,7 @@
     /// <summary>Cierre del mes, o null si está abierto.</summary>
     [Parameter] public MesCerradoDto? Cierre { get; set; }
 
-    /// <summary>Si el usuario es admin y puede cerrar o reabrir.</summary>
+    /// <summary>Si el usuario es admin: solo él puede reabrir (cerrar puede cualquier miembro).</summary>
     [Parameter] public bool EsAdmin { get; set; }
 
     /// <summary>Se invoca tras cerrar o reabrir, para que la vista recargue.</summary>

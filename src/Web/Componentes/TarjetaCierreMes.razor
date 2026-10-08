@@ -1,0 +1,113 @@
+@* Cierre del mes mostrado: estado y, para admins, botón de cerrar o reabrir. Un mes cerrado congela sus gastos. *@
+@using System.Globalization
+@inject CoreApiClient Api
+@inject ServicioAvisos Avisos
+
+<section class="card" aria-labelledby="t-cierre">
+    <div class="card-head"><h2 id="t-cierre">Cierre del mes</h2></div>
+
+    @if (Cierre is not null)
+    {
+        <p class="muted">
+            <span class="tag cur">Cerrado</span>
+            @Cierre.CerradoEn.ToLocalTime().ToString("dd/MM/yyyy", Es)@(Cierre.CerradoPor is null ? "" : " por " + Cierre.CerradoPor).
+            Sus gastos, su reparto y su liquidación están congelados; los pagos de liquidación se pueden seguir registrando.
+        </p>
+    }
+    else
+    {
+        <p class="muted">Mes abierto. Al cerrarlo, sus gastos no se podrán añadir, editar ni borrar hasta que un administrador lo reabra.</p>
+    }
+
+    @if (_error is not null)
+    {
+        <div class="aviso err" role="alert">@_error</div>
+    }
+
+    @if (EsAdmin)
+    {
+        @if (_confirmando)
+        {
+            <span class="muted">@(Cierre is null ? "¿Cerrar" : "¿Reabrir") @NombreMes?</span>
+            <button class="btn" type="button" disabled="@_trabajando" @onclick="CambiarAsync">Sí, @(Cierre is null ? "cerrar" : "reabrir")</button>
+            <button class="linkbtn" type="button" @onclick="() => _confirmando = false">No</button>
+        }
+        else if (Cierre is null && !HaTerminado)
+        {
+            <p class="muted">Solo se puede cerrar un mes que ya ha terminado.</p>
+        }
+        else
+        {
+            <button class="btn" type="button" aria-label="@(Cierre is null ? "Cerrar" : "Reabrir") @NombreMes" @onclick="() => _confirmando = true">
+                @(Cierre is null ? "Cerrar mes" : "Reabrir mes")
+            </button>
+        }
+    }
+    else
+    {
+        <p class="muted">Solo un administrador puede cerrar o reabrir el mes.</p>
+    }
+</section>
+
+@code {
+    private static readonly CultureInfo Es = new("es-ES");
+
+    private bool _confirmando, _trabajando;
+    private string? _error;
+
+    /// <summary>Primer día del mes mostrado.</summary>
+    [Parameter, EditorRequired] public DateOnly Mes { get; set; }
+
+    /// <summary>Cierre del mes, o null si está abierto.</summary>
+    [Parameter] public MesCerradoDto? Cierre { get; set; }
+
+    /// <summary>Si el usuario es admin y puede cerrar o reabrir.</summary>
+    [Parameter] public bool EsAdmin { get; set; }
+
+    /// <summary>Se invoca tras cerrar o reabrir, para que la vista recargue.</summary>
+    [Parameter] public EventCallback Cambiado { get; set; }
+
+    private string NombreMes => Mes.ToString("MMMM yyyy", Es);
+
+    private string Clave => Mes.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+
+    /// <summary>Un mes solo se cierra cuando ya ha terminado, igual que exige la API.</summary>
+    private bool HaTerminado => Mes.AddMonths(1) <= DateOnly.FromDateTime(DateTime.UtcNow);
+
+    protected override void OnParametersSet()
+    {
+        // Al cambiar de mes se descarta cualquier confirmación o error del anterior.
+        if (_mesAnterior != Mes)
+        {
+            _mesAnterior = Mes;
+            _confirmando = false;
+            _error = null;
+        }
+    }
+
+    private DateOnly _mesAnterior;
+
+    private async Task CambiarAsync()
+    {
+        _error = null;
+        _trabajando = true;
+        try
+        {
+            var cerrando = Cierre is null;
+            if (cerrando) await Api.CerrarMesAsync(Clave);
+            else await Api.ReabrirMesAsync(Clave);
+            _confirmando = false;
+            await Cambiado.InvokeAsync();
+            Avisos.Mostrar(cerrando ? "Mes cerrado" : "Mes reabierto");
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+            _confirmando = false;
+        }
+        finally
+        {
+            _trabajando = false;
+        }
+    }
+}

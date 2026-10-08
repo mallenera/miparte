@@ -158,7 +158,17 @@ Los ingresos del hogar **no se guardan** y no hay endpoints de ingresos. Los per
 
 El importe de un mes es el de la aportación con `desde` más reciente que no pase de ese mes. **Saldo** = aportado acumulado − ahorro acumulado − gastos cargados a la cuenta hasta el mes (negativo si no los cubre): el ahorro no cuenta para gastos. **Ahorro acumulado** = parte de ahorro de las aportaciones + ingresos aparte (depósitos) hasta el mes. **Ahorro disponible** = ahorro acumulado − retiradas − gastos pagados desde el ahorro hasta el mes; una retirada baja solo el ahorro, nunca el saldo ni el efectivo. Un gasto se paga desde el ahorro con `GastoRequest.pagadoDesdeAhorro = true`: exige `pagadoPor = null` y el perfil `cuenta_comun` (400 en otro caso), baja el ahorro disponible y no el saldo ni el efectivo, no deja pendiente ni deuda entre personas, y no puede superar el ahorro disponible (409). Una retirada tampoco puede superar lo ahorrado hasta el mes de su fecha menos lo ya retirado o gastado desde el ahorro (409); el ahorro disponible nunca queda en negativo: rebajar el ahorro de una aportación (`PUT /aportaciones`) o eliminar un ingreso se rechaza con 409 si dejaría sin respaldo lo ya retirado o gastado desde el ahorro (se comprueba en el último mes con retiradas o gastos desde el ahorro). **Pendiente** de un miembro = gastos de la cuenta que adelantó − reembolsos recibidos. **Efectivo** = saldo + pendientes, sin contar el ahorro (el dinero de gastos de la cuenta no baja hasta reembolsar un gasto que adelantó una persona). Un gasto también puede pagarlo **directamente la cuenta**: `GastoRequest.pagadoPor = null`, solo con perfil `cuenta_comun` (400 en otro caso); no genera pendiente y baja el efectivo. `GastoResponse.pagadoPor` es `null` en esos gastos. Ejemplo: aportan 600 + 400, Ana adelanta una hipoteca de 900 a cargo de la cuenta → saldo 100, pendiente de Ana 900, efectivo 1000; tras reembolsarle 400 → saldo 100, pendiente 500, efectivo 600. Con ahorro: si Ana aporta 600 y aparta 150, y Beto aporta 400 sin ahorro, el saldo es 850 y el ahorro disponible 150; retirar 100 lo deja en 50 y el saldo sigue en 850. Con un ingreso aparte de 1000 (ahorro inicial) el disponible es 1050 y pagar una fianza de 300 desde el ahorro lo deja en 750, con el saldo en 850.
 
-### 3.10 Auditoría
+### 3.10 Cierre de mes
+
+| Método y ruta | Descripción | Request | Response | Errores | Permisos |
+|---|---|---|---|---|---|
+| `GET /api/cierres-mes` | Meses cerrados del hogar, del más reciente al más antiguo | - | `MesCerradoDto[]` 200 | 409 sin hogar | miembro |
+| `POST /api/cierres-mes` | Cierra un mes (`mes` = `YYYY-MM`) | `CerrarMesRequest` | `MesCerradoDto` 201 | 400 mes inválido o que aún no ha terminado; 403 no admin; 409 ya cerrado o sin hogar | admin |
+| `DELETE /api/cierres-mes/{mes}` | Reabre un mes cerrado (`mes` = `YYYY-MM`) | - | 204 | 400 mes inválido; 403 no admin; 404 no estaba cerrado; 409 sin hogar | admin |
+
+Un mes cerrado congela sus **gastos** y, con ellos, su reparto, su resumen y su liquidación (saldos y transferencias sugeridas): `POST /api/gastos` con fecha en ese mes, `PUT /api/gastos/{id}` (si la fecha actual **o** la nueva cae en un mes cerrado, es decir, tampoco se saca un gasto de él ni se mete uno), `DELETE /api/gastos/{id}` y `POST /api/gastos-recurrentes/generar?mes=` devuelven 409 `{ "error": "Ese mes está cerrado: ..." }`. Los pagos de liquidación (`/api/pagos-liquidacion`) siguen permitidos porque saldan lo congelado sin cambiarlo. Solo se cierra un mes ya terminado (el mes en curso y los futuros dan 400). Reabrir es posible en cualquier momento y queda en el historial. Cerrar y reabrir quedan en la auditoría con la entidad `mes_cerrado`.
+
+### 3.11 Auditoría
 
 | Método y ruta | Descripción | Request | Response | Errores | Permisos |
 |---|---|---|---|---|---|
@@ -166,7 +176,7 @@ El importe de un mes es el de la aportación con `desde` más reciente que no pa
 
 Cada cambio de gasto, gasto recurrente, pago de liquidación, aportación, reembolso, ingreso y retirada de ahorro, perfil, categoría, miembro e invitación queda registrado **en la misma transacción** que el cambio (no puede haber cambio sin rastro). `accion`: `crear` (solo `despues`), `editar` (solo los campos que cambian, en `antes` y `despues`), `borrar` (solo `antes`), `vincular` (un usuario queda ligado a un miembro al aceptar una invitación) y `usar` (invitación aceptada). El reparto de un gasto (`repartos`) y el detalle de un perfil (`detalle`) van dentro de su evento. Crear un hogar es un único evento (no se detalla la semilla). Nunca se registran el token de una invitación ni su hash. `autor` es el nombre del miembro vinculado al usuario; `usuarioId` sigue siendo válido aunque ese miembro se desactive.
 
-Total: 48 endpoints de negocio (4 hogares/yo, 6 miembros/invitaciones, 4 categorías, 5 perfiles, 5 gastos, 6 recurrentes, 4 resumen/liquidación/pagos, 8 cuenta común, 1 auditoría) más `GET /health`.
+Total: 51 endpoints de negocio (4 hogares/yo, 6 miembros/invitaciones, 4 categorías, 5 perfiles, 5 gastos, 6 recurrentes, 4 resumen/liquidación/pagos, 8 cuenta común, 3 cierre de mes, 1 auditoría) más `GET /health`.
 
 ## 4. Ejemplos JSON
 
@@ -399,6 +409,7 @@ Error típico si se pasa de la deuda (409): `{ "error": "El importe supera la de
 - **Quién soy**: `MiembroDto.esYo` es `true` en el miembro vinculado al usuario autenticado (en `GET /api/miembros`, `PUT` y `DELETE`; el alta siempre devuelve `false`). El front lo usa para saber si mostrar los controles de admin y cuál es "su" miembro.
 - **Roles**: solo admin crea miembros e invitaciones, modifica a otros y lee el historial (`/api/auditoria`); el hogar siempre conserva al menos un admin activo y vinculado (409). Un adulto responsable de miembros a cargo activos no se puede desactivar (409). **Decisión**: todo lo demás (gastos, pagos, reembolsos, aportaciones, perfiles, categorías, recurrentes) lo puede hacer cualquier miembro, admin o no; la responsabilidad se cubre con la auditoría, no con permisos.
 - **Invitaciones**: el `token` en claro solo se devuelve en la respuesta de `POST /api/invitaciones` (en base de datos solo se guarda su hash): mostrarlo o copiarlo en ese momento. Caduca a los 7 días (`caducaEn`) y es de un solo uso. Quien acepta no necesita hogar previo. Si la invitación apunta a un `miembroId`, ese miembro queda vinculado al usuario; si no, hay que enviar `nombre` y entra como adulto con rol `miembro`.
+- **Cierre de mes**: `GET /api/cierres-mes` dice qué meses están cerrados; en ellos la UI debe ocultar o desactivar alta, edición y borrado de gastos y la generación de recurrentes (el servidor los rechaza con 409). Solo un admin cierra o reabre.
 - **Eliminaciones**: categorías y perfiles en uso devuelven 409; los miembros se desactivan, no se borran.
 
 ## 6. Nota de cambio en /api/yo

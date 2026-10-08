@@ -229,6 +229,23 @@ public sealed class CoreApiClient
     public Task EliminarPagoLiquidacionAsync(Guid id, CancellationToken ct = default) =>
         EnviarSinRespuestaAsync(HttpMethod.Delete, $"api/pagos-liquidacion/{id}", ct);
 
+    /// <summary>Meses cerrados del hogar (<c>GET /api/cierres-mes</c>).</summary>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<List<MesCerradoDto>> ListarCierresMesAsync(CancellationToken ct = default) =>
+        ObtenerAsync<List<MesCerradoDto>>("api/cierres-mes", ct);
+
+    /// <summary>Cierra un mes; solo admin (<c>POST /api/cierres-mes</c>).</summary>
+    /// <param name="mes">Mes en formato YYYY-MM.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<MesCerradoDto> CerrarMesAsync(string mes, CancellationToken ct = default) =>
+        EnviarAsync<MesCerradoDto>(HttpMethod.Post, "api/cierres-mes", new CerrarMesRequest(mes), ct);
+
+    /// <summary>Reabre un mes cerrado; solo admin (<c>DELETE /api/cierres-mes/{mes}</c>).</summary>
+    /// <param name="mes">Mes en formato YYYY-MM.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task ReabrirMesAsync(string mes, CancellationToken ct = default) =>
+        EnviarSinRespuestaAsync(HttpMethod.Delete, $"api/cierres-mes/{Uri.EscapeDataString(mes)}", ct);
+
     private Task<T> ObtenerAsync<T>(string ruta, CancellationToken ct) => EnviarAsync<T>(HttpMethod.Get, ruta, null, ct);
 
     private async Task EnviarSinRespuestaAsync(HttpMethod metodo, string ruta, CancellationToken ct)

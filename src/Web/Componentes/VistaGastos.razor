@@ -30,6 +30,13 @@ else
         </div>
         <p class="muted">Total del mes: <b>@Euros(_gastos.Sum(g => g.Importe))</b> en @_gastos.Count @(_gastos.Count == 1 ? "gasto" : "gastos").</p>
 
+        @if (MesCerrado)
+        {
+            <div class="aviso warn" role="status" style="margin-top: 12px">
+                Este mes está cerrado: sus gastos no se pueden añadir, editar ni borrar. Un administrador puede reabrirlo desde Resumen.
+            </div>
+        }
+
         @if (_error is not null)
         {
             <div class="aviso err" role="alert" style="margin-top: 12px">@_error</div>
@@ -68,7 +75,7 @@ else
                             <button class="linkbtn danger" type="button" @onclick="() => EliminarAsync(g)">Sí</button>
                             <button class="linkbtn" type="button" @onclick="() => _confirmandoEliminar = null">No</button>
                         }
-                        else
+                        else if (!MesCerrado)
                         {
                             <button class="linkbtn" type="button" aria-label="Editar gasto @g.Concepto" @onclick="() => EmpezarEdicion(g)">Editar</button>
                             <button class="linkbtn danger" type="button" aria-label="Eliminar gasto @g.Concepto" @onclick="() => _confirmandoEliminar = g.Id">Eliminar</button>
@@ -172,6 +179,11 @@ else
     /// <summary>Perfil de modo cuenta común del hogar, el único con el que puede pagar la cuenta directamente.</summary>
     private PerfilRepartoDto? PerfilCuentaComun => _perfiles.FirstOrDefault(p => p.Modo == "cuenta_comun");
 
+    private List<MesCerradoDto> _cierres = [];
+
+    /// <summary>El mes mostrado está cerrado: el servidor rechazaría cualquier cambio en sus gastos.</summary>
+    private bool MesCerrado => _cierres.Any(c => c.Mes == _mes.ToString("yyyy-MM", CultureInfo.InvariantCulture));
+
     private string NombreMes => _mes.ToString("MMMM yyyy", Es);
 
     private bool ImporteValido => TryImporte(out _);
@@ -225,9 +237,19 @@ else
         if (_pagador is null && PerfilCuentaComun is { } p) _perfil = p.Id;
     }
 
-    private async Task RecargarGastosAsync() =>
+    private async Task RecargarGastosAsync()
+    {
         _gastos = (await Api.ListarGastosAsync(_mes.ToString("yyyy-MM", CultureInfo.InvariantCulture)))
             .OrderByDescending(g => g.Fecha).ToList();
+        try
+        {
+            _cierres = await Api.ListarCierresMesAsync();
+        }
+        catch (ApiException)
+        {
+            _cierres = []; // sin saber qué meses están cerrados, el servidor sigue rechazando los cambios
+        }
+    }
 
     private async Task CambiarMesAsync(int delta)
     {

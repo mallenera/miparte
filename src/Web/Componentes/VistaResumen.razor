@@ -31,6 +31,8 @@ else if (_resumen is not null && _liquidacion is not null)
         <div class="aviso err" role="alert" style="margin-top: 12px">@_error</div>
     }
 
+    <TarjetaCierreMes Mes="_mes" Cierre="CierreDelMes" EsAdmin="SoyAdmin" Cambiado="RecargarTrasCierreAsync" />
+
     <section class="card" aria-labelledby="t-liquidacion">
         <div class="card-head"><h2 id="t-liquidacion">Liquidación</h2></div>
         <p class="muted">Quién debe a quién para quedar en paz este mes. Los pagos que registres se descuentan de los saldos.</p>
@@ -172,6 +174,11 @@ else if (_resumen is not null && _liquidacion is not null)
     private string? _errorCarga, _error;
     private DateOnly _mes = new(DateTime.Today.Year, DateTime.Today.Month, 1);
     private Guid? _confirmandoEliminar;
+    private List<MesCerradoDto> _cierres = [];
+
+    private bool SoyAdmin => _miembros.Any(m => m.EsYo && m.Rol == "admin");
+
+    private MesCerradoDto? CierreDelMes => _cierres.FirstOrDefault(c => c.Mes == _mes.ToString("yyyy-MM", CultureInfo.InvariantCulture));
 
     private string NombreMes => _mes.ToString("MMMM yyyy", Es);
 
@@ -199,6 +206,26 @@ else if (_resumen is not null && _liquidacion is not null)
         var mes = _mes.ToString("yyyy-MM", CultureInfo.InvariantCulture);
         _resumen = await Api.ObtenerResumenAsync(mes);
         _liquidacion = await Api.ObtenerLiquidacionAsync(mes);
+        try
+        {
+            _cierres = await Api.ListarCierresMesAsync();
+        }
+        catch (ApiException)
+        {
+            _cierres = []; // el cierre es informativo aquí: sin él se sigue viendo el resumen
+        }
+    }
+
+    private async Task RecargarTrasCierreAsync()
+    {
+        try
+        {
+            await RecargarAsync();
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
     }
 
     private async Task CambiarMesAsync(int delta)

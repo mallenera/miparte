@@ -26,7 +26,7 @@ public static class GastosEndpoints
     private static GastoResponse A(Gasto g) => new(
         g.Id, g.Fecha, g.Importe, g.CategoriaId, g.PagadoPor, g.PerfilRepartoId, g.Concepto, g.GastoRecurrenteId,
         g.Repartos.OrderBy(r => r.MiembroId).Select(r => new RepartoGastoDto(r.MiembroId, r.ImporteAsumido)).ToList(),
-        g.ACargoCuentaComun, g.PagadoDesdeAhorro);
+        g.ACargoCuentaComun, g.PagadoDesdeAhorro, g.EsPersonal);
 
     /// <summary>GET /api/gastos: lista los gastos, filtrables por mes (YYYY-MM), categoría, miembro (quien paga o asume una parte mayor que 0) y texto del concepto, de más reciente a más antiguo. 409 sin hogar; 400 si el mes es inválido.</summary>
     private static async Task<IResult> ListarAsync(
@@ -63,7 +63,7 @@ public static class GastosEndpoints
         return g is null ? Results.NotFound() : Results.Ok(A(g));
     }
 
-    /// <summary>Valida el cuerpo y calcula el reparto (vacío y marcado a cargo de la cuenta común si el perfil es de cuenta común).</summary>
+    /// <summary>Valida el cuerpo y calcula el reparto (vacío y marcado a cargo de la cuenta común si el perfil es de cuenta común; el 100 % del pagador si el gasto es personal).</summary>
     private static async Task<(IReadOnlyList<ParteAsumida>? Partes, string? Error, bool CuentaComun)> Preparar(
         GastoRequest r, MiParteDbContext db, CancellationToken ct)
     {
@@ -75,10 +75,15 @@ public static class GastosEndpoints
             return (null, "Quien paga debe ser un adulto activo del hogar.", false);
         if (r.PagadoDesdeAhorro && r.PagadoPor is not null)
             return (null, "Un gasto pagado desde el ahorro no lo adelanta nadie: déjalo sin pagador.", false);
+        if (r.Personal && (r.PagadoPor is null || r.PagadoDesdeAhorro))
+            return (null, "Un gasto personal lo paga un miembro del hogar, no la cuenta común ni el ahorro.", false);
         var perfil = await db.PerfilesReparto.Include(p => p.Detalles).FirstOrDefaultAsync(p => p.Id == r.PerfilRepartoId, ct);
         if (perfil is null) return (null, "El perfil de reparto no existe en el hogar.", false);
         if (r.PagadoPor is null && perfil.Modo != ModoReparto.CuentaComun)
             return (null, "La cuenta común solo paga gastos con el perfil de cuenta común.", false);
+
+        // Un gasto personal lo asume íntegro quien lo paga, sea cual sea el modo del perfil, y no es de la cuenta común.
+        if (r.Personal) return ([new ParteAsumida(r.PagadoPor!.Value, r.Importe)], null, false);
 
         var adultos = await ApiComun.AdultosActivos(db, ct);
         var partes = ApiComun.Repartir(perfil, adultos, r.Importe, r.PagadoPor ?? Guid.Empty, out var error);
@@ -109,7 +114,7 @@ public static class GastosEndpoints
             Id = Guid.NewGuid(), HogarId = hogarId, Fecha = req.Fecha, Importe = req.Importe,
             CategoriaId = req.CategoriaId, PagadoPor = req.PagadoPor, PerfilRepartoId = req.PerfilRepartoId,
             Concepto = ApiComun.NormalizarConcepto(req.Concepto), ACargoCuentaComun = cuentaComun,
-            PagadoDesdeAhorro = req.PagadoDesdeAhorro,
+            PagadoDesdeAhorro = req.PagadoDesdeAhorro, EsPersonal = req.Personal,
         };
         ApiComun.AplicarReparto(g, partes);
         db.Gastos.Add(g);
@@ -138,6 +143,7 @@ public static class GastosEndpoints
         g.Concepto = ApiComun.NormalizarConcepto(req.Concepto);
         g.ACargoCuentaComun = cuentaComun;
         g.PagadoDesdeAhorro = req.PagadoDesdeAhorro;
+        g.EsPersonal = req.Personal;
         ApiComun.AplicarReparto(g, partes);
         await db.SaveChangesAsync(ct);
         return Results.Ok(A(g));

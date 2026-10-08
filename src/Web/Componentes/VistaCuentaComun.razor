@@ -27,15 +27,15 @@ else if (_estado is not null && !_estado.Activa)
         </p>
         @if (_error is not null)
         {
-            <div class="aviso err" role="alert" style="margin-top: 12px">@_error</div>
+            <div class="aviso err u-mt12" role="alert">@_error</div>
         }
         @if (SoyAdmin)
         {
-            <button class="btn" type="button" style="margin-top: 12px" disabled="@_enviando" @onclick="() => CambiarActivacionAsync(true)">Activar la cuenta común</button>
+            <button class="btn u-mt12" type="button" disabled="@_enviando" @onclick="() => CambiarActivacionAsync(true)">Activar la cuenta común</button>
         }
         else
         {
-            <div class="aviso warn" role="status" style="margin-top: 12px">Solo un administrador del hogar puede activarla.</div>
+            <div class="aviso warn u-mt12" role="status">Solo un administrador del hogar puede activarla.</div>
         }
     </section>
 }

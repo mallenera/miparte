@@ -353,6 +353,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 /* Utilidades de espaciado que antes eran style="" en línea; !important porque deben ganar a reglas como .card h3 */
 .u-mt0 { margin-top: 0 !important; }
 .u-mt10 { margin-top: 10px !important; }
+.u-mt8-inline { margin-top: 8px; display: inline-block; }
 .u-mt12 { margin-top: 12px !important; }
 .u-mt14 { margin-top: 14px !important; }
 .u-sec { margin: 16px 0 0 !important; }
@@ -544,6 +545,8 @@ input.invalid, input[aria-invalid="true"] { border-color: var(--err); outline: 0
     grid-template-columns: minmax(0, 1fr) auto auto;
 }
 .gastorow:first-child { border-top: 0; }
+/* Gasto personal: franja naranja a la izquierda además de la etiqueta, para distinguirlo del gasto compartido sin depender solo del color. */
+.gastorow.personal { border-left: 3px solid var(--orange); padding-left: 10px; }
 .g-concepto { font-weight: 600; overflow-wrap: anywhere; }
 .g-meta { font-size: .85rem; }
 .g-reparto { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }

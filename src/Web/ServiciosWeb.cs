@@ -30,6 +30,8 @@ public static class ServiciosWeb
         servicios.AddSingleton<ServicioAvisos>();
         servicios.AddSingleton<ServicioTema>();
         servicios.AddScoped<ServicioArranque>();
+        servicios.AddSingleton<ServicioConexion>();
+        servicios.AddTransient<ManejadorReintentos>();
         servicios.AddTransient<ManejadorCoreApi>();
         servicios.AddSingleton<ServidorDemo>();
         servicios.AddTransient<ManejadorDemo>();
@@ -40,6 +42,7 @@ public static class ServiciosWeb
             http.DefaultRequestHeaders.Add("apikey", opciones.SupabaseAnonKey);
         });
         servicios.AddHttpClient<CoreApiClient>(http => http.BaseAddress = Base(opciones.CoreUrl, "/"))
+            .AddHttpMessageHandler<ManejadorReintentos>()
             .AddHttpMessageHandler<ManejadorCoreApi>()
             .AddHttpMessageHandler<ManejadorDemo>();
 

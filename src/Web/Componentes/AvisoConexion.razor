@@ -1,0 +1,18 @@
+@* Avisa mientras Core.Api no responde y se están reintentando las lecturas (reinicio por despliegue o arranque en frío). *@
+@implements IDisposable
+@inject ServicioConexion Conexion
+
+@if (Conexion.Reintentando)
+{
+    <div class="aviso warn aviso-sistema" role="status">
+        El servidor se está actualizando o arrancando. Puede tardar hasta un minuto; seguimos intentándolo.
+    </div>
+}
+
+@code {
+    protected override void OnInitialized() => Conexion.Cambiado += Refrescar;
+
+    private void Refrescar() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Conexion.Cambiado -= Refrescar;
+}

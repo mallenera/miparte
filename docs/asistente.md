@@ -40,7 +40,7 @@ Reglas del diseño que se cumplen en código: si falta el año se asume el en cu
 
 ## Contrato HTTP
 
-Base local: `http://localhost:5174` (`dotnet run`) o `http://localhost:5002` (docker compose). Errores como en Core.Api: `{ "error": "mensaje en español" }`.
+Base local: `http://localhost:5002` (tanto con `dotnet run` como con docker compose). Errores como en Core.Api: `{ "error": "mensaje en español" }`.
 
 ### `GET /health`
 Sin autenticación: `{ "service": "assistant", "status": "ok" }`.
@@ -93,10 +93,12 @@ Front: `Api:AssistantUrl` en `wwwroot/appsettings.json` (público, sin secretos)
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...        # solo en tu terminal
 export Supabase__Url=https://xxxx.supabase.co
+# Solo si el proyecto aún usa el secreto HS256 legado (el mismo valor en Core.Api y Assistant.Api; nunca lo subas al repo):
+export Supabase__JwtSecret="<secreto-hs256-del-proyecto>"
 export ConnectionStrings__Default="..."
 dotnet run --project src/Core/Core.Api --urls http://localhost:5001
-Asistente__CoreUrl=http://localhost:5001 dotnet run --project src/Assistant/Assistant.Api   # http://localhost:5174
-dotnet run --project src/Web                                                                 # Api:AssistantUrl ya apunta a :5174
+Asistente__CoreUrl=http://localhost:5001 dotnet run --project src/Assistant/Assistant.Api   # http://localhost:5002
+dotnet run --project src/Web                                                                 # Api:AssistantUrl ya apunta a :5002
 ```
 
 Sin clave se puede ver la pestaña y comprobar el 503; el modo demo del front responde con un texto fijo. Los tests (`dotnet test src/Assistant/Assistant.Tests`) usan un cliente de modelo falso y no llaman a la API de Anthropic.

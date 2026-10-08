@@ -22,6 +22,10 @@ public static class ErroresInesperados
             {
                 ctx.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("MiParte.Core.Api.Errores")
                     .LogError(ex, "Excepción no controlada en {Metodo} {Ruta}", ctx.Request.Method, ctx.Request.Path);
+                // Cabeceras de cuerpo que el endpoint pudo fijar antes de fallar: describirían otro cuerpo. Las demás
+                // (CORS, seguridad) se conservan a propósito.
+                ctx.Response.Headers.ContentLength = null;
+                ctx.Response.Headers.Remove("Content-Encoding");
                 ctx.Response.StatusCode = StatusCodes.Status500InternalServerError;
                 await ctx.Response.WriteAsJsonAsync(new { error = "Error interno del servidor." });
             }

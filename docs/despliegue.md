@@ -26,7 +26,7 @@ El plan gratuito duerme el servicio tras 15 minutos sin tráfico: la primera pet
 1. Supabase → Project Settings → Database → **SSL Configuration** → *Download certificate* (fichero `.crt`; es público, no un secreto).
 2. Render → `miparte-core` → Environment → **Secret Files** → *Add Secret File*: nombre `supabase-ca.crt`, contenido el del certificado. Queda en `/etc/secrets/supabase-ca.crt`.
 3. Cambia `ConnectionStrings__Default` a `...;SSL Mode=VerifyFull;Root Certificate=/etc/secrets/supabase-ca.crt` (en lugar de `SSL Mode=Require`) y guarda; Render redespliega.
-4. Si el log muestra un error de certificado o de nombre, vuelve a `Require` mientras lo revisas: `VerifyFull` exige que el nombre del host coincida con el del certificado. Con `VerifyCA` solo se valida la cadena.
+4. Si el log muestra un error de certificado o de nombre, no bajes a `Require`: corrige el certificado, la ruta de `Root Certificate` o el host (debe ser el del certificado). `VerifyFull` valida cadena y nombre del host; `VerifyCA` solo la cadena.
 
 ## Errores 500
 

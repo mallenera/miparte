@@ -84,9 +84,13 @@ public class CorsTests
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
         {
             next(app);
-            app.Run(ctx => ctx.Request.Path == "/prueba/falla"
-                ? throw new InvalidOperationException("detalle-interno-secreto")
-                : Task.CompletedTask);
+            app.Run(ctx =>
+            {
+                if (ctx.Request.Path == "/prueba/falla-con-longitud") ctx.Response.ContentLength = 3;
+                return ctx.Request.Path.Value!.StartsWith("/prueba/falla")
+                    ? throw new InvalidOperationException("detalle-interno-secreto")
+                    : Task.CompletedTask;
+            });
         };
     }
 
@@ -105,5 +109,20 @@ public class CorsTests
         var cuerpo = await r.Content.ReadAsStringAsync();
         Assert.Contains("Error interno", cuerpo);
         Assert.DoesNotContain("detalle-interno-secreto", cuerpo);
+    }
+
+    [Fact]
+    public async Task ErrorInesperado_DescartaLaLongitudQueElEndpointHabiaFijado()
+    {
+        using var f = ConOrigenes(Permitido).WithWebHostBuilder(b =>
+            b.ConfigureServices(s => s.AddSingleton<IStartupFilter, EndpointQueFallaFilter>()));
+        var c = f.CreateClient();
+        c.DefaultRequestHeaders.Add("Origin", Permitido);
+
+        var r = await c.GetAsync("/prueba/falla-con-longitud");
+
+        Assert.Equal(HttpStatusCode.InternalServerError, r.StatusCode);
+        Assert.Contains("Error interno", await r.Content.ReadAsStringAsync());
+        Assert.Equal(Permitido, r.Headers.GetValues("Access-Control-Allow-Origin").Single());
     }
 }

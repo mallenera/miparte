@@ -163,6 +163,11 @@ else
     </div>
 
     <PanelPerfiles Perfiles="_perfiles" Miembros="_miembros" OnCambiado="CargarSinParpadeoAsync" />
+
+    @if (EsAdmin)
+    {
+        <PanelHistorial />
+    }
 }
 
 @code {

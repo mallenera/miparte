@@ -69,10 +69,15 @@
             }
         </ol>
 
+        @if (_errorMas is not null)
+        {
+            <div class="aviso err" role="alert">@_errorMas</div>
+        }
+
         @if (_hayMas)
         {
             <div class="hist-mas">
-                <button class="btn btn-ghost btn-sm" type="button" disabled="@_cargandoMas" @onclick="CargarMasAsync">Cargar más</button>
+                <button class="btn btn-ghost btn-sm" type="button" disabled="@_cargandoMas" @onclick="CargarMasAsync">@(_errorMas is null ? "Cargar más" : "Reintentar")</button>
             </div>
         }
     }
@@ -82,53 +87,73 @@
     private const int PorPagina = 50;
     private static readonly CultureInfo Es = new("es-ES");
 
-    /// <summary>Miembros del hogar, para poner nombre a los ids que aparecen en el detalle.</summary>
-    [Parameter] public List<MiembroDto> Miembros { get; set; } = [];
-
     private string Filtro { get; set; } = "";
     private readonly List<EventoAuditoriaDto> _eventos = [];
+
+    // Incluye a los desactivados: un cambio antiguo puede referirse a alguien que ya no está activo.
+    private List<MiembroDto> _miembros = [];
     private bool _cargando = true, _cargandoMas, _hayMas;
-    private string? _error;
+    private string? _error, _errorMas;
 
-    protected override Task OnInitializedAsync() => CargarAsync();
+    // Identifica la última carga iniciada: la respuesta de una anterior (otro filtro) se descarta.
+    private int _generacion;
 
-    private string? NombreMiembro(Guid id) => Miembros.FirstOrDefault(m => m.Id == id)?.Nombre;
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _miembros = await Api.ListarMiembrosAsync(incluirInactivos: true);
+        }
+        catch (ApiException)
+        {
+            // Sin nombres el detalle omite los campos que son personas, pero el historial sigue siendo útil.
+        }
+        await CargarAsync();
+    }
+
+    private string? NombreMiembro(Guid id) => _miembros.FirstOrDefault(m => m.Id == id)?.Nombre;
 
     private string? FiltroONull => string.IsNullOrEmpty(Filtro) ? null : Filtro;
 
     private async Task CargarAsync()
     {
+        var generacion = ++_generacion;
         _cargando = true;
-        _error = null;
+        _cargandoMas = false;
+        _error = _errorMas = null;
         _eventos.Clear();
         try
         {
             var pagina = await Api.ListarAuditoriaAsync(FiltroONull, PorPagina);
+            if (generacion != _generacion) return;
             _eventos.AddRange(pagina);
             _hayMas = pagina.Count == PorPagina;
         }
-        catch (ApiException e)
+        catch (ApiException e) when (generacion == _generacion)
         {
             _error = e.Message;
         }
-        _cargando = false;
+        if (generacion == _generacion) _cargando = false;
     }
 
     private async Task CargarMasAsync()
     {
         if (_eventos.Count == 0) return;
+        var generacion = _generacion;
         var ultimo = _eventos[^1];
         _cargandoMas = true;
+        _errorMas = null;
         try
         {
             var pagina = await Api.ListarAuditoriaAsync(FiltroONull, PorPagina, ultimo.Cuando, ultimo.Id);
+            if (generacion != _generacion) return;
             _eventos.AddRange(pagina);
             _hayMas = pagina.Count == PorPagina;
         }
-        catch (ApiException e)
+        catch (ApiException e) when (generacion == _generacion)
         {
-            _error = e.Message;
+            _errorMas = e.Message;
         }
-        _cargandoMas = false;
+        if (generacion == _generacion) _cargandoMas = false;
     }
 }

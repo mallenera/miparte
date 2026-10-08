@@ -31,9 +31,10 @@ public sealed class CoreApiClient
         EnviarAsync<HogarResumen>(HttpMethod.Post, "api/invitaciones/aceptar", peticion, ct);
 
     /// <summary>Miembros activos del hogar actual (<c>GET /api/miembros</c>); <c>EsYo</c> marca al usuario autenticado.</summary>
+    /// <param name="incluirInactivos">Incluye también a los desactivados (<c>?incluirInactivos=true</c>), para poner nombre a quien aparece en el historial.</param>
     /// <param name="ct">Token de cancelación.</param>
-    public Task<List<MiembroDto>> ListarMiembrosAsync(CancellationToken ct = default) =>
-        ObtenerAsync<List<MiembroDto>>("api/miembros", ct);
+    public Task<List<MiembroDto>> ListarMiembrosAsync(bool incluirInactivos = false, CancellationToken ct = default) =>
+        ObtenerAsync<List<MiembroDto>>(incluirInactivos ? "api/miembros?incluirInactivos=true" : "api/miembros", ct);
 
     /// <summary>Añade una persona sin cuenta (<c>POST /api/miembros</c>, solo admin).</summary>
     /// <param name="peticion">Nombre, tipo y responsable (si es a cargo).</param>

@@ -104,6 +104,25 @@ public static class TextoAuditoria
         return char.ToUpperInvariant(texto[0]) + texto[1..];
     }
 
+    /// <summary>
+    /// Reparto de un gasto o detalle de un perfil: «Ana 60, Luis 40». Cualquier otra lista se resume por su número de líneas.
+    /// </summary>
+    private static string Lineas(JsonElement lista, Func<Guid, string?> miembro)
+    {
+        var partes = new List<string>();
+        foreach (var linea in lista.EnumerateArray())
+        {
+            if (linea.ValueKind != JsonValueKind.Object || !linea.TryGetProperty("miembroId", out var m)
+                || !Guid.TryParse(m.GetString(), out var id))
+                return lista.GetArrayLength() == 1 ? "1 línea" : $"{lista.GetArrayLength()} líneas";
+            var dato = linea.TryGetProperty("valor", out var valor) ? valor
+                : linea.TryGetProperty("importeAsumido", out var importe) ? importe : default;
+            var numero = dato.ValueKind == JsonValueKind.Number ? " " + dato.GetDecimal().ToString("0.##", Es) : "";
+            partes.Add((miembro(id) ?? "otro miembro") + numero);
+        }
+        return partes.Count == 0 ? "sin líneas" : string.Join(", ", partes);
+    }
+
     /// <summary>Valor legible del campo; <paramref name="ok"/> es false si es un id que no se puede resolver.</summary>
     private static string? Valor(JsonElement? objeto, string clave, Func<Guid, string?> miembro, out bool ok)
     {
@@ -115,7 +134,7 @@ public static class TextoAuditoria
             case JsonValueKind.True: return "Sí";
             case JsonValueKind.False: return "No";
             case JsonValueKind.Number: return v.GetDecimal().ToString("0.##", Es);
-            case JsonValueKind.Array: return v.GetArrayLength() == 1 ? "1 línea" : $"{v.GetArrayLength()} líneas";
+            case JsonValueKind.Array: return Lineas(v, miembro);
             case JsonValueKind.Object: return "…";
             default:
                 var texto = v.GetString() ?? "—";

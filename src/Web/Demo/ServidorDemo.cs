@@ -58,7 +58,7 @@ public sealed partial class ServidorDemo
             ("hogares", 2, "POST") => Mal(HttpStatusCode.Conflict, "En el modo demo no se pueden crear hogares."),
             ("invitaciones", 3, "POST") when subruta == "aceptar" => Mal(HttpStatusCode.Conflict, "En el modo demo no se pueden aceptar invitaciones."),
 
-            ("miembros", 2, "GET") => Ok(_miembros.Where(m => m.Activo).OrderBy(m => m.Nombre).Select(ADto).ToList()),
+            ("miembros", 2, "GET") => Ok(_miembros.Where(m => m.Activo || Consulta(uri, "incluirInactivos") == "true").OrderBy(m => m.Nombre).Select(ADto).ToList()),
             ("miembros", 2, "POST") => CrearMiembro((await Cuerpo<CrearMiembroRequest>())!),
             ("miembros", 3, "PUT") when id is { } i => ActualizarMiembro(i, (await Cuerpo<ActualizarMiembroRequest>())!),
             ("invitaciones", 2, "POST") => CrearInvitacion(await Cuerpo<CrearInvitacionRequest>()),

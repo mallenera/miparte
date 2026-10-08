@@ -27,11 +27,12 @@ public class HistorialTests : TestContext
 
     private ApiFalsa Registrar(ApiFalsa api)
     {
+        api.Responde("GET /api/miembros", HttpStatusCode.OK, Miembros);
         Services.AddSingleton(new CoreApiClient(new HttpClient(api) { BaseAddress = new Uri("http://localhost:5001/") }));
         return api;
     }
 
-    private IRenderedComponent<PanelHistorial> Panel() => RenderComponent<PanelHistorial>(p => p.Add(x => x.Miembros, Miembros));
+    private IRenderedComponent<PanelHistorial> Panel() => RenderComponent<PanelHistorial>();
 
     [Fact]
     public void Frase_describe_la_accion_y_el_nombre()
@@ -65,6 +66,38 @@ public class HistorialTests : TestContext
         var cambios = TextoAuditoria.Cambios(e, _ => null);
 
         Assert.Equal([new CambioAuditoria("Reparto", null, "2 líneas")], cambios);
+    }
+
+    [Fact]
+    public void Un_reparto_o_detalle_muestra_miembro_y_valor_de_cada_linea()
+    {
+        var e = Evento("editar", "perfil_reparto",
+            $$"""{"detalle":[{"miembroId":"{{AnaId}}","valor":60},{"miembroId":"{{LuisId}}","valor":40}]}""",
+            $$"""{"detalle":[{"miembroId":"{{AnaId}}","valor":50},{"miembroId":"{{LuisId}}","valor":50.5}]}""");
+
+        var cambios = TextoAuditoria.Cambios(e, id => Miembros.FirstOrDefault(m => m.Id == id)?.Nombre);
+
+        Assert.Equal([new CambioAuditoria("Detalle", "Ana 60, Luis 40", "Ana 50, Luis 50,5")], cambios);
+    }
+
+    [Fact]
+    public void Un_reparto_de_gasto_usa_el_importe_asumido_y_un_miembro_desconocido_no_se_oculta()
+    {
+        var e = Evento("crear", "gasto", null, $$"""{"repartos":[{"miembroId":"{{AnaId}}","importeAsumido":21},{"miembroId":"{{Guid.NewGuid()}}","importeAsumido":9}]}""");
+
+        var cambios = TextoAuditoria.Cambios(e, id => Miembros.FirstOrDefault(m => m.Id == id)?.Nombre);
+
+        Assert.Equal([new CambioAuditoria("Reparto", null, "Ana 21, otro miembro 9")], cambios);
+    }
+
+    [Fact]
+    public void El_panel_pide_tambien_los_miembros_desactivados_para_poner_nombre()
+    {
+        var api = Registrar(new ApiFalsa().Responde("GET /api/auditoria", HttpStatusCode.OK, new List<EventoAuditoriaDto>()));
+
+        Panel();
+
+        Assert.Contains("/api/miembros?incluirInactivos=true", api.Consultas);
     }
 
     [Fact]
@@ -135,5 +168,28 @@ public class HistorialTests : TestContext
         c.Find("select").Change("categoria");
 
         Assert.Contains("entidad=categoria", api.Consultas.Last());
+    }
+
+    [Fact]
+    public void Si_falla_cargar_mas_se_conserva_la_lista_y_el_reintento_pide_solo_esa_pagina()
+    {
+        var primera = Enumerable.Range(0, 50)
+            .Select(i => Evento("crear", "gasto", null, """{"concepto":"x"}""", cuando: new DateTimeOffset(2026, 10, 8, 10, 0, 0, TimeSpan.Zero).AddMinutes(-i)))
+            .ToList();
+        var llamadas = 0;
+        var api = Registrar(new ApiFalsa().Responde("GET /api/auditoria", HttpStatusCode.OK, primera));
+        api.Responde("GET /api/auditoria", r => ++llamadas == 1
+            ? ApiFalsa.Json(HttpStatusCode.OK, primera)
+            : ApiFalsa.Json(HttpStatusCode.InternalServerError, new { error = "Fallo de prueba." }));
+        var c = Panel();
+
+        c.FindAll("button").First(b => b.TextContent.Contains("Cargar más")).Click();
+
+        Assert.Equal(50, c.FindAll("li.hist-item").Count);
+        Assert.Contains("Fallo de prueba.", c.Find("[role=alert]").TextContent);
+        var reintentar = c.FindAll("button").First(b => b.TextContent.Contains("Reintentar"));
+        reintentar.Click();
+        Assert.Contains("despuesDeId=", api.Consultas.Last());
+        Assert.Equal(50, c.FindAll("li.hist-item").Count);
     }
 }

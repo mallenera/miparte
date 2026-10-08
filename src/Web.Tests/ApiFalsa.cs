@@ -25,6 +25,14 @@ internal sealed class ApiFalsa : HttpMessageHandler
         return this;
     }
 
+    public ApiFalsa Responde(string metodoYRuta, Func<HttpRequestMessage, HttpResponseMessage> respuesta)
+    {
+        _rutas[metodoYRuta] = respuesta;
+        return this;
+    }
+
+    public static HttpResponseMessage Json(HttpStatusCode codigo, object? cuerpo) => Respuesta(codigo, cuerpo);
+
     public ApiFalsa Error(string metodoYRuta, HttpStatusCode codigo, string mensaje) =>
         Responde(metodoYRuta, codigo, new { error = mensaje });
 

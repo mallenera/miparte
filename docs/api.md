@@ -41,6 +41,18 @@ El resto de rutas `/api/*` requieren hogar (cabecera o hogar único). Los datos 
 
 Orígenes permitidos: variable de entorno `Cors__OrigenesPermitidos__0` (y `__1`, ...), equivalente a `Cors:OrigenesPermitidos` en configuración. Ejemplo: `Cors__OrigenesPermitidos__0=http://localhost:8080`. Sin configuración no se permite ningún origen cruzado. Cabeceras permitidas: `Authorization`, `Content-Type`, `X-Hogar-Id`. Métodos: GET, POST, PUT, PATCH, DELETE, OPTIONS. Las barras finales del origen se ignoran.
 
+### Límites de peticiones (429)
+
+Ventana deslizante de 1 minuto, **por usuario** (`sub` del JWT ya validado) y, sin sesión válida, **por IP**. Al superarla: **429** con `Retry-After` (segundos) y `{ "error": "Demasiadas peticiones..." }`. El front debe tratarlo como un error recuperable y esperar.
+
+| Ámbito | Límite por defecto | Variable de entorno |
+|---|---|---|
+| Toda la API (salvo `/health`) | 120/min | `Limites__PeticionesPorMinuto` |
+| Costosas: `POST /api/hogares`, `POST /api/invitaciones`, `POST /api/invitaciones/aceptar`, `POST /api/gastos-recurrentes/generar` | 10/min | `Limites__CostosasPorMinuto` |
+| Tamaño del cuerpo de la petición (413 al superarlo) | 65536 bytes | `Limites__MaxCuerpoBytes` |
+
+Detrás de un proxy inverso hay que configurar `ForwardedHeaders`; si no, todos los anónimos comparten la IP del proxy.
+
 ## 2. Flujo recomendado de arranque del front
 
 1. Con sesión Supabase iniciada, llamar `GET /api/yo` (sin `X-Hogar-Id`).

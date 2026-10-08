@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MiParte.Contracts;
+using MiParte.Core.Api.Seguridad;
 using MiParte.Core.Domain.Entidades;
 using MiParte.Core.Infrastructure.Persistencia;
 
@@ -33,6 +34,7 @@ public static class HogaresEndpoints
 
         app.MapPost("/api/hogares", CrearAsync)
             .RequireAuthorization()
+            .RequireRateLimiting(LimitacionPeticiones.Costosa)
             .WithMetadata(new SinHogarActual());
 
         app.MapGet("/api/hogares/{id:guid}", ObtenerAsync)

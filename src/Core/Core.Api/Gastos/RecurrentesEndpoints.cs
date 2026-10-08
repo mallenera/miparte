@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MiParte.Contracts;
+using MiParte.Core.Api.Seguridad;
 using MiParte.Core.Domain.Entidades;
 using MiParte.Core.Infrastructure.Persistencia;
 
@@ -18,7 +19,7 @@ public static class RecurrentesEndpoints
         g.MapPost("", CrearAsync);
         g.MapPut("{id:guid}", EditarAsync);
         g.MapDelete("{id:guid}", BorrarAsync);
-        g.MapPost("generar", GenerarAsync);
+        g.MapPost("generar", GenerarAsync).RequireRateLimiting(LimitacionPeticiones.Costosa);
         return app;
     }
 

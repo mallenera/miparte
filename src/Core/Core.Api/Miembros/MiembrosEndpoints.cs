@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MiParte.Contracts;
 using MiParte.Core.Api.Hogares;
+using MiParte.Core.Api.Seguridad;
 using MiParte.Core.Domain.Entidades;
 using MiParte.Core.Infrastructure.Persistencia;
 
@@ -32,9 +33,12 @@ public static class MiembrosEndpoints
         app.MapPut("/api/miembros/{id:guid}", ActualizarAsync).RequireAuthorization();
         app.MapDelete("/api/miembros/{id:guid}", DesactivarAsync).RequireAuthorization();
 
-        app.MapPost("/api/invitaciones", CrearInvitacionAsync).RequireAuthorization();
+        app.MapPost("/api/invitaciones", CrearInvitacionAsync)
+            .RequireAuthorization()
+            .RequireRateLimiting(LimitacionPeticiones.Costosa);
         app.MapPost("/api/invitaciones/aceptar", AceptarInvitacionAsync)
             .RequireAuthorization()
+            .RequireRateLimiting(LimitacionPeticiones.Costosa)
             .WithMetadata(new SinHogarActual());
 
         return app;

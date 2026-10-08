@@ -5,12 +5,14 @@ using MiParte.Core.Api.Gastos;
 using MiParte.Core.Api.Hogares;
 using MiParte.Core.Api.Miembros;
 using MiParte.Core.Api.Reparto;
+using MiParte.Core.Api.Seguridad;
 using MiParte.Core.Infrastructure;
 using MiParte.Core.Infrastructure.Persistencia;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSupabaseAuth(builder.Configuration);
+builder.AddLimitacionPeticiones();
 
 // Cadena de conexión: variable de entorno ConnectionStrings__Default (nunca en el repo).
 var connectionString = builder.Configuration.GetConnectionString("Default");
@@ -50,10 +52,13 @@ if (!string.IsNullOrWhiteSpace(supabase.Url)
 
 app.UseCors();
 app.UseAuthentication();
+// Entre autenticar y autorizar: la partición es el usuario ya validado (un sub falsificado no cuenta) y
+// los 401 de quien no se autentica también se limitan por IP, porque UseAuthorization corta antes.
+app.UseRateLimiter();
 app.UseAuthorization();
 app.UseMiddleware<HogarActualMiddleware>();
 
-app.MapGet("/health", () => Results.Ok(new { service = "core", status = "ok" }));
+app.MapGet("/health", () => Results.Ok(new { service = "core", status = "ok" })).DisableRateLimiting();
 
 app.MapHogares();
 app.MapGastos();

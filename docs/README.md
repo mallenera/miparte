@@ -8,6 +8,7 @@ Punto de entrada a todo lo que define *Mi parte, tu parte*. Léelo antes de toca
 | [modelo-de-datos.md](modelo-de-datos.md) | Tablas, relaciones e invariantes del esquema | Modelo (junto a `supabase/migrations`) |
 | [marca.md](marca.md) | Logotipo, paleta, tipografía y reglas de uso | Imagen de marca |
 | [api.md](api.md) | Referencia de endpoints y DTOs de `Core.Api` para el front | Contrato HTTP |
+| [despliegue.md](despliegue.md) | Despliegue gratuito: Cloudflare Pages (front), Render (Core.Api) y Supabase | Guía operativa |
 | [referencia/maqueta.html](referencia/maqueta.html) | Maqueta interactiva con datos de ejemplo y la lógica de reparto/liquidación/cuenta común en JS | Comportamiento esperado de la UI |
 | [referencia/identidad-de-marca.dc.html](referencia/identidad-de-marca.dc.html) | Hoja de identidad original (código fuente del lienzo de diseño) | Variantes del logotipo |
 

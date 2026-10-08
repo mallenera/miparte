@@ -1,0 +1,22 @@
+# Blueprint de Render para Core.Api (plan gratuito: se duerme tras 15 min sin tráfico). Los valores con
+# sync: false se piden al crear el Blueprint y nunca viven en el repo. Ver docs/despliegue.md.
+services:
+  - type: web
+    name: miparte-core
+    runtime: docker
+    plan: free
+    dockerfilePath: ./src/Core/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    # Solo despliega cuando CI (build + tests) pasa en master.
+    autoDeployTrigger: checksPass
+    envVars:
+      # El Dockerfile escucha en 8080; sin esto Render espera el puerto 10000.
+      - key: PORT
+        value: "8080"
+      - key: Supabase__Url
+        sync: false
+      - key: ConnectionStrings__Default
+        sync: false
+      - key: Cors__OrigenesPermitidos__0
+        sync: false

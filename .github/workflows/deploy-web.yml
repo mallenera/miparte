@@ -1,0 +1,43 @@
+name: Desplegar web
+# Publica el front (Blazor WASM) en Cloudflare Pages con subida directa: el SDK de .NET 10 no está en el entorno
+# de build de Pages. Requiere los secretos CLOUDFLARE_API_TOKEN y CLOUDFLARE_ACCOUNT_ID y la variable CORE_URL.
+on:
+  push:
+    branches: [master]
+    paths:
+      - "src/Web/**"
+      - "src/Contracts/**"
+      - ".github/workflows/deploy-web.yml"
+  workflow_dispatch:
+concurrency:
+  group: deploy-web
+  cancel-in-progress: true
+jobs:
+  desplegar:
+    runs-on: ubuntu-latest
+    env:
+      CORE_URL: ${{ vars.CORE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Tests del front
+        run: dotnet test src/Web.Tests --configuration Release
+      - run: dotnet publish src/Web -c Release -o salida
+      - name: Configurar appsettings, CSP y cabeceras
+        run: |
+          set -euo pipefail
+          test -n "$CORE_URL" || { echo "Falta la variable de repositorio CORE_URL"; exit 1; }
+          pub=salida/wwwroot
+          # Supabase:Url sale del propio appsettings.json para que CSP y configuración no diverjan.
+          export SUPABASE_URL=$(jq -r '.Supabase.Url' "$pub/appsettings.json")
+          jq --arg u "$CORE_URL" '.Api.CoreUrl = $u' "$pub/appsettings.json" > "$pub/appsettings.tmp"
+          mv "$pub/appsettings.tmp" "$pub/appsettings.json"
+          envsubst '${SUPABASE_URL} ${CORE_URL}' < src/Web/cloudflare/_headers.template > "$pub/_headers"
+      - name: Subir a Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy salida/wwwroot --project-name=miparte --branch=master

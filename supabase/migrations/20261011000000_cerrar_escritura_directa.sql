@@ -36,12 +36,15 @@ revoke execute on function public.crear_hogar(text, text) from authenticated;
 revoke execute on function public.aceptar_invitacion(text, text) from authenticated;
 
 -- Límites de longitud también en la base de datos, por si algún camino de escritura no pasa por la API
--- (los mismos que aplica Core.Api: 100 para nombres y 200 para conceptos).
-alter table public.hogar            add constraint hogar_nombre_longitud            check (length(nombre) <= 100);
-alter table public.miembro          add constraint miembro_nombre_longitud          check (length(nombre) <= 100);
-alter table public.perfil_reparto   add constraint perfil_reparto_nombre_longitud   check (length(nombre) <= 100);
-alter table public.categoria        add constraint categoria_nombre_longitud        check (length(nombre) <= 100);
-alter table public.gasto            add constraint gasto_concepto_longitud          check (length(concepto) <= 200);
-alter table public.gasto_recurrente add constraint gasto_recurrente_concepto_longitud check (length(concepto) <= 200);
-alter table public.pago_liquidacion add constraint pago_liquidacion_concepto_longitud check (length(concepto) <= 200);
-alter table public.reembolso_cuenta add constraint reembolso_cuenta_concepto_longitud check (length(concepto) <= 200);
+-- (los mismos que aplica Core.Api: 100 para nombres y 200 para conceptos). Van NOT VALID: se aplican ya a toda
+-- fila nueva o modificada, pero no escanean (ni bloquean) las tablas ni fallan si hubiera una fila antigua que
+-- los supere. Cuando se hayan revisado esas filas (si las hay), se validan aparte con
+-- alter table public.<tabla> validate constraint <restricción>; (no bloquea las escrituras).
+alter table public.hogar            add constraint hogar_nombre_longitud            check (length(nombre) <= 100) not valid;
+alter table public.miembro          add constraint miembro_nombre_longitud          check (length(nombre) <= 100) not valid;
+alter table public.perfil_reparto   add constraint perfil_reparto_nombre_longitud   check (length(nombre) <= 100) not valid;
+alter table public.categoria        add constraint categoria_nombre_longitud        check (length(nombre) <= 100) not valid;
+alter table public.gasto            add constraint gasto_concepto_longitud          check (length(concepto) <= 200) not valid;
+alter table public.gasto_recurrente add constraint gasto_recurrente_concepto_longitud check (length(concepto) <= 200) not valid;
+alter table public.pago_liquidacion add constraint pago_liquidacion_concepto_longitud check (length(concepto) <= 200) not valid;
+alter table public.reembolso_cuenta add constraint reembolso_cuenta_concepto_longitud check (length(concepto) <= 200) not valid;

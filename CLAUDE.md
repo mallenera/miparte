@@ -62,7 +62,12 @@ createdb -U postgres -h localhost miparte
 Cada vez que haya migraciones nuevas (o al empezar de cero), recrea la base y aplica stub y migraciones en orden (los comandos de arriba, con `PGUSER=postgres PGHOST=localhost`); no edites migraciones ya aplicadas, crea otra. Para parar el servidor: `pg_ctl -D ~/scoop/apps/postgresql/current/data stop`. Si `pg_ctl` se cuelga en una tubería (`| tail`), no redirijas su salida: el servidor queda arrancado igualmente (comprueba el log).
 
 ```bash
-psql -U postgres -h localhost -c "drop database if exists miparte" -c "create database miparte"
+export PGUSER=postgres PGHOST=localhost
+psql -c "drop database if exists miparte" -c "create database miparte"
+psql -d miparte -v ON_ERROR_STOP=1 -f supabase/tests/auth_stub.sql || exit 1
+for f in supabase/migrations/*.sql; do
+  psql -d miparte -v ON_ERROR_STOP=1 -f "$f" || exit 1
+done
 MIPARTE_TEST_DB="Host=localhost;Database=miparte;Username=postgres" dotnet test
 ```
 

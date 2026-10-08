@@ -63,6 +63,24 @@
         </AuthorizeView>
     </header>
 
+    <AuthorizeView>
+        <Authorized>
+            @if (Sesion.EsDemoLocal)
+            {
+                <div class="aviso warn aviso-demo" role="status">
+                    Estás en el modo demo: los datos son de ejemplo y se pierden al recargar la página.
+                    <a href="login" @onclick="CerrarSesionAsync" @onclick:preventDefault>Salir de la demo</a>
+                </div>
+            }
+            else if (Sesion.EsDemo)
+            {
+                <div class="aviso warn aviso-demo" role="status">
+                    Estás en la cuenta demo compartida: cualquiera puede verla y modificarla, así que no escribas datos personales.
+                </div>
+            }
+        </Authorized>
+    </AuthorizeView>
+
     @if (Hogar.HogarActual is not null)
     {
         <AuthorizeView>

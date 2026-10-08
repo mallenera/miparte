@@ -1,4 +1,5 @@
 using System.Text.Json;
+using MiParte.Web.Demo;
 
 namespace MiParte.Web.Autenticacion;
 
@@ -25,6 +26,12 @@ public sealed class ServicioSesion
     /// <summary>Sesión actual, o null si no hay usuario autenticado.</summary>
     public SesionSupabase? SesionActual { get; private set; }
 
+    /// <summary>Indica si la sesión actual es la del modo demo local (datos en memoria, sin servidor).</summary>
+    public bool EsDemoLocal => CuentaDemo.EsLocal(SesionActual?.UserId);
+
+    /// <summary>Indica si la sesión es de alguna de las dos demos: la local o la cuenta demo real compartida.</summary>
+    public bool EsDemo => EsDemoLocal || string.Equals(SesionActual?.Email, CuentaDemo.Correo, StringComparison.OrdinalIgnoreCase);
+
     /// <summary>Crea el servicio.</summary>
     /// <param name="auth">Cliente de Supabase Auth.</param>
     /// <param name="almacen">Almacén persistente del navegador.</param>
@@ -47,6 +54,16 @@ public sealed class ServicioSesion
     {
         await InicializarAsync();
         await EstablecerAsync(await _auth.IniciarSesionAsync(email, password));
+    }
+
+    /// <summary>
+    /// Entra en el modo demo local: una sesión ficticia que no caduca y que <see cref="ManejadorDemo"/> reconoce para
+    /// contestar desde memoria. Se guarda como cualquier sesión, así que recargar la página no saca de la demo.
+    /// </summary>
+    public async Task IniciarDemoAsync()
+    {
+        await InicializarAsync();
+        await EstablecerAsync(new SesionSupabase("demo", "demo", DateTimeOffset.MaxValue, CuentaDemo.IdUsuarioLocal, "Demo"));
     }
 
     /// <summary>Crea la cuenta; devuelve true si ya queda con sesión iniciada, false si hay que confirmar el correo.</summary>
@@ -128,7 +145,8 @@ public sealed class ServicioSesion
     {
         var sesion = SesionActual;
         await DescartarAsync();
-        if (sesion is not null) await _auth.CerrarSesionAsync(sesion.AccessToken);
+        // La sesión del modo demo local no existe en Supabase.
+        if (sesion is not null && !CuentaDemo.EsLocal(sesion.UserId)) await _auth.CerrarSesionAsync(sesion.AccessToken);
     }
 
     /// <summary>Descarta la sesión local sin avisar a Supabase (p. ej. tras un 401 de la API).</summary>

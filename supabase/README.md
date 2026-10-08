@@ -45,3 +45,7 @@ supabase stop
 ## Autenticación
 
 `config.toml` solo se aplica al proyecto remoto con `supabase config push`; los proveedores y las Redirect URLs del proyecto real se configuran en el panel (Authentication → Providers / URL Configuration). Google: define `SUPABASE_AUTH_GOOGLE_CLIENT_ID` y `SUPABASE_AUTH_GOOGLE_SECRET` en tu entorno y pon `enabled = true`.
+
+## Cuenta demo (semilla)
+
+`seed/demo.sql` crea el usuario `demo` (correo `demo@miparte.example`, contraseña `demo`) con un hogar de ejemplo y dos meses de gastos. No es una migración: CI no la aplica; se ejecuta a mano en el SQL Editor del proyecto (o `psql -f supabase/seed/demo.sql`) y es idempotente, así que volver a ejecutarla **restablece** la demo. La contraseña es pública a propósito; la cuenta solo ve el hogar demo.

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using MiParte.Web.Api;
 using MiParte.Web.Autenticacion;
 using MiParte.Web.Configuracion;
+using MiParte.Web.Demo;
 using MiParte.Web.Hogares;
 using MiParte.Web.Temas;
 
@@ -30,6 +31,8 @@ public static class ServiciosWeb
         servicios.AddSingleton<ServicioTema>();
         servicios.AddScoped<ServicioArranque>();
         servicios.AddTransient<ManejadorCoreApi>();
+        servicios.AddSingleton<ServidorDemo>();
+        servicios.AddTransient<ManejadorDemo>();
 
         servicios.AddHttpClient<SupabaseAuthClient>(http =>
         {
@@ -37,7 +40,8 @@ public static class ServiciosWeb
             http.DefaultRequestHeaders.Add("apikey", opciones.SupabaseAnonKey);
         });
         servicios.AddHttpClient<CoreApiClient>(http => http.BaseAddress = Base(opciones.CoreUrl, "/"))
-            .AddHttpMessageHandler<ManejadorCoreApi>();
+            .AddHttpMessageHandler<ManejadorCoreApi>()
+            .AddHttpMessageHandler<ManejadorDemo>();
 
         servicios.AddAuthorizationCore();
         servicios.AddCascadingAuthenticationState();

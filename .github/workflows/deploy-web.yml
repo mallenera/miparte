@@ -7,6 +7,7 @@ on:
     paths:
       - "src/Web/**"
       - "src/Contracts/**"
+      - "src/Core/Core.Domain/**"
       - ".github/workflows/deploy-web.yml"
   workflow_dispatch:
 concurrency:

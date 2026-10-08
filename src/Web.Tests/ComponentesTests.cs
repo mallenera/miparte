@@ -592,6 +592,90 @@ public class ComponentesTests : TestContext
     }
 
     [Fact]
+    public void Resumen_pago_parcial_envia_el_importe_escrito_y_no_el_sugerido()
+    {
+        var api = ApiResumen(new ResumenMensualResponse("2026-10", 600m, [], []), Liquidacion(300m))
+            .Responde("POST /api/pagos-liquidacion", HttpStatusCode.Created,
+                new PagoLiquidacionDto(Guid.NewGuid(), new DateOnly(2026, 10, 1), LuisId, AnaId, 125.5m, new DateOnly(2026, 10, 20), null));
+        Registrar(api);
+        var c = RenderComponent<VistaResumen>();
+
+        Assert.Equal("300,00", c.Find(".pagoimp input").GetAttribute("value")); // por defecto, el importe sugerido
+        c.Find(".pagoimp input").Input("125,50");
+        c.FindAll("button").First(b => b.TextContent == "Registrar pago").Click();
+
+        Assert.Contains("\"importe\":125.5", api.Cuerpos["POST /api/pagos-liquidacion"]);
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-5")]
+    [InlineData("10,005")]
+    [InlineData("1,230")]
+    [InlineData("300,01")]
+    [InlineData("abc")]
+    public void Resumen_no_deja_registrar_un_pago_con_importe_invalido_o_mayor_que_lo_pendiente(string escrito)
+    {
+        var api = ApiResumen(new ResumenMensualResponse("2026-10", 600m, [], []), Liquidacion(300m));
+        Registrar(api);
+        var c = RenderComponent<VistaResumen>();
+
+        c.Find(".pagoimp input").Input(escrito);
+
+        Assert.True(c.FindAll("button").First(b => b.TextContent == "Registrar pago").HasAttribute("disabled"));
+        Assert.Contains("máximo 2 decimales", c.Markup);
+        // El error queda asociado al campo para los lectores de pantalla.
+        var campo = c.Find(".pagoimp input");
+        Assert.Equal("true", campo.GetAttribute("aria-invalid"));
+        Assert.NotNull(c.Find("#" + campo.GetAttribute("aria-describedby")));
+    }
+
+    [Fact]
+    public void Resumen_filtrar_por_miembro_oculta_los_saldos_y_pagos_de_los_demas()
+    {
+        var otro = Guid.NewGuid();
+        var pago = new PagoLiquidacionDto(Guid.NewGuid(), new DateOnly(2026, 10, 1), otro, AnaId, 10m, new DateOnly(2026, 10, 20), "Efectivo");
+        var liq = new LiquidacionResponse("2026-10",
+            [new SaldoMiembroDto(AnaId, "Ana", 100m), new SaldoMiembroDto(LuisId, "Luis", -60m), new SaldoMiembroDto(otro, "Otra", -40m)],
+            [new TransferenciaDto(LuisId, AnaId, 60m), new TransferenciaDto(otro, AnaId, 40m)], [pago]);
+        Registrar(ApiResumen(new ResumenMensualResponse("2026-10", 600m, [], []), liq));
+        var c = RenderComponent<VistaResumen>();
+        Assert.Equal(2, c.FindAll(".pagoimp").Count);
+
+        c.Find("select[aria-label='Filtrar la liquidación por miembro']").Change(LuisId.ToString());
+
+        Assert.Single(c.FindAll(".pagoimp"));
+        Assert.Contains("Luis paga a Ana", c.Markup);
+        Assert.DoesNotContain("Efectivo", c.Markup);
+    }
+
+    [Fact]
+    public void Gastos_cambiar_un_filtro_vuelve_a_pedir_la_lista_y_permite_quitar_los_filtros()
+    {
+        var ana = ApiFalsa.Miembro("Ana", esYo: true);
+        var perfil = new PerfilRepartoDto(Guid.NewGuid(), "Cuenta común", "cuenta_comun", []);
+        var cat = new CategoriaDto(Guid.NewGuid(), "Comida", null, perfil.Id);
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
+            .Responde("GET /api/categorias", HttpStatusCode.OK, new[] { cat })
+            .Responde("GET /api/perfiles", HttpStatusCode.OK, new[] { perfil })
+            .Responde("GET /api/gastos", HttpStatusCode.OK, Array.Empty<GastoResponse>())
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, Cuenta(0m));
+        Registrar(api);
+        var c = RenderComponent<VistaGastos>();
+        var antes = api.Recibidas.Count(r => r == "GET /api/gastos");
+        Assert.Empty(c.FindAll(".filtros .linkbtn"));
+
+        c.Find(".filtros select").Change(ana.Id.ToString());
+
+        Assert.Equal(antes + 1, api.Recibidas.Count(r => r == "GET /api/gastos"));
+        Assert.Contains("coincide con los filtros", c.Markup);
+        c.Find(".filtros .linkbtn").Click();
+        Assert.Equal(antes + 2, api.Recibidas.Count(r => r == "GET /api/gastos"));
+        Assert.Empty(c.FindAll(".filtros .linkbtn"));
+    }
+
+    [Fact]
     public void Resumen_muestra_el_error_de_la_api_si_el_pago_supera_la_deuda()
     {
         var api = ApiResumen(new ResumenMensualResponse("2026-10", 600m, [], []), Liquidacion(300m))

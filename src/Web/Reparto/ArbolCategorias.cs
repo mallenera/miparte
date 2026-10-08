@@ -48,4 +48,18 @@ public static class ArbolCategorias
         } while (crecio);
         return resultado;
     }
+
+    /// <summary>Nombre completo de una categoría, con sus ancestros («Comida › Supermercado»); «—» si no existe.</summary>
+    /// <param name="categorias">Categorías del hogar.</param>
+    /// <param name="id">Categoría a nombrar.</param>
+    public static string Ruta(IReadOnlyCollection<CategoriaDto> categorias, Guid id)
+    {
+        var porId = categorias.ToDictionary(c => c.Id);
+        if (!porId.TryGetValue(id, out var actual)) return "—";
+        var partes = new List<string> { actual.Nombre };
+        // El tope de pasos protege de un ciclo que la API ya impide pero el front no debe colgarse por él.
+        while (actual.CategoriaPadreId is { } p && porId.TryGetValue(p, out actual) && partes.Count <= categorias.Count)
+            partes.Insert(0, actual.Nombre);
+        return string.Join(" › ", partes);
+    }
 }

@@ -163,6 +163,44 @@ public class ComponentesTests : TestContext
     }
 
     [Fact]
+    public void Subcategoria_del_boton_envia_el_padre_y_hereda_su_perfil()
+    {
+        var perfil = new PerfilRepartoDto(Guid.NewGuid(), "50/50", "porcentaje", []);
+        var comida = new CategoriaDto(Guid.NewGuid(), "Comida", null, perfil.Id);
+        var api = new ApiFalsa()
+            .Responde("GET /api/categorias", HttpStatusCode.OK, new[] { comida })
+            .Responde("GET /api/perfiles", HttpStatusCode.OK, new[] { perfil })
+            .Responde("POST /api/categorias", HttpStatusCode.Created, new CategoriaDto(Guid.NewGuid(), "Bares", comida.Id, perfil.Id));
+        Registrar(api);
+        var c = RenderComponent<VistaCategorias>();
+
+        c.FindAll("button").First(b => b.GetAttribute("aria-label") == "Añadir subcategoría a Comida").Click();
+        Assert.Contains("Nueva subcategoría", c.Find("form.addcat label").TextContent);
+        c.Find("form.addcat input").Input("Bares");
+        c.Find("form.addcat").Submit();
+
+        var cuerpo = api.Cuerpos["POST /api/categorias"];
+        Assert.Contains("\"nombre\":\"Bares\"", cuerpo);
+        Assert.Contains(comida.Id.ToString(), cuerpo);
+        Assert.Contains(perfil.Id.ToString(), cuerpo);
+    }
+
+    [Fact]
+    public void Resumen_muestra_la_ruta_de_las_subcategorias()
+    {
+        var comida = new CategoriaDto(Guid.NewGuid(), "Comida", null, null);
+        var super_ = new CategoriaDto(Guid.NewGuid(), "Supermercado", comida.Id, null);
+        var resumen = new ResumenMensualResponse("2026-10", 80m,
+            [new ResumenMiembroDto(AnaId, "Ana", 80m, 40m), new ResumenMiembroDto(LuisId, "Luis", 0m, 40m)],
+            [new ResumenCategoriaDto(super_.Id, "Supermercado", 80m, [])]);
+        Registrar(ApiResumen(resumen, Liquidacion(40m)).Responde("GET /api/categorias", HttpStatusCode.OK, new[] { comida, super_ }));
+
+        var c = RenderComponent<VistaResumen>();
+
+        Assert.Contains("Comida › Supermercado", c.Markup);
+    }
+
+    [Fact]
     public void Anadir_categoria_envia_nombre_padre_y_perfil()
     {
         var perfil = new PerfilRepartoDto(Guid.NewGuid(), "Cuenta común", "cuenta_comun", []);

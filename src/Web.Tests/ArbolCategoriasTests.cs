@@ -58,4 +58,26 @@ public class ArbolCategoriasTests
         Assert.Equal(0, ColorMiembro.De(ordenados[8].Id, miembros));
         Assert.Equal(ColorMiembro.Colores - 1, ColorMiembro.De(Guid.NewGuid(), miembros));
     }
+
+    [Fact]
+    public void La_ruta_une_los_ancestros_y_una_categoria_desconocida_sale_como_raya()
+    {
+        var comida = Cat("Comida");
+        var super_ = Cat("Supermercado", comida.Id);
+        var fruta = Cat("Fruta", super_.Id);
+
+        Assert.Equal("Comida", ArbolCategorias.Ruta([comida, super_, fruta], comida.Id));
+        Assert.Equal("Comida › Supermercado › Fruta", ArbolCategorias.Ruta([comida, super_, fruta], fruta.Id));
+        Assert.Equal("—", ArbolCategorias.Ruta([comida], Guid.NewGuid()));
+    }
+
+    [Fact]
+    public void La_ruta_no_se_cuelga_con_un_ciclo()
+    {
+        var a = new CategoriaDto(Guid.NewGuid(), "A", null, null);
+        var b = new CategoriaDto(Guid.NewGuid(), "B", a.Id, null);
+        a = a with { CategoriaPadreId = b.Id };
+
+        Assert.Contains("B", ArbolCategorias.Ruta([a, b], b.Id));
+    }
 }

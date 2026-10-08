@@ -140,7 +140,7 @@ else if (_resumen is not null && _liquidacion is not null)
             @foreach (var c in _resumen.Categorias)
             {
                 <div class="catrow">
-                    <div class="c-name">@c.Nombre</div>
+                    <div class="c-name">@NombreCategoria(c)</div>
                     <div class="c-sel">
                         <b class="g-importe">@Euros(c.Total)</b>
                         @if (c.PorMiembro.Count > 0)
@@ -168,6 +168,7 @@ else if (_resumen is not null && _liquidacion is not null)
     private ResumenMensualResponse? _resumen;
     private LiquidacionResponse? _liquidacion;
     private List<MiembroDto> _miembros = [];
+    private List<CategoriaDto> _categorias = [];
     private bool _cargando = true, _guardando;
     private string? _errorCarga, _error;
     private DateOnly _mes = new(DateTime.Today.Year, DateTime.Today.Month, 1);
@@ -184,6 +185,16 @@ else if (_resumen is not null && _liquidacion is not null)
         try
         {
             _miembros = await Api.ListarMiembrosAsync();
+            try
+            {
+                _categorias = await Api.ListarCategoriasAsync();
+            }
+            catch (ApiException)
+            {
+                // Solo sirven para mostrar la ruta de las subcategorías: sin ellas el resumen usa el nombre suelto.
+                _categorias = [];
+            }
+
             await RecargarAsync();
         }
         catch (ApiException e)
@@ -215,6 +226,10 @@ else if (_resumen is not null && _liquidacion is not null)
             _error = e.Message;
         }
     }
+
+    /// <summary>Ruta «Padre › Hija» de la categoría del resumen; si no se pudo cargar el árbol, su nombre.</summary>
+    private string NombreCategoria(ResumenCategoriaDto c) =>
+        _categorias.Any(x => x.Id == c.CategoriaId) ? ArbolCategorias.Ruta(_categorias, c.CategoriaId) : c.Nombre;
 
     private string NombreMiembro(Guid id) => _miembros.FirstOrDefault(m => m.Id == id)?.Nombre ?? "—";
 

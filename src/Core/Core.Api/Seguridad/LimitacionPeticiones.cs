@@ -34,11 +34,15 @@ public static class LimitacionPeticiones
     /// <summary>Límite de peticiones simultáneas en cola: ninguna, se rechaza directamente con 429.</summary>
     private const int SinCola = 0;
 
-    /// <summary>Segmentos de la ventana de un minuto; cada uno se libera cuando pasan 60 / segmentos segundos.</summary>
+    /// <summary>Segmentos de la ventana de un minuto.</summary>
     private const int Segmentos = 6;
 
-    /// <summary>Segundos que tarda en liberarse un segmento de la ventana.</summary>
-    private const int SegundosPorSegmento = 60 / Segmentos;
+    /// <summary>
+    /// Espera que se indica en <c>Retry-After</c> cuando el limitador no la calcula: la ventana entera. Quien agota la
+    /// cuota en un solo segmento no recupera permisos hasta ~50-60 s después, así que avisar de menos provocaría un
+    /// segundo 429 al reintentar.
+    /// </summary>
+    private const int SegundosVentana = 60;
 
     /// <summary>
     /// Registra el limitador global y la política <see cref="Costosa"/>, y baja el tope de tamaño del cuerpo de
@@ -56,10 +60,10 @@ public static class LimitacionPeticiones
             o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             o.OnRejected = async (ctx, ct) =>
             {
-                // La ventana deslizante no informa del tiempo de espera: se indica lo que tarda en liberarse un segmento.
+                // La ventana deslizante no informa del tiempo de espera: se indica la ventana completa (lo seguro).
                 var segundos = ctx.Lease.TryGetMetadata(MetadataName.RetryAfter, out var espera)
                     ? (int)Math.Ceiling(espera.TotalSeconds)
-                    : SegundosPorSegmento;
+                    : SegundosVentana;
                 ctx.HttpContext.Response.Headers.RetryAfter = segundos.ToString();
                 await ctx.HttpContext.Response.WriteAsJsonAsync(
                     new { error = "Demasiadas peticiones. Espera un momento antes de volver a intentarlo." }, ct);
@@ -80,7 +84,7 @@ public static class LimitacionPeticiones
         => RateLimitPartition.GetSlidingWindowLimiter(clave, _ => new SlidingWindowRateLimiterOptions
         {
             PermitLimit = limite,
-            Window = TimeSpan.FromMinutes(1),
+            Window = TimeSpan.FromSeconds(SegundosVentana),
             SegmentsPerWindow = Segmentos,
             QueueLimit = SinCola,
         });

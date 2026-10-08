@@ -2,7 +2,11 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
+using MiParte.Core.Domain.Entidades;
+using MiParte.Core.Infrastructure.Persistencia;
 using MiParte.Contracts;
 using static MiParte.Core.Tests.ApiPostgresTests;
 using static MiParte.Core.Tests.AutenticacionTests;
@@ -159,9 +163,38 @@ public class AuditoriaTests
 
         var primera = await Eventos(x.Admin, "?limite=2");
         Assert.Equal(2, primera.Count);
-        var siguiente = await Eventos(x.Admin, $"?limite=50&hasta={Uri.EscapeDataString(primera[^1].Cuando.ToString("O"))}");
+        var siguiente = await Eventos(x.Admin, Cursor(primera[^1], 50));
         Assert.DoesNotContain(siguiente, e => primera.Any(p => p.Id == e.Id));
         Assert.Equal(4, primera.Count + siguiente.Count); // hogar + 3 gastos
+    }
+
+    private static string Cursor(EventoAuditoriaDto ultimo, int limite)
+        => $"?limite={limite}&hasta={Uri.EscapeDataString(ultimo.Cuando.ToString("O"))}&despuesDeId={ultimo.Id}";
+
+    [Fact]
+    public async Task Paginacion_NoPierdeEventosQueComparteInstante()
+    {
+        var x = await Montar();
+        // Un mismo guardado con varias entidades produce eventos con idéntico «cuando».
+        using (var scope = x.F.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MiParteDbContext>();
+            for (var i = 0; i < 5; i++)
+                db.Categorias.Add(new Categoria { Id = Guid.NewGuid(), HogarId = x.Hogar, Nombre = "C" + i });
+            await db.SaveChangesAsync();
+        }
+        var todos = await Eventos(x.Admin, "?limite=200");
+        Assert.True(todos.GroupBy(e => e.Cuando).Any(g => g.Count() > 1), "el escenario debe tener empates de instante");
+
+        var recorridos = new List<EventoAuditoriaDto>();
+        var pagina = await Eventos(x.Admin, "?limite=1");
+        while (pagina.Count > 0)
+        {
+            recorridos.AddRange(pagina);
+            pagina = await Eventos(x.Admin, Cursor(pagina[^1], 1));
+        }
+
+        Assert.Equal(todos.Select(e => e.Id), recorridos.Select(e => e.Id)); // ni se pierde ni se repite ninguno, en el mismo orden
     }
 
     // --- PostgreSQL real: jsonb, ExecuteUpdate y la inmutabilidad de la tabla -----------------------------

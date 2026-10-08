@@ -117,7 +117,7 @@ Tres mejoras entran en el MVP porque hacen utilizable el resumen "A debe a B"; e
 | Historial de cambios | Quién modificó qué y cuándo | **Hecho** (rama `feature/security`; solo lo lee un admin, `docs/api.md` §3.10) |
 | Copia de seguridad y exportación | Descarga completa de los datos del hogar | Posterior |
 
-Estas mejoras necesitarán tablas nuevas, por ejemplo para pagos, etiquetas, invitaciones e historial de cambios; se definen cuando cada una entre en desarrollo.
+Estas mejoras necesitarán tablas nuevas, por ejemplo para pagos, etiquetas e invitaciones; se definen cuando cada una entre en desarrollo. El historial de cambios ya está hecho (tabla `auditoria`, ver `docs/modelo-de-datos.md`).
 
 ## Reglas de reparto de gastos
 

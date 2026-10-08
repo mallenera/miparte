@@ -31,7 +31,8 @@ public class LimitacionPeticionesTests
 
         var rechazada = await AceptarInvitacionInventada(c);
         Assert.Equal(HttpStatusCode.TooManyRequests, rechazada.StatusCode);
-        Assert.True(rechazada.Headers.Contains("Retry-After"));
+        // Sin metadato del limitador se indica la ventana entera: avisar de menos provocaría un segundo 429.
+        Assert.Equal("60", rechazada.Headers.GetValues("Retry-After").Single());
         Assert.Contains("Demasiadas peticiones", await rechazada.Content.ReadAsStringAsync());
     }
 

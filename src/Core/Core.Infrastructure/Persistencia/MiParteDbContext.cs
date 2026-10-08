@@ -46,6 +46,9 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
     /// <summary>Conjunto de <see cref="RetiradaAhorro"/> del hogar actual.</summary>
     public DbSet<RetiradaAhorro> RetiradasAhorro => Set<RetiradaAhorro>();
 
+    /// <summary>Conjunto de <see cref="MesCerrado"/> del hogar actual.</summary>
+    public DbSet<MesCerrado> MesesCerrados => Set<MesCerrado>();
+
     /// <summary>Conjunto de <see cref="EventoAuditoria"/> del hogar actual (solo de añadir; lo lee únicamente un admin).</summary>
     public DbSet<EventoAuditoria> Auditoria => Set<EventoAuditoria>();
 
@@ -135,6 +138,13 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
             e.ToTable("aportacion_cuenta");
             e.Property(x => x.Importe).HasPrecision(12, 2);
             e.Property(x => x.Ahorro).HasPrecision(12, 2);
+            e.HasQueryFilter(x => x.HogarId == HogarId);
+        });
+
+        b.Entity<MesCerrado>(e =>
+        {
+            e.ToTable("mes_cerrado");
+            e.Property(x => x.CerradoEn).HasDefaultValueSql("now()");
             e.HasQueryFilter(x => x.HogarId == HogarId);
         });
 

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using MiParte.Auth;
 using MiParte.Core.Api.Auditoria;
+using MiParte.Core.Api.Cierres;
 using MiParte.Core.Api.Gastos;
 using MiParte.Core.Api.Hogares;
 using MiParte.Core.Api.Miembros;
@@ -79,6 +80,7 @@ app.MapCategorias();
 app.MapPerfiles();
 app.MapMiembros();
 app.MapAuditoria();
+app.MapCierresMes();
 
 app.Run();
 

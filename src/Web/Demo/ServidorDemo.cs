@@ -25,6 +25,7 @@ public sealed partial class ServidorDemo
     private readonly List<AportacionCuentaDto> _aportaciones = [];
     private readonly List<ReembolsoCuentaDto> _reembolsos = [];
     private readonly List<PagoLiquidacionDto> _pagos = [];
+    private readonly List<MesCerradoDto> _cierres = [];
     private readonly HogarResumen _hogar = new(IdHogar, "Casa de Ana y Marcos");
     private readonly DateOnly _hoy;
     private bool _cuentaActiva = true;
@@ -77,7 +78,11 @@ public sealed partial class ServidorDemo
             ("gastos", 2, "GET") => ListarGastos(mes, Consulta(uri, "categoriaId"), Consulta(uri, "miembroId"), Consulta(uri, "buscar")),
             ("gastos", 2, "POST") => GuardarGasto(null, (await Cuerpo<GastoRequest>())!),
             ("gastos", 3, "PUT") when id is { } i => GuardarGasto(i, (await Cuerpo<GastoRequest>())!),
-            ("gastos", 3, "DELETE") when id is { } i => _gastos.RemoveAll(x => x.Id == i) > 0 ? Sin() : NoEncontrado(),
+            ("gastos", 3, "DELETE") when id is { } i => BorrarGasto(i),
+
+            ("cierres-mes", 2, "GET") => Ok(_cierres.OrderByDescending(c => c.Mes).ToList()),
+            ("cierres-mes", 2, "POST") => CerrarMes(await Cuerpo<CerrarMesRequest>()),
+            ("cierres-mes", 3, "DELETE") => ReabrirMes(ruta[2]),
 
             ("gastos-recurrentes", 2, "GET") => Ok(_recurrentes.OrderBy(r => r.DiaMes).ThenBy(r => r.Id).Select(RecurrenteDto).ToList()),
             ("gastos-recurrentes", 2, "POST") => GuardarRecurrente(null, (await Cuerpo<GastoRecurrenteRequest>())!),
@@ -382,6 +387,7 @@ public sealed partial class ServidorDemo
     {
         var existente = id is null ? null : _gastos.FirstOrDefault(g => g.Id == id);
         if (id is not null && existente is null) return NoEncontrado();
+        if (MesCerrado(r.Fecha) || (existente is not null && MesCerrado(existente.Fecha))) return MesCerradoError();
         if (PrepararGasto(r, out var repartos, out var cuentaComun) is { } error) return Mal(error);
         if (cuentaComun && !_cuentaActiva) return CuentaInactiva();
 
@@ -397,6 +403,39 @@ public sealed partial class ServidorDemo
         g.Repartos = repartos;
         if (existente is null) _gastos.Add(g);
         return Respuesta(existente is null ? HttpStatusCode.Created : HttpStatusCode.OK, GastoDto(g));
+    }
+
+    private HttpResponseMessage BorrarGasto(Guid id)
+    {
+        var g = _gastos.FirstOrDefault(x => x.Id == id);
+        if (g is null) return NoEncontrado();
+        if (MesCerrado(g.Fecha)) return MesCerradoError();
+        _gastos.Remove(g);
+        return Sin();
+    }
+
+    // ───── Cierre de mes ─────
+
+    private bool MesCerrado(DateOnly fecha) => _cierres.Any(c => c.Mes == FormatoMes(new DateOnly(fecha.Year, fecha.Month, 1)));
+
+    private static HttpResponseMessage MesCerradoError() =>
+        Mal(HttpStatusCode.Conflict, "Ese mes está cerrado: un administrador debe reabrirlo para cambiar sus gastos.");
+
+    private HttpResponseMessage CerrarMes(CerrarMesRequest? r)
+    {
+        if (!TryMes(r?.Mes, out var inicio)) return MesInvalido();
+        if (inicio.AddMonths(1) > _hoy) return Mal("Solo se puede cerrar un mes que ya ha terminado.");
+        var mes = FormatoMes(inicio);
+        if (_cierres.Any(c => c.Mes == mes)) return Mal(HttpStatusCode.Conflict, "Ese mes ya está cerrado.");
+        var cierre = new MesCerradoDto(mes, DateTimeOffset.UtcNow, "Ana");
+        _cierres.Add(cierre);
+        return Respuesta(HttpStatusCode.Created, cierre);
+    }
+
+    private HttpResponseMessage ReabrirMes(string mes)
+    {
+        if (!TryMes(mes, out _)) return MesInvalido();
+        return _cierres.RemoveAll(c => c.Mes == mes) > 0 ? Sin() : NoEncontrado();
     }
 
     // ───── Recurrentes ─────
@@ -445,6 +484,7 @@ public sealed partial class ServidorDemo
     private HttpResponseMessage Generar(string? mes)
     {
         if (!TryMes(mes, out var inicio)) return MesInvalido();
+        if (MesCerrado(inicio)) return MesCerradoError();
         var fin = inicio.AddMonths(1);
         var plantillas = _recurrentes.Where(r => r.Activo).OrderBy(r => r.DiaMes).ThenBy(r => r.Id).ToList();
         var yaGenerados = _gastos.Where(g => g.GastoRecurrenteId is not null && g.Fecha >= inicio && g.Fecha < fin)

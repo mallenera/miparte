@@ -62,6 +62,13 @@ else
             }
         </p>
 
+        @if (MesCerrado)
+        {
+            <div class="aviso warn u-mt12" role="status">
+                Este mes está cerrado: sus gastos no se pueden añadir, editar ni borrar. Un administrador puede reabrirlo desde Resumen.
+            </div>
+        }
+
         @if (_error is not null)
         {
             <div class="aviso err u-mt12" role="alert">@_error</div>
@@ -104,7 +111,7 @@ else
                             <button class="linkbtn danger" type="button" @onclick="() => EliminarAsync(g)">Sí</button>
                             <button class="linkbtn" type="button" @onclick="() => _confirmandoEliminar = null">No</button>
                         }
-                        else
+                        else if (!MesCerrado)
                         {
                             <button class="linkbtn" type="button" aria-label="Editar gasto @g.Concepto" @onclick="() => EmpezarEdicion(g)">Editar</button>
                             <button class="linkbtn danger" type="button" aria-label="Eliminar gasto @g.Concepto" @onclick="() => _confirmandoEliminar = g.Id">Eliminar</button>
@@ -229,6 +236,11 @@ else
     /// <summary>Perfil de modo cuenta común del hogar, el único con el que puede pagar la cuenta directamente.</summary>
     private PerfilRepartoDto? PerfilCuentaComun => _perfiles.FirstOrDefault(p => p.Modo == "cuenta_comun");
 
+    private List<MesCerradoDto> _cierres = [];
+
+    /// <summary>El mes mostrado está cerrado: el servidor rechazaría cualquier cambio en sus gastos.</summary>
+    private bool MesCerrado => _cierres.Any(c => c.Mes == _mes.ToString("yyyy-MM", CultureInfo.InvariantCulture));
+
     /// <summary>Perfiles que se ofrecen: el de cuenta común solo con la cuenta activada (si no, la API rechazaría el gasto).</summary>
     private IEnumerable<PerfilRepartoDto> PerfilesOfrecidos
     {
@@ -319,6 +331,15 @@ else
         catch (ApiException) when (version != _versionCarga)
         {
             // Un fallo de una petición ya superada no debe mostrar un error junto a los resultados de la nueva.
+        }
+
+        try
+        {
+            _cierres = await Api.ListarCierresMesAsync();
+        }
+        catch (ApiException)
+        {
+            _cierres = []; // sin saber qué meses están cerrados, el servidor sigue rechazando los cambios
         }
     }
 

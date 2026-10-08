@@ -90,4 +90,32 @@ public class LimitacionPeticionesTests
         c.DefaultRequestHeaders.Authorization = new("Bearer", Token(Hs256("otro-secreto-distinto-de-al-menos-32-bytes!!"), Guid.NewGuid()));
         Assert.Equal(HttpStatusCode.TooManyRequests, (await c.GetAsync("/api/yo")).StatusCode);
     }
+
+    private static async Task<HttpStatusCode> AnonimaDesde(HttpClient c, string ip)
+    {
+        using var peticion = new HttpRequestMessage(HttpMethod.Get, "/api/yo");
+        peticion.Headers.Add("X-Forwarded-For", ip);
+        return (await c.SendAsync(peticion)).StatusCode;
+    }
+
+    [Fact]
+    public async Task TrasProxyDeConfianza_LasAnonimasSeLimitanPorIpReenviada()
+    {
+        using var f = Fabrica(global: 1).WithWebHostBuilder(b => b.UseSetting("ProxyInverso:Confiar", "true"));
+        var c = f.CreateClient();
+
+        Assert.Equal(HttpStatusCode.Unauthorized, await AnonimaDesde(c, "203.0.113.1"));
+        Assert.Equal(HttpStatusCode.Unauthorized, await AnonimaDesde(c, "203.0.113.2"));
+        Assert.Equal(HttpStatusCode.TooManyRequests, await AnonimaDesde(c, "203.0.113.2"));
+    }
+
+    [Fact]
+    public async Task SinProxyDeConfianza_SeIgnoraXForwardedFor()
+    {
+        using var f = Fabrica(global: 1);
+        var c = f.CreateClient();
+
+        Assert.Equal(HttpStatusCode.Unauthorized, await AnonimaDesde(c, "203.0.113.1"));
+        Assert.Equal(HttpStatusCode.TooManyRequests, await AnonimaDesde(c, "203.0.113.2"));
+    }
 }

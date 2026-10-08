@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using MiParte.Contracts;
 using MiParte.Core.Api.Seguridad;
 using MiParte.Core.Domain.Entidades;
+using MiParte.Core.Infrastructure.Auditoria;
 using MiParte.Core.Infrastructure.Persistencia;
 
 namespace MiParte.Core.Api.Hogares;
@@ -139,6 +140,8 @@ public static class HogaresEndpoints
         // categorías) dentro de una transacción, y si algo falla se deshace todo. InMemory no admite transacciones.
         await using var tx = db.Database.IsRelational() ? await db.Database.BeginTransactionAsync(ct) : null;
 
+        // La semilla (perfiles, categorías, detalles) son decenas de filas que no aportan: se resume en un solo evento.
+        db.AuditoriaActiva = false;
         var hogar = new Hogar { Id = Guid.NewGuid(), Nombre = nombreHogar };
         db.Hogares.Add(hogar);
         await db.SaveChangesAsync(ct);
@@ -154,6 +157,10 @@ public static class HogaresEndpoints
         db.Miembros.Add(creador);
         await db.SaveChangesAsync(ct);
         await SemillaHogar.SembrarAsync(db, hogar.Id, creador.Id, ct); // perfiles y categorías por defecto, como crear_hogar en SQL
+        db.AuditoriaActiva = true;
+        db.Auditoria.Add(RegistroAuditoria.Manual(
+            hogar.Id, userId, RegistroAuditoria.Crear, "hogar", hogar.Id, despues: new { nombre = nombreHogar }));
+        await db.SaveChangesAsync(ct);
         if (tx is not null) await tx.CommitAsync(ct);
 
         return Results.Created($"/api/hogares/{hogar.Id}", new HogarResumen(hogar.Id, hogar.Nombre));

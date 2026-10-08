@@ -114,7 +114,7 @@ Tres mejoras entran en el MVP porque hacen utilizable el resumen "A debe a B"; e
 | Foto del ticket | Imagen adjunta al gasto, sin lectura automática | Posterior |
 | Avisos por correo | Resumen mensual y recibos próximos | Posterior |
 | Invitación al hogar | Alta de la pareja por correo con permisos; la persona a cargo no necesita login | Posterior |
-| Historial de cambios | Quién modificó qué y cuándo | Posterior |
+| Historial de cambios | Quién modificó qué y cuándo | **Hecho** (rama `feature/security`; solo lo lee un admin, `docs/api.md` §3.10) |
 | Copia de seguridad y exportación | Descarga completa de los datos del hogar | Posterior |
 
 Estas mejoras necesitarán tablas nuevas, por ejemplo para pagos, etiquetas, invitaciones e historial de cambios; se definen cuando cada una entre en desarrollo.

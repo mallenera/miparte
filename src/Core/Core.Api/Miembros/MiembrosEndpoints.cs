@@ -6,6 +6,7 @@ using MiParte.Contracts;
 using MiParte.Core.Api.Hogares;
 using MiParte.Core.Api.Seguridad;
 using MiParte.Core.Domain.Entidades;
+using MiParte.Core.Infrastructure.Auditoria;
 using MiParte.Core.Infrastructure.Persistencia;
 
 namespace MiParte.Core.Api.Miembros;
@@ -345,7 +346,13 @@ public static class MiembrosEndpoints
                     .ExecuteUpdateAsync(s => s.SetProperty(x => x.UserId, userId), ct);
                 if (vinculados == 0)
                     return Error(409, "El miembro de la invitación ya no está disponible o ya está vinculado a un usuario.");
+                db.Auditoria.Add(RegistroAuditoria.Manual(
+                    inv.HogarId, userId, RegistroAuditoria.Vincular, "miembro", destino, despues: new { userId }));
             }
+
+            // Los UPDATE condicionales no los ve el ChangeTracker: el rastro se añade a mano (el miembro nuevo sí se registra solo).
+            db.Auditoria.Add(RegistroAuditoria.Manual(
+                inv.HogarId, userId, RegistroAuditoria.Usar, "invitacion", inv.Id, despues: new { usadaPor = userId, usadaEn = ahora }));
 
             await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);

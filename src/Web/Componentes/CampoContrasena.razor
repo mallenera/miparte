@@ -1,0 +1,30 @@
+@* Campo de contraseña con botón para mostrarla u ocultarla. Por defecto va oculta; el botón lleva aria-pressed y etiqueta. *@
+<div class="pwd">
+    <InputText id="@Id" type="@(_visible ? "text" : "password")" autocomplete="@Autocomplete" maxlength="128"
+               spellcheck="false" autocapitalize="off" Value="@Value" ValueChanged="ValueChanged" ValueExpression="ValueExpression" />
+    <button type="button" class="pwd-ver" aria-label="@(_visible ? "Ocultar contraseña" : "Mostrar contraseña")"
+            aria-pressed="@(_visible ? "true" : "false")" @onclick="Alternar">
+        <Icono Nombre="@(_visible ? "eye-off" : "eye")" />
+    </button>
+</div>
+
+@code {
+    private bool _visible;
+
+    /// <summary>Id del input, para enlazar con su <c>label</c>.</summary>
+    [Parameter, EditorRequired] public string Id { get; set; } = "";
+
+    /// <summary>Valor <c>autocomplete</c> (<c>current-password</c> o <c>new-password</c>).</summary>
+    [Parameter] public string Autocomplete { get; set; } = "current-password";
+
+    /// <summary>Contraseña escrita.</summary>
+    [Parameter] public string Value { get; set; } = "";
+
+    /// <summary>Se dispara al cambiar la contraseña.</summary>
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+
+    /// <summary>Expresión del valor, necesaria para la validación del formulario.</summary>
+    [Parameter] public System.Linq.Expressions.Expression<Func<string>>? ValueExpression { get; set; }
+
+    private void Alternar() => _visible = !_visible;
+}

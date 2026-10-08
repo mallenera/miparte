@@ -97,4 +97,15 @@ public class ServicioSesionTests
         Assert.Null(await servicio.ObtenerTokenAsync());
         Assert.Empty(almacen.Datos);
     }
+
+    [Fact]
+    public async Task Verificar_codigo_inicia_y_guarda_la_sesion()
+    {
+        var (servicio, almacen, _) = Crear(ManejadorFalso.Json(HttpStatusCode.OK, Token("a1", "r1")));
+
+        await servicio.VerificarCodigoAsync("a@b.com", "123456");
+
+        Assert.Equal("a1", servicio.SesionActual!.AccessToken);
+        Assert.True(almacen.Datos.ContainsKey("miparte.sesion"));
+    }
 }

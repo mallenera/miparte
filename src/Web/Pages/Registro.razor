@@ -22,8 +22,34 @@
         @if (_pendienteConfirmar)
         {
             <div class="aviso ok" role="status">
-                Cuenta creada. Te hemos enviado un correo para confirmarla; después podrás <a href="login">iniciar sesión</a>.
+                @if (_desdeUrl)
+                {
+                    <text>Escribe el código de 6 dígitos que te enviamos a <strong>@_modelo.Email.Trim()</strong>. Si no lo tienes, pide uno nuevo.</text>
+                }
+                else
+                {
+                    <text>Te hemos enviado un código de 6 dígitos a <strong>@_modelo.Email.Trim()</strong>. Escríbelo para confirmar tu cuenta.</text>
+                }
             </div>
+            <EditForm Model="_verificacion" OnValidSubmit="VerificarAsync">
+                <DataAnnotationsValidator />
+                <div class="fieldrow">
+                    <label for="codigo">Código de confirmación</label>
+                    <InputText id="codigo" class="codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6" @bind-Value="_verificacion.Codigo" />
+                    <ValidationMessage For="() => _verificacion.Codigo" />
+                </div>
+                @if (_error is not null)
+                {
+                    <div class="aviso err" role="alert">@_error</div>
+                }
+                @if (_info is not null)
+                {
+                    <div class="aviso ok" role="status">@_info</div>
+                }
+                <button class="btn btn-block" type="submit" disabled="@_enviando">@(_enviando ? "Comprobando…" : "Confirmar cuenta")</button>
+            </EditForm>
+            <p class="muted">¿No te ha llegado? <button type="button" class="linkbtn" disabled="@_enviando" @onclick="ReenviarAsync">Reenviar código</button></p>
+            <p class="muted"><button type="button" class="linkbtn" disabled="@_enviando" @onclick="VolverAlAlta">Usar otro correo o crear la cuenta</button></p>
         }
         else
         {
@@ -36,12 +62,12 @@
                 </div>
                 <div class="fieldrow">
                     <label for="password">Contraseña</label>
-                    <InputText id="password" type="password" autocomplete="new-password" @bind-Value="_modelo.Password" />
+                    <CampoContrasena Id="password" Autocomplete="new-password" @bind-Value="_modelo.Password" />
                     <ValidationMessage For="() => _modelo.Password" />
                 </div>
                 <div class="fieldrow">
                     <label for="repetir">Repite la contraseña</label>
-                    <InputText id="repetir" type="password" autocomplete="new-password" @bind-Value="_modelo.Repetir" />
+                    <CampoContrasena Id="repetir" Autocomplete="new-password" @bind-Value="_modelo.Repetir" />
                     <ValidationMessage For="() => _modelo.Repetir" />
                 </div>
                 @if (_error is not null)
@@ -60,9 +86,33 @@
 
 @code {
     private readonly Modelo _modelo = new();
+    private readonly Verificacion _verificacion = new();
+    private string? _info;
+
+    /// <summary>Correo con la cuenta pendiente de confirmar (llega desde el login); abre directamente el paso del código.</summary>
+    [SupplyParameterFromQuery(Name = "email")] private string? EmailPendiente { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (!string.IsNullOrWhiteSpace(EmailPendiente))
+        {
+            _modelo.Email = EmailPendiente.Trim();
+            _pendienteConfirmar = _desdeUrl = true;
+        }
+    }
+
+    private void VolverAlAlta()
+    {
+        _pendienteConfirmar = _desdeUrl = false;
+        _error = _info = null;
+        _modelo.Email = "";
+        _verificacion.Codigo = "";
+    }
+
     private string? _error;
     private bool _enviando;
     private bool _pendienteConfirmar;
+    private bool _desdeUrl;
 
     private async Task EnviarAsync()
     {
@@ -87,6 +137,59 @@
         }
     }
 
+    private async Task VerificarAsync()
+    {
+        _enviando = true;
+        _error = _info = null;
+        try
+        {
+            await Sesion.VerificarCodigoAsync(_modelo.Email.Trim(), _verificacion.Codigo.Trim());
+            Navegacion.NavigateTo("", replace: true);
+        }
+        catch (AuthException e)
+        {
+            _error = e.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _error = "No se pudo conectar con Supabase. Comprueba tu conexión.";
+        }
+        finally
+        {
+            _enviando = false;
+        }
+    }
+
+    private async Task ReenviarAsync()
+    {
+        _enviando = true;
+        _error = _info = null;
+        try
+        {
+            await Sesion.ReenviarCodigoAsync(_modelo.Email.Trim());
+            _info = "Código reenviado. Revisa también la carpeta de spam.";
+        }
+        catch (AuthException e)
+        {
+            _error = e.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _error = "No se pudo conectar con Supabase. Comprueba tu conexión.";
+        }
+        finally
+        {
+            _enviando = false;
+        }
+    }
+
+    private sealed class Verificacion
+    {
+        [Required(ErrorMessage = "Escribe el código.")]
+        [RegularExpression(@"^\s*\d{6}\s*$", ErrorMessage = "El código tiene 6 dígitos.")]
+        public string Codigo { get; set; } = "";
+    }
+
     private sealed class Modelo
     {
         [Required(ErrorMessage = "Indica tu correo.")]
@@ -94,7 +197,8 @@
         public string Email { get; set; } = "";
 
         [Required(ErrorMessage = "Indica una contraseña.")]
-        [MinLength(6, ErrorMessage = "Mínimo 6 caracteres.")]
+        [MinLength(8, ErrorMessage = "Mínimo 8 caracteres.")]
+        [RegularExpression(@"^(?=.*\p{L})(?=.*\d).+$", ErrorMessage = "Incluye al menos una letra y un número.")]
         public string Password { get; set; } = "";
 
         [Required(ErrorMessage = "Repite la contraseña.")]

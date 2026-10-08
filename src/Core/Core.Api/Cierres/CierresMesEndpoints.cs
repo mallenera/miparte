@@ -105,6 +105,33 @@ public static class CierreMes
     /// <summary>Mensaje de error cuando se intenta tocar un mes cerrado.</summary>
     public const string Mensaje = "Ese mes está cerrado: un administrador debe reabrirlo para cambiar sus gastos.";
 
+    /// <summary>SQLSTATE con el que los triggers de la base de datos rechazan una escritura de gasto en un mes cerrado.</summary>
+    public const string SqlState = "MP409";
+
+    /// <summary>Indica si la excepción es el rechazo de la base de datos por mes cerrado (carrera con un cierre concurrente).</summary>
+    public static bool EsRechazo(DbUpdateException ex)
+        => ex.InnerException is Npgsql.PostgresException { SqlState: SqlState };
+
+    /// <summary>Respuesta 409 de mes cerrado.</summary>
+    public static IResult Rechazo() => Results.Conflict(new { error = Mensaje });
+
+    /// <summary>
+    /// Guarda los cambios; si la base de datos rechaza la escritura porque otra petición cerró el mes después de la
+    /// comprobación previa, devuelve el mismo 409 (y null si se guardó).
+    /// </summary>
+    public static async Task<IResult?> GuardarAsync(MiParteDbContext db, CancellationToken ct)
+    {
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            return null;
+        }
+        catch (DbUpdateException ex) when (EsRechazo(ex))
+        {
+            return Rechazo();
+        }
+    }
+
     /// <summary>Indica si el mes de la fecha está cerrado en el hogar actual.</summary>
     public static Task<bool> EstaCerradoAsync(MiParteDbContext db, DateOnly fecha, CancellationToken ct)
     {
@@ -116,7 +143,7 @@ public static class CierreMes
     public static async Task<IResult?> ComprobarAsync(MiParteDbContext db, CancellationToken ct, params DateOnly[] fechas)
     {
         foreach (var f in fechas.Distinct())
-            if (await EstaCerradoAsync(db, f, ct)) return Results.Conflict(new { error = Mensaje });
+            if (await EstaCerradoAsync(db, f, ct)) return Rechazo();
         return null;
     }
 }

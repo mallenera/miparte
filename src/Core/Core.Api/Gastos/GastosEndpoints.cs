@@ -114,7 +114,7 @@ public static class GastosEndpoints
         };
         ApiComun.AplicarReparto(g, partes);
         db.Gastos.Add(g);
-        await db.SaveChangesAsync(ct); // gasto y reparto en la misma transacción
+        if (await CierreMes.GuardarAsync(db, ct) is { } cerradoAhora) return cerradoAhora; // gasto y reparto en la misma transacción
         return Results.Created($"/api/gastos/{g.Id}", A(g));
     }
 
@@ -140,7 +140,7 @@ public static class GastosEndpoints
         g.ACargoCuentaComun = cuentaComun;
         g.PagadoDesdeAhorro = req.PagadoDesdeAhorro;
         ApiComun.AplicarReparto(g, partes);
-        await db.SaveChangesAsync(ct);
+        if (await CierreMes.GuardarAsync(db, ct) is { } cerradoAhora) return cerradoAhora;
         return Results.Ok(A(g));
     }
 
@@ -154,7 +154,7 @@ public static class GastosEndpoints
         if (await CierreMes.ComprobarAsync(db, ct, g.Fecha) is { } cerrado) return cerrado;
         db.GastosReparto.RemoveRange(g.Repartos);
         db.Gastos.Remove(g);
-        await db.SaveChangesAsync(ct);
+        if (await CierreMes.GuardarAsync(db, ct) is { } cerradoAhora) return cerradoAhora;
         return Results.NoContent();
     }
 }

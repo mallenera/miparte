@@ -452,6 +452,9 @@ input.invalid, input[aria-invalid="true"] { border-color: var(--err); outline: 0
 .aviso a { color: inherit; }
 .aviso-demo { margin-bottom: 14px; }
 .aviso-demo a { margin-left: 8px; font-weight: 700; }
+.pie { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; margin-top: 40px; padding: 20px 0 calc(20px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); color: var(--ink-2); font-size: .8rem; }
+.aviso-sistema { margin-bottom: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.aviso-sistema .btn:first-of-type { margin-left: auto; }
 
 /* Etiquetas */
 .tag {

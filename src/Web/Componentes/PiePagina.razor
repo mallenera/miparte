@@ -1,0 +1,18 @@
+@* Pie de página con el copyright y la fecha de la última actualización (la de compilación del front). *@
+@using System.Globalization
+
+<footer class="pie">
+    <span>© @(Fecha?.Year ?? DateTime.Now.Year) Mi parte, tu parte</span>
+    @if (Fecha is { } fecha)
+    {
+        <span>Actualizada el <time datetime="@fecha.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)">@fecha.ToString("d 'de' MMMM 'de' yyyy", Es)</time></span>
+    }
+</footer>
+
+@code {
+    private static readonly CultureInfo Es = new("es-ES");
+
+    /// <summary>Fecha a mostrar; por defecto la de compilación del front.</summary>
+    [Parameter]
+    public DateOnly? Fecha { get; set; } = InfoVersion.FechaCompilacion;
+}

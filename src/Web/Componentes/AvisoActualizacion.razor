@@ -1,0 +1,38 @@
+@* Avisa cuando el service worker ha descargado una versión nueva de la web y deja elegir cuándo aplicarla. *@
+@implements IDisposable
+@inject IJSRuntime JS
+
+@if (_hayVersionNueva && !_descartado)
+{
+    <div class="aviso warn aviso-sistema" role="status">
+        Hay una versión nueva de la web.
+        <button class="btn btn-sm" type="button" @onclick="AplicarAsync">Actualizar</button>
+        <button class="btn btn-sm btn-ghost" type="button" @onclick="() => _descartado = true">Ahora no</button>
+    </div>
+}
+
+@code {
+    private DotNetObjectReference<AvisoActualizacion>? _referencia;
+    private bool _hayVersionNueva;
+    private bool _descartado;
+
+    protected override async Task OnAfterRenderAsync(bool primera)
+    {
+        if (!primera) return;
+        _referencia = DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("miparteActualizacion.suscribir", _referencia);
+    }
+
+    /// <summary>La llama <c>registrar-sw.js</c> cuando hay una versión nueva instalada y a la espera.</summary>
+    [JSInvokable]
+    public Task HayVersionNueva()
+    {
+        _hayVersionNueva = true;
+        _descartado = false;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private async Task AplicarAsync() => await JS.InvokeVoidAsync("miparteActualizacion.aplicar");
+
+    public void Dispose() => _referencia?.Dispose();
+}

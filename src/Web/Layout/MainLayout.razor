@@ -63,6 +63,9 @@
         </AuthorizeView>
     </header>
 
+    <AvisoActualizacion />
+    <AvisoConexion />
+
     <AuthorizeView>
         <Authorized>
             @if (Sesion.EsDemoLocal)
@@ -102,6 +105,8 @@
         @* La clave recrea la página al cambiar de hogar para que recargue sus datos. *@
         <div @key="Hogar.HogarActual?.Id">@Body</div>
     </main>
+
+    <PiePagina />
 </div>
 
 @if (Avisos.Texto is { } aviso)

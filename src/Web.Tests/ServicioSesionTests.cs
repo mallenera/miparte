@@ -192,4 +192,36 @@ public class ServicioSesionTests
         Assert.Contains("cancelado", e.Message);
         Assert.False(almacen.Datos.ContainsKey("miparte.pkce"));
     }
+
+    [Fact]
+    public async Task La_demo_local_crea_una_sesion_que_no_caduca_y_sobrevive_a_recargar()
+    {
+        var (servicio, almacen, reloj) = Crear(ManejadorFalso.Json(HttpStatusCode.OK, Token("a1", "r1")));
+
+        await servicio.IniciarDemoAsync();
+
+        Assert.True(servicio.EsDemoLocal);
+        Assert.True(servicio.EsDemo);
+        reloj.Advance(TimeSpan.FromDays(3650));
+        Assert.Equal("demo", await servicio.ObtenerTokenAsync());
+
+        // Una «recarga»: otro servicio con el mismo almacén recupera la demo sin llamar a Supabase.
+        var auth = new SupabaseAuthClient(new HttpClient(ManejadorFalso.Json(HttpStatusCode.InternalServerError, "{}")) { BaseAddress = new Uri("https://x.supabase.co/auth/v1/") }, reloj);
+        var otro = new ServicioSesion(auth, almacen, reloj);
+        await otro.InicializarAsync();
+        Assert.True(otro.EsDemoLocal);
+    }
+
+    [Fact]
+    public async Task Cerrar_la_demo_local_no_llama_a_Supabase()
+    {
+        var manejador = ManejadorFalso.Json(HttpStatusCode.OK, Token("a1", "r1"));
+        var (servicio, _, _) = Crear(manejador);
+        await servicio.IniciarDemoAsync();
+
+        await servicio.CerrarSesionAsync();
+
+        Assert.Null(servicio.SesionActual);
+        Assert.Empty(manejador.Peticiones);
+    }
 }

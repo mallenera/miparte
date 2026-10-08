@@ -450,6 +450,8 @@ input.invalid, input[aria-invalid="true"] { border-color: var(--err); outline: 0
 .aviso.ok { background: var(--ok-soft); color: var(--ok); }
 .aviso.warn { background: var(--warn-soft); color: var(--warn); }
 .aviso a { color: inherit; }
+.aviso-demo { margin-bottom: 14px; }
+.aviso-demo a { margin-left: 8px; font-weight: 700; }
 
 /* Etiquetas */
 .tag {

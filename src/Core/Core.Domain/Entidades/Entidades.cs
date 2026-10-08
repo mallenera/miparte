@@ -109,6 +109,23 @@ public class AportacionCuenta
     public decimal Ahorro { get; set; }
 }
 
+/// <summary>Dinero que entra al ahorro de la cuenta común fuera de la aportación mensual (tabla deposito_ahorro).</summary>
+public class DepositoAhorro
+{
+    /// <summary>Identificador del depósito.</summary>
+    public Guid Id { get; set; }
+    /// <summary>Hogar al que pertenece.</summary>
+    public Guid HogarId { get; set; }
+    /// <summary>Miembro que lo registra.</summary>
+    public Guid MiembroId { get; set; }
+    /// <summary>Fecha del depósito.</summary>
+    public DateOnly Fecha { get; set; }
+    /// <summary>Importe depositado (positivo).</summary>
+    public decimal Importe { get; set; }
+    /// <summary>Nota opcional (ahorro inicial, lotería...).</summary>
+    public string? Concepto { get; set; }
+}
+
 /// <summary>Dinero que el hogar saca del ahorro de la cuenta común (tabla retirada_ahorro).</summary>
 public class RetiradaAhorro
 {
@@ -234,6 +251,8 @@ public class Gasto
     public Guid? GastoRecurrenteId { get; set; }
     /// <summary>Si lo asume la cuenta común (perfil «cuenta común»): no se reparte entre personas ni genera deuda.</summary>
     public bool ACargoCuentaComun { get; set; }
+    /// <summary>Si se paga con el ahorro de la cuenta común: se descuenta del ahorro disponible, no del saldo de gastos.</summary>
+    public bool PagadoDesdeAhorro { get; set; }
     /// <summary>Importe asumido por cada miembro.</summary>
     public List<GastoReparto> Repartos { get; set; } = [];
 }

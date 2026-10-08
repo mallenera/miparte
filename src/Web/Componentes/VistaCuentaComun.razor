@@ -155,11 +155,13 @@ else if (_estado is not null)
 
     <section class="card" aria-labelledby="t-ahorro">
         <div class="card-head"><h2 id="t-ahorro">Ahorro</h2></div>
-        <p class="muted">La parte de las aportaciones que se aparta. Los gastos no la tocan: solo baja al retirarla.</p>
+        <p class="muted">Suma la parte de las aportaciones que se aparta y lo que ingreses aparte (ahorro inicial, lotería…). Los gastos no la tocan: solo baja al retirarla o al pagar un gasto desde el ahorro.</p>
         <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px">
             <span class="chip">Ahorrado este mes&nbsp;<b>@Euros(_estado.AhorroMes)</b></span>
             <span class="chip">Ahorrado en total&nbsp;<b>@Euros(_estado.AhorroAcumulado)</b></span>
+            <span class="chip">Ingresado aparte&nbsp;<b>@Euros(_estado.AhorroDepositado)</b></span>
             <span class="chip">Retirado&nbsp;<b>@Euros(_estado.AhorroRetirado)</b></span>
+            <span class="chip">Gastado del ahorro&nbsp;<b>@Euros(_estado.AhorroGastado)</b></span>
         </div>
 
         @if (_estado.AhorroDisponible < 0)
@@ -167,6 +169,51 @@ else if (_estado is not null)
             <div class="aviso warn" role="status" style="margin-top: 12px">
                 Se ha retirado más de lo ahorrado: faltan @Euros(-_estado.AhorroDisponible) (revisa las aportaciones o las retiradas).
             </div>
+        }
+
+        @foreach (var d in (_estado.DepositosAhorro ?? []).OrderByDescending(d => d.Fecha))
+        {
+            <div class="gastorow">
+                <div class="g-main">
+                    <div class="g-concepto">Ingreso de @NombreMiembro(d.MiembroId)</div>
+                    <div class="muted g-meta">@d.Fecha.ToString("dd/MM/yyyy", Es)@(string.IsNullOrWhiteSpace(d.Concepto) ? "" : " · " + d.Concepto)</div>
+                </div>
+                <div class="g-importe">@Euros(d.Importe)</div>
+                <div class="c-acc">
+                    @if (_confirmandoEliminar == d.Id)
+                    {
+                        <span class="muted">¿Eliminar?</span>
+                        <button class="linkbtn danger" type="button" @onclick="() => EliminarDepositoAsync(d)">Sí</button>
+                        <button class="linkbtn" type="button" @onclick="() => _confirmandoEliminar = null">No</button>
+                    }
+                    else
+                    {
+                        <button class="linkbtn danger" type="button" aria-label="Eliminar ingreso de @NombreMiembro(d.MiembroId)" @onclick="() => _confirmandoEliminar = d.Id">Eliminar</button>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (_adultos.Count > 0)
+        {
+            <form class="addcat" id="form-deposito" @onsubmit="IngresarAhorroAsync">
+                <h3 style="flex: 1 1 100%; margin: 0">Añadir al ahorro</h3>
+                <label>Lo ingresa
+                    <select @bind="_depositante">
+                        @foreach (var a in _adultos)
+                        {
+                            <option value="@a.Id">@a.Nombre</option>
+                        }
+                    </select>
+                </label>
+                <label>Importe (€)
+                    <input inputmode="decimal" required placeholder="0,00" @bind="_importeDeposito" @bind:event="oninput" />
+                </label>
+                <label>Concepto
+                    <input maxlength="200" placeholder="Ahorro inicial, lotería…" @bind="_conceptoDeposito" @bind:event="oninput" />
+                </label>
+                <button class="btn" type="submit" disabled="@(!DepositoValido)">Añadir</button>
+            </form>
         }
 
         @foreach (var r in (_estado.RetiradasAhorro ?? []).OrderByDescending(r => r.Fecha))
@@ -231,13 +278,14 @@ else if (_estado is not null)
     private Guid? _confirmandoEliminar;
 
     private Guid _aportante, _reembolsado;
-    private Guid _retirante;
+    private Guid _retirante, _depositante;
     private string _importeAportacion = "", _ahorroAportacion = "", _importeReembolso = "", _conceptoReembolso = "";
-    private string _importeRetirada = "", _conceptoRetirada = "";
+    private string _importeRetirada = "", _conceptoRetirada = "", _importeDeposito = "", _conceptoDeposito = "";
 
     private string NombreMes => _mes.ToString("MMMM yyyy", Es);
     private bool AportacionValida => TryImporte(_importeAportacion, permitirCero: true, out var importe)
         && TryImporte(string.IsNullOrWhiteSpace(_ahorroAportacion) ? "0" : _ahorroAportacion, permitirCero: true, out var ahorro) && ahorro <= importe;
+    private bool DepositoValido => TryImporte(_importeDeposito, permitirCero: false, out _);
     private bool RetiradaValida => TryImporte(_importeRetirada, permitirCero: false, out _);
     private bool ReembolsoValido => TryImporte(_importeReembolso, permitirCero: false, out _);
 
@@ -251,7 +299,7 @@ else if (_estado is not null)
         {
             _miembros = await Api.ListarMiembrosAsync();
             _adultos = _miembros.Where(m => m.Tipo == "adulto" && m.Activo).ToList();
-            _aportante = _retirante = (_adultos.FirstOrDefault(m => m.EsYo) ?? _adultos.FirstOrDefault())?.Id ?? Guid.Empty;
+            _aportante = _retirante = _depositante = (_adultos.FirstOrDefault(m => m.EsYo) ?? _adultos.FirstOrDefault())?.Id ?? Guid.Empty;
             await RecargarAsync();
         }
         catch (ApiException e)
@@ -331,6 +379,26 @@ else if (_estado is not null)
             _importeReembolso = "";
             _conceptoReembolso = "";
             return "Reembolso registrado";
+        });
+
+    private Task IngresarAhorroAsync() =>
+        EjecutarAsync(async () =>
+        {
+            if (!TryImporte(_importeDeposito, permitirCero: false, out var importe))
+                throw new ApiException(System.Net.HttpStatusCode.BadRequest, "Introduce un importe mayor que 0 con máximo 2 decimales.");
+            await Api.CrearDepositoAhorroAsync(new CrearDepositoAhorroRequest(
+                _depositante, importe, null, string.IsNullOrWhiteSpace(_conceptoDeposito) ? null : _conceptoDeposito.Trim()));
+            _importeDeposito = "";
+            _conceptoDeposito = "";
+            return "Ahorro añadido";
+        });
+
+    private Task EliminarDepositoAsync(DepositoAhorroDto d) =>
+        EjecutarAsync(async () =>
+        {
+            await Api.EliminarDepositoAhorroAsync(d.Id);
+            _confirmandoEliminar = null;
+            return "Ingreso eliminado";
         });
 
     private Task RetirarAhorroAsync() =>

@@ -207,7 +207,7 @@ public class EsquemaPostgresTests
         {
             "hogar", "miembro", "perfil_reparto", "perfil_reparto_detalle", "categoria", "gasto_recurrente", "gasto",
             "gasto_reparto", "invitacion_hogar", "pago_liquidacion", "aportacion_cuenta", "reembolso_cuenta",
-            "retirada_ahorro",
+            "retirada_ahorro", "deposito_ahorro",
         };
         foreach (var tabla in tablas)
             foreach (var privilegio in new[] { "INSERT", "UPDATE", "DELETE", "TRUNCATE" })

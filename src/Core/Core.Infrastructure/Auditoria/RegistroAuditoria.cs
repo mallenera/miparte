@@ -190,7 +190,7 @@ public static class RegistroAuditoria
     {
         Hogar x => x.Id, Miembro x => x.Id, InvitacionHogar x => x.Id, Gasto x => x.Id, GastoRecurrente x => x.Id,
         PagoLiquidacionRegistro x => x.Id, AportacionCuenta x => x.Id, ReembolsoCuenta x => x.Id,
-        RetiradaAhorro x => x.Id, PerfilReparto x => x.Id, Categoria x => x.Id, _ => Guid.Empty,
+        RetiradaAhorro x => x.Id, DepositoAhorro x => x.Id, PerfilReparto x => x.Id, Categoria x => x.Id, _ => Guid.Empty,
     };
 
     /// <summary>Nombre con el que se registra el tipo de entidad, o null si no se audita.</summary>
@@ -199,6 +199,6 @@ public static class RegistroAuditoria
         Hogar => "hogar", Miembro => "miembro", InvitacionHogar => "invitacion", Gasto => "gasto",
         GastoRecurrente => "gasto_recurrente", PagoLiquidacionRegistro => "pago_liquidacion",
         AportacionCuenta => "aportacion_cuenta", ReembolsoCuenta => "reembolso_cuenta",
-        RetiradaAhorro => "retirada_ahorro", PerfilReparto => "perfil_reparto", Categoria => "categoria", _ => null,
+        RetiradaAhorro => "retirada_ahorro", DepositoAhorro => "deposito_ahorro", PerfilReparto => "perfil_reparto", Categoria => "categoria", _ => null,
     };
 }

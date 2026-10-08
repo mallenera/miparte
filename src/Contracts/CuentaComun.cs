@@ -30,6 +30,21 @@ public record ReembolsoCuentaDto(Guid Id, Guid MiembroId, DateOnly Fecha, decima
 /// <param name="Concepto">Descripción opcional.</param>
 public record CrearReembolsoRequest(Guid MiembroId, decimal Importe, DateOnly? Fecha, string? Concepto);
 
+/// <summary>Dinero que entra al ahorro de la cuenta común fuera de la aportación mensual (ahorro inicial, lotería...).</summary>
+/// <param name="Id">Identificador del depósito.</param>
+/// <param name="MiembroId">Miembro que lo registra.</param>
+/// <param name="Fecha">Fecha del depósito.</param>
+/// <param name="Importe">Importe depositado.</param>
+/// <param name="Concepto">De dónde viene (opcional).</param>
+public record DepositoAhorroDto(Guid Id, Guid MiembroId, DateOnly Fecha, decimal Importe, string? Concepto);
+
+/// <summary>POST /api/cuenta-comun/depositos-ahorro. Fecha por defecto: hoy (UTC).</summary>
+/// <param name="MiembroId">Miembro que registra el depósito.</param>
+/// <param name="Importe">Importe depositado.</param>
+/// <param name="Fecha">Fecha del depósito; si es null se usa hoy (UTC).</param>
+/// <param name="Concepto">Descripción opcional.</param>
+public record CrearDepositoAhorroRequest(Guid MiembroId, decimal Importe, DateOnly? Fecha, string? Concepto);
+
 /// <summary>Dinero que el hogar saca del ahorro de la cuenta común.</summary>
 /// <param name="Id">Identificador de la retirada.</param>
 /// <param name="MiembroId">Miembro que la registra.</param>
@@ -61,14 +76,19 @@ public record PendienteCuentaDto(Guid MiembroId, string Nombre, decimal Importe)
 /// <param name="Efectivo">Dinero de gastos que hay realmente en la cuenta (sin ahorro): saldo más lo pendiente de reembolsar.</param>
 /// <param name="Aportaciones">Aportaciones configuradas, ordenadas por miembro y mes.</param>
 /// <param name="Reembolsos">Reembolsos registrados en el mes.</param>
-/// <param name="AhorroMes">Parte de ahorro de las aportaciones del mes.</param>
-/// <param name="AhorroAcumulado">Ahorro aportado hasta el mes.</param>
+/// <param name="AhorroMes">Ahorro del mes: la parte de ahorro de las aportaciones más los depósitos del mes.</param>
+/// <param name="AhorroAcumulado">Ahorro acumulado hasta el mes: aportaciones más depósitos.</param>
 /// <param name="AhorroRetirado">Ahorro retirado hasta el mes.</param>
-/// <param name="AhorroDisponible">Ahorro acumulado menos retirado; negativo si una aportación se rebajó tras retirar.</param>
+/// <param name="AhorroDisponible">Ahorro acumulado menos retirado y menos gastado desde el ahorro; negativo si una aportación se rebajó tras retirar.</param>
 /// <param name="RetiradasAhorro">Retiradas de ahorro registradas en el mes.</param>
+/// <param name="AhorroDepositado">Parte del ahorro acumulado que entró como depósitos aparte de las aportaciones.</param>
+/// <param name="DepositosAhorro">Depósitos de ahorro registrados en el mes.</param>
+/// <param name="AhorroGastado">Gastos pagados desde el ahorro hasta el mes; restan del ahorro disponible.</param>
 public record CuentaComunResponse(
     string Mes, decimal AportadoMes, decimal Aportado, decimal Gastado, decimal Saldo,
     IReadOnlyList<PendienteCuentaDto> Pendientes, decimal Efectivo,
     IReadOnlyList<AportacionCuentaDto> Aportaciones, IReadOnlyList<ReembolsoCuentaDto> Reembolsos,
     decimal AhorroMes = 0m, decimal AhorroAcumulado = 0m, decimal AhorroRetirado = 0m, decimal AhorroDisponible = 0m,
-    IReadOnlyList<RetiradaAhorroDto>? RetiradasAhorro = null);
+    IReadOnlyList<RetiradaAhorroDto>? RetiradasAhorro = null,
+    decimal AhorroDepositado = 0m, IReadOnlyList<DepositoAhorroDto>? DepositosAhorro = null,
+    decimal AhorroGastado = 0m);

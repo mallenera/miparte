@@ -16,6 +16,7 @@ erDiagram
     hogar ||--o{ aportacion_cuenta : "aporta a la cuenta común"
     hogar ||--o{ reembolso_cuenta : "reembolsa de la cuenta común"
     hogar ||--o{ retirada_ahorro : "retira del ahorro"
+    hogar ||--o{ deposito_ahorro : "ingresa en el ahorro"
     miembro |o--o| miembro : "responsable_id (a_cargo)"
     perfil_reparto ||--o{ perfil_reparto_detalle : "valor por miembro"
     miembro ||--o{ perfil_reparto_detalle : ""
@@ -30,6 +31,7 @@ erDiagram
     aportacion_cuenta }o--|| miembro : ""
     reembolso_cuenta }o--|| miembro : ""
     retirada_ahorro }o--|| miembro : ""
+    deposito_ahorro }o--|| miembro : ""
 ```
 
 ## Tablas
@@ -41,7 +43,7 @@ erDiagram
 | `perfil_reparto` | `modo`: `porcentaje`, `partes`, `cuenta_comun` (lo asume la cuenta común) o `individual`. Nombre único por hogar. |
 | `perfil_reparto_detalle` | Valor (% o partes) por miembro y perfil. No se usa en `cuenta_comun` ni en `individual`. |
 | `categoria` | Jerárquica (`categoria_padre_id`) con perfil de reparto por defecto. |
-| `gasto` | Fecha, `importe > 0` con 2 decimales, categoría, `pagado_por` (nulo = lo paga directamente la cuenta común; exige `a_cargo_cuenta_comun`), perfil aplicado, concepto, `gasto_recurrente_id` de origen, `a_cargo_cuenta_comun` (sin filas en `gasto_reparto`, fuera de la liquidación). |
+| `gasto` | Fecha, `importe > 0` con 2 decimales, categoría, `pagado_por` (nulo = lo paga directamente la cuenta común; exige `a_cargo_cuenta_comun`), `pagado_desde_ahorro` (se descuenta del ahorro en vez del saldo de gastos; exige `pagado_por` nulo y `a_cargo_cuenta_comun`), perfil aplicado, concepto, `gasto_recurrente_id` de origen, `a_cargo_cuenta_comun` (sin filas en `gasto_reparto`, fuera de la liquidación). |
 | `gasto_reparto` | **Resultado del reparto congelado al crear el gasto**: `importe_asumido` por miembro. No se recalcula salvo con `PUT` del gasto. La suma de las filas = importe del gasto. |
 | `gasto_recurrente` | Plantilla mensual, `dia_mes` 1-28, `activo`. Índice único evita duplicar la generación de un mes (idempotente). |
 | `invitacion_hogar` | Solo se guarda el **hash SHA-256** del token; caduca a 7 días; un solo uso (`usada_en`/`usada_por`). |
@@ -49,6 +51,7 @@ erDiagram
 | `auditoria` | Historial **de solo añadir** (un trigger rechaza `UPDATE`, `DELETE` y `TRUNCATE`, también al propietario; solo se permite el borrado en cascada al eliminar el hogar). `usuario_id` sin FK (el rastro sobrevive a la cuenta), `accion`, `entidad`, `entidad_id`, `antes`/`despues` en `jsonb`. La escribe solo Core.Api, dentro de la transacción del cambio; la lee un admin vía RLS (`es_admin_hogar`). |
 | `aportacion_cuenta` | Importe fijo mensual de un adulto a la cuenta común, vigente `desde` un mes (día 1); único por miembro y mes. El importe de un mes es el de la fila más reciente que no lo supere; 0 = deja de aportar. `ahorro` (0 ≤ ahorro ≤ importe, por `check`) es la parte que se aparta para ahorro; el resto queda para gastos. |
 | `reembolso_cuenta` | Pago de la cuenta común a un miembro por gastos que adelantó (`gasto.a_cargo_cuenta_comun`). Baja lo pendiente y el efectivo, no el saldo. |
+| `deposito_ahorro` | Dinero que entra al ahorro de la cuenta común fuera de la aportación mensual (ahorro inicial, lotería...; `importe > 0`, concepto opcional). Suma al ahorro disponible, no toca el saldo de gastos. Solo lectura para los roles de cliente. |
 | `retirada_ahorro` | Dinero que el hogar saca del ahorro de la cuenta común (`importe > 0`, concepto opcional). Baja el ahorro disponible, no el saldo de gastos. Core.Api impide retirar más de lo ahorrado. Solo lectura para los roles de cliente. |
 | ~~`ingreso`~~ | **Eliminada** por `20261007000000_perfiles_cuenta_comun_sin_ingresos.sql`: el diseño no guarda ingresos. |
 

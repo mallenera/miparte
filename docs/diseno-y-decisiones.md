@@ -164,7 +164,9 @@ La cuenta común es un pagador más: los gastos que paga no entran en la deuda e
 **Ahorro dentro de la cuenta común** (decisión posterior al MVP): cada aportación mensual se reparte en una parte para gastos y otra de ahorro, en euros y por persona (`aportacion_cuenta.ahorro`, entre 0 y el importe; 0 por defecto, lo que deja todo como antes).
 
 - El ahorro no cuenta para gastos: el saldo y el efectivo se calculan sobre la parte de gastos (aportado − ahorro − gastado).
-- El ahorro disponible es el acumulado menos las retiradas (`retirada_ahorro`): sacar dinero del ahorro (por ejemplo, para unas vacaciones) baja solo el ahorro, y no se puede retirar más de lo ahorrado.
+- Además de lo apartado en las aportaciones, se puede ingresar dinero aparte (`deposito_ahorro`): el ahorro inicial al empezar a usar la app, un premio de lotería, un regalo... Suma al ahorro sin tocar el saldo de gastos.
+- Un gasto puede pagarse desde el ahorro (`gasto.pagado_desde_ahorro`): se descuenta del ahorro disponible y no del saldo, no lo adelanta nadie (sin reembolso pendiente), va a cargo de la cuenta común (sin reparto ni deuda entre personas) y no puede superar el ahorro disponible.
+- El ahorro disponible es el acumulado (aportaciones más ingresos aparte) menos las retiradas (`retirada_ahorro`) y lo gastado desde el ahorro: sacar dinero del ahorro (por ejemplo, para unas vacaciones) baja solo el ahorro, y no se puede retirar más de lo ahorrado.
 - Fuera de alcance por ahora: objetivos de ahorro (meta e importe objetivo) e intereses.
 
 - **Aportaciones:** cada adulto aporta un importe fijo al mes, guardado por mes y persona. Es lo único que se guarda del dinero que entra en el hogar.

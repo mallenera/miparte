@@ -42,13 +42,17 @@ else
                     <div class="g-main">
                         <div class="g-concepto">@(string.IsNullOrWhiteSpace(g.Concepto) ? NombreCategoria(g.CategoriaId) : g.Concepto)</div>
                         <div class="muted g-meta">
-                            @g.Fecha.ToString("dd/MM/yyyy", Es) · @NombreCategoria(g.CategoriaId) · paga @(g.PagadoPor is { } quien ? NombreMiembro(quien) : "la cuenta común")
+                            @g.Fecha.ToString("dd/MM/yyyy", Es) · @NombreCategoria(g.CategoriaId) · paga @(g.PagadoDesdeAhorro ? "el ahorro" : g.PagadoPor is { } quien ? NombreMiembro(quien) : "la cuenta común")
                             @if (g.GastoRecurrenteId is not null) { <span class="tag off">recurrente</span> }
                         </div>
                         <div class="g-reparto">
                             @if (g.ACargoCuentaComun)
                             {
                                 <span class="tag cur">Cuenta común: sin reparto entre personas</span>
+                            }
+                            @if (g.PagadoDesdeAhorro)
+                            {
+                                <span class="tag cur">Descontado del ahorro</span>
                             }
                             @foreach (var r in g.Repartos)
                             {
@@ -102,7 +106,7 @@ else
                     </select>
                 </label>
                 <label>Paga
-                    <select @bind="_pagador" @bind:after="AlCambiarPagador">
+                    <select @bind="OrigenPago" @bind:after="AlCambiarPagador">
                         @foreach (var m in _adultos)
                         {
                             <option value="@m.Id">@m.Nombre</option>
@@ -110,6 +114,7 @@ else
                         @if (_cuentaConfigurada && PerfilCuentaComun is not null)
                         {
                             <option value="">Cuenta común (la paga directamente)</option>
+                            <option value="ahorro">Ahorro (se descuenta del ahorro)</option>
                         }
                     </select>
                 </label>
@@ -151,7 +156,18 @@ else
     private string _importe = "", _concepto = "";
     private Guid _categoria, _perfil;
     private Guid? _pagador;
-    private bool _cuentaConfigurada;
+    private bool _cuentaConfigurada, _desdeAhorro;
+
+    /// <summary>Quién paga en el selector: un adulto (su id), la cuenta común ("") o el ahorro ("ahorro").</summary>
+    private string OrigenPago
+    {
+        get => _desdeAhorro ? "ahorro" : _pagador?.ToString() ?? "";
+        set
+        {
+            _desdeAhorro = value == "ahorro";
+            _pagador = _desdeAhorro || value == "" ? null : Guid.Parse(value);
+        }
+    }
 
     /// <summary>Perfil de modo cuenta común del hogar, el único con el que puede pagar la cuenta directamente.</summary>
     private PerfilRepartoDto? PerfilCuentaComun => _perfiles.FirstOrDefault(p => p.Modo == "cuenta_comun");
@@ -194,7 +210,8 @@ else
     {
         try
         {
-            return (await Api.ObtenerCuentaComunAsync(_mes.ToString("yyyy-MM", CultureInfo.InvariantCulture))).Aportaciones.Count > 0;
+            var cuenta = await Api.ObtenerCuentaComunAsync(_mes.ToString("yyyy-MM", CultureInfo.InvariantCulture));
+            return cuenta.Aportaciones.Count > 0 || cuenta.AhorroAcumulado > 0;
         }
         catch (ApiException)
         {
@@ -247,6 +264,7 @@ else
         _concepto = "";
         _categoria = _arbol.Count > 0 ? _arbol[0].Categoria.Id : Guid.Empty;
         _pagador = (_adultos.FirstOrDefault(m => m.EsYo) ?? _adultos.FirstOrDefault())?.Id ?? Guid.Empty;
+        _desdeAhorro = false;
         _perfil = _perfiles.FirstOrDefault()?.Id ?? Guid.Empty;
         AlCambiarCategoria();
     }
@@ -264,6 +282,7 @@ else
         _importe = g.Importe.ToString(CultureInfo.InvariantCulture);
         _categoria = g.CategoriaId;
         _pagador = g.PagadoPor;
+        _desdeAhorro = g.PagadoDesdeAhorro;
         _perfil = g.PerfilRepartoId;
         _concepto = g.Concepto ?? "";
         _error = null;
@@ -276,7 +295,7 @@ else
         {
             if (!TryImporte(out var importe)) throw new ApiException(System.Net.HttpStatusCode.BadRequest, "Introduce un importe mayor que 0 con máximo 2 decimales.");
             var peticion = new GastoRequest(_fecha, importe, _categoria, _pagador, _perfil,
-                string.IsNullOrWhiteSpace(_concepto) ? null : _concepto.Trim());
+                string.IsNullOrWhiteSpace(_concepto) ? null : _concepto.Trim(), _desdeAhorro);
             if (_editando is { } id)
             {
                 await Api.GuardarGastoAsync(id, peticion);

@@ -47,7 +47,24 @@ done
 MIPARTE_TEST_DB="Host=localhost;Database=miparte;Username=postgres;Password=..." dotnet test
 ```
 
-`supabase/tests/auth_stub.sql` simula el esquema `auth` de Supabase; hay que aplicarlo antes de las migraciones.
+`supabase/tests/auth_stub.sql` simula el esquema `auth` de Supabase (y sus privilegios por defecto para `anon`/`authenticated`, necesarios para que los tests de permisos tengan algo que comprobar); hay que aplicarlo antes de las migraciones.
+
+#### Montar un PostgreSQL local en Windows (una vez)
+
+Sin Docker ni instalador con administrador, con scoop (instala la 18 en `~\scoop\apps\postgresql`; CI usa la 16, el SQL es estándar). Su post-instalación ya crea un clúster con superusuario `postgres` sin contraseña y autenticación `trust` solo local. En una terminal nueva (para que vea el PATH):
+
+```bash
+scoop install postgresql
+pg_ctl -D ~/scoop/apps/postgresql/current/data -l ~/pg.log start     # no arranca solo con el equipo
+createdb -U postgres -h localhost miparte
+```
+
+Cada vez que haya migraciones nuevas (o al empezar de cero), recrea la base y aplica stub y migraciones en orden (los comandos de arriba, con `PGUSER=postgres PGHOST=localhost`); no edites migraciones ya aplicadas, crea otra. Para parar el servidor: `pg_ctl -D ~/scoop/apps/postgresql/current/data stop`. Si `pg_ctl` se cuelga en una tubería (`| tail`), no redirijas su salida: el servidor queda arrancado igualmente (comprueba el log).
+
+```bash
+psql -U postgres -h localhost -c "drop database if exists miparte" -c "create database miparte"
+MIPARTE_TEST_DB="Host=localhost;Database=miparte;Username=postgres" dotnet test
+```
 
 ## Arquitectura
 

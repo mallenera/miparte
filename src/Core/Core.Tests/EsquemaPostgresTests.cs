@@ -198,6 +198,39 @@ public class EsquemaPostgresTests
     }
 
     [SkippableFact]
+    public async Task RolesDeCliente_NoPuedenEscribirNiLlamarARpcDeAlta()
+    {
+        Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
+
+        await using var conn = await AbrirAsync();
+        var tablas = new[]
+        {
+            "hogar", "miembro", "perfil_reparto", "perfil_reparto_detalle", "categoria", "gasto_recurrente", "gasto",
+            "gasto_reparto", "invitacion_hogar", "pago_liquidacion", "aportacion_cuenta", "reembolso_cuenta",
+        };
+        foreach (var tabla in tablas)
+            foreach (var privilegio in new[] { "INSERT", "UPDATE", "DELETE", "TRUNCATE" })
+                Assert.False(
+                    (bool)(await EscalarAsync(conn, $"select has_table_privilege('authenticated', 'public.{tabla}', '{privilegio}')"))!,
+                    $"authenticated no debe tener {privilegio} sobre {tabla}");
+
+        // La lectura (acotada por RLS) sí se mantiene para authenticated y se cierra del todo para anon.
+        Assert.True((bool)(await EscalarAsync(conn, "select has_table_privilege('authenticated', 'public.gasto', 'SELECT')"))!);
+        Assert.False((bool)(await EscalarAsync(conn, "select has_table_privilege('anon', 'public.gasto', 'SELECT')"))!);
+
+        Assert.False((bool)(await EscalarAsync(conn, "select has_function_privilege('authenticated', 'public.crear_hogar(text, text)', 'EXECUTE')"))!);
+        Assert.False((bool)(await EscalarAsync(conn, "select has_function_privilege('authenticated', 'public.aceptar_invitacion(text, text)', 'EXECUTE')"))!);
+        // Las políticas RLS de lectura las siguen necesitando.
+        Assert.True((bool)(await EscalarAsync(conn, "select has_function_privilege('authenticated', 'public.mis_hogares()', 'EXECUTE')"))!);
+    }
+
+    private static async Task<object?> EscalarAsync(NpgsqlConnection conn, string sql)
+    {
+        await using var cmd = new NpgsqlCommand(sql, conn);
+        return await cmd.ExecuteScalarAsync();
+    }
+
+    [SkippableFact]
     public async Task AceptarInvitacion_VinculaMiembro_YNoSePuedeReutilizar()
     {
         Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");

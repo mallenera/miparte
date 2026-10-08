@@ -2,6 +2,8 @@
 
 PostgreSQL (Supabase). **La fuente de verdad es `supabase/migrations/*.sql`**; este documento es un mapa para orientarse. EF Core solo mapea (`MiParteDbContext`). Todas las tablas cuelgan de `hogar` (`hogar_id`) con RLS y filtro global por hogar en el servicio.
 
+**Escritura solo por Core.Api** (migración `20261011000000_cerrar_escritura_directa.sql`): `anon` y `authenticated` solo conservan `SELECT` (acotado por RLS; `anon` ni eso) y no pueden insertar, actualizar ni borrar, porque la anon key es pública y permitiría saltarse las validaciones de la API vía PostgREST. Las RPC `crear_hogar` y `aceptar_invitacion` ya no son ejecutables por `authenticated` (Core.Api las replica con sus topes). Las tablas llevan además `check` de longitud (nombres ≤ 100, conceptos ≤ 200). El rol de conexión de Core.Api debe ser propietario (`postgres`), nunca `authenticated`.
+
 ```mermaid
 erDiagram
     hogar ||--o{ miembro : tiene

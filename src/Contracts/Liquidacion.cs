@@ -11,7 +11,8 @@ public record ImporteMiembroDto(Guid MiembroId, decimal Importe);
 /// <param name="Pagado">Total de gastos del mes pagados por el miembro, incluidos los que asume la cuenta común.</param>
 /// <param name="Asumido">Total de gastos del mes que le corresponden según los repartos.</param>
 /// <param name="DebeCuentaComun">Lo que la cuenta común le debe por gastos que adelantó (acumulado hasta el fin del mes, descontados los reembolsos).</param>
-public record ResumenMiembroDto(Guid MiembroId, string Nombre, decimal Pagado, decimal Asumido, decimal DebeCuentaComun = 0m);
+/// <param name="Personal">Total de sus gastos personales del mes, que no entran en <paramref name="Pagado"/>, <paramref name="Asumido"/> ni en la liquidación.</param>
+public record ResumenMiembroDto(Guid MiembroId, string Nombre, decimal Pagado, decimal Asumido, decimal DebeCuentaComun = 0m, decimal Personal = 0m);
 
 /// <summary>Resumen mensual de una categoría.</summary>
 /// <param name="CategoriaId">Identificador de la categoría.</param>
@@ -35,14 +36,15 @@ public record ResumenCuentaComunDto(
 
 /// <summary>GET /api/resumen?mes=YYYY-MM.</summary>
 /// <param name="Mes">Mes consultado, en formato YYYY-MM.</param>
-/// <param name="GastosTotales">Suma de los gastos del mes.</param>
+/// <param name="GastosTotales">Suma de los gastos del mes, sin contar los personales.</param>
 /// <param name="Miembros">Pagado y asumido por cada miembro.</param>
-/// <param name="Categorias">Total y desglose por categoría.</param>
+/// <param name="Categorias">Total y desglose por categoría (sin gastos personales).</param>
 /// <param name="CuentaComun">Saldos de la cuenta común al final del mes; null si el hogar no la tiene activada.</param>
+/// <param name="GastosPersonales">Suma de los gastos personales del mes de todos los miembros, fuera de los totales anteriores.</param>
 public record ResumenMensualResponse(
     string Mes, decimal GastosTotales,
     IReadOnlyList<ResumenMiembroDto> Miembros, IReadOnlyList<ResumenCategoriaDto> Categorias,
-    ResumenCuentaComunDto? CuentaComun = null);
+    ResumenCuentaComunDto? CuentaComun = null, decimal GastosPersonales = 0m);
 
 /// <summary>Saldo positivo = le deben; negativo = debe. Ya descuenta los pagos registrados.</summary>
 /// <param name="MiembroId">Identificador del miembro.</param>

@@ -315,7 +315,7 @@ public sealed partial class ServidorDemo
 
     private static GastoResponse GastoDto(GastoDemo g) => new(
         g.Id, g.Fecha, g.Importe, g.CategoriaId, g.PagadoPor, g.PerfilRepartoId, g.Concepto, g.GastoRecurrenteId,
-        g.Repartos.OrderBy(r => r.MiembroId).ToList(), g.ACargoCuentaComun);
+        g.Repartos.OrderBy(r => r.MiembroId).ToList(), g.ACargoCuentaComun, false, g.EsPersonal);
 
     private HttpResponseMessage ListarGastos(string? mes, string? categoriaId, string? miembroId, string? buscar)
     {
@@ -344,9 +344,15 @@ public sealed partial class ServidorDemo
         if (r.Fecha == default) return "La fecha es obligatoria.";
         if (_categorias.All(c => c.Id != r.CategoriaId)) return "La categoría no existe en el hogar.";
         if (r.PagadoPor is { } pagador && !EsAdultoActivo(pagador)) return "Quien paga debe ser un adulto activo del hogar.";
+        if (r.Personal && (r.PagadoPor is null || r.PagadoDesdeAhorro)) return "Un gasto personal lo paga un miembro del hogar, no la cuenta común ni el ahorro.";
         var perfil = _perfiles.FirstOrDefault(p => p.Id == r.PerfilRepartoId);
         if (perfil is null) return "El perfil de reparto no existe en el hogar.";
         if (r.PagadoPor is null && perfil.Modo != ModoReparto.CuentaComun) return "La cuenta común solo paga gastos con el perfil de cuenta común.";
+        if (r.Personal)
+        {
+            repartos = [new RepartoGastoDto(r.PagadoPor!.Value, r.Importe)]; // lo asume íntegro quien paga, sea cual sea el perfil
+            return null;
+        }
 
         cuentaComun = perfil.Modo == ModoReparto.CuentaComun;
         return Repartir(perfil, r.Importe, r.PagadoPor ?? Guid.Empty, out repartos);
@@ -392,6 +398,7 @@ public sealed partial class ServidorDemo
         g.PerfilRepartoId = r.PerfilRepartoId;
         g.Concepto = NormalizarConcepto(r.Concepto);
         g.ACargoCuentaComun = cuentaComun;
+        g.EsPersonal = r.Personal;
         g.Repartos = repartos;
         if (existente is null) _gastos.Add(g);
         return Respuesta(existente is null ? HttpStatusCode.Created : HttpStatusCode.OK, GastoDto(g));
@@ -547,7 +554,9 @@ public sealed partial class ServidorDemo
     private HttpResponseMessage Resumen(string? mes)
     {
         if (!TryMes(mes, out var inicio)) return MesInvalido();
-        var gastos = GastosDelMes(inicio);
+        var delMes = GastosDelMes(inicio);
+        var gastos = delMes.Where(g => !g.EsPersonal).ToList();
+        var personales = delMes.Where(g => g.EsPersonal).ToList();
         var cuenta = CuentaComun.Calcular(inicio, [], GastosDeCuenta(), _reembolsos.Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe)));
 
         // Los acreedores con pendiente de meses anteriores aparecen aunque no participen en los gastos de este mes.
@@ -555,13 +564,15 @@ public sealed partial class ServidorDemo
             .Concat(gastos.Where(g => g.PagadoPor is not null).Select(g => g.PagadoPor!.Value))
             .Concat(gastos.SelectMany(g => g.Repartos).Select(r => r.MiembroId))
             .Concat(cuenta.Pendientes.Where(p => p.Importe > 0m).Select(p => p.MiembroId))
+            .Concat(personales.Select(g => g.PagadoPor!.Value))
             .ToHashSet();
         var porMiembro = _miembros.Where(m => implicados.Contains(m.Id)).OrderBy(m => m.Nombre).ThenBy(m => m.Id)
             .Select(m => new ResumenMiembroDto(
                 m.Id, m.Nombre,
                 gastos.Where(g => g.PagadoPor == m.Id).Sum(g => g.Importe),
                 gastos.SelectMany(g => g.Repartos).Where(r => r.MiembroId == m.Id).Sum(r => r.ImporteAsumido),
-                Math.Max(0m, cuenta.Pendientes.FirstOrDefault(p => p.MiembroId == m.Id)?.Importe ?? 0m)))
+                Math.Max(0m, cuenta.Pendientes.FirstOrDefault(p => p.MiembroId == m.Id)?.Importe ?? 0m),
+                personales.Where(g => g.PagadoPor == m.Id).Sum(g => g.Importe)))
             .ToList();
 
         var porCategoria = gastos.GroupBy(g => g.CategoriaId)
@@ -582,14 +593,14 @@ public sealed partial class ServidorDemo
                 estado.Pendientes.Where(p => p.Importe > 0m).Sum(p => p.Importe), estado.AhorroMes, estado.AhorroDisponible);
         }
 
-        return Ok(new ResumenMensualResponse(FormatoMes(inicio), gastos.Sum(g => g.Importe), porMiembro, porCategoria, resumenCuenta));
+        return Ok(new ResumenMensualResponse(FormatoMes(inicio), gastos.Sum(g => g.Importe), porMiembro, porCategoria, resumenCuenta, personales.Sum(g => g.Importe)));
     }
 
     private (IReadOnlyList<SaldoMiembro> Saldos, IReadOnlyList<Transferencia> Transferencias, List<PagoLiquidacionDto> Pagos, bool HayGastos)
         CalcularLiquidacion(DateOnly inicio)
     {
         // Lo que asume la cuenta común no entra en la deuda entre personas.
-        var gastos = GastosDelMes(inicio).Where(g => !g.ACargoCuentaComun).ToList();
+        var gastos = GastosDelMes(inicio).Where(g => !g.ACargoCuentaComun && !g.EsPersonal).ToList();
         var pagos = _pagos.Where(p => p.Mes == inicio).OrderBy(p => p.Fecha).ThenBy(p => p.Id).ToList();
         var ids = AdultosActivos().Select(m => m.Id)
             .Concat(gastos.Select(g => g.PagadoPor!.Value)).Concat(gastos.SelectMany(g => g.Repartos).Select(r => r.MiembroId))
@@ -722,6 +733,7 @@ public sealed partial class ServidorDemo
         public Guid? GastoRecurrenteId { get; set; }
         public List<RepartoGastoDto> Repartos { get; set; } = [];
         public bool ACargoCuentaComun { get; set; }
+        public bool EsPersonal { get; set; }
     }
 
     private sealed class RecurrenteDemo

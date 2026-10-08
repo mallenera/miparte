@@ -98,6 +98,7 @@ public class EsquemaPostgresTests
 
             var comun = await ctx.Gastos.Include(g => g.Repartos).SingleAsync(g => g.Id == gastoComunId);
             Assert.True(comun.ACargoCuentaComun);
+            Assert.False(comun.EsPersonal);
             Assert.Empty(comun.Repartos);
             var p = await ctx.PerfilesReparto.SingleAsync(x => x.Id == perfilComun);
             Assert.Equal(ModoReparto.CuentaComun, p.Modo);

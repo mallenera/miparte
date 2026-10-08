@@ -677,3 +677,7 @@ section.card + section.card { margin-top: 24px; }
 
 .mitem .muestra i + i + i { background: var(--cta); }
 .mhead-ico { display: flex; align-items: center; gap: 6px; }
+
+/* Resumen: barra del peso de la categoría sobre el total del mes (el texto con el porcentaje va al lado). */
+.barra { height: 6px; margin-top: 4px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.barra > span { display: block; height: 100%; background: var(--wine); }

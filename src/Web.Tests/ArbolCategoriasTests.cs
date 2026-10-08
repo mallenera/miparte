@@ -80,4 +80,25 @@ public class ArbolCategoriasTests
 
         Assert.Contains("B", ArbolCategorias.Ruta([a, b], b.Id));
     }
+
+    [Fact]
+    public void El_resumen_en_arbol_suma_cada_gasto_una_sola_vez_e_incluye_madres_sin_gasto()
+    {
+        var casa = Cat("Casa");
+        var luz = Cat("Luz", casa.Id);
+        var agua = Cat("Agua", casa.Id);
+        var ocio = Cat("Ocio");
+        var miembro = Guid.NewGuid();
+        ResumenCategoriaDto R(CategoriaDto c, decimal t) => new(c.Id, c.Nombre, t, [new ImporteMiembroDto(miembro, t)]);
+
+        var arbol = ArbolCategorias.ResumenEnArbol([casa, luz, agua, ocio], [R(luz, 30m), R(agua, 10m), R(ocio, 100m)]);
+
+        Assert.Equal(["Ocio", "Casa"], arbol.Select(n => n.Nombre));
+        var madre = arbol[1];
+        Assert.Equal(0m, madre.Propio);
+        Assert.Equal(40m, madre.Total);
+        Assert.Equal(40m, Assert.Single(madre.PorMiembro).Importe);
+        Assert.Equal(["Luz", "Agua"], madre.Hijos.Select(h => h.Nombre));
+        Assert.Equal(140m, arbol.Sum(n => n.Total));
+    }
 }

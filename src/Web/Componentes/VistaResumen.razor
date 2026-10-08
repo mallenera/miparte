@@ -159,6 +159,19 @@ else if (_resumen is not null && _liquidacion is not null)
                 </div>
             }
         }
+
+        @if (_resumen.GastosPersonales > 0)
+        {
+            <h3 style="margin: 16px 0 0">Gastos personales</h3>
+            <p class="muted">Cada uno es solo de quien lo paga: no entran en la liquidación ni en los totales de arriba.</p>
+            @foreach (var m in _resumen.Miembros.Where(m => m.Personal > 0))
+            {
+                <div class="catrow">
+                    <div class="c-name"><Avatar Nombre="@m.Nombre" Color="@ColorMiembro.De(m.MiembroId, _miembros)" Tamano="sm" /> @m.Nombre</div>
+                    <div class="c-sel"><span class="tag admin">Personal</span> <b class="g-importe">@Euros(m.Personal)</b></div>
+                </div>
+            }
+        }
     </section>
 }
 

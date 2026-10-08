@@ -628,4 +628,68 @@ public class GastosLiquidacionTests
 
         Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
     }
+
+    [Fact]
+    public async Task Gasto_Personal_LoAsumeElPagadorYQuedaFueraDeLaLiquidacion()
+    {
+        var e = await Montar();
+        await CrearGasto(e, Gasto(e, 900m, e.Perfil6040)); // compartido: Ana 540, Beto 360
+        var g = await CrearGasto(e, Gasto(e, 80m, e.Perfil6040, pagador: e.Beto) with { Personal = true }); // el perfil se ignora
+
+        Assert.True(g.Personal);
+        Assert.False(g.ACargoCuentaComun);
+        var parte = Assert.Single(g.Repartos);
+        Assert.Equal((e.Beto, 80m), (parte.MiembroId, parte.ImporteAsumido));
+        var leido = await Leer<GastoResponse>(await e.Cliente.GetAsync($"/api/gastos/{g.Id}"));
+        Assert.True(leido.Personal);
+
+        // La liquidación solo ve el gasto compartido: Beto debe 360 a Ana, sin los 80 personales.
+        var liq = await Leer<LiquidacionResponse>(await e.Cliente.GetAsync("/api/liquidacion?mes=2026-09"));
+        var t = Assert.Single(liq.Transferencias);
+        Assert.Equal((e.Beto, e.Ana, 360m), (t.De, t.A, t.Importe));
+
+        // El resumen no mezcla el personal con pagado/asumido/totales, pero lo muestra aparte.
+        var resumen = await Leer<ResumenMensualResponse>(await e.Cliente.GetAsync("/api/resumen?mes=2026-09"));
+        Assert.Equal((900m, 80m), (resumen.GastosTotales, resumen.GastosPersonales));
+        var beto = resumen.Miembros.Single(m => m.MiembroId == e.Beto);
+        Assert.Equal((0m, 360m, 80m), (beto.Pagado, beto.Asumido, beto.Personal));
+        Assert.Equal(0m, resumen.Miembros.Single(m => m.MiembroId == e.Ana).Personal);
+        Assert.Equal(900m, resumen.Categorias.Sum(c => c.Total));
+    }
+
+    [Fact]
+    public async Task Gasto_Personal_SoloEnUnMesSinGastosCompartidos_NoGeneraLiquidacion()
+    {
+        var e = await Montar();
+        await CrearGasto(e, Gasto(e, 25m, e.PerfilIndividual) with { Personal = true });
+
+        var liq = await Leer<LiquidacionResponse>(await e.Cliente.GetAsync("/api/liquidacion?mes=2026-09"));
+        Assert.All(liq.Saldos, s => Assert.Equal(0m, s.Saldo));
+        Assert.Empty(liq.Transferencias);
+        var resumen = await Leer<ResumenMensualResponse>(await e.Cliente.GetAsync("/api/resumen?mes=2026-09"));
+        Assert.Equal((0m, 25m), (resumen.GastosTotales, resumen.GastosPersonales));
+        Assert.Equal(25m, resumen.Miembros.Single(m => m.MiembroId == e.Ana).Personal);
+    }
+
+    [Fact]
+    public async Task Gasto_Personal_NoPuedeLlevarCuentaComunNiAhorro_YSePuedeEditarAHogar()
+    {
+        var e = await Montar();
+
+        var sinPagador = await e.Cliente.PostAsJsonAsync("/api/gastos", Gasto(e, 10m, e.PerfilCuentaComun) with { PagadoPor = null, Personal = true });
+        var ahorro = await e.Cliente.PostAsJsonAsync("/api/gastos", Gasto(e, 10m, e.PerfilCuentaComun) with { PagadoPor = null, PagadoDesdeAhorro = true, Personal = true });
+        Assert.Equal(HttpStatusCode.BadRequest, sinPagador.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, ahorro.StatusCode);
+
+        // Con perfil de cuenta común y pagador, un personal sigue siendo personal (no va a cargo de la cuenta).
+        var g = await CrearGasto(e, Gasto(e, 10m, e.PerfilCuentaComun) with { Personal = true });
+        Assert.False(g.ACargoCuentaComun);
+
+        // Al editarlo como gasto del hogar vuelve a repartirse y a entrar en la liquidación.
+        var editado = await Leer<GastoResponse>(await e.Cliente.PutAsJsonAsync($"/api/gastos/{g.Id}", Gasto(e, 100m, e.Perfil6040)));
+        Assert.False(editado.Personal);
+        Assert.Equal(2, editado.Repartos.Count);
+        var liq = await Leer<LiquidacionResponse>(await e.Cliente.GetAsync("/api/liquidacion?mes=2026-09"));
+        Assert.Single(liq.Transferencias);
+    }
 }

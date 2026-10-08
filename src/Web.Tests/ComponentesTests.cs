@@ -402,6 +402,33 @@ public class ComponentesTests : TestContext
     }
 
     [Fact]
+    public void Gasto_personal_se_envia_marcado_y_se_distingue_en_la_lista()
+    {
+        var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
+        var perfil = new PerfilRepartoDto(Guid.NewGuid(), "Individual", "individual", []);
+        var cat = new CategoriaDto(Guid.NewGuid(), "Ocio", null, perfil.Id);
+        var personal = new GastoResponse(Guid.NewGuid(), DateOnly.FromDateTime(DateTime.Today), 30m, cat.Id, AnaId, perfil.Id, "Cine", null,
+            [new RepartoGastoDto(AnaId, 30m)], false, false, true);
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
+            .Responde("GET /api/categorias", HttpStatusCode.OK, new[] { cat })
+            .Responde("GET /api/perfiles", HttpStatusCode.OK, new[] { perfil })
+            .Responde("GET /api/gastos", HttpStatusCode.OK, new[] { personal })
+            .Responde("POST /api/gastos", HttpStatusCode.Created, personal);
+        Registrar(api);
+        var c = RenderComponent<VistaGastos>();
+
+        Assert.NotEmpty(c.FindAll(".gastorow.personal"));
+        Assert.Contains("no entra en la liquidación", c.Markup);
+
+        c.FindAll("form.addcat select")[2].Change("personal"); // Tipo de gasto: personal
+        c.Find("form.addcat input[inputmode=decimal]").Input("30");
+        c.Find("form.addcat").Submit();
+
+        Assert.Contains("\"personal\":true", api.Cuerpos["POST /api/gastos"]);
+    }
+
+    [Fact]
     public void Cuenta_comun_ingreso_al_ahorro_envia_importe_y_concepto()
     {
         var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);

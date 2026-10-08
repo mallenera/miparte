@@ -526,6 +526,8 @@ input.invalid, input[aria-invalid="true"] { border-color: var(--err); outline: 0
     grid-template-columns: minmax(0, 1fr) auto auto;
 }
 .gastorow:first-child { border-top: 0; }
+/* Gasto personal: franja naranja a la izquierda además de la etiqueta, para distinguirlo del gasto compartido sin depender solo del color. */
+.gastorow.personal { border-left: 3px solid var(--orange); padding-left: 10px; }
 .g-concepto { font-weight: 600; overflow-wrap: anywhere; }
 .g-meta { font-size: .85rem; }
 .g-reparto { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }

@@ -28,7 +28,12 @@ else
                 <button class="linkbtn" type="button" aria-label="Mes siguiente" @onclick="() => CambiarMesAsync(1)"><Icono Nombre="chevron-right" /></button>
             </div>
         </div>
-        <p class="muted">Total del mes: <b>@Euros(_gastos.Sum(g => g.Importe))</b> en @_gastos.Count @(_gastos.Count == 1 ? "gasto" : "gastos").</p>
+        <p class="muted">Total del mes: <b>@Euros(_gastos.Where(g => !g.Personal).Sum(g => g.Importe))</b> en @_gastos.Count(g => !g.Personal) @(_gastos.Count(g => !g.Personal) == 1 ? "gasto" : "gastos").
+            @if (_gastos.Any(g => g.Personal))
+            {
+                <span>Personales (fuera de la liquidación): <b>@Euros(_gastos.Where(g => g.Personal).Sum(g => g.Importe))</b>.</span>
+            }
+        </p>
 
         @if (_error is not null)
         {
@@ -38,7 +43,7 @@ else
         <div style="margin-top: 10px">
             @foreach (var g in _gastos)
             {
-                <div class="gastorow">
+                <div class="gastorow @(g.Personal ? "personal" : "")">
                     <div class="g-main">
                         <div class="g-concepto">@(string.IsNullOrWhiteSpace(g.Concepto) ? NombreCategoria(g.CategoriaId) : g.Concepto)</div>
                         <div class="muted g-meta">
@@ -46,6 +51,10 @@ else
                             @if (g.GastoRecurrenteId is not null) { <span class="tag off">recurrente</span> }
                         </div>
                         <div class="g-reparto">
+                            @if (g.Personal)
+                            {
+                                <span class="tag admin">Personal: no entra en la liquidación</span>
+                            }
                             @if (g.ACargoCuentaComun)
                             {
                                 <span class="tag cur">Cuenta común: sin reparto entre personas</span>
@@ -118,8 +127,17 @@ else
                         }
                     </select>
                 </label>
+                @if (_pagador is not null)
+                {
+                    <label>Tipo de gasto
+                        <select @bind="TipoGasto">
+                            <option value="hogar">Del hogar (se reparte)</option>
+                            <option value="personal">Personal (solo de quien paga, fuera de la liquidación)</option>
+                        </select>
+                    </label>
+                }
                 <label>Reparto
-                    <select @bind="_perfil">
+                    <select @bind="_perfil" disabled="@(_personal && _pagador is not null)">
                         @foreach (var p in _perfiles)
                         {
                             <option value="@p.Id">@p.Nombre</option>
@@ -156,7 +174,7 @@ else
     private string _importe = "", _concepto = "";
     private Guid _categoria, _perfil;
     private Guid? _pagador;
-    private bool _cuentaConfigurada, _desdeAhorro;
+    private bool _cuentaConfigurada, _desdeAhorro, _personal;
 
     /// <summary>Quién paga en el selector: un adulto (su id), la cuenta común ("") o el ahorro ("ahorro").</summary>
     private string OrigenPago
@@ -167,6 +185,13 @@ else
             _desdeAhorro = value == "ahorro";
             _pagador = _desdeAhorro || value == "" ? null : Guid.Parse(value);
         }
+    }
+
+    /// <summary>Tipo de gasto en el selector: «hogar» (se reparte y entra en la liquidación) o «personal» (solo de quien paga).</summary>
+    private string TipoGasto
+    {
+        get => _personal ? "personal" : "hogar";
+        set => _personal = value == "personal";
     }
 
     /// <summary>Perfil de modo cuenta común del hogar, el único con el que puede pagar la cuenta directamente.</summary>
@@ -222,6 +247,7 @@ else
     /// <summary>La cuenta común solo paga gastos con su perfil: al elegirla como pagador se selecciona ese perfil.</summary>
     private void AlCambiarPagador()
     {
+        if (_pagador is null) _personal = false; // un gasto personal siempre lo paga una persona
         if (_pagador is null && PerfilCuentaComun is { } p) _perfil = p.Id;
     }
 
@@ -265,6 +291,7 @@ else
         _categoria = _arbol.Count > 0 ? _arbol[0].Categoria.Id : Guid.Empty;
         _pagador = (_adultos.FirstOrDefault(m => m.EsYo) ?? _adultos.FirstOrDefault())?.Id ?? Guid.Empty;
         _desdeAhorro = false;
+        _personal = false;
         _perfil = _perfiles.FirstOrDefault()?.Id ?? Guid.Empty;
         AlCambiarCategoria();
     }
@@ -283,6 +310,7 @@ else
         _categoria = g.CategoriaId;
         _pagador = g.PagadoPor;
         _desdeAhorro = g.PagadoDesdeAhorro;
+        _personal = g.Personal;
         _perfil = g.PerfilRepartoId;
         _concepto = g.Concepto ?? "";
         _error = null;
@@ -295,7 +323,7 @@ else
         {
             if (!TryImporte(out var importe)) throw new ApiException(System.Net.HttpStatusCode.BadRequest, "Introduce un importe mayor que 0 con máximo 2 decimales.");
             var peticion = new GastoRequest(_fecha, importe, _categoria, _pagador, _perfil,
-                string.IsNullOrWhiteSpace(_concepto) ? null : _concepto.Trim(), _desdeAhorro);
+                string.IsNullOrWhiteSpace(_concepto) ? null : _concepto.Trim(), _desdeAhorro, _personal && _pagador is not null);
             if (_editando is { } id)
             {
                 await Api.GuardarGastoAsync(id, peticion);

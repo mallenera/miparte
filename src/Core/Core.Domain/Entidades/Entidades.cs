@@ -109,6 +109,21 @@ public class AportacionCuenta
     public decimal Ahorro { get; set; }
 }
 
+/// <summary>Mes cerrado por un admin (tabla mes_cerrado): sus gastos ya no se pueden crear, editar ni borrar. Reabrir = borrar la fila.</summary>
+public class MesCerrado
+{
+    /// <summary>Identificador del cierre.</summary>
+    public Guid Id { get; set; }
+    /// <summary>Hogar al que pertenece.</summary>
+    public Guid HogarId { get; set; }
+    /// <summary>Primer día del mes cerrado.</summary>
+    public DateOnly Mes { get; set; }
+    /// <summary>Instante en que se cerró.</summary>
+    public DateTimeOffset CerradoEn { get; set; }
+    /// <summary>Usuario (claim sub) que lo cerró, si se conoce.</summary>
+    public Guid? CerradoPor { get; set; }
+}
+
 /// <summary>Dinero que entra al ahorro de la cuenta común fuera de la aportación mensual (tabla deposito_ahorro).</summary>
 public class DepositoAhorro
 {

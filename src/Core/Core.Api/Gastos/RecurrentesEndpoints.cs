@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MiParte.Contracts;
+using MiParte.Core.Api.Cierres;
 using MiParte.Core.Api.Seguridad;
 using MiParte.Core.Domain.Entidades;
 using MiParte.Core.Infrastructure.Persistencia;
@@ -111,13 +112,14 @@ public static class RecurrentesEndpoints
         return Results.NoContent();
     }
 
-    /// <summary>Crea los gastos del mes para las plantillas activas que aún no tengan uno. Idempotente.</summary>
+    /// <summary>Crea los gastos del mes para las plantillas activas que aún no tengan uno. Idempotente. 409 si el mes está cerrado.</summary>
     private static async Task<IResult> GenerarAsync(
         [FromQuery] string? mes, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
         if (!ApiComun.TryMes(mes, out var inicio)) return ApiComun.MesInvalido();
         var fin = inicio.AddMonths(1);
+        if (await CierreMes.ComprobarAsync(db, ct, inicio) is { } cerrado) return cerrado;
 
         // Dos peticiones simultáneas pueden leer lo mismo y generar duplicados: el índice único
         // gasto_recurrente_mes_uq lo impide y aquí se trata el conflicto reintentando (hasta 3 veces).

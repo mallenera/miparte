@@ -155,7 +155,8 @@ public class HogaresTests
     [Fact]
     public async Task MaximoDeHogaresPorUsuario_409()
     {
-        using var f = Crear(Secreto);
+        // El tope de peticiones costosas por minuto no debe interferir con la regla de negocio que se prueba.
+        using var f = Crear(Secreto).WithWebHostBuilder(b => b.UseSetting("Limites:CostosasPorMinuto", "1000"));
         var c = ConToken(f, Guid.NewGuid());
         for (var i = 0; i < HogaresEndpoints.MaxHogaresPorUsuario; i++)
             Assert.Equal(HttpStatusCode.Created, (await c.PostAsJsonAsync("/api/hogares", new CrearHogarRequest($"H{i}", "Ana"))).StatusCode);

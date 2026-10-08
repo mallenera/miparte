@@ -23,6 +23,13 @@ public class HogarActualMiddleware(RequestDelegate next)
     {
         var sub = ctx.User.FindFirst("sub")?.Value;
         var sinHogar = ctx.GetEndpoint()?.Metadata.GetMetadata<SinHogarActual>() is not null;
+
+        // El autor lo necesita la auditoría también en los endpoints sin hogar (crear hogar, aceptar invitación).
+        // GetService: sin persistencia configurada (p. ej. /health) no existe y no debe fallar.
+        if (ctx.User.Identity?.IsAuthenticated == true && Guid.TryParse(sub, out var autor)
+            && ctx.RequestServices.GetService<HogarActual>() is { } actual)
+            actual.UsuarioId = autor;
+
         if (!sinHogar && ctx.User.Identity?.IsAuthenticated == true && Guid.TryParse(sub, out var userId))
         {
             // Se resuelven aquí y no en el constructor: sin base de datos configurada

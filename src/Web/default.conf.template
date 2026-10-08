@@ -1,0 +1,36 @@
+# Plantilla de nginx: la imagen nginx-unprivileged sustituye ${SUPABASE_URL} y ${CORE_URL} (envsubst solo toca las
+# variables definidas, así que $uri se conserva). Ver docs/api.md y CLAUDE.md. Las URLs van en la CSP porque el
+# front solo puede hablar con Supabase Auth y con Core.Api; cualquier otro destino (exfiltrar el token) se bloquea.
+server {
+    listen 8080;
+    server_tokens off;
+    root /usr/share/nginx/html;
+    include /etc/nginx/mime.types;
+    types { application/wasm wasm; }
+
+    # Las cabeceras van en el server y no en los location: un add_header dentro de un location anula los heredados.
+    # Scripts solo propios ('wasm-unsafe-eval' es lo único que exige Blazor WASM): un XSS no puede inyectar
+    # código en línea ni cargarlo de otro origen. Los estilos en línea (atributos style="") se permiten solo como
+    # atributo porque Blazor y algunos componentes (Avatar) los fijan en tiempo de ejecución.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' https://fonts.googleapis.com; style-src-attr 'unsafe-inline'; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' ${SUPABASE_URL} ${CORE_URL}; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()" always;
+    add_header Cross-Origin-Opener-Policy "same-origin" always;
+    add_header Cross-Origin-Resource-Policy "same-origin" always;
+    # Solo tiene efecto cuando el navegador llega por HTTPS (el TLS lo termina el proxy o balanceador).
+    add_header Strict-Transport-Security "max-age=31536000" always;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Lo que decide qué versión de la app se ejecuta no se cachea: así una corrección de seguridad llega a todos
+    # en la siguiente visita y no queda un service worker o una configuración antigua. expires -1 = no-cache y,
+    # a diferencia de add_header, no anula las cabeceras de seguridad de arriba.
+    location = /index.html { expires -1; }
+    location = /service-worker.js { expires -1; }
+    location = /service-worker-assets.js { expires -1; }
+    location = /appsettings.json { expires -1; }
+}

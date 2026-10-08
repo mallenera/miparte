@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MiParte.Contracts;
 using MiParte.Core.Api.Hogares;
+using MiParte.Core.Api.Seguridad;
 using MiParte.Core.Domain.Entidades;
+using MiParte.Core.Infrastructure.Auditoria;
 using MiParte.Core.Infrastructure.Persistencia;
 
 namespace MiParte.Core.Api.Miembros;
@@ -32,9 +34,12 @@ public static class MiembrosEndpoints
         app.MapPut("/api/miembros/{id:guid}", ActualizarAsync).RequireAuthorization();
         app.MapDelete("/api/miembros/{id:guid}", DesactivarAsync).RequireAuthorization();
 
-        app.MapPost("/api/invitaciones", CrearInvitacionAsync).RequireAuthorization();
+        app.MapPost("/api/invitaciones", CrearInvitacionAsync)
+            .RequireAuthorization()
+            .RequireRateLimiting(LimitacionPeticiones.Costosa);
         app.MapPost("/api/invitaciones/aceptar", AceptarInvitacionAsync)
             .RequireAuthorization()
+            .RequireRateLimiting(LimitacionPeticiones.Costosa)
             .WithMetadata(new SinHogarActual());
 
         return app;
@@ -341,7 +346,13 @@ public static class MiembrosEndpoints
                     .ExecuteUpdateAsync(s => s.SetProperty(x => x.UserId, userId), ct);
                 if (vinculados == 0)
                     return Error(409, "El miembro de la invitación ya no está disponible o ya está vinculado a un usuario.");
+                db.Auditoria.Add(RegistroAuditoria.Manual(
+                    inv.HogarId, userId, RegistroAuditoria.Vincular, "miembro", destino, despues: new { userId }));
             }
+
+            // Los UPDATE condicionales no los ve el ChangeTracker: el rastro se añade a mano (el miembro nuevo sí se registra solo).
+            db.Auditoria.Add(RegistroAuditoria.Manual(
+                inv.HogarId, userId, RegistroAuditoria.Usar, "invitacion", inv.Id, despues: new { usadaPor = userId, usadaEn = ahora }));
 
             await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);

@@ -231,3 +231,29 @@ public class GastoReparto
     /// <summary>Importe que asume el miembro.</summary>
     public decimal ImporteAsumido { get; set; }
 }
+
+/// <summary>
+/// Cambio registrado en la auditoría (tabla auditoria, solo de añadir): quién hizo qué sobre qué entidad y
+/// cuándo. <see cref="Antes"/> y <see cref="Despues"/> son JSON con los campos afectados.
+/// </summary>
+public class EventoAuditoria
+{
+    /// <summary>Identificador del evento.</summary>
+    public Guid Id { get; set; }
+    /// <summary>Hogar al que pertenece el cambio.</summary>
+    public Guid HogarId { get; set; }
+    /// <summary>Usuario (claim sub) que hizo el cambio; null si no hay sesión asociada.</summary>
+    public Guid? UsuarioId { get; set; }
+    /// <summary>Instante del cambio.</summary>
+    public DateTimeOffset Cuando { get; set; }
+    /// <summary>Acción: crear, editar, borrar, vincular o usar.</summary>
+    public string Accion { get; set; } = "";
+    /// <summary>Tipo de entidad afectada (gasto, miembro, pago_liquidacion...).</summary>
+    public string Entidad { get; set; } = "";
+    /// <summary>Identificador de la entidad afectada.</summary>
+    public Guid EntidadId { get; set; }
+    /// <summary>JSON con el valor anterior de los campos que cambian (o el estado completo al borrar); null al crear.</summary>
+    public string? Antes { get; set; }
+    /// <summary>JSON con el valor nuevo de los campos que cambian (o el estado completo al crear); null al borrar.</summary>
+    public string? Despues { get; set; }
+}

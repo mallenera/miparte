@@ -30,7 +30,7 @@ dotnet run --project src/Core/Core.Api                          # GET /health, G
 ./scripts/probar-api.ps1 -SupabaseUrl https://xxxx.supabase.co -Email ...   # prueba de humo contra Supabase real
 dotnet run --project src/Assistant/Assistant.Api
 dotnet run --project src/Web
-docker compose up --build                                       # web :8080, core :5001, assistant :5002
+docker compose up --build                                       # web :8080 (nginx sin privilegios), core :5001, assistant :5002
 ```
 
 No hay linter configurado. CodeRabbit revisa los PR (`.coderabbit.yaml`; exige documentación XML en el código de producción).
@@ -47,7 +47,33 @@ done
 MIPARTE_TEST_DB="Host=localhost;Database=miparte;Username=postgres;Password=..." dotnet test
 ```
 
-`supabase/tests/auth_stub.sql` simula el esquema `auth` de Supabase; hay que aplicarlo antes de las migraciones.
+`supabase/tests/auth_stub.sql` simula el esquema `auth` de Supabase (y sus privilegios por defecto para `anon`/`authenticated`, necesarios para que los tests de permisos tengan algo que comprobar); hay que aplicarlo antes de las migraciones.
+
+#### Montar un PostgreSQL local en Windows (una vez)
+
+Sin Docker ni instalador con administrador, con scoop (instala la 18 en `~\scoop\apps\postgresql`; CI usa la 16, el SQL es estándar). Su post-instalación ya crea un clúster con superusuario `postgres` sin contraseña y autenticación `trust` solo local. En una terminal nueva (para que vea el PATH):
+
+```bash
+scoop install postgresql
+pg_ctl -D ~/scoop/apps/postgresql/current/data -l ~/pg.log start     # no arranca solo con el equipo
+createdb -U postgres -h localhost miparte
+```
+
+Cada vez que haya migraciones nuevas (o al empezar de cero), recrea la base y aplica stub y migraciones en orden (los comandos de arriba, con `PGUSER=postgres PGHOST=localhost`); no edites migraciones ya aplicadas, crea otra. Para parar el servidor: `pg_ctl -D ~/scoop/apps/postgresql/current/data stop`. Si `pg_ctl` se cuelga en una tubería (`| tail`), no redirijas su salida: el servidor queda arrancado igualmente (comprueba el log).
+
+```bash
+export PGUSER=postgres PGHOST=localhost
+psql -c "drop database if exists miparte" -c "create database miparte"
+psql -d miparte -v ON_ERROR_STOP=1 -f supabase/tests/auth_stub.sql || exit 1
+for f in supabase/migrations/*.sql; do
+  psql -d miparte -v ON_ERROR_STOP=1 -f "$f" || exit 1
+done
+MIPARTE_TEST_DB="Host=localhost;Database=miparte;Username=postgres" dotnet test
+```
+
+## Seguridad del front (CSP)
+
+`src/Web/default.conf.template` (nginx) fija la CSP y demás cabeceras; la imagen las aplica con envsubst a partir de `SUPABASE_URL` y `CORE_URL` (en `docker compose` salen de `Supabase__Url` y `CoreUrl`), que deben coincidir con `Supabase:Url` y `Api:CoreUrl` del `appsettings.json` del front. Consecuencias al desarrollar: **no añadas scripts en línea** a `index.html` (ponlos en `wwwroot/js/`), ni cargues JavaScript de otro origen, ni hables con otros hosts desde el front sin añadirlos a `connect-src`. Para comprobar un cambio con CSP real no hace falta Docker: publica el front (`dotnet publish src/Web`) y sírvelo con las cabeceras de la plantilla; la consola del navegador mostrará las violaciones.
 
 ## Arquitectura
 

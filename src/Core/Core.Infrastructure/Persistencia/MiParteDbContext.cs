@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using MiParte.Core.Domain.Entidades;
+using MiParte.Core.Infrastructure.Auditoria;
 
 namespace MiParte.Core.Infrastructure.Persistencia;
 
@@ -41,6 +42,37 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
     /// <summary>Conjunto de <see cref="ReembolsoCuenta"/> del hogar actual.</summary>
     public DbSet<ReembolsoCuenta> ReembolsosCuenta => Set<ReembolsoCuenta>();
 
+    /// <summary>Conjunto de <see cref="EventoAuditoria"/> del hogar actual (solo de añadir; lo lee únicamente un admin).</summary>
+    public DbSet<EventoAuditoria> Auditoria => Set<EventoAuditoria>();
+
+    /// <summary>
+    /// Si es true (por defecto), cada guardado añade a la auditoría los cambios que contiene. Se desactiva solo para
+    /// las altas masivas de la semilla de un hogar, que se resumen en un único evento.
+    /// </summary>
+    public bool AuditoriaActiva { get; set; } = true;
+
+    /// <inheritdoc />
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        Auditar();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    /// <inheritdoc />
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        Auditar();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    /// <summary>Añade al contexto los eventos de auditoría de los cambios pendientes, para que se guarden en la misma transacción.</summary>
+    private void Auditar()
+    {
+        if (!AuditoriaActiva) return;
+        var eventos = RegistroAuditoria.Capturar(ChangeTracker, hogarActual.UsuarioId);
+        if (eventos.Count > 0) Auditoria.AddRange(eventos);
+    }
+
     /// <summary>
     /// Fija tablas, precisiones y conversiones de enums a texto, y aplica a cada entidad el
     /// filtro global por hogar (toda entidad nueva con HogarId necesita su HasQueryFilter).
@@ -63,6 +95,17 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
             e.Property(x => x.Rol).HasConversion(
                 v => v == RolMiembro.Admin ? "admin" : "miembro",
                 v => v == "admin" ? RolMiembro.Admin : RolMiembro.Miembro);
+            e.HasQueryFilter(x => x.HogarId == HogarId);
+        });
+
+        b.Entity<EventoAuditoria>(e =>
+        {
+            e.ToTable("auditoria");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Antes).HasColumnType("jsonb");
+            e.Property(x => x.Despues).HasColumnType("jsonb");
+            // Única FK que debe conocer EF: si el hogar y su evento se guardan juntos, el hogar se inserta antes.
+            e.HasOne<Hogar>().WithMany().HasForeignKey(x => x.HogarId);
             e.HasQueryFilter(x => x.HogarId == HogarId);
         });
 

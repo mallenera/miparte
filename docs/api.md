@@ -41,6 +41,18 @@ El resto de rutas `/api/*` requieren hogar (cabecera o hogar único). Los datos 
 
 Orígenes permitidos: variable de entorno `Cors__OrigenesPermitidos__0` (y `__1`, ...), equivalente a `Cors:OrigenesPermitidos` en configuración. Ejemplo: `Cors__OrigenesPermitidos__0=http://localhost:8080`. Sin configuración no se permite ningún origen cruzado. Cabeceras permitidas: `Authorization`, `Content-Type`, `X-Hogar-Id`. Métodos: GET, POST, PUT, PATCH, DELETE, OPTIONS. Las barras finales del origen se ignoran.
 
+### Límites de peticiones (429)
+
+Ventana deslizante de 1 minuto, **por usuario** (`sub` del JWT ya validado) y, sin sesión válida, **por IP**. Al superarla: **429** con `Retry-After` (segundos) y `{ "error": "Demasiadas peticiones..." }`. El front debe tratarlo como un error recuperable y esperar.
+
+| Ámbito | Límite por defecto | Variable de entorno |
+|---|---|---|
+| Toda la API (salvo `/health`) | 120/min | `Limites__PeticionesPorMinuto` |
+| Costosas: `POST /api/hogares`, `POST /api/invitaciones`, `POST /api/invitaciones/aceptar`, `POST /api/gastos-recurrentes/generar` | 10/min | `Limites__CostosasPorMinuto` |
+| Tamaño del cuerpo de la petición (413 al superarlo) | 65536 bytes | `Limites__MaxCuerpoBytes` |
+
+Detrás de un proxy inverso hay que configurar `ForwardedHeaders`; si no, todos los anónimos comparten la IP del proxy.
+
 ## 2. Flujo recomendado de arranque del front
 
 1. Con sesión Supabase iniciada, llamar `GET /api/yo` (sin `X-Hogar-Id`).
@@ -141,7 +153,15 @@ Los ingresos del hogar **no se guardan** y no hay endpoints de ingresos. Los per
 
 El importe de un mes es el de la aportación con `desde` más reciente que no pase de ese mes. **Saldo** = aportado acumulado − gastos cargados a la cuenta hasta el mes (negativo si no los cubre). **Pendiente** de un miembro = gastos de la cuenta que adelantó − reembolsos recibidos. **Efectivo** = saldo + pendientes (el dinero de la cuenta no baja hasta reembolsar un gasto que adelantó una persona). Un gasto también puede pagarlo **directamente la cuenta**: `GastoRequest.pagadoPor = null`, solo con perfil `cuenta_comun` (400 en otro caso); no genera pendiente y baja el efectivo. `GastoResponse.pagadoPor` es `null` en esos gastos. Ejemplo: aportan 600 + 400, Ana adelanta una hipoteca de 900 a cargo de la cuenta → saldo 100, pendiente de Ana 900, efectivo 1000; tras reembolsarle 400 → saldo 100, pendiente 500, efectivo 600.
 
-Total: 43 endpoints de negocio (4 hogares/yo, 6 miembros/invitaciones, 4 categorías, 5 perfiles, 5 gastos, 6 recurrentes, 4 resumen/liquidación/pagos, 4 cuenta común) más `GET /health`.
+### 3.10 Auditoría
+
+| Método y ruta | Descripción | Request | Response | Errores | Permisos |
+|---|---|---|---|---|---|
+| `GET /api/auditoria?entidad=&entidadId=&limite=&hasta=&despuesDeId=` | Historial de cambios del hogar, del más reciente al más antiguo (empates por `id`). `limite` 1-200 (50 por defecto). Se pagina con el `cuando` y el `id` del último evento recibido, enviados como `hasta` (ISO 8601) y `despuesDeId`; con solo `hasta` se perderían los eventos de un mismo guardado, que comparten `cuando` | - | `EventoAuditoriaDto[]` 200 | 400 límite fuera de 1-200; 403 no admin; 409 sin hogar | admin |
+
+Cada cambio de gasto, gasto recurrente, pago de liquidación, aportación, reembolso, perfil, categoría, miembro e invitación queda registrado **en la misma transacción** que el cambio (no puede haber cambio sin rastro). `accion`: `crear` (solo `despues`), `editar` (solo los campos que cambian, en `antes` y `despues`), `borrar` (solo `antes`), `vincular` (un usuario queda ligado a un miembro al aceptar una invitación) y `usar` (invitación aceptada). El reparto de un gasto (`repartos`) y el detalle de un perfil (`detalle`) van dentro de su evento. Crear un hogar es un único evento (no se detalla la semilla). Nunca se registran el token de una invitación ni su hash. `autor` es el nombre del miembro vinculado al usuario; `usuarioId` sigue siendo válido aunque ese miembro se desactive.
+
+Total: 44 endpoints de negocio (4 hogares/yo, 6 miembros/invitaciones, 4 categorías, 5 perfiles, 5 gastos, 6 recurrentes, 4 resumen/liquidación/pagos, 4 cuenta común, 1 auditoría) más `GET /health`.
 
 ## 4. Ejemplos JSON
 
@@ -372,7 +392,7 @@ Error típico si se pasa de la deuda (409): `{ "error": "El importe supera la de
 - **Recurrentes**: `diaMes` entre 1 y 28. `generar` es idempotente por mes y plantilla; una plantilla con gastos generados no se borra, se desactiva.
 - **Semilla al crear hogar**: 4 perfiles (`Cuenta común`, `Por partes`, `Porcentaje fijo`, `Individual`; el creador queda con 1 parte en "Por partes" y 100 % en "Porcentaje fijo") y 6 categorías (Hipoteca/Alquiler, Alimentación, Suministros, Gastos varios de casa e Hijo con "Por partes"; Ocio personal con "Individual"). El creador es admin y adulto.
 - **Quién soy**: `MiembroDto.esYo` es `true` en el miembro vinculado al usuario autenticado (en `GET /api/miembros`, `PUT` y `DELETE`; el alta siempre devuelve `false`). El front lo usa para saber si mostrar los controles de admin y cuál es "su" miembro.
-- **Roles**: solo admin crea miembros e invitaciones y modifica a otros; el hogar siempre conserva al menos un admin activo y vinculado (409). Un adulto responsable de miembros a cargo activos no se puede desactivar (409).
+- **Roles**: solo admin crea miembros e invitaciones, modifica a otros y lee el historial (`/api/auditoria`); el hogar siempre conserva al menos un admin activo y vinculado (409). Un adulto responsable de miembros a cargo activos no se puede desactivar (409). **Decisión**: todo lo demás (gastos, pagos, reembolsos, aportaciones, perfiles, categorías, recurrentes) lo puede hacer cualquier miembro, admin o no; la responsabilidad se cubre con la auditoría, no con permisos.
 - **Invitaciones**: el `token` en claro solo se devuelve en la respuesta de `POST /api/invitaciones` (en base de datos solo se guarda su hash): mostrarlo o copiarlo en ese momento. Caduca a los 7 días (`caducaEn`) y es de un solo uso. Quien acepta no necesita hogar previo. Si la invitación apunta a un `miembroId`, ese miembro queda vinculado al usuario; si no, hay que enviar `nombre` y entra como adulto con rol `miembro`.
 - **Eliminaciones**: categorías y perfiles en uso devuelven 409; los miembros se desactivan, no se borran.
 

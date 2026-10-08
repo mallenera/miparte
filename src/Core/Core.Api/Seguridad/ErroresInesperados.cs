@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Mvc;
+
 namespace MiParte.Core.Api.Seguridad;
 
 /// <summary>
@@ -9,7 +11,8 @@ public static class ErroresInesperados
 {
     /// <summary>
     /// Captura lo que no haya resuelto un endpoint, lo registra con su traza y responde
-    /// <c>500 { "error": ... }</c> sin detalles internos. Va tras <c>UseCors</c> para conservar sus cabeceras.
+    /// un <c>500</c> <see cref="ProblemDetails"/> (<c>application/problem+json</c>) en español sin detalles internos.
+    /// Va tras <c>UseCors</c> para conservar sus cabeceras.
     /// </summary>
     public static IApplicationBuilder UseErroresInesperados(this IApplicationBuilder app)
         => app.Use(async (ctx, next) =>
@@ -27,7 +30,16 @@ public static class ErroresInesperados
                 ctx.Response.Headers.ContentLength = null;
                 ctx.Response.Headers.Remove("Content-Encoding");
                 ctx.Response.StatusCode = StatusCodes.Status500InternalServerError;
-                await ctx.Response.WriteAsJsonAsync(new { error = "Error interno del servidor." });
+                var problema = new ProblemDetails
+                {
+                    Status = StatusCodes.Status500InternalServerError,
+                    Title = "Error interno del servidor.",
+                    Type = "https://datatracker.ietf.org/doc/html/rfc9110#section-15.6.1",
+                };
+                // «error» mantiene el contrato de los demás errores de la API (el front lee ese campo).
+                problema.Extensions["error"] = problema.Title;
+                problema.Extensions["traceId"] = ctx.TraceIdentifier;
+                await ctx.Response.WriteAsJsonAsync(problema, options: null, contentType: "application/problem+json");
             }
         });
 }

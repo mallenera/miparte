@@ -18,7 +18,7 @@
 
     @if (!Disponible)
     {
-        <div class="aviso warn" role="status" style="margin-top: 12px">
+        <div class="aviso warn u-mt12" role="status">
             El asistente no está configurado en esta instalación (falta <code>Api:AssistantUrl</code>).
         </div>
     }
@@ -61,7 +61,7 @@
 
         @if (_error is not null)
         {
-            <div class="aviso err" role="alert" style="margin-top: 12px">@_error</div>
+            <div class="aviso err u-mt12" role="alert">@_error</div>
         }
 
         <form class="chatform" @onsubmit="() => EnviarAsync(_texto)">

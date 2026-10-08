@@ -353,6 +353,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 /* Utilidades de espaciado que antes eran style="" en línea; !important porque deben ganar a reglas como .card h3 */
 .u-mt0 { margin-top: 0 !important; }
 .u-mt10 { margin-top: 10px !important; }
+.u-mt8-inline { margin-top: 8px; display: inline-block; }
 .u-mt12 { margin-top: 12px !important; }
 .u-mt14 { margin-top: 14px !important; }
 .u-sec { margin: 16px 0 0 !important; }

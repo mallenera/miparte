@@ -17,6 +17,7 @@ erDiagram
     hogar ||--o{ reembolso_cuenta : "reembolsa de la cuenta común"
     hogar ||--o{ retirada_ahorro : "retira del ahorro"
     hogar ||--o{ deposito_ahorro : "ingresa en el ahorro"
+    hogar ||--o{ mes_cerrado : "cierra"
     miembro |o--o| miembro : "responsable_id (a_cargo)"
     perfil_reparto ||--o{ perfil_reparto_detalle : "valor por miembro"
     miembro ||--o{ perfil_reparto_detalle : ""
@@ -52,6 +53,7 @@ erDiagram
 | `aportacion_cuenta` | Importe fijo mensual de un adulto a la cuenta común, vigente `desde` un mes (día 1); único por miembro y mes. El importe de un mes es el de la fila más reciente que no lo supere; 0 = deja de aportar. `ahorro` (0 ≤ ahorro ≤ importe, por `check`) es la parte que se aparta para ahorro; el resto queda para gastos. |
 | `reembolso_cuenta` | Pago de la cuenta común a un miembro por gastos que adelantó (`gasto.a_cargo_cuenta_comun`). Baja lo pendiente y el efectivo, no el saldo. |
 | `deposito_ahorro` | Dinero que entra al ahorro de la cuenta común fuera de la aportación mensual (ahorro inicial, lotería...; `importe > 0`, concepto opcional). Suma al ahorro disponible, no toca el saldo de gastos. Solo lectura para los roles de cliente. |
+| `mes_cerrado` | Mes cerrado por un miembro (`mes` = día 1, único por hogar; `cerrado_por` = usuario sin FK). Mientras exista la fila no se pueden crear, editar ni borrar gastos con fecha en ese mes ni generar recurrentes en él; reabrir = borrar la fila. Solo lectura para los roles de cliente: escribe Core.Api, que deja cerrar a cualquier miembro y reabrir solo a un admin. |
 | `retirada_ahorro` | Dinero que el hogar saca del ahorro de la cuenta común (`importe > 0`, concepto opcional). Baja el ahorro disponible, no el saldo de gastos. Core.Api impide retirar más de lo ahorrado. Solo lectura para los roles de cliente. |
 | ~~`ingreso`~~ | **Eliminada** por `20261007000000_perfiles_cuenta_comun_sin_ingresos.sql`: el diseño no guarda ingresos. |
 
@@ -62,4 +64,4 @@ erDiagram
 - Cambiar partes o perfiles solo afecta a gastos **nuevos**.
 
 ## Pendiente de modelar (ver diseño)
-Cierre de mes, etiquetas, historial de cambios. Cada uno requerirá una migración SQL nueva y su mapeo en `MiParteDbContext`.
+Etiquetas, historial de cambios. Cada uno requerirá una migración SQL nueva y su mapeo en `MiParteDbContext`.

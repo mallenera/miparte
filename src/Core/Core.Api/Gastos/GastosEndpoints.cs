@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MiParte.Contracts;
+using MiParte.Core.Api.Cierres;
 using MiParte.Core.Domain;
 using MiParte.Core.Domain.Entidades;
 using MiParte.Core.Infrastructure.Persistencia;
@@ -99,7 +100,7 @@ public static class GastosEndpoints
             : Results.Conflict(new { error = $"El ahorro disponible ({disponible:0.00}) no cubre el gasto.", disponible });
     }
 
-    /// <summary>POST /api/gastos: crea el gasto y guarda su reparto en la misma transacción. 201 si se crea; 409 sin hogar; 400 si falla la validación o el reparto; 409 si se paga desde el ahorro y no alcanza o si va a cargo de la cuenta común y el hogar no la ha activado.</summary>
+    /// <summary>POST /api/gastos: crea el gasto y guarda su reparto en la misma transacción. 201 si se crea; 409 sin hogar; 400 si falla la validación o el reparto; 409 si el mes está cerrado, si se paga desde el ahorro y no alcanza o si va a cargo de la cuenta común y el hogar no la ha activado.</summary>
     private static async Task<IResult> CrearAsync(
         GastoRequest req, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
@@ -107,6 +108,7 @@ public static class GastosEndpoints
         var (partes, error, cuentaComun) = await Preparar(req, db, ct);
         if (partes is null) return ApiComun.Invalido(error!);
         if (cuentaComun && await CuentaComunEndpoints.ExigirActivaAsync(db, ct) is { } inactiva) return inactiva;
+        if (await CierreMes.ComprobarAsync(db, ct, req.Fecha) is { } cerrado) return cerrado;
         if (await ComprobarAhorroAsync(req, null, db, ct) is { } sinAhorro) return sinAhorro;
 
         var g = new Gasto
@@ -132,6 +134,7 @@ public static class GastosEndpoints
         var (partes, error, cuentaComun) = await Preparar(req, db, ct);
         if (partes is null) return ApiComun.Invalido(error!);
         if (cuentaComun && await CuentaComunEndpoints.ExigirActivaAsync(db, ct) is { } inactiva) return inactiva;
+        if (await CierreMes.ComprobarAsync(db, ct, g.Fecha, req.Fecha) is { } cerrado) return cerrado; // ni sacarlo de un mes cerrado ni meterlo en uno
         if (await ComprobarAhorroAsync(req, id, db, ct) is { } sinAhorro) return sinAhorro;
 
         // Solo se recalcula este gasto; el resto del histórico no se toca.
@@ -149,13 +152,14 @@ public static class GastosEndpoints
         return Results.Ok(A(g));
     }
 
-    /// <summary>DELETE /api/gastos/{id}: borra el gasto y su reparto. 409 sin hogar; 404 si no existe; 204 si se borra.</summary>
+    /// <summary>DELETE /api/gastos/{id}: borra el gasto y su reparto. 409 sin hogar o si el mes está cerrado; 404 si no existe; 204 si se borra.</summary>
     private static async Task<IResult> BorrarAsync(
         Guid id, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
         var g = await db.Gastos.Include(x => x.Repartos).FirstOrDefaultAsync(x => x.Id == id, ct);
         if (g is null) return Results.NotFound();
+        if (await CierreMes.ComprobarAsync(db, ct, g.Fecha) is { } cerrado) return cerrado;
         db.GastosReparto.RemoveRange(g.Repartos);
         db.Gastos.Remove(g);
         await db.SaveChangesAsync(ct);

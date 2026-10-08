@@ -261,12 +261,19 @@ else
     private async Task RecargarGastosAsync()
     {
         var version = ++_versionCarga;
-        var gastos = await Api.ListarGastosAsync(
-                _mes.ToString("yyyy-MM", CultureInfo.InvariantCulture),
-                Guid.TryParse(_filtroCategoria, out var categoria) ? categoria : null,
-                Guid.TryParse(_filtroMiembro, out var miembro) ? miembro : null,
-                _filtroTexto);
-        if (version == _versionCarga) _gastos = gastos.OrderByDescending(g => g.Fecha).ToList();
+        try
+        {
+            var gastos = await Api.ListarGastosAsync(
+                    _mes.ToString("yyyy-MM", CultureInfo.InvariantCulture),
+                    Guid.TryParse(_filtroCategoria, out var categoria) ? categoria : null,
+                    Guid.TryParse(_filtroMiembro, out var miembro) ? miembro : null,
+                    _filtroTexto);
+            if (version == _versionCarga) _gastos = gastos.OrderByDescending(g => g.Fecha).ToList();
+        }
+        catch (ApiException) when (version != _versionCarga)
+        {
+            // Un fallo de una petición ya superada no debe mostrar un error junto a los resultados de la nueva.
+        }
     }
 
     /// <summary>Vuelve a pedir los gastos del mes con los filtros elegidos; los errores salen en pantalla.</summary>

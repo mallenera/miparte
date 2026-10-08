@@ -77,12 +77,13 @@ else if (_resumen is not null && _liquidacion is not null)
                         <div class="muted g-meta">Pendiente @Euros(t.Importe)</div>
                         @if (!ImporteValido(t))
                         {
-                            <div class="muted g-meta" role="status">Importe entre 0,01 y @Euros(t.Importe), con máximo 2 decimales.</div>
+                            <div id="@IdError(t)" class="muted g-meta" role="status">Importe entre 0,01 y @Euros(t.Importe), con máximo 2 decimales.</div>
                         }
                     </div>
                     <div class="c-acc pagoimp">
                         <label class="sr" for="@IdImporte(t)">Importe a pagar de @NombreMiembro(t.De) a @NombreMiembro(t.A)</label>
                         <input id="@IdImporte(t)" class="g-importe" inputmode="decimal" value="@ImporteEscrito(t)"
+                               aria-invalid="@(ImporteValido(t) ? null : "true")" aria-describedby="@(ImporteValido(t) ? null : IdError(t))"
                                @oninput="e => EscribirImporte(t, e.Value?.ToString())" />
                         <button class="btn" type="button" aria-label="Registrar el pago de @NombreMiembro(t.De) a @NombreMiembro(t.A)"
                                 disabled="@(_guardando || !ImporteValido(t))" @onclick="() => RegistrarPagoAsync(t)">Registrar pago</button>
@@ -254,14 +255,21 @@ else if (_resumen is not null && _liquidacion is not null)
 
     private static string IdImporte(TransferenciaDto t) => $"pago-{t.De}-{t.A}";
 
+    private static string IdError(TransferenciaDto t) => $"pago-error-{t.De}-{t.A}";
+
     /// <summary>Lo escrito por el usuario o, si aún no ha tocado el campo, el importe sugerido.</summary>
     private string ImporteEscrito(TransferenciaDto t) =>
         _importes.TryGetValue(Clave(t), out var texto) ? texto : t.Importe.ToString("0.00", Es);
 
     /// <summary>Importe del pago: mayor que 0, con máximo 2 decimales y sin pasar de lo pendiente.</summary>
-    private bool TryImporte(TransferenciaDto t, out decimal valor) =>
-        decimal.TryParse(ImporteEscrito(t).Trim().Replace(',', '.'), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out valor)
-        && valor > 0 && valor <= t.Importe && decimal.Round(valor, 2) == valor;
+    private bool TryImporte(TransferenciaDto t, out decimal valor)
+    {
+        var texto = ImporteEscrito(t).Trim().Replace(',', '.');
+        // Se mira el texto y no solo el valor: «1,230» vale lo mismo que «1,23» pero tiene tres decimales.
+        var decimales = texto.Contains('.') ? texto.Length - texto.IndexOf('.') - 1 : 0;
+        return decimal.TryParse(texto, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out valor)
+            && valor > 0 && valor <= t.Importe && decimales <= 2;
+    }
 
     private void EscribirImporte(TransferenciaDto t, string? texto) => _importes[Clave(t)] = texto ?? "";
 

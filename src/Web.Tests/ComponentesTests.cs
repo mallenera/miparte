@@ -528,6 +528,7 @@ public class ComponentesTests : TestContext
     [InlineData("0")]
     [InlineData("-5")]
     [InlineData("10,005")]
+    [InlineData("1,230")]
     [InlineData("300,01")]
     [InlineData("abc")]
     public void Resumen_no_deja_registrar_un_pago_con_importe_invalido_o_mayor_que_lo_pendiente(string escrito)
@@ -540,6 +541,10 @@ public class ComponentesTests : TestContext
 
         Assert.True(c.FindAll("button").First(b => b.TextContent == "Registrar pago").HasAttribute("disabled"));
         Assert.Contains("máximo 2 decimales", c.Markup);
+        // El error queda asociado al campo para los lectores de pantalla.
+        var campo = c.Find(".pagoimp input");
+        Assert.Equal("true", campo.GetAttribute("aria-invalid"));
+        Assert.NotNull(c.Find("#" + campo.GetAttribute("aria-describedby")));
     }
 
     [Fact]

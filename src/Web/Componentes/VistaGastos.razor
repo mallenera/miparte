@@ -255,13 +255,19 @@ else
 
     private bool HayFiltros => _filtroMiembro != "" || _filtroCategoria != "" || !string.IsNullOrWhiteSpace(_filtroTexto);
 
-    private async Task RecargarGastosAsync() =>
-        _gastos = (await Api.ListarGastosAsync(
+    /// <summary>Versión de la última petición de gastos: una respuesta tardía de otra selección no pisa la actual.</summary>
+    private int _versionCarga;
+
+    private async Task RecargarGastosAsync()
+    {
+        var version = ++_versionCarga;
+        var gastos = await Api.ListarGastosAsync(
                 _mes.ToString("yyyy-MM", CultureInfo.InvariantCulture),
                 Guid.TryParse(_filtroCategoria, out var categoria) ? categoria : null,
                 Guid.TryParse(_filtroMiembro, out var miembro) ? miembro : null,
-                _filtroTexto))
-            .OrderByDescending(g => g.Fecha).ToList();
+                _filtroTexto);
+        if (version == _versionCarga) _gastos = gastos.OrderByDescending(g => g.Fecha).ToList();
+    }
 
     /// <summary>Vuelve a pedir los gastos del mes con los filtros elegidos; los errores salen en pantalla.</summary>
     private async Task AplicarFiltrosAsync()

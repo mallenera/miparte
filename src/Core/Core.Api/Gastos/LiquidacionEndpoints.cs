@@ -27,6 +27,11 @@ public static class LiquidacionEndpoints
         return await db.Gastos.Include(g => g.Repartos).Where(g => g.Fecha >= inicio && g.Fecha < fin).ToListAsync(ct);
     }
 
+    /// <summary>Gastos cargados a la cuenta común, para saber cuánto debe a quien los adelantó.</summary>
+    private static async Task<List<GastoDeCuenta>> GastosDeCuenta(MiParteDbContext db, CancellationToken ct)
+        => await db.Gastos.Where(g => g.ACargoCuentaComun)
+            .Select(g => new GastoDeCuenta(g.PagadoPor, g.Fecha, g.Importe)).ToListAsync(ct);
+
     /// <summary>GET /api/resumen?mes=YYYY-MM: gastos del mes, con totales pagados y asumidos por miembro y desglose por categoría. 409 sin hogar; 400 si el mes es inválido.</summary>
     private static async Task<IResult> ResumenAsync(
         [FromQuery] string? mes, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
@@ -41,15 +46,22 @@ public static class LiquidacionEndpoints
 
         var gastosTotales = gastos.Sum(g => g.Importe);
 
+        // Lo que adelantó un miembro para la cuenta común cuenta como pagado, y la cuenta le debe lo aún no reembolsado.
+        var reembolsos = await db.ReembolsosCuenta.ToListAsync(ct);
+        var cuenta = CuentaComun.Calcular(
+            inicio, [], await GastosDeCuenta(db, ct), reembolsos.Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe)));
+        // Los acreedores con pendiente de meses anteriores aparecen aunque no participen en los gastos de este mes (p. ej. un miembro ya inactivo).
         var implicados = miembros.Where(m => m.Activo && m.Tipo == TipoMiembro.Adulto).Select(m => m.Id)
             .Concat(gastos.Where(g => g.PagadoPor is not null).Select(g => g.PagadoPor!.Value))
             .Concat(gastos.SelectMany(g => g.Repartos).Select(r => r.MiembroId))
+            .Concat(cuenta.Pendientes.Where(p => p.Importe > 0m).Select(p => p.MiembroId))
             .ToHashSet();
         var porMiembro = miembros.Where(m => implicados.Contains(m.Id)).OrderBy(m => m.Nombre).ThenBy(m => m.Id)
             .Select(m => new ResumenMiembroDto(
                 m.Id, m.Nombre,
-                gastos.Where(g => g.PagadoPor == m.Id && !g.ACargoCuentaComun).Sum(g => g.Importe),
-                gastos.SelectMany(g => g.Repartos).Where(r => r.MiembroId == m.Id).Sum(r => r.ImporteAsumido)))
+                gastos.Where(g => g.PagadoPor == m.Id).Sum(g => g.Importe),
+                gastos.SelectMany(g => g.Repartos).Where(r => r.MiembroId == m.Id).Sum(r => r.ImporteAsumido),
+                Math.Max(0m, cuenta.Pendientes.FirstOrDefault(p => p.MiembroId == m.Id)?.Importe ?? 0m)))
             .ToList();
 
         var porCategoria = gastos.GroupBy(g => g.CategoriaId)

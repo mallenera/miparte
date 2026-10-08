@@ -8,9 +8,10 @@ public record ImporteMiembroDto(Guid MiembroId, decimal Importe);
 /// <summary>Resumen mensual de un miembro: lo que pagó frente a lo que le correspondía asumir.</summary>
 /// <param name="MiembroId">Identificador del miembro.</param>
 /// <param name="Nombre">Nombre del miembro.</param>
-/// <param name="Pagado">Total de gastos del mes pagados por el miembro.</param>
+/// <param name="Pagado">Total de gastos del mes pagados por el miembro, incluidos los que asume la cuenta común.</param>
 /// <param name="Asumido">Total de gastos del mes que le corresponden según los repartos.</param>
-public record ResumenMiembroDto(Guid MiembroId, string Nombre, decimal Pagado, decimal Asumido);
+/// <param name="DebeCuentaComun">Lo que la cuenta común le debe por gastos que adelantó (acumulado hasta el fin del mes, descontados los reembolsos).</param>
+public record ResumenMiembroDto(Guid MiembroId, string Nombre, decimal Pagado, decimal Asumido, decimal DebeCuentaComun = 0m);
 
 /// <summary>Resumen mensual de una categoría.</summary>
 /// <param name="CategoriaId">Identificador de la categoría.</param>

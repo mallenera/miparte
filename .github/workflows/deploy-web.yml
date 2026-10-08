@@ -22,6 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CORE_URL: ${{ vars.CORE_URL }}
+      # Opcional: URL de Assistant.Api. Sin ella el chat queda desactivado en el front publicado.
+      ASSISTANT_URL: ${{ vars.ASSISTANT_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -39,7 +41,9 @@ jobs:
           export SUPABASE_URL=$(jq -r '.Supabase.Url' "$pub/appsettings.json")
           jq --arg u "$CORE_URL" '.Api.CoreUrl = $u' "$pub/appsettings.json" > "$pub/appsettings.tmp"
           mv "$pub/appsettings.tmp" "$pub/appsettings.json"
-          envsubst '${SUPABASE_URL} ${CORE_URL}' < src/Web/cloudflare/_headers.template > "$pub/_headers"
+          jq --arg u "$ASSISTANT_URL" '.Api.AssistantUrl = $u' "$pub/appsettings.json" > "$pub/appsettings.tmp"
+          mv "$pub/appsettings.tmp" "$pub/appsettings.json"
+          envsubst '${SUPABASE_URL} ${CORE_URL} ${ASSISTANT_URL}'< src/Web/cloudflare/_headers.template > "$pub/_headers"
       - name: Subir a Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:

@@ -23,3 +23,26 @@ services:
         sync: false
       - key: Cors__OrigenesPermitidos__0
         sync: false
+
+  # Chatbot (Assistant.Api). Consulta los datos del hogar a Core.Api con el JWT de la persona, así que no necesita
+  # cadena de conexión. ANTHROPIC_API_KEY es un secreto: solo se escribe en Render, nunca en el repo.
+  - type: web
+    name: miparte-assistant
+    runtime: docker
+    plan: free
+    dockerfilePath: ./src/Assistant/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: PORT
+        value: "8080"
+      - key: Supabase__Url
+        sync: false
+      # URL de Core.Api, p. ej. https://miparte-core.onrender.com
+      - key: Asistente__CoreUrl
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: Cors__OrigenesPermitidos__0
+        sync: false

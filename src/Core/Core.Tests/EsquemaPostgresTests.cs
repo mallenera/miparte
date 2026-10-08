@@ -207,6 +207,7 @@ public class EsquemaPostgresTests
         {
             "hogar", "miembro", "perfil_reparto", "perfil_reparto_detalle", "categoria", "gasto_recurrente", "gasto",
             "gasto_reparto", "invitacion_hogar", "pago_liquidacion", "aportacion_cuenta", "reembolso_cuenta",
+            "retirada_ahorro", "deposito_ahorro",
         };
         foreach (var tabla in tablas)
             foreach (var privilegio in new[] { "INSERT", "UPDATE", "DELETE", "TRUNCATE" })
@@ -222,6 +223,33 @@ public class EsquemaPostgresTests
         Assert.False((bool)(await EscalarAsync(conn, "select has_function_privilege('authenticated', 'public.aceptar_invitacion(text, text)', 'EXECUTE')"))!);
         // Las políticas RLS de lectura las siguen necesitando.
         Assert.True((bool)(await EscalarAsync(conn, "select has_function_privilege('authenticated', 'public.mis_hogares()', 'EXECUTE')"))!);
+    }
+
+    [SkippableFact]
+    public async Task Ahorro_NoPuedeSuperarLaAportacionNiSerNegativo()
+    {
+        Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
+
+        await using var conn = await AbrirAsync();
+        var user = await CrearUsuarioAsync(conn);
+        await using var tx = await conn.BeginTransactionAsync();
+        var hogar = (Guid)(await EscalarComoAsync(conn, tx, user, "select public.crear_hogar('Casa ahorro', 'Ana')"))!;
+        var miembro = (Guid)(await EscalarComoAsync(conn, tx, user, "select id from public.miembro where hogar_id = @h", ("h", hogar)))!;
+
+        const string insertar =
+            "insert into public.aportacion_cuenta (hogar_id, miembro_id, desde, importe, ahorro) values (@h, @m, '2026-01-01', 100, @a) returning 1";
+        Assert.Equal(1, await EscalarComoAsync(conn, tx, user, insertar, ("h", hogar), ("m", miembro), ("a", 100m)));
+
+        foreach (var ahorro in new[] { 100.01m, -1m })
+        {
+            await tx.SaveAsync("antes");
+            var ex = await Assert.ThrowsAsync<PostgresException>(() => EscalarComoAsync(
+                conn, tx, user, insertar.Replace("2026-01-01", "2026-02-01"), ("h", hogar), ("m", miembro), ("a", ahorro)));
+            Assert.Equal(PostgresErrorCodes.CheckViolation, ex.SqlState);
+            await tx.RollbackAsync("antes");
+        }
+
+        await tx.RollbackAsync();
     }
 
     private static async Task<object?> EscalarAsync(NpgsqlConnection conn, string sql)

@@ -26,7 +26,7 @@ public static class GastosEndpoints
     private static GastoResponse A(Gasto g) => new(
         g.Id, g.Fecha, g.Importe, g.CategoriaId, g.PagadoPor, g.PerfilRepartoId, g.Concepto, g.GastoRecurrenteId,
         g.Repartos.OrderBy(r => r.MiembroId).Select(r => new RepartoGastoDto(r.MiembroId, r.ImporteAsumido)).ToList(),
-        g.ACargoCuentaComun);
+        g.ACargoCuentaComun, g.PagadoDesdeAhorro);
 
     /// <summary>GET /api/gastos: lista los gastos, filtrables por mes (YYYY-MM) y categoría, de más reciente a más antiguo. 409 sin hogar; 400 si el mes es inválido.</summary>
     private static async Task<IResult> ListarAsync(
@@ -65,6 +65,8 @@ public static class GastosEndpoints
         if (!await db.Categorias.AnyAsync(c => c.Id == r.CategoriaId, ct)) return (null, "La categoría no existe en el hogar.", false);
         if (r.PagadoPor is { } pagador && !await ApiComun.EsAdultoActivo(db, pagador, ct))
             return (null, "Quien paga debe ser un adulto activo del hogar.", false);
+        if (r.PagadoDesdeAhorro && r.PagadoPor is not null)
+            return (null, "Un gasto pagado desde el ahorro no lo adelanta nadie: déjalo sin pagador.", false);
         var perfil = await db.PerfilesReparto.Include(p => p.Detalles).FirstOrDefaultAsync(p => p.Id == r.PerfilRepartoId, ct);
         if (perfil is null) return (null, "El perfil de reparto no existe en el hogar.", false);
         if (r.PagadoPor is null && perfil.Modo != ModoReparto.CuentaComun)
@@ -75,19 +77,30 @@ public static class GastosEndpoints
         return (partes, error, perfil.Modo == ModoReparto.CuentaComun);
     }
 
-    /// <summary>POST /api/gastos: crea el gasto y guarda su reparto en la misma transacción. 201 si se crea; 409 sin hogar; 400 si falla la validación o el reparto.</summary>
+    /// <summary>Si el gasto se paga desde el ahorro, comprueba que el ahorro disponible lo cubre; devuelve el 409 si no, o null si todo está bien.</summary>
+    private static async Task<IResult?> ComprobarAhorroAsync(GastoRequest r, Guid? excluir, MiParteDbContext db, CancellationToken ct)
+    {
+        if (!r.PagadoDesdeAhorro) return null;
+        var disponible = Math.Max(0m, await CuentaComunEndpoints.AhorroDisponibleAsync(db, r.Fecha, excluir, ct));
+        return r.Importe <= disponible ? null
+            : Results.Conflict(new { error = $"El ahorro disponible ({disponible:0.00}) no cubre el gasto.", disponible });
+    }
+
+    /// <summary>POST /api/gastos: crea el gasto y guarda su reparto en la misma transacción. 201 si se crea; 409 sin hogar; 400 si falla la validación o el reparto; 409 si se paga desde el ahorro y no alcanza.</summary>
     private static async Task<IResult> CrearAsync(
         GastoRequest req, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
         var (partes, error, cuentaComun) = await Preparar(req, db, ct);
         if (partes is null) return ApiComun.Invalido(error!);
+        if (await ComprobarAhorroAsync(req, null, db, ct) is { } sinAhorro) return sinAhorro;
 
         var g = new Gasto
         {
             Id = Guid.NewGuid(), HogarId = hogarId, Fecha = req.Fecha, Importe = req.Importe,
             CategoriaId = req.CategoriaId, PagadoPor = req.PagadoPor, PerfilRepartoId = req.PerfilRepartoId,
             Concepto = ApiComun.NormalizarConcepto(req.Concepto), ACargoCuentaComun = cuentaComun,
+            PagadoDesdeAhorro = req.PagadoDesdeAhorro,
         };
         ApiComun.AplicarReparto(g, partes);
         db.Gastos.Add(g);
@@ -104,6 +117,7 @@ public static class GastosEndpoints
         if (g is null) return Results.NotFound();
         var (partes, error, cuentaComun) = await Preparar(req, db, ct);
         if (partes is null) return ApiComun.Invalido(error!);
+        if (await ComprobarAhorroAsync(req, id, db, ct) is { } sinAhorro) return sinAhorro;
 
         // Solo se recalcula este gasto; el resto del histórico no se toca.
         g.Fecha = req.Fecha;
@@ -113,6 +127,7 @@ public static class GastosEndpoints
         g.PerfilRepartoId = req.PerfilRepartoId;
         g.Concepto = ApiComun.NormalizarConcepto(req.Concepto);
         g.ACargoCuentaComun = cuentaComun;
+        g.PagadoDesdeAhorro = req.PagadoDesdeAhorro;
         ApiComun.AplicarReparto(g, partes);
         await db.SaveChangesAsync(ct);
         return Results.Ok(A(g));

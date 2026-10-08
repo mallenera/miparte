@@ -65,6 +65,88 @@ public class CuentaComunTests
     }
 
     [Fact]
+    public void Ahorro_NoEntraEnElSaldoNiEnElEfectivoDeGastos()
+    {
+        var ap = new[] { new AportacionVigente(Ana, D("2026-01-01"), 600, 200), new AportacionVigente(Beto, D("2026-01-01"), 400, 100) };
+        var gastos = new[] { new GastoDeCuenta(Ana, D("2026-01-05"), 500) };
+
+        var e = CuentaComun.Calcular(D("2026-02-01"), ap, gastos, []);
+
+        Assert.Equal(2000m, e.Aportado);
+        Assert.Equal((300m, 600m), (e.AhorroMes, e.AhorroAcumulado));
+        Assert.Equal(900m, e.Saldo); // 2000 aportado - 600 ahorrado - 500 gastado
+        Assert.Equal(1400m, e.Efectivo); // el gasto lo adelantó Ana: sigue pendiente de reembolso
+        Assert.Equal(600m, e.AhorroDisponible);
+    }
+
+    [Fact]
+    public void Ahorro_CeroSeComportaComoAntes()
+    {
+        var sin = CuentaComun.Calcular(D("2026-03-01"), [new AportacionVigente(Ana, D("2026-01-01"), 500)], [], []);
+
+        Assert.Equal((1500m, 1500m), (sin.Aportado, sin.Saldo));
+        Assert.Equal(0m, sin.AhorroAcumulado);
+    }
+
+    [Fact]
+    public void Ahorro_CambiaDesdeElMesDeLaNuevaAportacion()
+    {
+        var ap = new[] { new AportacionVigente(Ana, D("2026-01-01"), 500, 100), new AportacionVigente(Ana, D("2026-03-01"), 500, 300) };
+
+        Assert.Equal(100m, CuentaComun.AhorroDelMes(Ana, D("2026-02-01"), ap));
+        Assert.Equal(300m, CuentaComun.AhorroDelMes(Ana, D("2026-03-01"), ap));
+        Assert.Equal(0m, CuentaComun.AhorroDelMes(Beto, D("2026-03-01"), ap));
+        Assert.Equal(500m, CuentaComun.Calcular(D("2026-03-01"), ap, [], []).AhorroAcumulado); // 100 + 100 + 300
+    }
+
+    [Fact]
+    public void Retirada_BajaElAhorroDisponibleYNoElSaldo()
+    {
+        var ap = new[] { new AportacionVigente(Ana, D("2026-01-01"), 500, 200) };
+        var retiradas = new[] { new RetiradaDeAhorro(D("2026-02-10"), 250), new RetiradaDeAhorro(D("2026-04-01"), 100) };
+
+        var e = CuentaComun.Calcular(D("2026-02-01"), ap, [], [], retiradas);
+
+        Assert.Equal((400m, 250m, 150m), (e.AhorroAcumulado, e.AhorroRetirado, e.AhorroDisponible)); // la de abril aún no cuenta
+        Assert.Equal(600m, e.Saldo);
+    }
+
+    [Fact]
+    public void Deposito_SumaAlAhorroSinTocarElSaldoNiLoAportado()
+    {
+        var ap = new[] { new AportacionVigente(Ana, D("2026-01-01"), 500, 100) };
+        var depositos = new[] { new DepositoDeAhorro(D("2026-01-10"), 1000), new DepositoDeAhorro(D("2026-03-05"), 50) };
+
+        var e = CuentaComun.Calcular(D("2026-02-01"), ap, [], [], null, depositos);
+
+        Assert.Equal((1000m, 1200m, 1200m, 1000m), (e.AhorroDepositado, e.AhorroAcumulado, e.AhorroDisponible, e.Aportado)); // el de marzo aún no cuenta
+        Assert.Equal(100m, e.AhorroMes); // febrero: solo la parte de ahorro de la aportación, sin depósitos ese mes
+        Assert.Equal(800m, e.Saldo); // 1000 aportado - 200 de ahorro
+    }
+
+    [Fact]
+    public void Deposito_SinAportacionesBastaParaTenerAhorro()
+    {
+        var e = CuentaComun.Calcular(D("2026-01-01"), [], [], [], null, [new DepositoDeAhorro(D("2026-01-02"), 300)]);
+
+        Assert.Equal((300m, 0m), (e.AhorroDisponible, e.Saldo));
+    }
+
+    [Fact]
+    public void GastoDesdeAhorro_RestaDelAhorroYNoDelSaldoNiDejaPendiente()
+    {
+        var ap = new[] { new AportacionVigente(Ana, D("2026-01-01"), 500, 200) };
+        var gastos = new[] { new GastoDeCuenta(null, D("2026-01-05"), 120, DesdeAhorro: true), new GastoDeCuenta(null, D("2026-01-06"), 80) };
+
+        var e = CuentaComun.Calcular(D("2026-01-01"), ap, gastos, []);
+
+        Assert.Equal((80m, 120m), (e.Gastado, e.AhorroGastado));
+        Assert.Equal(220m, e.Saldo); // 500 - 200 de ahorro - 80 de gasto normal
+        Assert.Equal(80m, e.AhorroDisponible); // 200 - 120
+        Assert.Empty(e.Pendientes);
+    }
+
+    [Fact]
     public void Reembolso_ComplétoQuitaAlMiembroDePendientes()
     {
         var gastos = new[] { new GastoDeCuenta(Ana, D("2026-01-05"), 50) };

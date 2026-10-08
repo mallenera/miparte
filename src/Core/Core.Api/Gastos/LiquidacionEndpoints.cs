@@ -30,7 +30,7 @@ public static class LiquidacionEndpoints
     /// <summary>Gastos cargados a la cuenta común, para saber cuánto debe a quien los adelantó.</summary>
     private static async Task<List<GastoDeCuenta>> GastosDeCuenta(MiParteDbContext db, CancellationToken ct)
         => await db.Gastos.Where(g => g.ACargoCuentaComun)
-            .Select(g => new GastoDeCuenta(g.PagadoPor, g.Fecha, g.Importe)).ToListAsync(ct);
+            .Select(g => new GastoDeCuenta(g.PagadoPor, g.Fecha, g.Importe, g.PagadoDesdeAhorro)).ToListAsync(ct);
 
     /// <summary>GET /api/resumen?mes=YYYY-MM: gastos del mes, con totales pagados y asumidos por miembro y desglose por categoría. 409 sin hogar; 400 si el mes es inválido.</summary>
     private static async Task<IResult> ResumenAsync(

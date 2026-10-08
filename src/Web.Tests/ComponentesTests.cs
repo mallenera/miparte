@@ -268,6 +268,67 @@ public class ComponentesTests : TestContext
     }
 
     [Fact]
+    public void Cuenta_comun_fijar_aportacion_envia_la_parte_de_ahorro_y_rechaza_si_supera_el_importe()
+    {
+        var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, Cuenta(0m))
+            .Responde("PUT /api/cuenta-comun/aportaciones", HttpStatusCode.OK,
+                new AportacionCuentaDto(Guid.NewGuid(), AnaId, new DateOnly(DateTime.Today.Year, DateTime.Today.Month, 1), 600m, 100m));
+        Registrar(api);
+        var c = RenderComponent<VistaCuentaComun>();
+
+        c.Find("#form-aportacion input").Input("600");
+        c.Find("#ahorro-aportacion").Input("700");
+        Assert.True(c.Find("#form-aportacion button").HasAttribute("disabled")); // ahorro > importe
+
+        c.Find("#ahorro-aportacion").Input("100,50");
+        c.Find("#form-aportacion").Submit();
+
+        var cuerpo = api.Cuerpos["PUT /api/cuenta-comun/aportaciones"];
+        Assert.Contains("\"importe\":600", cuerpo);
+        Assert.Contains("\"ahorro\":100.5", cuerpo);
+    }
+
+    [Fact]
+    public void Cuenta_comun_retirada_de_ahorro_solo_se_ofrece_con_ahorro_disponible_y_envia_importe()
+    {
+        var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
+        var conAhorro = Cuenta(0m) with { AhorroAcumulado = 300m, AhorroDisponible = 300m };
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, conAhorro)
+            .Responde("POST /api/cuenta-comun/retiradas-ahorro", HttpStatusCode.Created,
+                new RetiradaAhorroDto(Guid.NewGuid(), AnaId, DateOnly.FromDateTime(DateTime.Today), 120m, null));
+        Registrar(api);
+        var c = RenderComponent<VistaCuentaComun>();
+
+        Assert.Contains("300,00", c.Find("#ahorro").TextContent);
+        c.Find("#form-retirada input").Input("120");
+        c.Find("#form-retirada").Submit();
+
+        var cuerpo = api.Cuerpos["POST /api/cuenta-comun/retiradas-ahorro"];
+        Assert.Contains(AnaId.ToString(), cuerpo);
+        Assert.Contains("\"importe\":120", cuerpo);
+    }
+
+    [Fact]
+    public void Cuenta_comun_sin_ahorro_no_ofrece_retirar()
+    {
+        var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, Cuenta(0m));
+        Registrar(api);
+
+        var c = RenderComponent<VistaCuentaComun>();
+
+        Assert.Empty(c.FindAll("#form-retirada"));
+        Assert.Contains("No hay ahorro disponible", c.Markup);
+    }
+
+    [Fact]
     public void Cuenta_comun_sin_pendientes_no_ofrece_reembolsar()
     {
         var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
@@ -308,6 +369,58 @@ public class ComponentesTests : TestContext
         var cuerpo = api.Cuerpos["POST /api/gastos"];
         Assert.Contains("\"pagadoPor\":null", cuerpo);
         Assert.Contains(perfil.Id.ToString(), cuerpo);
+    }
+
+    [Fact]
+    public void Gasto_ofrece_pagar_desde_el_ahorro_y_lo_envia_sin_pagador()
+    {
+        var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
+        var perfil = new PerfilRepartoDto(Guid.NewGuid(), "Cuenta común", "cuenta_comun", []);
+        var cat = new CategoriaDto(Guid.NewGuid(), "Casa", null, null);
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
+            .Responde("GET /api/categorias", HttpStatusCode.OK, new[] { cat })
+            .Responde("GET /api/perfiles", HttpStatusCode.OK, new[] { perfil })
+            .Responde("GET /api/gastos", HttpStatusCode.OK, Array.Empty<GastoResponse>())
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK,
+                new CuentaComunResponse("2026-10", 0m, 0m, 0m, 0m, [], 0m, [], [], 0m, 300m, 0m, 300m, [], 300m, []))
+            .Responde("POST /api/gastos", HttpStatusCode.Created,
+                new GastoResponse(Guid.NewGuid(), DateOnly.FromDateTime(DateTime.Today), 80m, cat.Id, null, perfil.Id, null, null, [], true, true));
+        Registrar(api);
+        var c = RenderComponent<VistaGastos>();
+
+        // Solo hay ahorro (sin aportaciones): aun así se ofrece pagar desde él.
+        Assert.Contains("Ahorro (se descuenta del ahorro)", c.Markup);
+        c.FindAll("form.addcat select")[1].Change("ahorro");
+        c.Find("form.addcat input[inputmode=decimal]").Input("80");
+        c.Find("form.addcat").Submit();
+
+        var cuerpo = api.Cuerpos["POST /api/gastos"];
+        Assert.Contains("\"pagadoPor\":null", cuerpo);
+        Assert.Contains("\"pagadoDesdeAhorro\":true", cuerpo);
+        Assert.Contains(perfil.Id.ToString(), cuerpo);
+    }
+
+    [Fact]
+    public void Cuenta_comun_ingreso_al_ahorro_envia_importe_y_concepto()
+    {
+        var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, Cuenta(0m))
+            .Responde("POST /api/cuenta-comun/depositos-ahorro", HttpStatusCode.Created,
+                new DepositoAhorroDto(Guid.NewGuid(), AnaId, DateOnly.FromDateTime(DateTime.Today), 1000m, "Ahorro inicial"));
+        Registrar(api);
+        var c = RenderComponent<VistaCuentaComun>();
+
+        c.FindAll("#form-deposito input")[0].Input("1000");
+        c.FindAll("#form-deposito input")[1].Input("Ahorro inicial");
+        c.Find("#form-deposito").Submit();
+
+        var cuerpo = api.Cuerpos["POST /api/cuenta-comun/depositos-ahorro"];
+        Assert.Contains(AnaId.ToString(), cuerpo);
+        Assert.Contains("\"importe\":1000", cuerpo);
+        Assert.Contains("Ahorro inicial", cuerpo);
     }
 
     private static ApiFalsa ApiResumen(ResumenMensualResponse resumen, LiquidacionResponse liquidacion) =>

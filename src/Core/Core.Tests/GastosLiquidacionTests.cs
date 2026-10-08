@@ -396,6 +396,211 @@ public class GastosLiquidacionTests
     }
 
     [Fact]
+    public async Task CuentaComun_Ahorro_ApartaDineroDelSaldoYValidaLimites()
+    {
+        var e = await Montar();
+        var mes = new DateOnly(2026, 9, 1);
+        Assert.Equal(HttpStatusCode.OK, (await e.Cliente.PutAsJsonAsync(
+            "/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, mes, 600m, 150m))).StatusCode);
+        await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Beto!.Value, mes, 400m));
+
+        var estado = await Leer<CuentaComunResponse>(await e.Cliente.GetAsync("/api/cuenta-comun?mes=2026-09"));
+        Assert.Equal((1000m, 850m, 150m, 150m), (estado.Aportado, estado.Saldo, estado.AhorroMes, estado.AhorroDisponible));
+        Assert.Equal(150m, estado.Aportaciones.Single(a => a.MiembroId == e.Ana).Ahorro);
+
+        foreach (var ahorro in new[] { -1m, 600.01m, 10.005m })
+            Assert.Equal(HttpStatusCode.BadRequest, (await e.Cliente.PutAsJsonAsync(
+                "/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, mes, 600m, ahorro))).StatusCode);
+    }
+
+    [Fact]
+    public async Task CuentaComun_RetiradaDeAhorro_BajaElDisponibleYNoPuedeSuperarloAunqueSeAcumuleEnVarias()
+    {
+        var e = await Montar();
+        await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, new DateOnly(2026, 9, 1), 500m, 200m));
+
+        var ok = await e.Cliente.PostAsJsonAsync("/api/cuenta-comun/retiradas-ahorro",
+            new CrearRetiradaAhorroRequest(e.Ana, 150m, new DateOnly(2026, 9, 20), "Vacaciones"));
+        Assert.Equal(HttpStatusCode.Created, ok.StatusCode);
+        var excede = await e.Cliente.PostAsJsonAsync("/api/cuenta-comun/retiradas-ahorro",
+            new CrearRetiradaAhorroRequest(e.Ana, 50.01m, new DateOnly(2026, 9, 21), null));
+        Assert.Equal(HttpStatusCode.Conflict, excede.StatusCode);
+
+        var estado = await Leer<CuentaComunResponse>(await e.Cliente.GetAsync("/api/cuenta-comun?mes=2026-09"));
+        Assert.Equal((200m, 150m, 50m, 300m), (estado.AhorroAcumulado, estado.AhorroRetirado, estado.AhorroDisponible, estado.Saldo));
+        var retirada = Assert.Single(estado.RetiradasAhorro!);
+        Assert.Equal("Vacaciones", retirada.Concepto);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await e.Cliente.DeleteAsync($"/api/cuenta-comun/retiradas-ahorro/{retirada.Id}")).StatusCode);
+        estado = await Leer<CuentaComunResponse>(await e.Cliente.GetAsync("/api/cuenta-comun?mes=2026-09"));
+        Assert.Equal(200m, estado.AhorroDisponible);
+    }
+
+    [Fact]
+    public async Task CuentaComun_RetiradaDeAhorro_ValidaImporteYMiembro()
+    {
+        var e = await Montar();
+        await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, new DateOnly(2026, 9, 1), 500m, 200m));
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await e.Cliente.PostAsJsonAsync("/api/cuenta-comun/retiradas-ahorro",
+            new CrearRetiradaAhorroRequest(e.Ana, 0m, new DateOnly(2026, 9, 20), null))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await e.Cliente.PostAsJsonAsync("/api/cuenta-comun/retiradas-ahorro",
+            new CrearRetiradaAhorroRequest(Guid.NewGuid(), 10m, new DateOnly(2026, 9, 20), null))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await e.Cliente.DeleteAsync($"/api/cuenta-comun/retiradas-ahorro/{Guid.NewGuid()}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task CuentaComun_DepositoDeAhorro_SumaAlDisponibleYPermiteRetirarSinAportaciones()
+    {
+        var e = await Montar();
+
+        var d = await e.Cliente.PostAsJsonAsync("/api/cuenta-comun/depositos-ahorro",
+            new CrearDepositoAhorroRequest(e.Ana, 1000m, new DateOnly(2026, 9, 1), "Ahorro inicial"));
+        Assert.Equal(HttpStatusCode.Created, d.StatusCode);
+        var deposito = (await d.Content.ReadFromJsonAsync<DepositoAhorroDto>(Web))!;
+
+        var estado = await Leer<CuentaComunResponse>(await e.Cliente.GetAsync("/api/cuenta-comun?mes=2026-09"));
+        Assert.Equal((1000m, 1000m, 1000m, 0m), (estado.AhorroMes, estado.AhorroAcumulado, estado.AhorroDisponible, estado.Saldo));
+        Assert.Equal("Ahorro inicial", Assert.Single(estado.DepositosAhorro!).Concepto);
+
+        var r = await e.Cliente.PostAsJsonAsync("/api/cuenta-comun/retiradas-ahorro",
+            new CrearRetiradaAhorroRequest(e.Ana, 1000m, new DateOnly(2026, 9, 2), null));
+        Assert.Equal(HttpStatusCode.Created, r.StatusCode);
+        var retirada = (await r.Content.ReadFromJsonAsync<RetiradaAhorroDto>(Web))!;
+
+        // Ya retirado, el ingreso no se puede borrar; al deshacer la retirada, sí.
+        Assert.Equal(HttpStatusCode.Conflict, (await e.Cliente.DeleteAsync($"/api/cuenta-comun/depositos-ahorro/{deposito.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await e.Cliente.DeleteAsync($"/api/cuenta-comun/retiradas-ahorro/{retirada.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await e.Cliente.DeleteAsync($"/api/cuenta-comun/depositos-ahorro/{deposito.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await e.Cliente.DeleteAsync($"/api/cuenta-comun/depositos-ahorro/{deposito.Id}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task CuentaComun_DepositoDeAhorro_ValidaImporteYMiembro()
+    {
+        var e = await Montar();
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await e.Cliente.PostAsJsonAsync("/api/cuenta-comun/depositos-ahorro",
+            new CrearDepositoAhorroRequest(e.Ana, 0m, null, null))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await e.Cliente.PostAsJsonAsync("/api/cuenta-comun/depositos-ahorro",
+            new CrearDepositoAhorroRequest(Guid.NewGuid(), 10m, null, null))).StatusCode);
+    }
+
+    [Fact]
+    public async Task Gasto_PagadoDesdeAhorro_DescuentaDelAhorroYNoDelSaldo()
+    {
+        var e = await Montar();
+        await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, new DateOnly(2026, 9, 1), 500m, 200m));
+        await e.Cliente.PostAsJsonAsync("/api/cuenta-comun/depositos-ahorro", new CrearDepositoAhorroRequest(e.Ana, 1000m, new DateOnly(2026, 9, 1), null));
+
+        var g = await CrearGasto(e, Gasto(e, 300m, e.PerfilCuentaComun) with { PagadoPor = null, PagadoDesdeAhorro = true });
+
+        Assert.True(g.PagadoDesdeAhorro);
+        Assert.True(g.ACargoCuentaComun);
+        Assert.Empty(g.Repartos);
+        var estado = await Leer<CuentaComunResponse>(await e.Cliente.GetAsync("/api/cuenta-comun?mes=2026-09"));
+        Assert.Equal((300m, 900m, 300m), (estado.AhorroGastado, estado.AhorroDisponible, estado.Saldo)); // 1200 ahorrado - 300; el saldo es 500 - 200
+        Assert.Equal(0m, estado.Gastado);
+        Assert.Empty(estado.Pendientes);
+        var liq = await Leer<LiquidacionResponse>(await e.Cliente.GetAsync("/api/liquidacion?mes=2026-09"));
+        Assert.Empty(liq.Transferencias);
+
+        // Al editarlo, su propio importe no cuenta contra el ahorro disponible: se puede subir hasta lo que haya (900 + 300).
+        var sube = await e.Cliente.PutAsJsonAsync($"/api/gastos/{g.Id}", Gasto(e, 1200m, e.PerfilCuentaComun) with { PagadoPor = null, PagadoDesdeAhorro = true });
+        Assert.Equal(HttpStatusCode.OK, sube.StatusCode);
+        var pasa = await e.Cliente.PutAsJsonAsync($"/api/gastos/{g.Id}", Gasto(e, 1200.01m, e.PerfilCuentaComun) with { PagadoPor = null, PagadoDesdeAhorro = true });
+        Assert.Equal(HttpStatusCode.Conflict, pasa.StatusCode);
+    }
+
+    [Fact]
+    public async Task Gasto_PagadoDesdeAhorro_NoPuedeSuperarElAhorroNiTenerPagador()
+    {
+        var e = await Montar();
+        await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, new DateOnly(2026, 9, 1), 500m, 100m));
+
+        var sinAhorro = await e.Cliente.PostAsJsonAsync("/api/gastos",
+            Gasto(e, 100.01m, e.PerfilCuentaComun) with { PagadoPor = null, PagadoDesdeAhorro = true });
+        Assert.Equal(HttpStatusCode.Conflict, sinAhorro.StatusCode);
+
+        var conPagador = await e.Cliente.PostAsJsonAsync("/api/gastos",
+            Gasto(e, 50m, e.PerfilCuentaComun) with { PagadoDesdeAhorro = true });
+        Assert.Equal(HttpStatusCode.BadRequest, conPagador.StatusCode);
+    }
+
+    [Fact]
+    public async Task CuentaComun_NoSePuedeRebajarElAhorroSiYaSeRetiroOGastoDesdeEl()
+    {
+        var e = await Montar();
+        var mes = new DateOnly(2026, 9, 1);
+        await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, mes, 500m, 200m));
+        await e.Cliente.PostAsJsonAsync("/api/cuenta-comun/retiradas-ahorro", new CrearRetiradaAhorroRequest(e.Ana, 120m, new DateOnly(2026, 9, 10), null));
+        await CrearGasto(e, Gasto(e, 50m, e.PerfilCuentaComun) with { PagadoPor = null, PagadoDesdeAhorro = true });
+
+        // Queda respaldo para 170 (120 + 50): bajar a 169,99 no se permite, a 170 sí.
+        var rechazada = await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, mes, 500m, 169.99m));
+        Assert.Equal(HttpStatusCode.Conflict, rechazada.StatusCode);
+        Assert.Contains("0.01", await rechazada.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.OK, (await e.Cliente.PutAsJsonAsync(
+            "/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, mes, 500m, 170m))).StatusCode);
+
+        // Subirlo, o cambiar solo el importe de gastos, siempre se puede.
+        Assert.Equal(HttpStatusCode.OK, (await e.Cliente.PutAsJsonAsync(
+            "/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, mes, 300m, 250m))).StatusCode);
+
+        var estado = await Leer<CuentaComunResponse>(await e.Cliente.GetAsync("/api/cuenta-comun?mes=2026-09"));
+        Assert.Equal(80m, estado.AhorroDisponible); // 250 - 120 - 50
+    }
+
+    [Fact]
+    public async Task CuentaComun_LaRebajaDelAhorroSeComprueba_EnCadaMesConUsos_NoSoloEnElUltimo()
+    {
+        var e = await Montar();
+        var enero = new DateOnly(2026, 1, 1);
+        await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, enero, 500m, 200m));
+        await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, new DateOnly(2026, 2, 1), 500m, 200m));
+        // Retirada de enero (cubierta por los 200 de enero) y un gasto pequeño desde el ahorro en junio.
+        Assert.Equal(HttpStatusCode.Created, (await e.Cliente.PostAsJsonAsync("/api/cuenta-comun/retiradas-ahorro",
+            new CrearRetiradaAhorroRequest(e.Ana, 200m, new DateOnly(2026, 1, 15), null))).StatusCode);
+        await CrearGasto(e, Gasto(e, 10m, e.PerfilCuentaComun) with { Fecha = new DateOnly(2026, 6, 10), PagadoPor = null, PagadoDesdeAhorro = true });
+
+        // Junio seguiría cubierto (1000 ahorrados desde febrero frente a 210), pero la retirada de enero se quedaría sin respaldo.
+        var rechazada = await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, enero, 500m, 0m));
+
+        Assert.Equal(HttpStatusCode.Conflict, rechazada.StatusCode);
+        var estado = await Leer<CuentaComunResponse>(await e.Cliente.GetAsync("/api/cuenta-comun?mes=2026-01"));
+        Assert.Equal(0m, estado.AhorroDisponible);
+    }
+
+    [Fact]
+    public async Task CuentaComun_NoSePuedeBorrarUnIngresoDeAhorroQueYaSeUso()
+    {
+        var e = await Montar();
+        var d = await e.Cliente.PostAsJsonAsync("/api/cuenta-comun/depositos-ahorro",
+            new CrearDepositoAhorroRequest(e.Ana, 500m, new DateOnly(2026, 9, 1), "Lotería"));
+        var deposito = (await d.Content.ReadFromJsonAsync<DepositoAhorroDto>(Web))!;
+        await CrearGasto(e, Gasto(e, 300m, e.PerfilCuentaComun) with { PagadoPor = null, PagadoDesdeAhorro = true });
+
+        Assert.Equal(HttpStatusCode.Conflict, (await e.Cliente.DeleteAsync($"/api/cuenta-comun/depositos-ahorro/{deposito.Id}")).StatusCode);
+
+        // Con otro ingreso que lo respalde, ya se puede borrar el primero.
+        await e.Cliente.PostAsJsonAsync("/api/cuenta-comun/depositos-ahorro", new CrearDepositoAhorroRequest(e.Ana, 300m, new DateOnly(2026, 9, 2), null));
+        Assert.Equal(HttpStatusCode.NoContent, (await e.Cliente.DeleteAsync($"/api/cuenta-comun/depositos-ahorro/{deposito.Id}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task CuentaComun_Retirada_TambienDescuentaLoGastadoDesdeElAhorro()
+    {
+        var e = await Montar();
+        await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, new DateOnly(2026, 9, 1), 500m, 100m));
+        await CrearGasto(e, Gasto(e, 70m, e.PerfilCuentaComun) with { PagadoPor = null, PagadoDesdeAhorro = true });
+
+        var excede = await e.Cliente.PostAsJsonAsync("/api/cuenta-comun/retiradas-ahorro",
+            new CrearRetiradaAhorroRequest(e.Ana, 30.01m, new DateOnly(2026, 9, 20), null));
+
+        Assert.Equal(HttpStatusCode.Conflict, excede.StatusCode);
+    }
+
+    [Fact]
     public async Task CuentaComun_GastoPagadoPorLaCuenta_BajaElEfectivoYNoDejaPendiente()
     {
         var e = await Montar();

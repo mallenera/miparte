@@ -47,7 +47,7 @@ max_frequency = "60s"
 
 [auth.email.template.confirmation]
 subject = "Tu código de confirmación de Mi parte, tu parte"
-content_path = "./templates/confirmacion.html"
+content_path = "./supabase/templates/confirmacion.html"
 
 # Google es opcional: se activa con credenciales OAuth propias (Google Cloud Console).
 [auth.external.google]

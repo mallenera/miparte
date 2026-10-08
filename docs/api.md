@@ -8,6 +8,7 @@ Convenciones generales:
 - Errores de validación: `{ "error": "mensaje en español" }` con el código HTTP indicado (400, 403, 404, 409). Algunos 404 y los 204 no llevan cuerpo.
 - Errores no controlados: **500** `{ "error": "Error interno del servidor." }` sin detalles internos (la traza queda en el log del servidor); conserva las cabeceras CORS.
 - Base URL local: `http://localhost:5001` (docker compose) o la de `launchSettings.json`.
+- El chatbot tiene su propia API (`POST /api/chat`), documentada en [asistente.md](asistente.md).
 - Además existe `GET /health` (sin autenticación): `{ "service": "core", "status": "ok" }`.
 
 ## 1. Autenticación, hogar actual y CORS

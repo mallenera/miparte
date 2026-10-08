@@ -61,6 +61,20 @@ public sealed class ServicioSesion
         return true;
     }
 
+    /// <summary>Confirma la cuenta con el código recibido por correo e inicia sesión.</summary>
+    /// <param name="email">Correo.</param>
+    /// <param name="codigo">Código de 6 dígitos.</param>
+    /// <exception cref="AuthException">Código incorrecto o caducado.</exception>
+    public async Task VerificarCodigoAsync(string email, string codigo)
+    {
+        await InicializarAsync();
+        await EstablecerAsync(await _auth.VerificarCodigoAsync(email, codigo));
+    }
+
+    /// <summary>Reenvía el código de confirmación al correo.</summary>
+    /// <param name="email">Correo.</param>
+    public async Task ReenviarCodigoAsync(string email) => await _auth.ReenviarCodigoAsync(email);
+
     /// <summary>Cierra la sesión en Supabase (mejor esfuerzo) y la descarta localmente.</summary>
     public async Task CerrarSesionAsync()
     {

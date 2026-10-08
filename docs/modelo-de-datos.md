@@ -62,4 +62,4 @@ erDiagram
 - Cambiar partes o perfiles solo afecta a gastos **nuevos**.
 
 ## Pendiente de modelar (ver diseño)
-Activar la cuenta común por hogar (hoy está activa si hay aportaciones), «su parte» por persona en el resumen, cierre de mes, gastos personales fuera de liquidación, etiquetas, historial de cambios. Cada uno requerirá una migración SQL nueva y su mapeo en `MiParteDbContext`.
+Activar la cuenta común por hogar (hoy está activa si hay aportaciones), «su parte» por persona en el resumen, cierre de mes, etiquetas, historial de cambios. Cada uno requerirá una migración SQL nueva y su mapeo en `MiParteDbContext`.

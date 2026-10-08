@@ -310,7 +310,7 @@ public sealed partial class ServidorDemo
         if (r.Fecha == default) return "La fecha es obligatoria.";
         if (_categorias.All(c => c.Id != r.CategoriaId)) return "La categoría no existe en el hogar.";
         if (r.PagadoPor is { } pagador && !EsAdultoActivo(pagador)) return "Quien paga debe ser un adulto activo del hogar.";
-        if (r.Personal && r.PagadoPor is null) return "Un gasto personal lo paga un miembro del hogar, no la cuenta común ni el ahorro.";
+        if (r.Personal && (r.PagadoPor is null || r.PagadoDesdeAhorro)) return "Un gasto personal lo paga un miembro del hogar, no la cuenta común ni el ahorro.";
         var perfil = _perfiles.FirstOrDefault(p => p.Id == r.PerfilRepartoId);
         if (perfil is null) return "El perfil de reparto no existe en el hogar.";
         if (r.PagadoPor is null && perfil.Modo != ModoReparto.CuentaComun) return "La cuenta común solo paga gastos con el perfil de cuenta común.";

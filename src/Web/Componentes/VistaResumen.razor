@@ -104,7 +104,7 @@ else if (_resumen is not null && _liquidacion is not null)
         @if (_resumen.GastosTotales == 0)
         {
             <div class="empty">
-                <span>No hay gastos en @NombreMes.</span>
+                <span>@(_resumen.GastosPersonales > 0 ? "No hay gastos del hogar" : "No hay gastos") en @NombreMes.</span>
                 <a class="btn" href="gastos">Añadir un gasto</a>
             </div>
             @foreach (var m in _resumen.Miembros.Where(m => m.DebeCuentaComun > 0))

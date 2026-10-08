@@ -696,6 +696,17 @@ section.card + section.card { margin-top: 24px; }
 .mitem .muestra i + i + i { background: var(--cta); }
 .mhead-ico { display: flex; align-items: center; gap: 6px; }
 
+/* Resumen: barra del peso de la categoría sobre el total del mes (el texto con el porcentaje va al lado). */
+/* Barra de porcentaje y sangría por nivel sin estilos en línea (la CSP bloquea style=""). */
+.barra { display: block; width: 100%; height: 6px; margin-top: 4px; border: 0; border-radius: 999px; background: var(--line); overflow: hidden; appearance: none; -webkit-appearance: none; }
+.barra::-webkit-progress-bar { background: var(--line); }
+.barra::-webkit-progress-value { background: var(--wine); border-radius: 999px; }
+.barra::-moz-progress-bar { background: var(--wine); border-radius: 999px; }
+.resrow.nivel-1 { padding-left: 22px; }
+.resrow.nivel-2 { padding-left: 44px; }
+.resrow.nivel-3 { padding-left: 66px; }
+.resrow.nivel-4 { padding-left: 88px; }
+
 /* Historial de cambios */
 .hist { list-style: none; margin: 10px 0 0; padding: 0; display: grid; }
 .hist-item { padding: 10px 0; border-top: 1px solid var(--line); }

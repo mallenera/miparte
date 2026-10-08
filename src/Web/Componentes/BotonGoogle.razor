@@ -1,4 +1,4 @@
-@* Botón «Continuar con Google»: manda al usuario a Supabase y vuelve a /login con la sesión en el fragmento de la URL. *@
+@* Botón «Continuar con Google»: manda al usuario a Supabase y vuelve a /login con un código PKCE en la URL. *@
 @inject ServicioSesion Sesion
 @inject NavigationManager Navegacion
 
@@ -20,6 +20,6 @@
     /// <summary>Desactiva el botón (formulario enviándose o app sin configurar).</summary>
     [Parameter] public bool Deshabilitado { get; set; }
 
-    private void Entrar() =>
-        Navegacion.NavigateTo(Sesion.UrlGoogle(Navegacion.ToAbsoluteUri("login").ToString()).ToString(), forceLoad: true);
+    private async Task Entrar() =>
+        Navegacion.NavigateTo((await Sesion.UrlGoogleAsync(Navegacion.ToAbsoluteUri("login").ToString())).ToString(), forceLoad: true);
 }

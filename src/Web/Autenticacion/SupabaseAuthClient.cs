@@ -59,34 +59,21 @@ public sealed class SupabaseAuthClient
     public async Task ReenviarCodigoAsync(string email, CancellationToken ct = default) =>
         await EnviarAsync("resend", new { type = "signup", email }, null, ct);
 
-    /// <summary>URL a la que enviar al usuario para iniciar sesión con Google; Supabase vuelve a <paramref name="redirectTo"/> con la sesión en el fragmento.</summary>
+    /// <summary>URL a la que enviar al usuario para iniciar sesión con Google (flujo PKCE); Supabase vuelve a <paramref name="redirectTo"/> con un <c>?code=</c>.</summary>
     /// <param name="redirectTo">URL absoluta de retorno (debe estar en las Redirect URLs de Supabase).</param>
-    public Uri UrlGoogle(string redirectTo) =>
-        new(_http.BaseAddress!, $"authorize?provider=google&redirect_to={Uri.EscapeDataString(redirectTo)}");
+    /// <param name="codeChallenge">SHA-256 en base64url del verificador que guarda este navegador.</param>
+    public Uri UrlGoogle(string redirectTo, string codeChallenge) =>
+        new(_http.BaseAddress!, $"authorize?provider=google&redirect_to={Uri.EscapeDataString(redirectTo)}&code_challenge={codeChallenge}&code_challenge_method=s256");
 
-    /// <summary>Construye la sesión a partir de los tokens que Supabase devuelve en el fragmento tras el login con Google.</summary>
-    /// <param name="accessToken">JWT de acceso.</param>
-    /// <param name="refreshToken">Token de renovación.</param>
-    /// <param name="segundos">Vigencia del token en segundos.</param>
-    /// <exception cref="AuthException">El token no es un JWT con <c>sub</c>.</exception>
-    public SesionSupabase CrearSesion(string accessToken, string refreshToken, int segundos)
+    /// <summary>Canjea el código del retorno de Google por la sesión; solo vale con el verificador que originó el <c>code_challenge</c>.</summary>
+    /// <param name="codigo">Valor de <c>code</c> recibido en la URL de retorno.</param>
+    /// <param name="verificador">Verificador PKCE guardado al iniciar el flujo.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    /// <exception cref="AuthException">Código o verificador no válidos.</exception>
+    public async Task<SesionSupabase> IntercambiarCodigoAsync(string codigo, string verificador, CancellationToken ct = default)
     {
-        string? userId = null, email = null;
-        try
-        {
-            var partes = accessToken.Split('.');
-            var b64 = partes[1].Replace('-', '+').Replace('_', '/');
-            using var doc = JsonDocument.Parse(Convert.FromBase64String(b64.PadRight(b64.Length + (4 - b64.Length % 4) % 4, '=')));
-            userId = doc.RootElement.TryGetProperty("sub", out var sub) ? sub.GetString() : null;
-            email = doc.RootElement.TryGetProperty("email", out var e) ? e.GetString() : null;
-        }
-        catch (Exception ex) when (ex is IndexOutOfRangeException or FormatException or JsonException)
-        {
-            // Se trata abajo como token no válido.
-        }
-
-        if (string.IsNullOrEmpty(userId)) throw new AuthException("Respuesta de autenticación no válida.", 502);
-        return new SesionSupabase(accessToken, refreshToken, _reloj.GetUtcNow().AddSeconds(segundos), userId, email);
+        var json = await EnviarAsync("token?grant_type=pkce", new { auth_code = codigo, code_verifier = verificador }, null, ct);
+        return LeerSesion(json) ?? throw new AuthException("Respuesta de autenticación no válida.", 502);
     }
 
     /// <summary>Renueva la sesión con el refresh token.</summary>

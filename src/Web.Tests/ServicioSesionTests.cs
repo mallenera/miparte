@@ -109,59 +109,87 @@ public class ServicioSesionTests
         Assert.True(almacen.Datos.ContainsKey("miparte.sesion"));
     }
 
-    private static string Jwt(string sub, string email)
+    private static (ServicioSesion servicio, AlmacenMemoria almacen, ManejadorFalso manejador) CrearGoogle(string respuesta = null!)
     {
-        static string B64(string t) => Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(t)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-        return $"{B64("{}")}.{B64($$"""{"sub":"{{sub}}","email":"{{email}}"}""")}.firma";
+        var manejador = ManejadorFalso.Json(HttpStatusCode.OK, respuesta ?? Token("g1", "gr1"));
+        var (servicio, almacen, _) = Crear(manejador);
+        return (servicio, almacen, manejador);
     }
 
     [Fact]
-    public async Task Google_con_fragmento_valido_inicia_sesion()
+    public async Task Url_de_google_lleva_el_code_challenge_del_verificador_guardado()
     {
-        var (servicio, almacen, _) = Crear(ManejadorFalso.Json(HttpStatusCode.OK, "{}"));
+        var (servicio, almacen, _) = CrearGoogle();
 
-        var ok = await servicio.CompletarGoogleAsync($"#access_token={Jwt("u9", "g@gmail.com")}&refresh_token=r9&expires_in=3600&token_type=bearer");
+        var url = await servicio.UrlGoogleAsync("http://localhost:5211/login");
+
+        var verificador = almacen.Datos["miparte.pkce"];
+        var desafio = Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.ASCII.GetBytes(verificador)))
+            .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        Assert.StartsWith("https://x.supabase.co/auth/v1/authorize?provider=google&redirect_to=http%3A%2F%2Flocalhost%3A5211%2Flogin", url.ToString());
+        Assert.EndsWith($"&code_challenge={desafio}&code_challenge_method=s256", url.ToString());
+        Assert.True(verificador.Length >= 43);
+    }
+
+    [Fact]
+    public async Task Google_con_codigo_canjea_con_el_verificador_y_lo_consume()
+    {
+        var (servicio, almacen, manejador) = CrearGoogle();
+        await servicio.UrlGoogleAsync("http://localhost:5211/login");
+        var verificador = almacen.Datos["miparte.pkce"];
+
+        var ok = await servicio.CompletarGoogleAsync("?code=abc123&otro=1");
 
         Assert.True(ok);
-        Assert.Equal("u9", servicio.SesionActual!.UserId);
-        Assert.Equal("g@gmail.com", servicio.SesionActual.Email);
+        Assert.Equal("g1", servicio.SesionActual!.AccessToken);
+        Assert.False(almacen.Datos.ContainsKey("miparte.pkce"));
         Assert.True(almacen.Datos.ContainsKey("miparte.sesion"));
+        Assert.EndsWith("/auth/v1/token?grant_type=pkce", manejador.Peticiones[0].RequestUri!.ToString());
+        Assert.NotEmpty(verificador);
     }
 
     [Fact]
-    public async Task Google_sin_tokens_no_hace_nada()
+    public async Task Google_con_codigo_sin_verificador_se_rechaza_sin_llamar_a_supabase()
     {
-        var (servicio, _, _) = Crear(ManejadorFalso.Json(HttpStatusCode.OK, "{}"));
+        var (servicio, _, manejador) = CrearGoogle();
 
-        Assert.False(await servicio.CompletarGoogleAsync(""));
+        await Assert.ThrowsAsync<AuthException>(() => servicio.CompletarGoogleAsync("?code=ajeno"));
+
+        Assert.Null(servicio.SesionActual);
+        Assert.Empty(manejador.Peticiones);
+    }
+
+    [Fact]
+    public async Task Google_no_admite_reutilizar_el_mismo_retorno()
+    {
+        var (servicio, _, _) = CrearGoogle();
+        await servicio.UrlGoogleAsync("http://localhost:5211/login");
+        await servicio.CompletarGoogleAsync("?code=abc");
+        await servicio.DescartarAsync();
+
+        await Assert.ThrowsAsync<AuthException>(() => servicio.CompletarGoogleAsync("?code=abc"));
         Assert.Null(servicio.SesionActual);
     }
 
     [Fact]
-    public async Task Google_cancelado_lanza_error_en_espanol()
+    public async Task Google_sin_parametros_no_hace_nada()
     {
-        var (servicio, _, _) = Crear(ManejadorFalso.Json(HttpStatusCode.OK, "{}"));
+        var (servicio, _, manejador) = CrearGoogle();
 
-        var e = await Assert.ThrowsAsync<AuthException>(() => servicio.CompletarGoogleAsync("#error=access_denied&error_description=x"));
+        Assert.False(await servicio.CompletarGoogleAsync("?x=1&"));
+        Assert.Null(servicio.SesionActual);
+        Assert.Empty(manejador.Peticiones);
+    }
+
+    [Fact]
+    public async Task Google_cancelado_lanza_error_en_espanol_y_consume_el_verificador()
+    {
+        var (servicio, almacen, _) = CrearGoogle();
+        await servicio.UrlGoogleAsync("http://localhost:5211/login");
+
+        var e = await Assert.ThrowsAsync<AuthException>(() => servicio.CompletarGoogleAsync("?error=access_denied&error_description=x"));
 
         Assert.Contains("cancelado", e.Message);
-    }
-
-    [Fact]
-    public async Task Google_con_token_corrupto_se_rechaza()
-    {
-        var (servicio, _, _) = Crear(ManejadorFalso.Json(HttpStatusCode.OK, "{}"));
-
-        await Assert.ThrowsAsync<AuthException>(() => servicio.CompletarGoogleAsync("#access_token=basura&refresh_token=r"));
-        Assert.Null(servicio.SesionActual);
-    }
-
-    [Fact]
-    public void Url_de_google_apunta_a_authorize_con_el_retorno_codificado()
-    {
-        var (servicio, _, _) = Crear(ManejadorFalso.Json(HttpStatusCode.OK, "{}"));
-
-        Assert.Equal("https://x.supabase.co/auth/v1/authorize?provider=google&redirect_to=http%3A%2F%2Flocalhost%3A5211%2Flogin",
-            servicio.UrlGoogle("http://localhost:5211/login").ToString());
+        Assert.False(almacen.Datos.ContainsKey("miparte.pkce"));
     }
 }

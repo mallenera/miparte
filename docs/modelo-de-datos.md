@@ -38,11 +38,11 @@ erDiagram
 
 | Tabla | Contenido y reglas |
 |---|---|
-| `hogar` | Nombre. Al crearlo (`crear_hogar`) se siembran 4 perfiles y 6 categorías y el creador entra como admin y adulto. |
+| `hogar` | Nombre y `cuenta_comun_activa` (false por defecto; la activa un admin y Core.Api bloquea las escrituras de la cuenta común mientras esté a false). Al crearlo (`crear_hogar`) se siembran 4 perfiles y 6 categorías y el creador entra como admin y adulto. |
 | `miembro` | `tipo` `adulto` \| `a_cargo`; un `a_cargo` **exige** `responsable_id` y un adulto no lo tiene. `user_id` enlaza con `auth.users` (puede ser nulo: p. ej. el hijo). `rol` (admin/miembro), `activo`. Siempre queda un admin activo y vinculado. |
 | `perfil_reparto` | `modo`: `porcentaje`, `partes`, `cuenta_comun` (lo asume la cuenta común) o `individual`. Nombre único por hogar. |
 | `perfil_reparto_detalle` | Valor (% o partes) por miembro y perfil. No se usa en `cuenta_comun` ni en `individual`. |
-| `categoria` | Jerárquica (`categoria_padre_id`) con perfil de reparto por defecto. |
+| `categoria` | Jerárquica (`categoria_padre_id`) con perfil de reparto por defecto. `a_cargo_cuenta_comun`: sus gastos van por defecto a cargo de la cuenta común (Core.Api exige entonces el perfil de cuenta común). |
 | `gasto` | Fecha, `importe > 0` con 2 decimales, categoría, `pagado_por` (nulo = lo paga directamente la cuenta común; exige `a_cargo_cuenta_comun`), `pagado_desde_ahorro` (se descuenta del ahorro en vez del saldo de gastos; exige `pagado_por` nulo y `a_cargo_cuenta_comun`), perfil aplicado, concepto, `gasto_recurrente_id` de origen, `a_cargo_cuenta_comun` (sin filas en `gasto_reparto`, fuera de la liquidación), `es_personal` (gasto personal de quien paga: una fila en `gasto_reparto` con el 100 %, fuera de la liquidación; exige `pagado_por` y excluye `a_cargo_cuenta_comun` y `pagado_desde_ahorro`). |
 | `gasto_reparto` | **Resultado del reparto congelado al crear el gasto**: `importe_asumido` por miembro. No se recalcula salvo con `PUT` del gasto. La suma de las filas = importe del gasto. |
 | `gasto_recurrente` | Plantilla mensual, `dia_mes` 1-28, `activo`. Índice único evita duplicar la generación de un mes (idempotente). |
@@ -62,4 +62,4 @@ erDiagram
 - Cambiar partes o perfiles solo afecta a gastos **nuevos**.
 
 ## Pendiente de modelar (ver diseño)
-Activar la cuenta común por hogar (hoy está activa si hay aportaciones), «su parte» por persona en el resumen, cierre de mes, etiquetas, historial de cambios. Cada uno requerirá una migración SQL nueva y su mapeo en `MiParteDbContext`.
+Cierre de mes, etiquetas, historial de cambios. Cada uno requerirá una migración SQL nueva y su mapeo en `MiParteDbContext`.

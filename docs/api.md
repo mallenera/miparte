@@ -6,7 +6,7 @@ Convenciones generales:
 
 - JSON en camelCase (valores por defecto de minimal API). Fechas `DateOnly` como `"2026-10-04"`; `DateTimeOffset` en ISO 8601; Guid como cadena.
 - Errores de validación: `{ "error": "mensaje en español" }` con el código HTTP indicado (400, 403, 404, 409). Algunos 404 y los 204 no llevan cuerpo.
-- Errores no controlados: **500** `{ "error": "Error interno del servidor." }` sin detalles internos (la traza queda en el log del servidor); conserva las cabeceras CORS.
+- Errores no controlados: **500** `application/problem+json` (`ProblemDetails`, RFC 9457) `{ "type", "title": "Error interno del servidor.", "status": 500, "error": "Error interno del servidor.", "traceId" }` sin detalles internos (la traza queda en el log del servidor); conserva las cabeceras CORS. `error` repite el título para que el cliente lo lea igual que el resto de errores.
 - Base URL local: `http://localhost:5001` (docker compose) o la de `launchSettings.json`.
 - Además existe `GET /health` (sin autenticación): `{ "service": "core", "status": "ok" }`.
 
@@ -93,8 +93,8 @@ Permisos: "miembro" = cualquier miembro activo del hogar (incluye admin). "admin
 | Método y ruta | Descripción | Request | Response | Errores | Permisos |
 |---|---|---|---|---|---|
 | `GET /api/categorias` | Lista (por nombre) | - | `CategoriaDto[]` 200 | - | miembro |
-| `POST /api/categorias` | Crea (subcategorías vía `categoriaPadreId`) | `GuardarCategoriaRequest` | `CategoriaDto` 201 | 400 nombre vacío/> 100, perfil o padre inexistente; 409 nombre duplicado en ese nivel | miembro |
-| `PUT /api/categorias/{id}` | Reemplaza todos los campos | `GuardarCategoriaRequest` | `CategoriaDto` 200 | 400 (igual, más padre = ella misma o ciclo), 404, 409 duplicada | miembro |
+| `POST /api/categorias` | Crea (subcategorías vía `categoriaPadreId`). `aCargoCuentaComun` (opcional, false) marca que sus gastos van por defecto a cargo de la cuenta común: exige que el perfil sea el de cuenta común (si no se envía perfil, se asigna el de cuenta común del hogar). Un perfil por defecto de cuenta común implica el indicador (elegir solo ese perfil guarda la marca sin exigir la cuenta activada; pedir `aCargoCuentaComun` explícitamente sí la exige) | `GuardarCategoriaRequest` | `CategoriaDto` 201 | 400 nombre vacío/> 100, perfil o padre inexistente, `aCargoCuentaComun` con otro perfil o sin perfil de cuenta común en el hogar; 409 nombre duplicado en ese nivel o `aCargoCuentaComun` con la cuenta común sin activar | miembro |
+| `PUT /api/categorias/{id}` | Reemplaza todos los campos (también `aCargoCuentaComun`: omitirlo lo deja en false, salvo que el perfil sea de cuenta común) | `GuardarCategoriaRequest` | `CategoriaDto` 200 | 400 (igual, más padre = ella misma o ciclo), 404, 409 duplicada o cuenta común sin activar al marcar una categoría que no lo estaba | miembro |
 | `DELETE /api/categorias/{id}` | Elimina | - | 204 | 404; 409 con subcategorías o con gastos/recurrentes asociados | miembro |
 
 ### 3.4 Perfiles de reparto
@@ -142,7 +142,7 @@ Los gastos personales (§3.6) no entran en la liquidación ni en `gastosTotales`
 
 | Método y ruta | Descripción | Request | Response | Errores | Permisos |
 |---|---|---|---|---|---|
-| `GET /api/resumen?mes=YYYY-MM` | Gastos del mes, por miembro y por categoría. `mes` obligatorio | - | `ResumenMensualResponse` 200 | 400 mes inválido; 409 sin hogar | miembro |
+| `GET /api/resumen?mes=YYYY-MM` | Gastos del mes, por miembro y por categoría, y (si el hogar tiene la cuenta común activada) el bloque `cuentaComun` con los saldos al final del mes. `mes` obligatorio | - | `ResumenMensualResponse` 200 | 400 mes inválido; 409 sin hogar | miembro |
 | `GET /api/liquidacion?mes=YYYY-MM` | Saldos (ya descontando pagos), transferencias sugeridas y pagos registrados. `mes` obligatorio | - | `LiquidacionResponse` 200 | 400; 409 | miembro |
 | `POST /api/pagos-liquidacion` | Registra un pago entre dos miembros del mes. El importe puede ser parcial o distinto del sugerido: cualquier valor > 0 (máx. 2 decimales) hasta la deuda pendiente del par; `GET /api/liquidacion` recalcula saldos y transferencias descontándolo, y se pueden registrar varios pagos hasta saldar | `CrearPagoLiquidacionRequest` | `PagoLiquidacionDto` 201 | 400 mes no es día 1, mismo miembro, importe (≤ 0 o más de 2 decimales), miembros fuera del hogar; 409 importe mayor que la deuda pendiente (`{ error, pendiente }`) o sin hogar | miembro |
 | `DELETE /api/pagos-liquidacion/{id}` | Elimina un pago | - | 204 | 404; 409 sin hogar | miembro |
@@ -151,8 +151,9 @@ Los gastos personales (§3.6) no entran en la liquidación ni en `gastosTotales`
 
 | Método y ruta | Descripción | Request | Response | Errores | Permisos |
 |---|---|---|---|---|---|
-| `GET /api/cuenta-comun?mes=YYYY-MM` | Estado al final del mes: aportado (mes y acumulado), gastado, saldo, reembolsos pendientes por miembro, efectivo, ahorro (del mes, acumulado, ingresado aparte, retirado, gastado y disponible), aportaciones configuradas, y reembolsos, ingresos aparte y retiradas de ahorro del mes. `mes` obligatorio | - | `CuentaComunResponse` 200 | 400 mes inválido; 409 sin hogar | miembro |
-| `PUT /api/cuenta-comun/aportaciones` | Fija lo que aporta un adulto desde un mes (`desde` = día 1); si ya había una de ese mes la sustituye. Importe 0 = deja de aportar. `ahorro` (opcional, 0 por defecto) es la parte del importe que se aparta: el resto queda para gastos | `FijarAportacionRequest` | `AportacionCuentaDto` 200 | 400 `desde` no es día 1, importe o ahorro negativos o con más de 2 decimales, ahorro mayor que el importe, miembro no adulto activo; 409 sin hogar o rebaja del ahorro que dejaría sin respaldo lo ya retirado o gastado desde el ahorro (`{ error, falta }`) | miembro |
+| `PUT /api/cuenta-comun/activacion` | **Solo admin.** Activa o desactiva la cuenta común del hogar (`{ "activa": true }`). Desactivarla no borra datos: solo bloquea las escrituras de la cuenta y los gastos a su cargo (409) hasta reactivarla. Los hogares que ya tenían datos de cuenta común quedaron activados por la migración | `ActivarCuentaComunRequest` | `{ "activa": bool }` 200 | 403 no es admin; 409 sin hogar | admin |
+| `GET /api/cuenta-comun?mes=YYYY-MM` | Estado al final del mes (incluye `activa` y `partes`, «su parte» por persona; se devuelve aunque la cuenta no esté activada): aportado (mes y acumulado), gastado, saldo, reembolsos pendientes por miembro, efectivo, ahorro (del mes, acumulado, ingresado aparte, retirado, gastado y disponible), aportaciones configuradas, y reembolsos, ingresos aparte y retiradas de ahorro del mes. `mes` obligatorio | - | `CuentaComunResponse` 200 | 400 mes inválido; 409 sin hogar | miembro |
+| `PUT /api/cuenta-comun/aportaciones` | Fija lo que aporta un adulto desde un mes (`desde` = día 1); si ya había una de ese mes la sustituye. Importe 0 = deja de aportar. `ahorro` (opcional, 0 por defecto) es la parte del importe que se aparta: el resto queda para gastos | `FijarAportacionRequest` | `AportacionCuentaDto` 200 | 400 `desde` no es día 1, importe o ahorro negativos o con más de 2 decimales, ahorro mayor que el importe, miembro no adulto activo; 409 sin hogar o rebaja del ahorro que dejaría sin respaldo lo ya retirado o gastado desde el ahorro (`{ error, falta }`); 409 también con la cuenta común sin activar | miembro |
 | `POST /api/cuenta-comun/reembolsos` | Registra un pago de la cuenta a quien adelantó gastos cargados a ella (`fecha` opcional, por defecto hoy UTC) | `CrearReembolsoRequest` | `ReembolsoCuentaDto` 201 | 400 importe o miembro fuera del hogar; 409 importe mayor que lo pendiente (`{ error, pendiente }`) o sin hogar | miembro |
 | `DELETE /api/cuenta-comun/reembolsos/{id}` | Elimina un reembolso | - | 204 | 404; 409 sin hogar | miembro |
 | `POST /api/cuenta-comun/depositos-ahorro` | Registra dinero que entra al ahorro fuera de la aportación mensual: ahorro inicial, lotería... (`fecha` opcional, por defecto hoy UTC) | `CrearDepositoAhorroRequest` | `DepositoAhorroDto` 201 | 400 importe o miembro fuera del hogar; 409 sin hogar | miembro |
@@ -243,8 +244,10 @@ Total: 48 endpoints de negocio (4 hogares/yo, 6 miembros/invitaciones, 4 categor
 { "nombre": "Supermercado", "categoriaPadreId": "d0000000-0000-4000-8000-000000000002", "perfilRepartoId": "e0000000-0000-4000-8000-000000000001" }
 ```
 ```json
-{ "id": "d0000000-0000-4000-8000-000000000009", "nombre": "Supermercado", "categoriaPadreId": "d0000000-0000-4000-8000-000000000002", "perfilRepartoId": "e0000000-0000-4000-8000-000000000001" }
+{ "id": "d0000000-0000-4000-8000-000000000009", "nombre": "Supermercado", "categoriaPadreId": "d0000000-0000-4000-8000-000000000002", "perfilRepartoId": "e0000000-0000-4000-8000-000000000001", "aCargoCuentaComun": false }
 ```
+
+Categoría a cargo de la cuenta común (con la cuenta activada; el servidor asigna el perfil de cuenta común si no se envía): `{ "nombre": "Comunidad", "categoriaPadreId": null, "perfilRepartoId": null, "aCargoCuentaComun": true }`.
 
 ### Perfiles
 
@@ -348,6 +351,8 @@ Total: 48 endpoints de negocio (4 hogares/yo, 6 miembros/invitaciones, 4 categor
 }
 ```
 
+`cuentaComun` (solo con la cuenta activada, si no es `null`): `{ "aportadoMes": 500.00, "gastadoMes": 120.00, "saldo": 280.00, "efectivo": 400.00, "pendiente": 120.00, "ahorroMes": 100.00, "ahorroDisponible": 100.00 }`, con los saldos acumulados al final del mes (`aportadoMes`, `gastadoMes` y `ahorroMes` son del propio mes; `pendiente` es el total que la cuenta debe a quienes adelantaron gastos).
+
 `pagado` incluye lo que el miembro adelantó para gastos de la cuenta común; `debeCuentaComun` es lo que la cuenta le debe aún (acumulado hasta el fin del mes, descontados los reembolsos).
 
 ### Liquidación
@@ -388,6 +393,10 @@ Total: 48 endpoints de negocio (4 hogares/yo, 6 miembros/invitaciones, 4 categor
   "importe": 150.00, "fecha": "2026-10-20", "concepto": "Bizum"
 }
 ```
+
+**Activación por hogar.** `hogar.cuenta_comun_activa` (false por defecto; `GET /api/cuenta-comun` la devuelve como `activa`). Con la cuenta sin activar responden 409 (`"La cuenta común no está activada en este hogar…"`): `PUT /aportaciones`, `POST` de reembolsos, ingresos y retiradas de ahorro, `POST`/`PUT /api/gastos` que queden a cargo de la cuenta (perfil `cuenta_comun`), `POST /api/gastos-recurrentes/generar` si alguna plantilla pendiente usa ese perfil, y marcar una categoría con `aCargoCuentaComun`. Los `DELETE` y las consultas siguen funcionando. El front oculta el perfil de cuenta común y la opción de pagar con la cuenta mientras no esté activa.
+
+**Su parte por persona** (`partes`, `PartePersonaDto[]`): para cada miembro con aportaciones o ingresos de ahorro suyos hasta el mes, `aportado` (para gastos, sin ahorro), `ahorrado` (parte de ahorro de sus aportaciones más sus ingresos aparte), `porcentajeGastos`/`porcentajeAhorro` (su peso sobre el total, 2 decimales), `parteSaldo` (saldo de gastos repartido en proporción a lo aportado), `parteAhorro` (ahorro disponible repartido en proporción a lo ahorrado) y `pendiente` (lo que la cuenta le debe por gastos que adelantó). El céntimo sobrante lo absorbe el último miembro (por id): las partes suman siempre el saldo y el ahorro disponible. Un saldo negativo se reparte igual (parte de cada uno en el descubierto). Un ingreso de ahorro se atribuye a quien lo registró. Ejemplo: Ana aporta 600 (200 de ahorro) y Beto 400 (sin ahorro) más 100 de ahorro ingresado por Beto; hay un gasto de 101. Saldo 699 → 349,50 cada uno (ambos pusieron 400 para gastos); ahorro disponible 300 → Ana 200 y Beto 100.
 
 Error típico si se pasa de la deuda (409): `{ "error": "El importe supera la deuda pendiente entre ambos miembros (150.00).", "pendiente": 150.00 }`.
 

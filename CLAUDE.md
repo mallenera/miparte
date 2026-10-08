@@ -73,7 +73,7 @@ MIPARTE_TEST_DB="Host=localhost;Database=miparte;Username=postgres" dotnet test
 
 ## Seguridad del front (CSP)
 
-`src/Web/default.conf.template` (nginx) fija la CSP y demás cabeceras; la imagen las aplica con envsubst a partir de `SUPABASE_URL` y `CORE_URL` (en `docker compose` salen de `Supabase__Url` y `CoreUrl`), que deben coincidir con `Supabase:Url` y `Api:CoreUrl` del `appsettings.json` del front. Consecuencias al desarrollar: **no añadas scripts en línea** a `index.html` (ponlos en `wwwroot/js/`), ni cargues JavaScript de otro origen, ni hables con otros hosts desde el front sin añadirlos a `connect-src`. Para comprobar un cambio con CSP real no hace falta Docker: publica el front (`dotnet publish src/Web`) y sírvelo con las cabeceras de la plantilla; la consola del navegador mostrará las violaciones.
+`src/Web/default.conf.template` (nginx) fija la CSP y demás cabeceras; la imagen las aplica con envsubst a partir de `SUPABASE_URL` y `CORE_URL` (en `docker compose` salen de `Supabase__Url` y `CoreUrl`), que deben coincidir con `Supabase:Url` y `Api:CoreUrl` del `appsettings.json` del front. Consecuencias al desarrollar: **no añadas scripts en línea** a `index.html` (ponlos en `wwwroot/js/`), **ni atributos `style=""`** (la CSP usa `style-src-attr 'none'`; usa clases de `app.css`, p. ej. `u-mt12` o `av c0..c7`), ni cargues JavaScript de otro origen, ni hables con otros hosts desde el front sin añadirlos a `connect-src`. Para comprobar un cambio con CSP real no hace falta Docker: publica el front (`dotnet publish src/Web`) y sírvelo con las cabeceras de la plantilla; la consola del navegador mostrará las violaciones.
 
 ## Arquitectura
 
@@ -95,7 +95,7 @@ Endpoints por carpeta en `src/Core/Core.Api`: `Hogares`, `Miembros`, `Reparto` (
 - Cada gasto guarda su reparto al crearse y no se recalcula salvo con `PUT` del gasto. Importes > 0 con máx. 2 decimales; meses con formato `YYYY-MM`.
 - Recurrentes: `diaMes` 1-28; `POST /api/gastos-recurrentes/generar?mes=` es idempotente. No hay proceso en segundo plano: lo dispara el cliente.
 - CORS: orígenes permitidos en `Cors__OrigenesPermitidos__N`.
-- **Ingresos no se guardan** (decisión de diseño): la migración `20261007000000_perfiles_cuenta_comun_sin_ingresos.sql` elimina la tabla `ingreso`; los perfiles son individual, porcentajes, partes y cuenta común (`cuenta_comun`: el gasto no se reparte ni genera deuda; `gasto.a_cargo_cuenta_comun`). **Cuenta común**: aportaciones, saldo, reembolsos y ahorro (parte de cada aportación que se aparta, ingresos aparte, retiradas y gastos pagados desde el ahorro) implementados (`/api/cuenta-comun`, `docs/api.md` §3.9); falta activarla por hogar.
+- **Ingresos no se guardan** (decisión de diseño): la migración `20261007000000_perfiles_cuenta_comun_sin_ingresos.sql` elimina la tabla `ingreso`; los perfiles son individual, porcentajes, partes y cuenta común (`cuenta_comun`: el gasto no se reparte ni genera deuda; `gasto.a_cargo_cuenta_comun`). **Cuenta común**: aportaciones, saldo, reembolsos y ahorro (parte de cada aportación que se aparta, ingresos aparte, retiradas y gastos pagados desde el ahorro) implementados (`/api/cuenta-comun`, `docs/api.md` §3.9); cada hogar la activa (un admin, `PUT /api/cuenta-comun/activacion`) y una categoría puede ir «a cargo de la cuenta común».
 
 ### Base de datos: el esquema es SQL, no EF
 

@@ -137,4 +137,34 @@ public class ServidorDemoTests
     [InlineData(" ana@correo.es ", "ana@correo.es")]
     public void El_usuario_demo_se_traduce_al_correo_de_la_cuenta_real(string escrito, string esperado) =>
         Assert.Equal(esperado, CuentaDemo.ACorreo(escrito));
+
+    [Fact]
+    public async Task La_cuenta_comun_de_la_demo_se_puede_desactivar_y_bloquea_sus_escrituras()
+    {
+        var api = Cliente();
+        var estado = await api.ObtenerCuentaComunAsync("2026-10");
+        Assert.True(estado.Activa);
+        Assert.Equal(estado.Saldo, estado.Partes!.Sum(p => p.ParteSaldo));
+        Assert.NotNull((await api.ObtenerResumenAsync("2026-10")).CuentaComun);
+
+        await api.ActivarCuentaComunAsync(false);
+
+        Assert.False((await api.ObtenerCuentaComunAsync("2026-10")).Activa);
+        Assert.Null((await api.ObtenerResumenAsync("2026-10")).CuentaComun);
+        var ana = (await api.ListarMiembrosAsync()).First(m => m.EsYo);
+        var e = await Assert.ThrowsAsync<ApiException>(() => api.FijarAportacionAsync(new FijarAportacionRequest(ana.Id, new DateOnly(2026, 10, 1), 100m)));
+        Assert.Contains("no está activada", e.Message);
+    }
+
+    [Fact]
+    public async Task Una_categoria_a_cargo_de_la_cuenta_recibe_el_perfil_de_cuenta_comun()
+    {
+        var api = Cliente();
+        var cuenta = (await api.ListarPerfilesAsync()).Single(p => p.Modo == "cuenta_comun");
+
+        var categoria = await api.CrearCategoriaAsync(new GuardarCategoriaRequest("Comunidad", null, null, true));
+
+        Assert.True(categoria.ACargoCuentaComun);
+        Assert.Equal(cuenta.Id, categoria.PerfilRepartoId);
+    }
 }

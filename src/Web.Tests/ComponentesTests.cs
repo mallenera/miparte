@@ -36,7 +36,8 @@ public class ComponentesTests : TestContext
         };
         return new ApiFalsa()
             .Responde("GET /api/miembros", HttpStatusCode.OK, miembros)
-            .Responde("GET /api/perfiles", HttpStatusCode.OK, perfiles);
+            .Responde("GET /api/perfiles", HttpStatusCode.OK, perfiles)
+            .Responde("GET /api/auditoria", HttpStatusCode.OK, new List<EventoAuditoriaDto>());
     }
 
     [Fact]

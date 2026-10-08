@@ -19,80 +19,17 @@ else if (_errorCarga is not null)
 }
 else if (_resumen is not null && _liquidacion is not null)
 {
-    <section class="card" aria-labelledby="t-resumen">
-        <div class="card-head">
-            <h2 id="t-resumen">Resumen del mes</h2>
-            <div class="mesnav">
-                <button class="linkbtn" type="button" aria-label="Mes anterior" @onclick="() => CambiarMesAsync(-1)">‹</button>
-                <span class="tag cur" aria-live="polite">@NombreMes</span>
-                <button class="linkbtn" type="button" aria-label="Mes siguiente" @onclick="() => CambiarMesAsync(1)">›</button>
-            </div>
+    <div class="mesbar">
+        <div class="mesnav">
+            <button class="linkbtn" type="button" aria-label="Mes anterior" @onclick="() => CambiarMesAsync(-1)"><Icono Nombre="chevron-left" /></button>
+            <span class="tag cur" aria-live="polite">@NombreMes</span>
+            <button class="linkbtn" type="button" aria-label="Mes siguiente" @onclick="() => CambiarMesAsync(1)"><Icono Nombre="chevron-right" /></button>
         </div>
-
-        @if (_error is not null)
-        {
-            <div class="aviso err" role="alert" style="margin-top: 12px">@_error</div>
-        }
-
-        @if (_resumen.GastosTotales == 0)
-        {
-            <div class="empty">
-                <span>No hay gastos en @NombreMes.</span>
-                <a class="btn" href="gastos">Añadir un gasto</a>
-            </div>
-            @foreach (var m in _resumen.Miembros.Where(m => m.DebeCuentaComun > 0))
-            {
-                <div class="catrow">
-                    <div class="c-name"><Avatar Nombre="@m.Nombre" Color="@ColorMiembro.De(m.MiembroId, _miembros)" Tamano="sm" /> @m.Nombre</div>
-                    <div class="c-sel"><span class="chip">La cuenta común le debe&nbsp;<b>@Euros(m.DebeCuentaComun)</b></span></div>
-                </div>
-            }
-        }
-        else
-        {
-            <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px">
-                <span class="chip">Gastos del mes&nbsp;<b id="total">@Euros(_resumen.GastosTotales)</b></span>
-            </div>
-
-            <h3 style="margin: 16px 0 0">Por persona</h3>
-            @foreach (var m in _resumen.Miembros)
-            {
-                <div class="catrow">
-                    <div class="c-name"><Avatar Nombre="@m.Nombre" Color="@ColorMiembro.De(m.MiembroId, _miembros)" Tamano="sm" /> @m.Nombre</div>
-                    <div class="c-sel">
-                        Ha pagado @Euros(m.Pagado) · le corresponden @Euros(m.Asumido)
-                        @if (m.DebeCuentaComun > 0)
-                        {
-                            <span class="chip">La cuenta común le debe&nbsp;<b>@Euros(m.DebeCuentaComun)</b></span>
-                        }
-                    </div>
-                </div>
-            }
-
-            <h3 style="margin: 16px 0 0">Por categoría</h3>
-            @foreach (var c in _resumen.Categorias)
-            {
-                <div class="catrow">
-                    <div class="c-name">@c.Nombre</div>
-                    <div class="c-sel">
-                        <b class="g-importe">@Euros(c.Total)</b>
-                        @if (c.PorMiembro.Count > 0)
-                        {
-                            <span class="g-reparto">
-                                @foreach (var p in c.PorMiembro)
-                                {
-                                    <span class="chip">
-                                        <Avatar Nombre="@NombreMiembro(p.MiembroId)" Color="@ColorMiembro.De(p.MiembroId, _miembros)" Tamano="sm" />
-                                        @Euros(p.Importe)
-                                    </span>
-                                }
-                            </span>
-                        }
-                    </div>
-                </div>
-            }
-        }
-    </section>
+    </div>
+    @if (_error is not null)
+    {
+        <div class="aviso err" role="alert" style="margin-top: 12px">@_error</div>
+    }
 
     <section class="card" aria-labelledby="t-liquidacion">
         <div class="card-head"><h2 id="t-liquidacion">Liquidación</h2></div>
@@ -154,6 +91,69 @@ else if (_resumen is not null && _liquidacion is not null)
                         else
                         {
                             <button class="linkbtn danger" type="button" aria-label="Eliminar el pago de @NombreMiembro(p.DeMiembroId) a @NombreMiembro(p.AMiembroId)" @onclick="() => _confirmandoEliminar = p.Id">Eliminar</button>
+                        }
+                    </div>
+                </div>
+            }
+        }
+    </section>
+
+    <section class="card" aria-labelledby="t-resumen">
+        <div class="card-head"><h2 id="t-resumen">Resumen del mes</h2></div>
+
+        @if (_resumen.GastosTotales == 0)
+        {
+            <div class="empty">
+                <span>No hay gastos en @NombreMes.</span>
+                <a class="btn" href="gastos">Añadir un gasto</a>
+            </div>
+            @foreach (var m in _resumen.Miembros.Where(m => m.DebeCuentaComun > 0))
+            {
+                <div class="catrow">
+                    <div class="c-name"><Avatar Nombre="@m.Nombre" Color="@ColorMiembro.De(m.MiembroId, _miembros)" Tamano="sm" /> @m.Nombre</div>
+                    <div class="c-sel"><span class="chip">La cuenta común le debe&nbsp;<b>@Euros(m.DebeCuentaComun)</b></span></div>
+                </div>
+            }
+        }
+        else
+        {
+            <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px">
+                <span class="chip">Gastos del mes&nbsp;<b id="total">@Euros(_resumen.GastosTotales)</b></span>
+            </div>
+
+            <h3 style="margin: 16px 0 0">Por persona</h3>
+            @foreach (var m in _resumen.Miembros)
+            {
+                <div class="catrow">
+                    <div class="c-name"><Avatar Nombre="@m.Nombre" Color="@ColorMiembro.De(m.MiembroId, _miembros)" Tamano="sm" /> @m.Nombre</div>
+                    <div class="c-sel">
+                        Ha pagado @Euros(m.Pagado) · le corresponden @Euros(m.Asumido)
+                        @if (m.DebeCuentaComun > 0)
+                        {
+                            <span class="chip">La cuenta común le debe&nbsp;<b>@Euros(m.DebeCuentaComun)</b></span>
+                        }
+                    </div>
+                </div>
+            }
+
+            <h3 style="margin: 16px 0 0">Por categoría</h3>
+            @foreach (var c in _resumen.Categorias)
+            {
+                <div class="catrow">
+                    <div class="c-name">@c.Nombre</div>
+                    <div class="c-sel">
+                        <b class="g-importe">@Euros(c.Total)</b>
+                        @if (c.PorMiembro.Count > 0)
+                        {
+                            <span class="g-reparto">
+                                @foreach (var p in c.PorMiembro)
+                                {
+                                    <span class="chip">
+                                        <Avatar Nombre="@NombreMiembro(p.MiembroId)" Color="@ColorMiembro.De(p.MiembroId, _miembros)" Tamano="sm" />
+                                        @Euros(p.Importe)
+                                    </span>
+                                }
+                            </span>
                         }
                     </div>
                 </div>

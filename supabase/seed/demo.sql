@@ -51,6 +51,10 @@ declare
 begin
     -- ───── Usuario de Supabase Auth ─────
     -- Se borra y se recrea para que la contraseña y la identidad siempre queden como se espera.
+    -- Antes se eliminan los hogares ajenos al demo que la cuenta haya creado o a los que se haya unido, para que
+    -- el restablecimiento no deje basura acumulada (la cuenta es pública).
+    delete from public.hogar
+    where id <> v_hogar and id in (select hogar_id from public.miembro where user_id = v_user);
     delete from auth.users where id = v_user;
     insert into auth.users (
         instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,

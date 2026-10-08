@@ -28,7 +28,7 @@ else if (_resumen is not null && _liquidacion is not null)
     </div>
     @if (_error is not null)
     {
-        <div class="aviso err" role="alert" style="margin-top: 12px">@_error</div>
+        <div class="aviso err u-mt12" role="alert">@_error</div>
     }
 
     <section class="card" aria-labelledby="t-liquidacion">
@@ -61,13 +61,13 @@ else if (_resumen is not null && _liquidacion is not null)
 
         @if (_liquidacion.Transferencias.Count == 0)
         {
-            <div class="aviso ok" role="status" style="margin-top: 12px">
+            <div class="aviso ok u-mt12" role="status">
                 @(_liquidacion.Saldos.Count == 0 ? "Todavía no hay nada que liquidar este mes." : "Este mes está saldado: nadie debe nada.")
             </div>
         }
         else
         {
-            <h3 style="margin: 16px 0 0">Transferencias sugeridas</h3>
+            <h3 class="u-sec">Transferencias sugeridas</h3>
             <p class="muted">Cambia el importe para registrar un pago parcial; lo que quede seguirá pendiente.</p>
             @foreach (var t in _liquidacion.Transferencias.Where(t => FiltraMiembro(t.De) || FiltraMiembro(t.A)))
             {
@@ -94,7 +94,7 @@ else if (_resumen is not null && _liquidacion is not null)
 
         @if (_liquidacion.Pagos.Count > 0)
         {
-            <h3 style="margin: 16px 0 0">Pagos registrados</h3>
+            <h3 class="u-sec">Pagos registrados</h3>
             @foreach (var p in _liquidacion.Pagos.Where(p => FiltraMiembro(p.DeMiembroId) || FiltraMiembro(p.AMiembroId)).OrderByDescending(p => p.Fecha))
             {
                 <div class="gastorow">
@@ -139,11 +139,11 @@ else if (_resumen is not null && _liquidacion is not null)
         }
         else
         {
-            <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px">
+            <div class="u-fila-mt10">
                 <span class="chip">Gastos del mes&nbsp;<b id="total">@Euros(_resumen.GastosTotales)</b></span>
             </div>
 
-            <h3 style="margin: 16px 0 0">Por persona</h3>
+            <h3 class="u-sec">Por persona</h3>
             @foreach (var m in _resumen.Miembros)
             {
                 <div class="catrow">
@@ -158,12 +158,12 @@ else if (_resumen is not null && _liquidacion is not null)
                 </div>
             }
 
-            <h3 style="margin: 16px 0 0">Por categoría</h3>
+            <h3 class="u-sec">Por categoría</h3>
             @foreach (var f in FilasCategorias())
             {
                 var n = f.Nodo;
                 var importe = f.Directo ? n.Propio : n.Total;
-                <div class="catrow resrow" style="padding-left: @(f.Nivel * 22)px">
+                <div class="catrow resrow nivel-@Math.Min(f.Nivel, 4)">
                     <div class="c-name @(f.Nivel > 0 ? "sub" : "")">
                         @if (!f.Directo && n.Hijos.Count > 0)
                         {
@@ -175,7 +175,7 @@ else if (_resumen is not null && _liquidacion is not null)
                     </div>
                     <div class="c-sel">
                         <b class="g-importe">@Euros(importe)</b> <span class="muted">@Porcentaje(importe) %</span>
-                        <div class="barra" role="img" aria-label="@Porcentaje(importe) % del total del mes"><span style="width: @(Porcentaje(importe))%"></span></div>
+                        <progress class="barra" max="100" value="@Porcentaje(importe)" aria-label="@Porcentaje(importe) % del total del mes"></progress>
                         @if (!f.Directo && n.PorMiembro.Count > 0)
                         {
                             <span class="g-reparto">

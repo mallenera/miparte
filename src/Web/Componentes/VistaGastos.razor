@@ -59,10 +59,10 @@ else
 
         @if (_error is not null)
         {
-            <div class="aviso err" role="alert" style="margin-top: 12px">@_error</div>
+            <div class="aviso err u-mt12" role="alert">@_error</div>
         }
 
-        <div style="margin-top: 10px">
+        <div class="u-mt10">
             @foreach (var g in _gastos)
             {
                 <div class="gastorow">
@@ -112,12 +112,12 @@ else
 
         @if (_adultos.Count == 0 || _categorias.Count == 0 || _perfiles.Count == 0)
         {
-            <div class="aviso warn" style="margin-top: 14px">Para registrar gastos hace falta al menos un adulto, una categoría y un perfil de reparto.</div>
+            <div class="aviso warn u-mt14">Para registrar gastos hace falta al menos un adulto, una categoría y un perfil de reparto.</div>
         }
         else
         {
             <form class="addcat" @onsubmit="GuardarAsync">
-                <h3 style="flex: 1 1 100%; margin: 0">@(_editando is null ? "Nuevo gasto" : "Editar gasto")</h3>
+                <h3 class="u-titulo-form">@(_editando is null ? "Nuevo gasto" : "Editar gasto")</h3>
                 <label>Fecha
                     <input type="date" required @bind="_fecha" />
                 </label>

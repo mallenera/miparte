@@ -32,10 +32,10 @@ else if (_estado is not null)
 
         @if (_error is not null)
         {
-            <div class="aviso err" role="alert" style="margin-top: 12px">@_error</div>
+            <div class="aviso err u-mt12" role="alert">@_error</div>
         }
 
-        <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px">
+        <div class="u-fila-mt10">
             <span class="chip">Saldo&nbsp;<b id="saldo">@Euros(_estado.Saldo)</b></span>
             <span class="chip">Efectivo&nbsp;<b>@Euros(_estado.Efectivo)</b></span>
             <span class="chip">Aportado este mes&nbsp;<b>@Euros(_estado.AportadoMes)</b></span>
@@ -46,7 +46,7 @@ else if (_estado is not null)
 
         @if (_estado.Saldo < 0)
         {
-            <div class="aviso warn" role="status" style="margin-top: 12px">
+            <div class="aviso warn u-mt12" role="status">
                 La cuenta no cubre los gastos: faltan @Euros(-_estado.Saldo) para cubrirlos.
             </div>
         }
@@ -55,7 +55,7 @@ else if (_estado is not null)
     <section class="card" aria-labelledby="t-aportaciones">
         <div class="card-head"><h2 id="t-aportaciones">Aportación mensual</h2></div>
         <p class="muted">Importe fijo que aporta cada adulto al mes; una parte puede ir a ahorro y el resto queda para gastos. Un cambio vale desde el mes elegido en adelante.</p>
-        <div style="margin-top: 10px">
+        <div class="u-mt10">
             @foreach (var a in _adultos)
             {
                 <div class="catrow">
@@ -133,7 +133,7 @@ else if (_estado is not null)
         @if (_estado.Pendientes.Count > 0)
         {
             <form class="addcat" id="form-reembolso" @onsubmit="ReembolsarAsync">
-                <h3 style="flex: 1 1 100%; margin: 0">Nuevo reembolso</h3>
+                <h3 class="u-titulo-form">Nuevo reembolso</h3>
                 <label>A
                     <select @bind="_reembolsado">
                         @foreach (var p in _estado.Pendientes)
@@ -156,7 +156,7 @@ else if (_estado is not null)
     <section class="card" aria-labelledby="t-ahorro">
         <div class="card-head"><h2 id="t-ahorro">Ahorro</h2></div>
         <p class="muted">Suma la parte de las aportaciones que se aparta y lo que ingreses aparte (ahorro inicial, lotería…). Los gastos no la tocan: solo baja al retirarla o al pagar un gasto desde el ahorro.</p>
-        <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px">
+        <div class="u-fila-mt10">
             <span class="chip">Ahorrado este mes&nbsp;<b>@Euros(_estado.AhorroMes)</b></span>
             <span class="chip">Ahorrado en total&nbsp;<b>@Euros(_estado.AhorroAcumulado)</b></span>
             <span class="chip">Ingresado aparte&nbsp;<b>@Euros(_estado.AhorroDepositado)</b></span>
@@ -166,7 +166,7 @@ else if (_estado is not null)
 
         @if (_estado.AhorroDisponible < 0)
         {
-            <div class="aviso warn" role="status" style="margin-top: 12px">
+            <div class="aviso warn u-mt12" role="status">
                 Se ha retirado más de lo ahorrado: faltan @Euros(-_estado.AhorroDisponible) (revisa las aportaciones o las retiradas).
             </div>
         }
@@ -197,7 +197,7 @@ else if (_estado is not null)
         @if (_adultos.Count > 0)
         {
             <form class="addcat" id="form-deposito" @onsubmit="IngresarAhorroAsync">
-                <h3 style="flex: 1 1 100%; margin: 0">Añadir al ahorro</h3>
+                <h3 class="u-titulo-form">Añadir al ahorro</h3>
                 <label>Lo ingresa
                     <select @bind="_depositante">
                         @foreach (var a in _adultos)
@@ -242,7 +242,7 @@ else if (_estado is not null)
         @if (_estado.AhorroDisponible > 0 && _adultos.Count > 0)
         {
             <form class="addcat" id="form-retirada" @onsubmit="RetirarAhorroAsync">
-                <h3 style="flex: 1 1 100%; margin: 0">Retirar del ahorro</h3>
+                <h3 class="u-titulo-form">Retirar del ahorro</h3>
                 <label>Lo retira
                     <select @bind="_retirante">
                         @foreach (var a in _adultos)

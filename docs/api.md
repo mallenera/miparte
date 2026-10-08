@@ -6,7 +6,7 @@ Convenciones generales:
 
 - JSON en camelCase (valores por defecto de minimal API). Fechas `DateOnly` como `"2026-10-04"`; `DateTimeOffset` en ISO 8601; Guid como cadena.
 - Errores de validación: `{ "error": "mensaje en español" }` con el código HTTP indicado (400, 403, 404, 409). Algunos 404 y los 204 no llevan cuerpo.
-- Errores no controlados: **500** `{ "error": "Error interno del servidor." }` sin detalles internos (la traza queda en el log del servidor); conserva las cabeceras CORS.
+- Errores no controlados: **500** `application/problem+json` (`ProblemDetails`, RFC 9457) `{ "type", "title": "Error interno del servidor.", "status": 500, "error": "Error interno del servidor.", "traceId" }` sin detalles internos (la traza queda en el log del servidor); conserva las cabeceras CORS. `error` repite el título para que el cliente lo lea igual que el resto de errores.
 - Base URL local: `http://localhost:5001` (docker compose) o la de `launchSettings.json`.
 - Además existe `GET /health` (sin autenticación): `{ "service": "core", "status": "ok" }`.
 

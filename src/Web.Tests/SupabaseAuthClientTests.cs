@@ -47,6 +47,48 @@ public class SupabaseAuthClientTests
     }
 
     [Fact]
+    public async Task Verificar_codigo_envia_tipo_signup_y_devuelve_la_sesion()
+    {
+        string? cuerpo = null;
+        var manejador = new ManejadorFalso(r =>
+        {
+            cuerpo = r.Content!.ReadAsStringAsync().Result;
+            return ManejadorFalso.RespuestaJson(HttpStatusCode.OK, TokenJson);
+        });
+
+        var sesion = await Crear(manejador).VerificarCodigoAsync("a@b.com", "123456");
+
+        Assert.Equal("acc", sesion.AccessToken);
+        var peticion = manejador.Peticiones[0];
+        Assert.Equal(HttpMethod.Post, peticion.Method);
+        Assert.Equal("https://x.supabase.co/auth/v1/verify", peticion.RequestUri!.ToString());
+        using var json = System.Text.Json.JsonDocument.Parse(cuerpo!);
+        Assert.Equal("signup", json.RootElement.GetProperty("type").GetString());
+        Assert.Equal("a@b.com", json.RootElement.GetProperty("email").GetString());
+        Assert.Equal("123456", json.RootElement.GetProperty("token").GetString());
+    }
+
+    [Fact]
+    public async Task Codigo_caducado_se_traduce_al_espanol()
+    {
+        var manejador = ManejadorFalso.Json(HttpStatusCode.Forbidden, """{"error_code":"otp_expired","msg":"Token has expired or is invalid"}""");
+
+        var e = await Assert.ThrowsAsync<AuthException>(() => Crear(manejador).VerificarCodigoAsync("a@b.com", "000000"));
+
+        Assert.Contains("caducado", e.Message);
+    }
+
+    [Fact]
+    public async Task Reenviar_codigo_llama_a_resend()
+    {
+        var manejador = ManejadorFalso.Json(HttpStatusCode.OK, "{}");
+
+        await Crear(manejador).ReenviarCodigoAsync("a@b.com");
+
+        Assert.EndsWith("/auth/v1/resend", manejador.Peticiones[0].RequestUri!.ToString());
+    }
+
+    [Fact]
     public async Task Cerrar_sesion_no_lanza_si_falla_la_red()
     {
         var manejador = new ManejadorFalso(_ => throw new HttpRequestException("sin red"));

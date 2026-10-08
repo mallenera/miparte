@@ -397,6 +397,14 @@ input.invalid, input[aria-invalid="true"] { border-color: var(--err); outline: 0
 @media (max-width: 430px) { .fields { grid-template-columns: minmax(0, 1fr); } }
 .form { display: grid; gap: 14px; align-content: start; }
 .fieldrow { display: grid; gap: 4px; }
+.pwd { position: relative; display: grid; }
+.pwd input { padding-right: 46px; }
+.pwd-ver {
+    position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; display: grid; place-items: center;
+    border: 0; background: none; color: var(--muted, var(--ink)); cursor: pointer; border-radius: 50%; padding: 0;
+}
+.pwd-ver:hover { color: var(--ink); background: var(--surface-2); }
+.codigo { letter-spacing: .4em; text-align: center; font-size: 1.4rem; font-variant-numeric: tabular-nums; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 14px; }
 .err, .validation-message { color: var(--err); font-size: .85rem; }
 .chk { display: flex; align-items: center; gap: 10px; font-size: .9rem; font-weight: 600; color: var(--ink); cursor: pointer; }

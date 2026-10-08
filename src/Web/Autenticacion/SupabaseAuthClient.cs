@@ -41,6 +41,24 @@ public sealed class SupabaseAuthClient
         return LeerSesion(json);
     }
 
+    /// <summary>Confirma la cuenta con el código de 6 dígitos que Supabase envió por correo; devuelve la sesión ya iniciada.</summary>
+    /// <param name="email">Correo con el que se registró.</param>
+    /// <param name="codigo">Código recibido por correo.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    /// <exception cref="AuthException">Código incorrecto o caducado.</exception>
+    public async Task<SesionSupabase> VerificarCodigoAsync(string email, string codigo, CancellationToken ct = default)
+    {
+        var json = await EnviarAsync("verify", new { type = "signup", email, token = codigo }, null, ct);
+        return LeerSesion(json) ?? throw new AuthException("Respuesta de autenticación no válida.", 502);
+    }
+
+    /// <summary>Reenvía el correo con el código de confirmación.</summary>
+    /// <param name="email">Correo con el que se registró.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    /// <exception cref="AuthException">Demasiados reenvíos u otro error.</exception>
+    public async Task ReenviarCodigoAsync(string email, CancellationToken ct = default) =>
+        await EnviarAsync("resend", new { type = "signup", email }, null, ct);
+
     /// <summary>Renueva la sesión con el refresh token.</summary>
     /// <param name="refreshToken">Refresh token vigente.</param>
     /// <param name="ct">Token de cancelación.</param>
@@ -115,7 +133,8 @@ public sealed class SupabaseAuthClient
             "invalid_credentials" or "invalid_grant" => "Correo o contraseña incorrectos.",
             "email_not_confirmed" => "Confirma tu correo antes de iniciar sesión.",
             "user_already_exists" or "email_exists" => "Ya existe una cuenta con ese correo.",
-            "weak_password" => "La contraseña es demasiado débil (mínimo 6 caracteres).",
+            "otp_expired" => "El código es incorrecto o ha caducado. Pide uno nuevo.",
+            "weak_password" => "La contraseña es demasiado débil: mínimo 8 caracteres, con al menos una letra y un número.",
             "over_request_rate_limit" or "over_email_send_rate_limit" => "Demasiados intentos. Espera un momento.",
             "signup_disabled" => "El registro está desactivado.",
             _ => mensaje ?? "No se pudo completar la operación de autenticación.",

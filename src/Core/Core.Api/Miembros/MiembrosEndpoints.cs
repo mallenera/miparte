@@ -67,11 +67,14 @@ public static class MiembrosEndpoints
     private static Task<Miembro?> Yo(MiParteDbContext db, Guid userId, CancellationToken ct)
         => db.Miembros.FirstOrDefaultAsync(m => m.UserId == userId && m.Activo, ct);
 
-    /// <summary>GET /api/miembros: miembros activos del hogar actual ordenados por nombre. Cualquier miembro puede consultarlo.</summary>
+    /// <summary>
+    /// GET /api/miembros: miembros activos del hogar actual ordenados por nombre; con <c>incluirInactivos=true</c> también
+    /// los desactivados (para poner nombre a quien aparece en el historial). Cualquier miembro puede consultarlo.
+    /// </summary>
     private static async Task<IResult> ListarAsync(
-        HttpContext ctx, [FromServices] MiParteDbContext db, CancellationToken ct)
+        HttpContext ctx, [FromServices] MiParteDbContext db, CancellationToken ct, bool incluirInactivos = false)
     {
-        var miembros = await db.Miembros.Where(m => m.Activo).OrderBy(m => m.Nombre).ToListAsync(ct);
+        var miembros = await db.Miembros.Where(m => incluirInactivos || m.Activo).OrderBy(m => m.Nombre).ToListAsync(ct);
         var usuario = TryUsuario(ctx, out var userId) ? userId : (Guid?)null;
         return Results.Ok(miembros.Select(m => ADto(m, usuario)).ToList());
     }

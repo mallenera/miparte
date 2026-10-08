@@ -29,9 +29,9 @@ public static class GastosEndpoints
         g.Repartos.OrderBy(r => r.MiembroId).Select(r => new RepartoGastoDto(r.MiembroId, r.ImporteAsumido)).ToList(),
         g.ACargoCuentaComun, g.PagadoDesdeAhorro);
 
-    /// <summary>GET /api/gastos: lista los gastos, filtrables por mes (YYYY-MM) y categoría, de más reciente a más antiguo. 409 sin hogar; 400 si el mes es inválido.</summary>
+    /// <summary>GET /api/gastos: lista los gastos, filtrables por mes (YYYY-MM), categoría, miembro (quien paga o asume una parte mayor que 0) y texto del concepto, de más reciente a más antiguo. 409 sin hogar; 400 si el mes es inválido.</summary>
     private static async Task<IResult> ListarAsync(
-        [FromQuery] string? mes, [FromQuery] Guid? categoriaId,
+        [FromQuery] string? mes, [FromQuery] Guid? categoriaId, [FromQuery] Guid? miembroId, [FromQuery] string? buscar,
         [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
@@ -43,6 +43,14 @@ public static class GastosEndpoints
             q = q.Where(g => g.Fecha >= inicio && g.Fecha < fin);
         }
         if (categoriaId is { } c) q = q.Where(g => g.CategoriaId == c);
+        if (miembroId is { } m) q = q.Where(g => g.PagadoPor == m || g.Repartos.Any(r => r.MiembroId == m && r.ImporteAsumido > 0m));
+        var texto = buscar?.Trim();
+        if (!string.IsNullOrEmpty(texto))
+        {
+            if (texto.Length > 200) return ApiComun.Invalido("El texto de búsqueda no puede pasar de 200 caracteres.");
+            var patron = texto.ToLowerInvariant();
+            q = q.Where(g => g.Concepto != null && g.Concepto.ToLower().Contains(patron));
+        }
         var lista = await q.OrderByDescending(g => g.Fecha).ThenBy(g => g.Id).ToListAsync(ct);
         return Results.Ok(lista.Select(A));
     }

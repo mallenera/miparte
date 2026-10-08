@@ -163,6 +163,12 @@ public sealed class CoreApiClient
     public Task<CuentaComunResponse> ObtenerCuentaComunAsync(string mes, CancellationToken ct = default) =>
         ObtenerAsync<CuentaComunResponse>($"api/cuenta-comun?mes={Uri.EscapeDataString(mes)}", ct);
 
+    /// <summary>Activa o desactiva la cuenta común del hogar; solo un admin (<c>PUT /api/cuenta-comun/activacion</c>).</summary>
+    /// <param name="activa">true para usar la cuenta común.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task ActivarCuentaComunAsync(bool activa, CancellationToken ct = default) =>
+        EnviarAsync<System.Text.Json.JsonElement>(HttpMethod.Put, "api/cuenta-comun/activacion", new ActivarCuentaComunRequest(activa), ct);
+
     /// <summary>Fija lo que aporta un adulto a la cuenta común desde un mes (<c>PUT /api/cuenta-comun/aportaciones</c>).</summary>
     /// <param name="peticion">Adulto, mes de inicio (día 1) e importe.</param>
     /// <param name="ct">Token de cancelación.</param>

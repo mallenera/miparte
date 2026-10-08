@@ -98,6 +98,30 @@ else if (_resumen is not null && _liquidacion is not null)
         }
     </section>
 
+    @if (_resumen.CuentaComun is { } cuenta)
+    {
+        <section class="card" aria-labelledby="t-cuenta-resumen">
+            <div class="card-head"><h2 id="t-cuenta-resumen">Cuenta común</h2></div>
+            <p class="muted">Saldos al final de @NombreMes. Los gastos a su cargo no entran en la liquidación entre personas.</p>
+            <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px">
+                <span class="chip">Saldo&nbsp;<b id="cuenta-saldo">@Euros(cuenta.Saldo)</b></span>
+                <span class="chip">Efectivo&nbsp;<b>@Euros(cuenta.Efectivo)</b></span>
+                <span class="chip">Aportado este mes&nbsp;<b>@Euros(cuenta.AportadoMes)</b></span>
+                <span class="chip">Gastado este mes&nbsp;<b>@Euros(cuenta.GastadoMes)</b></span>
+                <span class="chip">Ahorro disponible&nbsp;<b>@Euros(cuenta.AhorroDisponible)</b></span>
+                @if (cuenta.Pendiente > 0)
+                {
+                    <span class="chip">Pendiente de reembolsar&nbsp;<b>@Euros(cuenta.Pendiente)</b></span>
+                }
+            </div>
+            @if (cuenta.Saldo < 0)
+            {
+                <div class="aviso warn" role="status" style="margin-top: 12px">La cuenta no cubre los gastos: faltan @Euros(-cuenta.Saldo).</div>
+            }
+            <a class="linkbtn" href="cuenta-comun" style="margin-top: 8px; display: inline-block">Ver la cuenta común</a>
+        </section>
+    }
+
     <section class="card" aria-labelledby="t-resumen">
         <div class="card-head"><h2 id="t-resumen">Resumen del mes</h2></div>
 

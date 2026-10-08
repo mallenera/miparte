@@ -1,4 +1,4 @@
-@* Pestaña Cuenta común: saldo y efectivo del mes, aportaciones fijas por adulto (con su parte de ahorro), reembolsos a quien adelantó gastos de la cuenta y retiradas del ahorro. *@
+@* Pestaña Cuenta común (hay que activarla por hogar): saldo y efectivo del mes, su parte por persona, aportaciones fijas por adulto (con su parte de ahorro), reembolsos a quien adelantó gastos de la cuenta y retiradas del ahorro. *@
 @using System.Globalization
 @inject CoreApiClient Api
 @inject EstadoHogar Hogar
@@ -16,6 +16,28 @@ else if (_errorCarga is not null)
         @_errorCarga
         <button class="linkbtn" type="button" @onclick="CargarAsync">Reintentar</button>
     </div>
+}
+else if (_estado is not null && !_estado.Activa)
+{
+    <section class="card" aria-labelledby="t-cuenta-inactiva">
+        <div class="card-head"><h2 id="t-cuenta-inactiva">Cuenta común</h2><span class="tag off">Sin activar</span></div>
+        <p class="muted">
+            La cuenta común es un fondo del hogar al que cada adulto aporta una cantidad fija al mes. Con ella puedes pagar gastos
+            sin repartirlos entre personas, reembolsar a quien adelanta dinero y apartar un ahorro. Este hogar todavía no la usa.
+        </p>
+        @if (_error is not null)
+        {
+            <div class="aviso err" role="alert" style="margin-top: 12px">@_error</div>
+        }
+        @if (SoyAdmin)
+        {
+            <button class="btn" type="button" style="margin-top: 12px" disabled="@_enviando" @onclick="() => CambiarActivacionAsync(true)">Activar la cuenta común</button>
+        }
+        else
+        {
+            <div class="aviso warn" role="status" style="margin-top: 12px">Solo un administrador del hogar puede activarla.</div>
+        }
+    </section>
 }
 else if (_estado is not null)
 {
@@ -49,6 +71,31 @@ else if (_estado is not null)
             <div class="aviso warn" role="status" style="margin-top: 12px">
                 La cuenta no cubre los gastos: faltan @Euros(-_estado.Saldo) para cubrirlos.
             </div>
+        }
+    </section>
+
+    <section class="card" aria-labelledby="t-partes">
+        <div class="card-head"><h2 id="t-partes">Su parte</h2></div>
+        <p class="muted">Lo que ha puesto cada persona y la porción que le corresponde del saldo (en proporción a lo aportado para gastos) y del ahorro (en proporción a lo ahorrado).</p>
+        @foreach (var p in _estado.Partes ?? [])
+        {
+            <div class="catrow parte">
+                <div class="c-name"><Avatar Nombre="@p.Nombre" Color="@ColorMiembro.De(p.MiembroId, _miembros)" Tamano="sm" /> @p.Nombre</div>
+                <div class="c-sel">
+                    <span class="chip">Ha puesto&nbsp;<b>@Euros(p.Aportado)</b>&nbsp;para gastos (@Porcentaje(p.PorcentajeGastos))</span>
+                    <span class="chip">Ahorro&nbsp;<b>@Euros(p.Ahorrado)</b>&nbsp;(@Porcentaje(p.PorcentajeAhorro))</span>
+                    <span class="chip">Su parte del saldo&nbsp;<b>@Euros(p.ParteSaldo)</b></span>
+                    <span class="chip">Su parte del ahorro&nbsp;<b>@Euros(p.ParteAhorro)</b></span>
+                    @if (p.Pendiente > 0)
+                    {
+                        <span class="chip">La cuenta le debe&nbsp;<b>@Euros(p.Pendiente)</b></span>
+                    }
+                </div>
+            </div>
+        }
+        @if ((_estado.Partes ?? []).Count == 0)
+        {
+            <div class="empty">Todavía nadie ha aportado a la cuenta.</div>
         }
     </section>
 
@@ -265,6 +312,24 @@ else if (_estado is not null)
             <div class="empty">No hay ahorro disponible para retirar.</div>
         }
     </section>
+
+    @if (SoyAdmin)
+    {
+        <section class="card" aria-labelledby="t-ajustes">
+            <div class="card-head"><h2 id="t-ajustes">Ajustes</h2></div>
+            <p class="muted">Desactivar la cuenta común la oculta y bloquea nuevos movimientos y gastos a su cargo; no borra nada y se puede volver a activar.</p>
+            @if (_confirmandoDesactivar)
+            {
+                <span class="muted">¿Desactivar la cuenta común?</span>
+                <button class="linkbtn danger" type="button" @onclick="() => CambiarActivacionAsync(false)">Sí, desactivar</button>
+                <button class="linkbtn" type="button" @onclick="() => _confirmandoDesactivar = false">No</button>
+            }
+            else
+            {
+                <button class="linkbtn danger" type="button" @onclick="() => _confirmandoDesactivar = true">Desactivar la cuenta común</button>
+            }
+        </section>
+    }
 }
 
 @code {
@@ -272,7 +337,7 @@ else if (_estado is not null)
 
     private CuentaComunResponse? _estado;
     private List<MiembroDto> _miembros = [], _adultos = [];
-    private bool _cargando = true, _enviando;
+    private bool _cargando = true, _enviando, _confirmandoDesactivar;
     private string? _errorCarga, _error;
     private DateOnly _mes = new(DateTime.Today.Year, DateTime.Today.Month, 1);
     private Guid? _confirmandoEliminar;
@@ -281,6 +346,11 @@ else if (_estado is not null)
     private Guid _retirante, _depositante;
     private string _importeAportacion = "", _ahorroAportacion = "", _importeReembolso = "", _conceptoReembolso = "";
     private string _importeRetirada = "", _conceptoRetirada = "", _importeDeposito = "", _conceptoDeposito = "";
+
+    /// <summary>Si el usuario es admin del hogar: solo él activa o desactiva la cuenta común.</summary>
+    private bool SoyAdmin => _miembros.Any(m => m.EsYo && m.Rol == "admin");
+
+    private static string Porcentaje(decimal p) => $"{p.ToString("0.##", Es)} %";
 
     private string NombreMes => _mes.ToString("MMMM yyyy", Es);
     private bool AportacionValida => TryImporte(_importeAportacion, permitirCero: true, out var importe)
@@ -356,6 +426,14 @@ else if (_estado is not null)
     private static bool TryImporte(string texto, bool permitirCero, out decimal valor) =>
         decimal.TryParse(texto.Trim().Replace(',', '.'), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out valor)
         && (valor > 0 || (permitirCero && valor == 0)) && decimal.Round(valor, 2) == valor;
+
+    private Task CambiarActivacionAsync(bool activa) =>
+        EjecutarAsync(async () =>
+        {
+            await Api.ActivarCuentaComunAsync(activa);
+            _confirmandoDesactivar = false;
+            return activa ? "Cuenta común activada" : "Cuenta común desactivada";
+        });
 
     private Task FijarAportacionAsync() =>
         EjecutarAsync(async () =>

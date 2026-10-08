@@ -95,7 +95,7 @@ Endpoints por carpeta en `src/Core/Core.Api`: `Hogares`, `Miembros`, `Reparto` (
 - Cada gasto guarda su reparto al crearse y no se recalcula salvo con `PUT` del gasto. Importes > 0 con máx. 2 decimales; meses con formato `YYYY-MM`.
 - Recurrentes: `diaMes` 1-28; `POST /api/gastos-recurrentes/generar?mes=` es idempotente. No hay proceso en segundo plano: lo dispara el cliente.
 - CORS: orígenes permitidos en `Cors__OrigenesPermitidos__N`.
-- **Ingresos no se guardan** (decisión de diseño): la migración `20261007000000_perfiles_cuenta_comun_sin_ingresos.sql` elimina la tabla `ingreso`; los perfiles son individual, porcentajes, partes y cuenta común (`cuenta_comun`: el gasto no se reparte ni genera deuda; `gasto.a_cargo_cuenta_comun`). **Cuenta común**: aportaciones, saldo, reembolsos y ahorro (parte de cada aportación que se aparta, ingresos aparte, retiradas y gastos pagados desde el ahorro) implementados (`/api/cuenta-comun`, `docs/api.md` §3.9); falta activarla por hogar.
+- **Ingresos no se guardan** (decisión de diseño): la migración `20261007000000_perfiles_cuenta_comun_sin_ingresos.sql` elimina la tabla `ingreso`; los perfiles son individual, porcentajes, partes y cuenta común (`cuenta_comun`: el gasto no se reparte ni genera deuda; `gasto.a_cargo_cuenta_comun`). **Cuenta común**: aportaciones, saldo, reembolsos y ahorro (parte de cada aportación que se aparta, ingresos aparte, retiradas y gastos pagados desde el ahorro) implementados (`/api/cuenta-comun`, `docs/api.md` §3.9); cada hogar la activa (un admin, `PUT /api/cuenta-comun/activacion`) y una categoría puede ir «a cargo de la cuenta común».
 
 ### Base de datos: el esquema es SQL, no EF
 

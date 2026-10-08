@@ -192,6 +192,7 @@ public class ComponentesTests : TestContext
             .Responde("GET /api/categorias", HttpStatusCode.OK, new[] { cat })
             .Responde("GET /api/perfiles", HttpStatusCode.OK, new[] { perfil })
             .Responde("GET /api/gastos", HttpStatusCode.OK, Array.Empty<GastoResponse>())
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, Cuenta(0m))
             .Responde("POST /api/gastos", HttpStatusCode.Created,
                 new GastoResponse(Guid.NewGuid(), DateOnly.FromDateTime(DateTime.Today), 12.5m, cat.Id, ana.Id, perfil.Id, null, null, []));
         Registrar(api);
@@ -704,11 +705,146 @@ public class ComponentesTests : TestContext
             .Responde("GET /api/perfiles", HttpStatusCode.OK, new[] { perfil })
             .Responde("GET /api/gastos", HttpStatusCode.OK, Array.Empty<GastoResponse>())
             .Responde("GET /api/cuenta-comun", HttpStatusCode.OK,
-                new CuentaComunResponse("2026-10", 0m, 0m, 0m, 0m, [], 0m, [], []));
+                new CuentaComunResponse("2026-10", 0m, 0m, 0m, 0m, [], 0m, [], []) with { Activa = false });
         Registrar(api);
 
         var c = RenderComponent<VistaGastos>();
 
         Assert.DoesNotContain("la paga directamente", c.Markup);
+        Assert.DoesNotContain("Cuenta común", c.Find("form.addcat").InnerHtml); // sin activar, tampoco se ofrece su perfil
+    }
+
+    [Fact]
+    public void Gasto_de_categoria_a_cargo_de_la_cuenta_propone_su_perfil_y_lo_avisa()
+    {
+        var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
+        var cuenta = new PerfilRepartoDto(Guid.NewGuid(), "Cuenta común", "cuenta_comun", []);
+        var partes = new PerfilRepartoDto(Guid.NewGuid(), "Por partes", "partes", [new(AnaId, 1m)]);
+        var comunidad = new CategoriaDto(Guid.NewGuid(), "Comunidad", null, cuenta.Id, true);
+        var comida = new CategoriaDto(Guid.NewGuid(), "Comida", null, partes.Id);
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
+            .Responde("GET /api/categorias", HttpStatusCode.OK, new[] { comida, comunidad })
+            .Responde("GET /api/perfiles", HttpStatusCode.OK, new[] { partes, cuenta })
+            .Responde("GET /api/gastos", HttpStatusCode.OK, Array.Empty<GastoResponse>())
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, Cuenta(0m))
+            .Responde("POST /api/gastos", HttpStatusCode.Created,
+                new GastoResponse(Guid.NewGuid(), DateOnly.FromDateTime(DateTime.Today), 40m, comunidad.Id, ana.Id, cuenta.Id, null, null, [], true));
+        Registrar(api);
+        var c = RenderComponent<VistaGastos>();
+        Assert.DoesNotContain("va por defecto a cargo de la cuenta común", c.Markup); // la primera categoría (Comida) no lo está
+
+        c.FindAll("form.addcat select")[0].Change(comunidad.Id.ToString());
+        Assert.Contains("va por defecto a cargo de la cuenta común", c.Markup);
+        c.Find("form.addcat input[inputmode=decimal]").Input("40");
+        c.Find("form.addcat").Submit();
+
+        Assert.Contains(cuenta.Id.ToString(), api.Cuerpos["POST /api/gastos"]);
+    }
+
+    [Fact]
+    public void Categoria_marcada_a_cargo_de_la_cuenta_muestra_la_etiqueta_y_envia_el_indicador()
+    {
+        var cuenta = new PerfilRepartoDto(Guid.NewGuid(), "Cuenta común", "cuenta_comun", []);
+        var luz = new CategoriaDto(Guid.NewGuid(), "Luz", null, cuenta.Id, true);
+        var api = new ApiFalsa()
+            .Responde("GET /api/categorias", HttpStatusCode.OK, new[] { luz })
+            .Responde("GET /api/perfiles", HttpStatusCode.OK, new[] { cuenta })
+            .Responde("POST /api/categorias", HttpStatusCode.Created, new CategoriaDto(Guid.NewGuid(), "Agua", null, cuenta.Id, true));
+        Registrar(api);
+        var c = RenderComponent<VistaCategorias>();
+
+        Assert.Contains("A cargo de la cuenta común", c.Find(".catrow .c-sel").TextContent);
+
+        c.Find("form.addcat input").Input("Agua");
+        c.Find("form.addcat input[type=checkbox]").Change(true);
+        c.Find("form.addcat").Submit();
+
+        Assert.Contains("\"aCargoCuentaComun\":true", api.Cuerpos["POST /api/categorias"]);
+    }
+
+    [Fact]
+    public void Cuenta_comun_sin_activar_deja_activarla_solo_a_un_admin()
+    {
+        var inactiva = Cuenta(0m) with { Activa = false };
+        var admin = ApiFalsa.Miembro("Ana", rol: "admin", esYo: true, id: AnaId);
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { admin })
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, inactiva)
+            .Responde("PUT /api/cuenta-comun/activacion", HttpStatusCode.OK, new { activa = true });
+        Registrar(api);
+        var c = RenderComponent<VistaCuentaComun>();
+
+        Assert.Contains("Sin activar", c.Markup);
+        Assert.Empty(c.FindAll("#form-aportacion"));
+        c.FindAll("button").First(b => b.TextContent == "Activar la cuenta común").Click();
+
+        Assert.Contains("\"activa\":true", api.Cuerpos["PUT /api/cuenta-comun/activacion"]);
+    }
+
+    [Fact]
+    public void Cuenta_comun_sin_activar_no_ofrece_activarla_a_quien_no_es_admin()
+    {
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ApiFalsa.Miembro("Ana", esYo: true, id: AnaId) })
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, Cuenta(0m) with { Activa = false });
+        Registrar(api);
+
+        var c = RenderComponent<VistaCuentaComun>();
+
+        Assert.DoesNotContain(c.FindAll("button"), b => b.TextContent == "Activar la cuenta común");
+        Assert.Contains("Solo un administrador", c.Markup);
+    }
+
+    [Fact]
+    public void Cuenta_comun_muestra_su_parte_de_cada_persona()
+    {
+        var luis = ApiFalsa.Miembro("Luis", id: LuisId);
+        var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
+        var estado = Cuenta(699m) with
+        {
+            Partes =
+            [
+                new PartePersonaDto(AnaId, "Ana", 400m, 200m, 50m, 66.67m, 349.5m, 200m, 101m),
+                new PartePersonaDto(LuisId, "Luis", 400m, 100m, 50m, 33.33m, 349.5m, 100m, 0m),
+            ],
+        };
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana, luis })
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, estado);
+        Registrar(api);
+
+        var c = RenderComponent<VistaCuentaComun>();
+
+        var filas = c.FindAll(".catrow.parte");
+        Assert.Equal(2, filas.Count);
+        Assert.Contains("349,50", filas[0].TextContent);
+        Assert.Contains("50 %", filas[0].TextContent);
+        Assert.Contains("La cuenta le debe", filas[0].TextContent);
+        Assert.DoesNotContain("La cuenta le debe", filas[1].TextContent);
+    }
+
+    [Fact]
+    public void Resumen_muestra_los_saldos_de_la_cuenta_comun_si_vienen_en_la_respuesta()
+    {
+        var con = new ResumenMensualResponse("2026-10", 0m, [], [],
+            new ResumenCuentaComunDto(500m, 120m, 280m, 400m, 120m, 100m, 100m));
+        Registrar(ApiResumen(con, Liquidacion(0m)));
+
+        var c = RenderComponent<VistaResumen>();
+
+        Assert.Contains("280,00", c.Find("#cuenta-saldo").TextContent);
+        Assert.Contains("Pendiente de reembolsar", c.Markup);
+    }
+
+    [Fact]
+    public void Resumen_no_muestra_la_cuenta_comun_si_el_hogar_no_la_tiene_activada()
+    {
+        Registrar(ApiResumen(new ResumenMensualResponse("2026-10", 0m, [], []), Liquidacion(0m)));
+
+        var c = RenderComponent<VistaResumen>();
+
+        Assert.Empty(c.FindAll("#cuenta-saldo"));
     }
 }
+

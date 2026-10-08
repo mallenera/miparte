@@ -164,6 +164,88 @@ public class ComponentesTests : TestContext
     }
 
     [Fact]
+    public void Subcategoria_del_boton_envia_el_padre_y_hereda_su_perfil()
+    {
+        var perfil = new PerfilRepartoDto(Guid.NewGuid(), "50/50", "porcentaje", []);
+        var comida = new CategoriaDto(Guid.NewGuid(), "Comida", null, perfil.Id);
+        var api = new ApiFalsa()
+            .Responde("GET /api/categorias", HttpStatusCode.OK, new[] { comida })
+            .Responde("GET /api/perfiles", HttpStatusCode.OK, new[] { perfil })
+            .Responde("POST /api/categorias", HttpStatusCode.Created, new CategoriaDto(Guid.NewGuid(), "Bares", comida.Id, perfil.Id));
+        Registrar(api);
+        var c = RenderComponent<VistaCategorias>();
+
+        c.FindAll("button").First(b => b.GetAttribute("aria-label") == "Añadir subcategoría a Comida").Click();
+        Assert.Contains("Nueva subcategoría", c.Find("form.addcat label").TextContent);
+        c.Find("form.addcat input").Input("Bares");
+        c.Find("form.addcat").Submit();
+
+        var cuerpo = api.Cuerpos["POST /api/categorias"];
+        Assert.Contains("\"nombre\":\"Bares\"", cuerpo);
+        Assert.Contains(comida.Id.ToString(), cuerpo);
+        Assert.Contains(perfil.Id.ToString(), cuerpo);
+    }
+
+    [Fact]
+    public void Resumen_cuelga_la_subcategoria_de_su_madre_sin_gasto_propio()
+    {
+        var comida = new CategoriaDto(Guid.NewGuid(), "Comida", null, null);
+        var super_ = new CategoriaDto(Guid.NewGuid(), "Supermercado", comida.Id, null);
+        var resumen = new ResumenMensualResponse("2026-10", 80m,
+            [new ResumenMiembroDto(AnaId, "Ana", 80m, 40m), new ResumenMiembroDto(LuisId, "Luis", 0m, 40m)],
+            [new ResumenCategoriaDto(super_.Id, "Supermercado", 80m, [])]);
+        Registrar(ApiResumen(resumen, Liquidacion(40m)).Responde("GET /api/categorias", HttpStatusCode.OK, new[] { comida, super_ }));
+
+        var c = RenderComponent<VistaResumen>();
+
+        // La hija solo con gasto propio cuelga de su madre, que sale sin gasto directo y desplegable.
+        var madre = Assert.Single(c.FindAll(".resrow"));
+        Assert.Contains("Comida", madre.TextContent);
+        c.Find("button[aria-label='Desplegar Comida']").Click();
+        Assert.Equal(2, c.FindAll(".resrow").Count);
+        Assert.Contains("Supermercado", c.FindAll(".resrow")[1].TextContent);
+    }
+
+    [Fact]
+    public void Resumen_acumula_las_hijas_en_la_madre_sin_duplicar_y_se_despliega()
+    {
+        var comida = new CategoriaDto(Guid.NewGuid(), "Comida", null, null);
+        var super_ = new CategoriaDto(Guid.NewGuid(), "Supermercado", comida.Id, null);
+        var bares = new CategoriaDto(Guid.NewGuid(), "Bares", comida.Id, null);
+        var resumen = new ResumenMensualResponse("2026-10", 200m,
+            [new ResumenMiembroDto(AnaId, "Ana", 200m, 100m), new ResumenMiembroDto(LuisId, "Luis", 0m, 100m)],
+            [
+                new ResumenCategoriaDto(comida.Id, "Comida", 20m, [new ImporteMiembroDto(AnaId, 20m)]),
+                new ResumenCategoriaDto(super_.Id, "Supermercado", 100m, [new ImporteMiembroDto(AnaId, 100m)]),
+                new ResumenCategoriaDto(bares.Id, "Bares", 80m, [new ImporteMiembroDto(LuisId, 80m)]),
+            ]);
+        Registrar(ApiResumen(resumen, Liquidacion(0m)).Responde("GET /api/categorias", HttpStatusCode.OK, new[] { comida, super_, bares }));
+
+        var c = RenderComponent<VistaResumen>();
+
+        // Contraída: solo la madre, con el acumulado (20 + 100 + 80) y el 100 % del mes.
+        var filas = c.FindAll(".resrow");
+        Assert.Single(filas);
+        Assert.Contains("Comida", filas[0].TextContent);
+        Assert.Contains("200", filas[0].TextContent);
+        Assert.Contains("100 %", filas[0].TextContent);
+
+        c.Find("button[aria-label='Desplegar Comida']").Click();
+
+        filas = c.FindAll(".resrow");
+        Assert.Equal(4, filas.Count);
+        Assert.Contains("Sin subcategoría", filas[1].TextContent);
+        Assert.Contains("20", filas[1].TextContent);
+        Assert.Contains("Supermercado", filas[2].TextContent);
+        Assert.Contains("50 %", filas[2].TextContent);
+        Assert.Contains("Bares", filas[3].TextContent);
+        Assert.Contains("40 %", filas[3].TextContent);
+
+        c.Find("button[aria-label='Contraer Comida']").Click();
+        Assert.Single(c.FindAll(".resrow"));
+    }
+
+    [Fact]
     public void Anadir_categoria_envia_nombre_padre_y_perfil()
     {
         var perfil = new PerfilRepartoDto(Guid.NewGuid(), "Cuenta común", "cuenta_comun", []);

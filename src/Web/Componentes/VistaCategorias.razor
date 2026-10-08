@@ -46,6 +46,7 @@ else
                         }
                         else
                         {
+                            <button class="linkbtn" type="button" aria-label="Añadir subcategoría a @c.Nombre" @onclick="() => NuevaSubcategoria(c)">Subcategoría</button>
                             <button class="linkbtn" type="button" aria-label="Editar @c.Nombre" @onclick="() => EmpezarEdicion(c)">Editar</button>
                             <button class="linkbtn danger" type="button" aria-label="Eliminar @c.Nombre" @onclick="() => _confirmandoEliminar = c.Id">Eliminar</button>
                         }
@@ -87,8 +88,8 @@ else
             }
         </div>
 
-        <form class="addcat" @onsubmit="AnadirAsync">
-            <label>Nueva categoría
+        <form class="addcat" id="nueva-categoria" @onsubmit="AnadirAsync">
+            <label>@(string.IsNullOrEmpty(_nuevoPadre) ? "Nueva categoría" : "Nueva subcategoría")
                 <input maxlength="100" placeholder="Nombre" @bind="_nuevoNombre" @bind:event="oninput" />
             </label>
             <label>Cuelga de
@@ -155,6 +156,15 @@ else
     private string NombrePerfil(Guid? id) =>
         id is { } g ? _perfiles.FirstOrDefault(p => p.Id == g)?.Nombre ?? "—" : "Sin perfil";
 
+    /// <summary>Prepara el formulario de alta con la categoría elegida como padre.</summary>
+    private void NuevaSubcategoria(CategoriaDto padre)
+    {
+        _nuevoPadre = padre.Id.ToString();
+        _nuevoPerfil = padre.PerfilRepartoId?.ToString() ?? "";
+        _editando = null;
+        _error = null;
+    }
+
     private static Guid? ComoGuid(string texto) => Guid.TryParse(texto, out var g) ? g : null;
 
     private void EmpezarEdicion(CategoriaDto c)
@@ -187,7 +197,7 @@ else
         {
             await Api.CrearCategoriaAsync(new GuardarCategoriaRequest(_nuevoNombre.Trim(), ComoGuid(_nuevoPadre), ComoGuid(_nuevoPerfil)));
             _nuevoNombre = "";
-            return "Categoría añadida";
+            return string.IsNullOrEmpty(_nuevoPadre) ? "Categoría añadida" : "Subcategoría añadida";
         });
 
     /// <summary>Ejecuta una operación, recarga la lista y muestra el aviso; los errores de la API (409 en uso, duplicada…) salen en pantalla.</summary>

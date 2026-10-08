@@ -685,6 +685,10 @@ section.card + section.card { margin-top: 24px; }
 .pagoimp { align-items: center; }
 .pagoimp input { width: 7rem; text-align: right; }
 
+/* Resumen: barra del peso de la categoría sobre el total del mes (el texto con el porcentaje va al lado). */
+.barra { height: 6px; margin-top: 4px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.barra > span { display: block; height: 100%; background: var(--wine); }
+
 /* Historial de cambios */
 .hist { list-style: none; margin: 10px 0 0; padding: 0; display: grid; }
 .hist-item { padding: 10px 0; border-top: 1px solid var(--line); }

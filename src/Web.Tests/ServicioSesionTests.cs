@@ -201,6 +201,7 @@ public class ServicioSesionTests
         await servicio.IniciarDemoAsync();
 
         Assert.True(servicio.EsDemoLocal);
+        Assert.True(servicio.EsDemo);
         reloj.Advance(TimeSpan.FromDays(3650));
         Assert.Equal("demo", await servicio.ObtenerTokenAsync());
 

@@ -108,4 +108,11 @@ public class ServidorDemoTests
         var yo = (await api.ListarMiembrosAsync()).Single(m => m.EsYo);
         await Assert.ThrowsAsync<ApiException>(() => api.ActualizarMiembroAsync(yo.Id, new ActualizarMiembroRequest(Rol: "miembro")));
     }
+
+    [Theory]
+    [InlineData("demo", "demo@miparte.example")]
+    [InlineData(" DEMO ", "demo@miparte.example")]
+    [InlineData(" ana@correo.es ", "ana@correo.es")]
+    public void El_usuario_demo_se_traduce_al_correo_de_la_cuenta_real(string escrito, string esperado) =>
+        Assert.Equal(esperado, CuentaDemo.ACorreo(escrito));
 }

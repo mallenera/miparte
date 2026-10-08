@@ -22,7 +22,14 @@
         @if (_pendienteConfirmar)
         {
             <div class="aviso ok" role="status">
-                Te hemos enviado un código de 6 dígitos a <strong>@_modelo.Email.Trim()</strong>. Escríbelo para confirmar tu cuenta.
+                @if (_desdeUrl)
+                {
+                    <text>Escribe el código de 6 dígitos que te enviamos a <strong>@_modelo.Email.Trim()</strong>. Si no lo tienes, pide uno nuevo.</text>
+                }
+                else
+                {
+                    <text>Te hemos enviado un código de 6 dígitos a <strong>@_modelo.Email.Trim()</strong>. Escríbelo para confirmar tu cuenta.</text>
+                }
             </div>
             <EditForm Model="_verificacion" OnValidSubmit="VerificarAsync">
                 <DataAnnotationsValidator />
@@ -42,6 +49,7 @@
                 <button class="btn btn-block" type="submit" disabled="@_enviando">@(_enviando ? "Comprobando…" : "Confirmar cuenta")</button>
             </EditForm>
             <p class="muted">¿No te ha llegado? <button type="button" class="linkbtn" disabled="@_enviando" @onclick="ReenviarAsync">Reenviar código</button></p>
+            <p class="muted"><button type="button" class="linkbtn" disabled="@_enviando" @onclick="VolverAlAlta">Usar otro correo o crear la cuenta</button></p>
         }
         else
         {
@@ -91,12 +99,22 @@
         if (!string.IsNullOrWhiteSpace(EmailPendiente))
         {
             _modelo.Email = EmailPendiente.Trim();
-            _pendienteConfirmar = true;
+            _pendienteConfirmar = _desdeUrl = true;
         }
     }
+
+    private void VolverAlAlta()
+    {
+        _pendienteConfirmar = _desdeUrl = false;
+        _error = _info = null;
+        _modelo.Email = "";
+        _verificacion.Codigo = "";
+    }
+
     private string? _error;
     private bool _enviando;
     private bool _pendienteConfirmar;
+    private bool _desdeUrl;
 
     private async Task EnviarAsync()
     {

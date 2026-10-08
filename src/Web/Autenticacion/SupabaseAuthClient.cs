@@ -164,7 +164,7 @@ public sealed class SupabaseAuthClient
             "email_not_confirmed" => "Confirma tu correo antes de iniciar sesión.",
             "user_already_exists" or "email_exists" => "Ya existe una cuenta con ese correo.",
             "otp_expired" => "El código es incorrecto o ha caducado. Pide uno nuevo.",
-            "weak_password" => "La contraseña es demasiado débil (mínimo 6 caracteres).",
+            "weak_password" => "La contraseña es demasiado débil: mínimo 8 caracteres, con al menos una letra y un número.",
             "over_request_rate_limit" or "over_email_send_rate_limit" => "Demasiados intentos. Espera un momento.",
             "signup_disabled" => "El registro está desactivado.",
             _ => mensaje ?? "No se pudo completar la operación de autenticación.",

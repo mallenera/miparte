@@ -678,6 +678,13 @@ section.card + section.card { margin-top: 24px; }
 .mitem .muestra i + i + i { background: var(--cta); }
 .mhead-ico { display: flex; align-items: center; gap: 6px; }
 
+/* Filtros de gastos y de la liquidación; importe editable de cada transferencia sugerida. */
+.filtros { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-top: 10px; }
+.filtros label, .filtro { flex: 1 1 10rem; }
+.filtro { display: block; max-width: 16rem; margin-bottom: 8px; }
+.pagoimp { align-items: center; }
+.pagoimp input { width: 7rem; text-align: right; }
+
 /* Resumen: barra del peso de la categoría sobre el total del mes (el texto con el porcentaje va al lado). */
 .barra { height: 6px; margin-top: 4px; border-radius: 999px; background: var(--line); overflow: hidden; }
 .barra > span { display: block; height: 100%; background: var(--wine); }

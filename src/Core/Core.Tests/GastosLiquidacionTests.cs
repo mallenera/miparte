@@ -207,6 +207,63 @@ public class GastosLiquidacionTests
     }
 
     [Fact]
+    public async Task Gastos_FiltroPorMiembro_ConsideraPagadorYReparto()
+    {
+        var e = await Montar();
+        var beto = e.Beto!.Value;
+        var compartido = await CrearGasto(e, Gasto(e, 10m, e.Perfil5050)); // Ana paga, ambos asumen
+        var soloAna = await CrearGasto(e, Gasto(e, 20m, e.PerfilIndividual)); // Ana paga y asume todo
+        var pagaBeto = await CrearGasto(e, Gasto(e, 30m, e.Perfil5050, pagador: beto));
+
+        var deBeto = await Leer<List<GastoResponse>>(await e.Cliente.GetAsync($"/api/gastos?miembroId={beto}"));
+        Assert.Equal(new[] { compartido.Id, pagaBeto.Id }.Order(), deBeto.Select(g => g.Id).Order());
+        var deAna = await Leer<List<GastoResponse>>(await e.Cliente.GetAsync($"/api/gastos?miembroId={e.Ana}"));
+        Assert.Equal(3, deAna.Count);
+        Assert.Contains(deAna, g => g.Id == soloAna.Id);
+        Assert.Empty(await Leer<List<GastoResponse>>(await e.Cliente.GetAsync($"/api/gastos?miembroId={Guid.NewGuid()}")));
+    }
+
+    [Fact]
+    public async Task Gastos_FiltroPorTextoDelConcepto_IgnoraMayusculas_Y_SeCombinaConOtrosFiltros()
+    {
+        var e = await Montar();
+        await CrearGasto(e, Gasto(e, 10m, e.Perfil5050) with { Concepto = "Factura de la LUZ" });
+        await CrearGasto(e, Gasto(e, 20m, e.Perfil5050, "2026-10-02") with { Concepto = "Luz octubre" });
+        await CrearGasto(e, Gasto(e, 30m, e.Perfil5050) with { Concepto = "Supermercado" });
+
+        Assert.Equal(2, (await Leer<List<GastoResponse>>(await e.Cliente.GetAsync("/api/gastos?buscar=luz"))).Count);
+        var soloSep = await Leer<List<GastoResponse>>(await e.Cliente.GetAsync("/api/gastos?buscar=luz&mes=2026-09"));
+        Assert.Equal(10m, Assert.Single(soloSep).Importe);
+        Assert.Equal(3, (await Leer<List<GastoResponse>>(await e.Cliente.GetAsync("/api/gastos?buscar=%20"))).Count);
+        Assert.Equal(HttpStatusCode.BadRequest, (await e.Cliente.GetAsync("/api/gastos?buscar=" + new string('a', 201))).StatusCode);
+    }
+
+    [Fact]
+    public async Task Liquidacion_PagosParciales_RecalculanLoPendienteHastaSaldar()
+    {
+        var e = await Montar();
+        var c = e.Cliente;
+        var beto = e.Beto!.Value;
+        var mes = new DateOnly(2026, 9, 1);
+        await CrearGasto(e, Gasto(e, 100m, e.Perfil5050)); // Beto debe 50 a Ana
+
+        async Task<decimal> Pendiente() =>
+            (await Leer<LiquidacionResponse>(await c.GetAsync("/api/liquidacion?mes=2026-09"))).Transferencias.SingleOrDefault()?.Importe ?? 0m;
+
+        // Importes distintos del sugerido (50): 12,34 y luego 20,01; cada uno recalcula lo pendiente.
+        Assert.Equal(HttpStatusCode.Created, (await c.PostAsJsonAsync("/api/pagos-liquidacion", new CrearPagoLiquidacionRequest(mes, beto, e.Ana, 12.34m, null, null))).StatusCode);
+        Assert.Equal(37.66m, await Pendiente());
+        Assert.Equal(HttpStatusCode.Created, (await c.PostAsJsonAsync("/api/pagos-liquidacion", new CrearPagoLiquidacionRequest(mes, beto, e.Ana, 20.01m, null, null))).StatusCode);
+        Assert.Equal(17.65m, await Pendiente());
+
+        // Más de 2 decimales se rechaza; el resto exacto salda el mes.
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync("/api/pagos-liquidacion", new CrearPagoLiquidacionRequest(mes, beto, e.Ana, 1.005m, null, null))).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await c.PostAsJsonAsync("/api/pagos-liquidacion", new CrearPagoLiquidacionRequest(mes, beto, e.Ana, 17.65m, null, null))).StatusCode);
+        Assert.Equal(0m, await Pendiente());
+        Assert.Equal(3, (await Leer<LiquidacionResponse>(await c.GetAsync("/api/liquidacion?mes=2026-09"))).Pagos.Count);
+    }
+
+    [Fact]
     public async Task Recurrentes_Generar_EsIdempotente_YNoDuplica()
     {
         var e = await Montar();

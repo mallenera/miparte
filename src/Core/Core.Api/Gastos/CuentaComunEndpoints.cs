@@ -7,7 +7,7 @@ using MiParte.Core.Domain.Entidades;
 
 namespace MiParte.Core.Api.Gastos;
 
-/// <summary>Cuenta común: aportaciones mensuales, saldo y reembolsos a quien adelantó gastos de la cuenta.</summary>
+/// <summary>Cuenta común: aportaciones mensuales (con su parte de ahorro), saldo, reembolsos a quien adelantó gastos de la cuenta y retiradas de ahorro.</summary>
 public static class CuentaComunEndpoints
 {
     /// <summary>Registra los endpoints de la cuenta común; todos requieren autorización.</summary>
@@ -17,21 +17,30 @@ public static class CuentaComunEndpoints
         app.MapPut("/api/cuenta-comun/aportaciones", FijarAportacionAsync).RequireAuthorization();
         app.MapPost("/api/cuenta-comun/reembolsos", CrearReembolsoAsync).RequireAuthorization();
         app.MapDelete("/api/cuenta-comun/reembolsos/{id:guid}", BorrarReembolsoAsync).RequireAuthorization();
+        app.MapPost("/api/cuenta-comun/retiradas-ahorro", CrearRetiradaAsync).RequireAuthorization();
+        app.MapDelete("/api/cuenta-comun/retiradas-ahorro/{id:guid}", BorrarRetiradaAsync).RequireAuthorization();
         return app;
     }
 
     /// <summary>Convierte una aportación en su DTO de respuesta.</summary>
-    private static AportacionCuentaDto A(AportacionCuenta a) => new(a.Id, a.MiembroId, a.Desde, a.Importe);
+    private static AportacionCuentaDto A(AportacionCuenta a) => new(a.Id, a.MiembroId, a.Desde, a.Importe, a.Ahorro);
 
     /// <summary>Convierte un reembolso en su DTO de respuesta.</summary>
     private static ReembolsoCuentaDto A(ReembolsoCuenta r) => new(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto);
+
+    /// <summary>Convierte una retirada de ahorro en su DTO de respuesta.</summary>
+    private static RetiradaAhorroDto A(RetiradaAhorro r) => new(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto);
+
+    /// <summary>Aportaciones en la forma que usa el cálculo del dominio.</summary>
+    private static List<AportacionVigente> Vigentes(IEnumerable<AportacionCuenta> aportaciones)
+        => aportaciones.Select(a => new AportacionVigente(a.MiembroId, a.Desde, a.Importe, a.Ahorro)).ToList();
 
     /// <summary>Gastos cargados a la cuenta común, para el cálculo de saldo.</summary>
     private static async Task<List<GastoDeCuenta>> GastosDeCuenta(MiParteDbContext db, CancellationToken ct)
         => await db.Gastos.Where(g => g.ACargoCuentaComun)
             .Select(g => new GastoDeCuenta(g.PagadoPor, g.Fecha, g.Importe)).ToListAsync(ct);
 
-    /// <summary>GET /api/cuenta-comun?mes=YYYY-MM: saldo acumulado, reembolsos pendientes, aportaciones y reembolsos del mes. 409 sin hogar; 400 si el mes es inválido.</summary>
+    /// <summary>GET /api/cuenta-comun?mes=YYYY-MM: saldo acumulado, ahorro, reembolsos pendientes, aportaciones, y reembolsos y retiradas de ahorro del mes. 409 sin hogar; 400 si el mes es inválido.</summary>
     private static async Task<IResult> EstadoAsync(
         [FromQuery] string? mes, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
@@ -41,20 +50,24 @@ public static class CuentaComunEndpoints
 
         var aportaciones = await db.AportacionesCuenta.OrderBy(a => a.MiembroId).ThenBy(a => a.Desde).ToListAsync(ct);
         var reembolsos = await db.ReembolsosCuenta.OrderBy(r => r.Fecha).ThenBy(r => r.Id).ToListAsync(ct);
+        var retiradas = await db.RetiradasAhorro.OrderBy(r => r.Fecha).ThenBy(r => r.Id).ToListAsync(ct);
         var nombres = await db.Miembros.ToDictionaryAsync(m => m.Id, m => m.Nombre, ct);
 
         var e = CuentaComun.Calcular(
-            inicio, aportaciones.Select(a => new AportacionVigente(a.MiembroId, a.Desde, a.Importe)).ToList(),
-            await GastosDeCuenta(db, ct), reembolsos.Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe)));
+            inicio, Vigentes(aportaciones),
+            await GastosDeCuenta(db, ct), reembolsos.Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe)),
+            retiradas.Select(r => new RetiradaDeAhorro(r.Fecha, r.Importe)));
 
         return Results.Ok(new CuentaComunResponse(
             ApiComun.FormatoMes(inicio), e.AportadoMes, e.Aportado, e.Gastado, e.Saldo,
             e.Pendientes.Select(p => new PendienteCuentaDto(p.MiembroId, nombres.GetValueOrDefault(p.MiembroId, ""), p.Importe)).ToList(),
             e.Efectivo, aportaciones.Select(A).ToList(),
-            reembolsos.Where(r => r.Fecha >= inicio && r.Fecha < fin).Select(A).ToList()));
+            reembolsos.Where(r => r.Fecha >= inicio && r.Fecha < fin).Select(A).ToList(),
+            e.AhorroMes, e.AhorroAcumulado, e.AhorroRetirado, e.AhorroDisponible,
+            retiradas.Where(r => r.Fecha >= inicio && r.Fecha < fin).Select(A).ToList()));
     }
 
-    /// <summary>PUT /api/cuenta-comun/aportaciones: fija la aportación de un adulto desde un mes (si ya había una de ese mes, la sustituye). 400 si el mes no es día 1, el importe es inválido o el miembro no es adulto activo; 409 sin hogar.</summary>
+    /// <summary>PUT /api/cuenta-comun/aportaciones: fija la aportación de un adulto desde un mes, con la parte que va a ahorro (si ya había una de ese mes, la sustituye). 400 si el mes no es día 1, el importe o el ahorro son inválidos (el ahorro no puede superar el importe) o el miembro no es adulto activo; 409 sin hogar.</summary>
     private static async Task<IResult> FijarAportacionAsync(
         FijarAportacionRequest req, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
@@ -64,6 +77,10 @@ public static class CuentaComunEndpoints
         var errorImporte = req.Importe < 0 ? "El importe no puede ser negativo."
             : req.Importe == 0 ? null : ApiComun.ValidarImporte(req.Importe);
         if (errorImporte is not null) return ApiComun.Invalido(errorImporte);
+        var errorAhorro = req.Ahorro < 0 ? "El ahorro no puede ser negativo."
+            : req.Ahorro > req.Importe ? "El ahorro no puede superar la aportación."
+            : decimal.Round(req.Ahorro, 2) != req.Ahorro ? "El ahorro admite como máximo 2 decimales." : null;
+        if (errorAhorro is not null) return ApiComun.Invalido(errorAhorro);
         if (!await ApiComun.EsAdultoActivo(db, req.MiembroId, ct))
             return ApiComun.Invalido("Solo los adultos activos del hogar aportan a la cuenta común.");
 
@@ -74,6 +91,7 @@ public static class CuentaComunEndpoints
             db.AportacionesCuenta.Add(a);
         }
         a.Importe = req.Importe;
+        a.Ahorro = req.Ahorro;
         await db.SaveChangesAsync(ct);
         return Results.Ok(A(a));
     }
@@ -111,6 +129,46 @@ public static class CuentaComunEndpoints
         var r = await db.ReembolsosCuenta.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (r is null) return Results.NotFound();
         db.ReembolsosCuenta.Remove(r);
+        await db.SaveChangesAsync(ct);
+        return Results.NoContent();
+    }
+
+    /// <summary>POST /api/cuenta-comun/retiradas-ahorro: registra dinero que sale del ahorro. 400 si el importe es inválido o el miembro no es del hogar; 409 sin hogar o si supera el ahorro disponible (<c>{ error, disponible }</c>). 201 si se crea.</summary>
+    private static async Task<IResult> CrearRetiradaAsync(
+        CrearRetiradaAhorroRequest req, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
+    {
+        if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
+        var error = ApiComun.ValidarImporte(req.Importe) ?? ApiComun.ValidarConcepto(req.Concepto);
+        if (error is not null) return ApiComun.Invalido(error);
+        if (!await db.Miembros.AnyAsync(m => m.Id == req.MiembroId, ct))
+            return ApiComun.Invalido("El miembro de la retirada debe pertenecer al hogar.");
+
+        var fecha = req.Fecha ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        // Lo ahorrado hasta el mes de la retirada, menos todo lo ya retirado: nunca se saca más de lo que hay.
+        var aportaciones = await db.AportacionesCuenta.ToListAsync(ct);
+        var ahorrado = CuentaComun.Calcular(CuentaComun.InicioMes(fecha), Vigentes(aportaciones), [], []).AhorroAcumulado;
+        var disponible = ahorrado - await db.RetiradasAhorro.SumAsync(r => r.Importe, ct);
+        if (req.Importe > disponible)
+            return Results.Conflict(new { error = $"El importe supera el ahorro disponible ({Math.Max(0m, disponible):0.00}).", disponible = Math.Max(0m, disponible) });
+
+        var r = new RetiradaAhorro
+        {
+            Id = Guid.NewGuid(), HogarId = hogarId, MiembroId = req.MiembroId, Importe = req.Importe,
+            Fecha = fecha, Concepto = ApiComun.NormalizarConcepto(req.Concepto),
+        };
+        db.RetiradasAhorro.Add(r);
+        await db.SaveChangesAsync(ct);
+        return Results.Created($"/api/cuenta-comun/retiradas-ahorro/{r.Id}", A(r));
+    }
+
+    /// <summary>DELETE /api/cuenta-comun/retiradas-ahorro/{id}: borra una retirada de ahorro. 409 sin hogar; 404 si no existe; 204 si se borra.</summary>
+    private static async Task<IResult> BorrarRetiradaAsync(
+        Guid id, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
+    {
+        if (hogar.HogarId is null) return ApiComun.SinHogar();
+        var r = await db.RetiradasAhorro.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (r is null) return Results.NotFound();
+        db.RetiradasAhorro.Remove(r);
         await db.SaveChangesAsync(ct);
         return Results.NoContent();
     }

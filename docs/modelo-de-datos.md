@@ -15,6 +15,7 @@ erDiagram
     hogar ||--o{ pago_liquidacion : anota
     hogar ||--o{ aportacion_cuenta : "aporta a la cuenta común"
     hogar ||--o{ reembolso_cuenta : "reembolsa de la cuenta común"
+    hogar ||--o{ retirada_ahorro : "retira del ahorro"
     miembro |o--o| miembro : "responsable_id (a_cargo)"
     perfil_reparto ||--o{ perfil_reparto_detalle : "valor por miembro"
     miembro ||--o{ perfil_reparto_detalle : ""
@@ -28,6 +29,7 @@ erDiagram
     pago_liquidacion }o--|| miembro : "de / a"
     aportacion_cuenta }o--|| miembro : ""
     reembolso_cuenta }o--|| miembro : ""
+    retirada_ahorro }o--|| miembro : ""
 ```
 
 ## Tablas
@@ -45,8 +47,9 @@ erDiagram
 | `invitacion_hogar` | Solo se guarda el **hash SHA-256** del token; caduca a 7 días; un solo uso (`usada_en`/`usada_por`). |
 | `pago_liquidacion` | Transferencia real `de_miembro_id` → `a_miembro_id` en un `mes` (primer día del mes) para saldar la liquidación. |
 | `auditoria` | Historial **de solo añadir** (un trigger rechaza `UPDATE`, `DELETE` y `TRUNCATE`, también al propietario; solo se permite el borrado en cascada al eliminar el hogar). `usuario_id` sin FK (el rastro sobrevive a la cuenta), `accion`, `entidad`, `entidad_id`, `antes`/`despues` en `jsonb`. La escribe solo Core.Api, dentro de la transacción del cambio; la lee un admin vía RLS (`es_admin_hogar`). |
-| `aportacion_cuenta` | Importe fijo mensual de un adulto a la cuenta común, vigente `desde` un mes (día 1); único por miembro y mes. El importe de un mes es el de la fila más reciente que no lo supere; 0 = deja de aportar. |
+| `aportacion_cuenta` | Importe fijo mensual de un adulto a la cuenta común, vigente `desde` un mes (día 1); único por miembro y mes. El importe de un mes es el de la fila más reciente que no lo supere; 0 = deja de aportar. `ahorro` (0 ≤ ahorro ≤ importe, por `check`) es la parte que se aparta para ahorro; el resto queda para gastos. |
 | `reembolso_cuenta` | Pago de la cuenta común a un miembro por gastos que adelantó (`gasto.a_cargo_cuenta_comun`). Baja lo pendiente y el efectivo, no el saldo. |
+| `retirada_ahorro` | Dinero que el hogar saca del ahorro de la cuenta común (`importe > 0`, concepto opcional). Baja el ahorro disponible, no el saldo de gastos. Core.Api impide retirar más de lo ahorrado. Solo lectura para los roles de cliente. |
 | ~~`ingreso`~~ | **Eliminada** por `20261007000000_perfiles_cuenta_comun_sin_ingresos.sql`: el diseño no guarda ingresos. |
 
 ## Invariantes que no se rompen

@@ -1,4 +1,4 @@
-@* Pestaña Cuenta común: saldo y efectivo del mes, aportaciones fijas por adulto y reembolsos a quien adelantó gastos de la cuenta. *@
+@* Pestaña Cuenta común: saldo y efectivo del mes, aportaciones fijas por adulto (con su parte de ahorro), reembolsos a quien adelantó gastos de la cuenta y retiradas del ahorro. *@
 @using System.Globalization
 @inject CoreApiClient Api
 @inject EstadoHogar Hogar
@@ -28,7 +28,7 @@ else if (_estado is not null)
                 <button class="linkbtn" type="button" aria-label="Mes siguiente" @onclick="() => CambiarMesAsync(1)"><Icono Nombre="chevron-right" /></button>
             </div>
         </div>
-        <p class="muted">Saldo acumulado hasta final de mes: aportaciones menos los gastos cargados a la cuenta.</p>
+        <p class="muted">Saldo acumulado hasta final de mes: aportaciones para gastos (sin el ahorro) menos los gastos cargados a la cuenta.</p>
 
         @if (_error is not null)
         {
@@ -41,6 +41,7 @@ else if (_estado is not null)
             <span class="chip">Aportado este mes&nbsp;<b>@Euros(_estado.AportadoMes)</b></span>
             <span class="chip">Aportado en total&nbsp;<b>@Euros(_estado.Aportado)</b></span>
             <span class="chip">Gastado en total&nbsp;<b>@Euros(_estado.Gastado)</b></span>
+            <span class="chip">Ahorro disponible&nbsp;<b id="ahorro">@Euros(_estado.AhorroDisponible)</b></span>
         </div>
 
         @if (_estado.Saldo < 0)
@@ -53,13 +54,13 @@ else if (_estado is not null)
 
     <section class="card" aria-labelledby="t-aportaciones">
         <div class="card-head"><h2 id="t-aportaciones">Aportación mensual</h2></div>
-        <p class="muted">Importe fijo que aporta cada adulto al mes. Un cambio vale desde el mes elegido en adelante.</p>
+        <p class="muted">Importe fijo que aporta cada adulto al mes; una parte puede ir a ahorro y el resto queda para gastos. Un cambio vale desde el mes elegido en adelante.</p>
         <div style="margin-top: 10px">
             @foreach (var a in _adultos)
             {
                 <div class="catrow">
                     <div class="c-name"><Avatar Nombre="@a.Nombre" Color="@ColorMiembro.De(a.Id, _miembros)" Tamano="sm" /> @a.Nombre</div>
-                    <div class="c-sel">@Euros(VigenteDe(a.Id)) al mes</div>
+                    <div class="c-sel">@Euros(VigenteDe(a.Id)) al mes@(AhorroVigenteDe(a.Id) > 0 ? $" ({Euros(AhorroVigenteDe(a.Id))} de ahorro)" : "")</div>
                 </div>
             }
             @if (_adultos.Count == 0)
@@ -81,6 +82,9 @@ else if (_estado is not null)
                 </label>
                 <label>Importe al mes (€)
                     <input inputmode="decimal" required placeholder="0,00" @bind="_importeAportacion" @bind:event="oninput" />
+                </label>
+                <label>De ese importe, a ahorro (€)
+                    <input id="ahorro-aportacion" inputmode="decimal" placeholder="0,00" @bind="_ahorroAportacion" @bind:event="oninput" />
                 </label>
                 <button class="btn" type="submit" disabled="@(!AportacionValida)">Fijar desde @NombreMes</button>
             </form>
@@ -148,6 +152,72 @@ else if (_estado is not null)
             </form>
         }
     </section>
+
+    <section class="card" aria-labelledby="t-ahorro">
+        <div class="card-head"><h2 id="t-ahorro">Ahorro</h2></div>
+        <p class="muted">La parte de las aportaciones que se aparta. Los gastos no la tocan: solo baja al retirarla.</p>
+        <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px">
+            <span class="chip">Ahorrado este mes&nbsp;<b>@Euros(_estado.AhorroMes)</b></span>
+            <span class="chip">Ahorrado en total&nbsp;<b>@Euros(_estado.AhorroAcumulado)</b></span>
+            <span class="chip">Retirado&nbsp;<b>@Euros(_estado.AhorroRetirado)</b></span>
+        </div>
+
+        @if (_estado.AhorroDisponible < 0)
+        {
+            <div class="aviso warn" role="status" style="margin-top: 12px">
+                Se ha retirado más de lo ahorrado: faltan @Euros(-_estado.AhorroDisponible) (revisa las aportaciones o las retiradas).
+            </div>
+        }
+
+        @foreach (var r in (_estado.RetiradasAhorro ?? []).OrderByDescending(r => r.Fecha))
+        {
+            <div class="gastorow">
+                <div class="g-main">
+                    <div class="g-concepto">Retirada de @NombreMiembro(r.MiembroId)</div>
+                    <div class="muted g-meta">@r.Fecha.ToString("dd/MM/yyyy", Es)@(string.IsNullOrWhiteSpace(r.Concepto) ? "" : " · " + r.Concepto)</div>
+                </div>
+                <div class="g-importe">@Euros(r.Importe)</div>
+                <div class="c-acc">
+                    @if (_confirmandoEliminar == r.Id)
+                    {
+                        <span class="muted">¿Eliminar?</span>
+                        <button class="linkbtn danger" type="button" @onclick="() => EliminarRetiradaAsync(r)">Sí</button>
+                        <button class="linkbtn" type="button" @onclick="() => _confirmandoEliminar = null">No</button>
+                    }
+                    else
+                    {
+                        <button class="linkbtn danger" type="button" aria-label="Eliminar retirada de @NombreMiembro(r.MiembroId)" @onclick="() => _confirmandoEliminar = r.Id">Eliminar</button>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (_estado.AhorroDisponible > 0 && _adultos.Count > 0)
+        {
+            <form class="addcat" id="form-retirada" @onsubmit="RetirarAhorroAsync">
+                <h3 style="flex: 1 1 100%; margin: 0">Retirar del ahorro</h3>
+                <label>Lo retira
+                    <select @bind="_retirante">
+                        @foreach (var a in _adultos)
+                        {
+                            <option value="@a.Id">@a.Nombre</option>
+                        }
+                    </select>
+                </label>
+                <label>Importe (€)
+                    <input inputmode="decimal" required placeholder="0,00" @bind="_importeRetirada" @bind:event="oninput" />
+                </label>
+                <label>Concepto
+                    <input maxlength="200" placeholder="Opcional" @bind="_conceptoRetirada" @bind:event="oninput" />
+                </label>
+                <button class="btn" type="submit" disabled="@(!RetiradaValida)">Retirar</button>
+            </form>
+        }
+        else if (_estado.AhorroDisponible <= 0)
+        {
+            <div class="empty">No hay ahorro disponible para retirar.</div>
+        }
+    </section>
 }
 
 @code {
@@ -161,10 +231,14 @@ else if (_estado is not null)
     private Guid? _confirmandoEliminar;
 
     private Guid _aportante, _reembolsado;
-    private string _importeAportacion = "", _importeReembolso = "", _conceptoReembolso = "";
+    private Guid _retirante;
+    private string _importeAportacion = "", _ahorroAportacion = "", _importeReembolso = "", _conceptoReembolso = "";
+    private string _importeRetirada = "", _conceptoRetirada = "";
 
     private string NombreMes => _mes.ToString("MMMM yyyy", Es);
-    private bool AportacionValida => TryImporte(_importeAportacion, permitirCero: true, out _);
+    private bool AportacionValida => TryImporte(_importeAportacion, permitirCero: true, out var importe)
+        && TryImporte(string.IsNullOrWhiteSpace(_ahorroAportacion) ? "0" : _ahorroAportacion, permitirCero: true, out var ahorro) && ahorro <= importe;
+    private bool RetiradaValida => TryImporte(_importeRetirada, permitirCero: false, out _);
     private bool ReembolsoValido => TryImporte(_importeReembolso, permitirCero: false, out _);
 
     protected override Task OnInitializedAsync() => CargarAsync();
@@ -177,7 +251,7 @@ else if (_estado is not null)
         {
             _miembros = await Api.ListarMiembrosAsync();
             _adultos = _miembros.Where(m => m.Tipo == "adulto" && m.Activo).ToList();
-            _aportante = (_adultos.FirstOrDefault(m => m.EsYo) ?? _adultos.FirstOrDefault())?.Id ?? Guid.Empty;
+            _aportante = _retirante = (_adultos.FirstOrDefault(m => m.EsYo) ?? _adultos.FirstOrDefault())?.Id ?? Guid.Empty;
             await RecargarAsync();
         }
         catch (ApiException e)
@@ -219,9 +293,17 @@ else if (_estado is not null)
         _estado?.Aportaciones.Where(a => a.MiembroId == miembro && a.Desde <= _mes)
             .OrderByDescending(a => a.Desde).Select(a => a.Importe).FirstOrDefault() ?? 0m;
 
-    /// <summary>Al elegir adulto (o cambiar de mes) el campo de importe muestra su aportación vigente.</summary>
-    private void AlCambiarAportante() =>
+    /// <summary>Parte de ahorro de la aportación de un adulto en el mes mostrado.</summary>
+    private decimal AhorroVigenteDe(Guid miembro) =>
+        _estado?.Aportaciones.Where(a => a.MiembroId == miembro && a.Desde <= _mes)
+            .OrderByDescending(a => a.Desde).Select(a => a.Ahorro).FirstOrDefault() ?? 0m;
+
+    /// <summary>Al elegir adulto (o cambiar de mes) los campos muestran su aportación y ahorro vigentes.</summary>
+    private void AlCambiarAportante()
+    {
         _importeAportacion = VigenteDe(_aportante).ToString(CultureInfo.InvariantCulture);
+        _ahorroAportacion = AhorroVigenteDe(_aportante).ToString(CultureInfo.InvariantCulture);
+    }
 
     private static bool TryImporte(string texto, bool permitirCero, out decimal valor) =>
         decimal.TryParse(texto.Trim().Replace(',', '.'), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out valor)
@@ -232,7 +314,10 @@ else if (_estado is not null)
         {
             if (!TryImporte(_importeAportacion, permitirCero: true, out var importe))
                 throw new ApiException(System.Net.HttpStatusCode.BadRequest, "Introduce un importe de 0 o más con máximo 2 decimales.");
-            await Api.FijarAportacionAsync(new FijarAportacionRequest(_aportante, _mes, importe));
+            var ahorro = 0m;
+            if (!string.IsNullOrWhiteSpace(_ahorroAportacion) && (!TryImporte(_ahorroAportacion, permitirCero: true, out ahorro) || ahorro > importe))
+                throw new ApiException(System.Net.HttpStatusCode.BadRequest, "El ahorro debe estar entre 0 y la aportación, con máximo 2 decimales.");
+            await Api.FijarAportacionAsync(new FijarAportacionRequest(_aportante, _mes, importe, ahorro));
             return "Aportación guardada";
         });
 
@@ -246,6 +331,26 @@ else if (_estado is not null)
             _importeReembolso = "";
             _conceptoReembolso = "";
             return "Reembolso registrado";
+        });
+
+    private Task RetirarAhorroAsync() =>
+        EjecutarAsync(async () =>
+        {
+            if (!TryImporte(_importeRetirada, permitirCero: false, out var importe))
+                throw new ApiException(System.Net.HttpStatusCode.BadRequest, "Introduce un importe mayor que 0 con máximo 2 decimales.");
+            await Api.CrearRetiradaAhorroAsync(new CrearRetiradaAhorroRequest(
+                _retirante, importe, null, string.IsNullOrWhiteSpace(_conceptoRetirada) ? null : _conceptoRetirada.Trim()));
+            _importeRetirada = "";
+            _conceptoRetirada = "";
+            return "Retirada registrada";
+        });
+
+    private Task EliminarRetiradaAsync(RetiradaAhorroDto r) =>
+        EjecutarAsync(async () =>
+        {
+            await Api.EliminarRetiradaAhorroAsync(r.Id);
+            _confirmandoEliminar = null;
+            return "Retirada eliminada";
         });
 
     private Task EliminarAsync(ReembolsoCuentaDto r) =>

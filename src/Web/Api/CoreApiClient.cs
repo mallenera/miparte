@@ -181,6 +181,18 @@ public sealed class CoreApiClient
     public Task EliminarReembolsoAsync(Guid id, CancellationToken ct = default) =>
         EnviarSinRespuestaAsync(HttpMethod.Delete, $"api/cuenta-comun/reembolsos/{id}", ct);
 
+    /// <summary>Registra una retirada del ahorro de la cuenta común (<c>POST /api/cuenta-comun/retiradas-ahorro</c>).</summary>
+    /// <param name="peticion">Miembro, importe, fecha y concepto.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<RetiradaAhorroDto> CrearRetiradaAhorroAsync(CrearRetiradaAhorroRequest peticion, CancellationToken ct = default) =>
+        EnviarAsync<RetiradaAhorroDto>(HttpMethod.Post, "api/cuenta-comun/retiradas-ahorro", peticion, ct);
+
+    /// <summary>Elimina una retirada de ahorro (<c>DELETE /api/cuenta-comun/retiradas-ahorro/{id}</c>).</summary>
+    /// <param name="id">Retirada a eliminar.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task EliminarRetiradaAhorroAsync(Guid id, CancellationToken ct = default) =>
+        EnviarSinRespuestaAsync(HttpMethod.Delete, $"api/cuenta-comun/retiradas-ahorro/{id}", ct);
+
     /// <summary>Resumen del mes: pagado y asumido por miembro y total por categoría (<c>GET /api/resumen</c>).</summary>
     /// <param name="mes">Mes en formato YYYY-MM.</param>
     /// <param name="ct">Token de cancelación.</param>

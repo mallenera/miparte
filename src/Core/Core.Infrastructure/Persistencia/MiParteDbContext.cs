@@ -41,6 +41,8 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
     public DbSet<AportacionCuenta> AportacionesCuenta => Set<AportacionCuenta>();
     /// <summary>Conjunto de <see cref="ReembolsoCuenta"/> del hogar actual.</summary>
     public DbSet<ReembolsoCuenta> ReembolsosCuenta => Set<ReembolsoCuenta>();
+    /// <summary>Conjunto de <see cref="RetiradaAhorro"/> del hogar actual.</summary>
+    public DbSet<RetiradaAhorro> RetiradasAhorro => Set<RetiradaAhorro>();
 
     /// <summary>Conjunto de <see cref="EventoAuditoria"/> del hogar actual (solo de añadir; lo lee únicamente un admin).</summary>
     public DbSet<EventoAuditoria> Auditoria => Set<EventoAuditoria>();
@@ -129,6 +131,14 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
         b.Entity<AportacionCuenta>(e =>
         {
             e.ToTable("aportacion_cuenta");
+            e.Property(x => x.Importe).HasPrecision(12, 2);
+            e.Property(x => x.Ahorro).HasPrecision(12, 2);
+            e.HasQueryFilter(x => x.HogarId == HogarId);
+        });
+
+        b.Entity<RetiradaAhorro>(e =>
+        {
+            e.ToTable("retirada_ahorro");
             e.Property(x => x.Importe).HasPrecision(12, 2);
             e.HasQueryFilter(x => x.HogarId == HogarId);
         });

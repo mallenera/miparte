@@ -105,6 +105,25 @@ public class AportacionCuenta
     public DateOnly Desde { get; set; }
     /// <summary>Importe mensual; 0 deja de aportar.</summary>
     public decimal Importe { get; set; }
+    /// <summary>Parte del importe mensual que va a ahorro (entre 0 e <see cref="Importe"/>); el resto queda para gastos.</summary>
+    public decimal Ahorro { get; set; }
+}
+
+/// <summary>Dinero que el hogar saca del ahorro de la cuenta común (tabla retirada_ahorro).</summary>
+public class RetiradaAhorro
+{
+    /// <summary>Identificador de la retirada.</summary>
+    public Guid Id { get; set; }
+    /// <summary>Hogar al que pertenece.</summary>
+    public Guid HogarId { get; set; }
+    /// <summary>Miembro que la registra.</summary>
+    public Guid MiembroId { get; set; }
+    /// <summary>Fecha de la retirada.</summary>
+    public DateOnly Fecha { get; set; }
+    /// <summary>Importe retirado (positivo).</summary>
+    public decimal Importe { get; set; }
+    /// <summary>Nota opcional (para qué se retira).</summary>
+    public string? Concepto { get; set; }
 }
 
 /// <summary>Pago de la cuenta común a quien adelantó un gasto cargado a ella (tabla reembolso_cuenta).</summary>

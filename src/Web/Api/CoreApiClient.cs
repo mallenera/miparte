@@ -5,7 +5,7 @@ using MiParte.Contracts;
 
 namespace MiParte.Web.Api;
 
-/// <summary>Cliente tipado de Core.Api. Cubre usuario, hogares, miembros, invitaciones, categorías, perfiles, gastos, gastos recurrentes, cuenta común, resumen y liquidación; el resto se añadirá con cada pantalla.</summary>
+/// <summary>Cliente tipado de Core.Api. Cubre usuario, hogares, miembros, invitaciones, categorías, perfiles, gastos, gastos recurrentes, cuenta común, resumen, liquidación y auditoría; el resto se añadirá con cada pantalla.</summary>
 public sealed class CoreApiClient
 {
     private readonly HttpClient _http;
@@ -156,6 +156,22 @@ public sealed class CoreApiClient
     /// <param name="ct">Token de cancelación.</param>
     public Task<GenerarRecurrentesResponse> GenerarRecurrentesAsync(string mes, CancellationToken ct = default) =>
         EnviarAsync<GenerarRecurrentesResponse>(HttpMethod.Post, $"api/gastos-recurrentes/generar?mes={Uri.EscapeDataString(mes)}", null, ct);
+
+    /// <summary>Historial de cambios del hogar, del más reciente al más antiguo (<c>GET /api/auditoria</c>, solo admin).</summary>
+    /// <param name="entidad">Tipo de entidad a filtrar, o null para todas.</param>
+    /// <param name="limite">Eventos por página (1-200).</param>
+    /// <param name="hasta">Instante del último evento recibido, para pedir la página siguiente.</param>
+    /// <param name="despuesDeId">Id del último evento recibido; desempata los que comparten <paramref name="hasta"/>.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<List<EventoAuditoriaDto>> ListarAuditoriaAsync(
+        string? entidad = null, int limite = 50, DateTimeOffset? hasta = null, Guid? despuesDeId = null, CancellationToken ct = default)
+    {
+        var consulta = new List<string> { $"limite={limite}" };
+        if (!string.IsNullOrEmpty(entidad)) consulta.Add($"entidad={Uri.EscapeDataString(entidad)}");
+        if (hasta is { } h) consulta.Add($"hasta={Uri.EscapeDataString(h.ToString("O", System.Globalization.CultureInfo.InvariantCulture))}");
+        if (despuesDeId is { } d) consulta.Add($"despuesDeId={d}");
+        return ObtenerAsync<List<EventoAuditoriaDto>>($"api/auditoria?{string.Join('&', consulta)}", ct);
+    }
 
     /// <summary>Estado de la cuenta común al final de un mes (<c>GET /api/cuenta-comun</c>).</summary>
     /// <param name="mes">Mes en formato YYYY-MM.</param>

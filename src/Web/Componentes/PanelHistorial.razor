@@ -1,0 +1,134 @@
+@* Historial de cambios del hogar (solo admin): quién hizo qué y cuándo, con los campos que cambian. *@
+@inject CoreApiClient Api
+
+<section class="card" aria-labelledby="t-historial">
+    <div class="card-head">
+        <h2 id="t-historial">Historial de cambios</h2>
+        <label class="hist-filtro">
+            <span class="sr">Filtrar por tipo</span>
+            <select @bind="Filtro" @bind:after="CargarAsync">
+                <option value="">Todo</option>
+                @foreach (var (id, plural) in TextoAuditoria.Entidades)
+                {
+                    <option value="@id">@plural</option>
+                }
+            </select>
+        </label>
+    </div>
+    <p class="muted">Cada cambio queda registrado en el momento en que se guarda, y no se puede editar ni borrar. Solo lo ven los administradores.</p>
+
+    @if (_cargando)
+    {
+        <div class="spinbox" role="status"><div class="spin"></div><span>Cargando historial…</span></div>
+    }
+    else if (_error is not null)
+    {
+        <div class="aviso err" role="alert">
+            @_error
+            <button class="linkbtn" type="button" @onclick="CargarAsync">Reintentar</button>
+        </div>
+    }
+    else if (_eventos.Count == 0)
+    {
+        <div class="empty">Todavía no hay cambios registrados@(string.IsNullOrEmpty(Filtro) ? "" : " de este tipo").</div>
+    }
+    else
+    {
+        <ol class="hist" aria-label="Cambios del hogar">
+            @foreach (var e in _eventos)
+            {
+                var cambios = TextoAuditoria.Cambios(e, NombreMiembro);
+                <li class="hist-item">
+                    <div class="hist-linea">
+                        <b>@(e.Autor ?? "Alguien")</b> @TextoAuditoria.Frase(e)
+                        <time class="muted" datetime="@e.Cuando.ToString("O", CultureInfo.InvariantCulture)">@e.Cuando.ToLocalTime().ToString("d MMM yyyy, HH:mm", Es)</time>
+                    </div>
+                    @if (cambios.Count > 0)
+                    {
+                        <details class="hist-detalle">
+                            <summary>Ver detalle</summary>
+                            <dl>
+                                @foreach (var c in cambios)
+                                {
+                                    <dt>@c.Campo</dt>
+                                    <dd>
+                                        @if (c.Antes is not null && c.Despues is not null)
+                                        {
+                                            <span class="hist-antes">@c.Antes</span> <span aria-label="pasa a">→</span> <span>@c.Despues</span>
+                                        }
+                                        else
+                                        {
+                                            @(c.Despues ?? c.Antes)
+                                        }
+                                    </dd>
+                                }
+                            </dl>
+                        </details>
+                    }
+                </li>
+            }
+        </ol>
+
+        @if (_hayMas)
+        {
+            <div class="hist-mas">
+                <button class="btn btn-ghost btn-sm" type="button" disabled="@_cargandoMas" @onclick="CargarMasAsync">Cargar más</button>
+            </div>
+        }
+    }
+</section>
+
+@code {
+    private const int PorPagina = 50;
+    private static readonly CultureInfo Es = new("es-ES");
+
+    /// <summary>Miembros del hogar, para poner nombre a los ids que aparecen en el detalle.</summary>
+    [Parameter] public List<MiembroDto> Miembros { get; set; } = [];
+
+    private string Filtro { get; set; } = "";
+    private readonly List<EventoAuditoriaDto> _eventos = [];
+    private bool _cargando = true, _cargandoMas, _hayMas;
+    private string? _error;
+
+    protected override Task OnInitializedAsync() => CargarAsync();
+
+    private string? NombreMiembro(Guid id) => Miembros.FirstOrDefault(m => m.Id == id)?.Nombre;
+
+    private string? FiltroONull => string.IsNullOrEmpty(Filtro) ? null : Filtro;
+
+    private async Task CargarAsync()
+    {
+        _cargando = true;
+        _error = null;
+        _eventos.Clear();
+        try
+        {
+            var pagina = await Api.ListarAuditoriaAsync(FiltroONull, PorPagina);
+            _eventos.AddRange(pagina);
+            _hayMas = pagina.Count == PorPagina;
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+        _cargando = false;
+    }
+
+    private async Task CargarMasAsync()
+    {
+        if (_eventos.Count == 0) return;
+        var ultimo = _eventos[^1];
+        _cargandoMas = true;
+        try
+        {
+            var pagina = await Api.ListarAuditoriaAsync(FiltroONull, PorPagina, ultimo.Cuando, ultimo.Id);
+            _eventos.AddRange(pagina);
+            _hayMas = pagina.Count == PorPagina;
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+        _cargandoMas = false;
+    }
+}

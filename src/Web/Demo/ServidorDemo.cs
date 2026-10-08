@@ -84,6 +84,9 @@ public sealed partial class ServidorDemo
             ("gastos-recurrentes", 3, "PUT") when id is { } i => GuardarRecurrente(i, (await Cuerpo<GastoRecurrenteRequest>())!),
             ("gastos-recurrentes", 3, "DELETE") when id is { } i => EliminarRecurrente(i),
 
+            // El modo demo no registra cambios: el historial siempre sale vacío.
+            ("auditoria", 2, "GET") => Ok(new List<EventoAuditoriaDto>()),
+
             ("cuenta-comun", 2, "GET") => EstadoCuentaComun(mes),
             ("cuenta-comun", 3, "PUT") when subruta == "aportaciones" => FijarAportacion((await Cuerpo<FijarAportacionRequest>())!),
             ("cuenta-comun", 3, "POST") when subruta == "reembolsos" => CrearReembolso((await Cuerpo<CrearReembolsoRequest>())!),

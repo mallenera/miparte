@@ -33,9 +33,22 @@ else if (_resumen is not null && _liquidacion is not null)
 
     <section class="card" aria-labelledby="t-liquidacion">
         <div class="card-head"><h2 id="t-liquidacion">Liquidación</h2></div>
-        <p class="muted">Quién debe a quién para quedar en paz este mes. Los pagos que registres se descuentan de los saldos.</p>
+        <p class="muted">Quién debe a quién para quedar en paz este mes. Los pagos que registres, completos o parciales, se descuentan de los saldos.</p>
 
-        @foreach (var s in _liquidacion.Saldos)
+        @if (_liquidacion.Saldos.Count > 1)
+        {
+            <label class="filtro">Ver solo a
+                <select @bind="_filtroMiembro" aria-label="Filtrar la liquidación por miembro">
+                    <option value="">Todos</option>
+                    @foreach (var s in _liquidacion.Saldos)
+                    {
+                        <option value="@s.MiembroId">@s.Nombre</option>
+                    }
+                </select>
+            </label>
+        }
+
+        @foreach (var s in _liquidacion.Saldos.Where(s => FiltraMiembro(s.MiembroId)))
         {
             <div class="catrow">
                 <div class="c-name"><Avatar Nombre="@s.Nombre" Color="@ColorMiembro.De(s.MiembroId, _miembros)" Tamano="sm" /> @s.Nombre</div>
@@ -55,16 +68,24 @@ else if (_resumen is not null && _liquidacion is not null)
         else
         {
             <h3 style="margin: 16px 0 0">Transferencias sugeridas</h3>
-            @foreach (var t in _liquidacion.Transferencias)
+            <p class="muted">Cambia el importe para registrar un pago parcial; lo que quede seguirá pendiente.</p>
+            @foreach (var t in _liquidacion.Transferencias.Where(t => FiltraMiembro(t.De) || FiltraMiembro(t.A)))
             {
                 <div class="gastorow">
                     <div class="g-main">
                         <div class="g-concepto">@NombreMiembro(t.De) paga a @NombreMiembro(t.A)</div>
+                        <div class="muted g-meta">Pendiente @Euros(t.Importe)</div>
+                        @if (!ImporteValido(t))
+                        {
+                            <div class="muted g-meta" role="status">Importe entre 0,01 y @Euros(t.Importe), con máximo 2 decimales.</div>
+                        }
                     </div>
-                    <div class="g-importe">@Euros(t.Importe)</div>
-                    <div class="c-acc">
-                        <button class="btn" type="button" aria-label="Registrar el pago de @Euros(t.Importe) de @NombreMiembro(t.De) a @NombreMiembro(t.A)"
-                                disabled="@_guardando" @onclick="() => RegistrarPagoAsync(t)">Registrar pago</button>
+                    <div class="c-acc pagoimp">
+                        <label class="sr" for="@IdImporte(t)">Importe a pagar de @NombreMiembro(t.De) a @NombreMiembro(t.A)</label>
+                        <input id="@IdImporte(t)" class="g-importe" inputmode="decimal" value="@ImporteEscrito(t)"
+                               @oninput="e => EscribirImporte(t, e.Value?.ToString())" />
+                        <button class="btn" type="button" aria-label="Registrar el pago de @NombreMiembro(t.De) a @NombreMiembro(t.A)"
+                                disabled="@(_guardando || !ImporteValido(t))" @onclick="() => RegistrarPagoAsync(t)">Registrar pago</button>
                     </div>
                 </div>
             }
@@ -73,7 +94,7 @@ else if (_resumen is not null && _liquidacion is not null)
         @if (_liquidacion.Pagos.Count > 0)
         {
             <h3 style="margin: 16px 0 0">Pagos registrados</h3>
-            @foreach (var p in _liquidacion.Pagos.OrderByDescending(p => p.Fecha))
+            @foreach (var p in _liquidacion.Pagos.Where(p => FiltraMiembro(p.DeMiembroId) || FiltraMiembro(p.AMiembroId)).OrderByDescending(p => p.Fecha))
             {
                 <div class="gastorow">
                     <div class="g-main">
@@ -172,6 +193,8 @@ else if (_resumen is not null && _liquidacion is not null)
     private string? _errorCarga, _error;
     private DateOnly _mes = new(DateTime.Today.Year, DateTime.Today.Month, 1);
     private Guid? _confirmandoEliminar;
+    private string _filtroMiembro = "";
+    private readonly Dictionary<(Guid, Guid), string> _importes = [];
 
     private string NombreMes => _mes.ToString("MMMM yyyy", Es);
 
@@ -206,6 +229,7 @@ else if (_resumen is not null && _liquidacion is not null)
         _mes = _mes.AddMonths(delta);
         _error = null;
         _confirmandoEliminar = null;
+        _importes.Clear();
         try
         {
             await RecargarAsync();
@@ -223,11 +247,33 @@ else if (_resumen is not null && _liquidacion is not null)
     /// <summary>Saldo con signo explícito, para que no dependa solo del color.</summary>
     private static string Saldo(decimal saldo) => (saldo > 0 ? "+" : "") + Euros(saldo);
 
+    /// <summary>Sin filtro pasa todo; con filtro, solo lo que afecta al miembro elegido.</summary>
+    private bool FiltraMiembro(Guid id) => _filtroMiembro == "" || id.ToString() == _filtroMiembro;
+
+    private static (Guid, Guid) Clave(TransferenciaDto t) => (t.De, t.A);
+
+    private static string IdImporte(TransferenciaDto t) => $"pago-{t.De}-{t.A}";
+
+    /// <summary>Lo escrito por el usuario o, si aún no ha tocado el campo, el importe sugerido.</summary>
+    private string ImporteEscrito(TransferenciaDto t) =>
+        _importes.TryGetValue(Clave(t), out var texto) ? texto : t.Importe.ToString("0.00", Es);
+
+    /// <summary>Importe del pago: mayor que 0, con máximo 2 decimales y sin pasar de lo pendiente.</summary>
+    private bool TryImporte(TransferenciaDto t, out decimal valor) =>
+        decimal.TryParse(ImporteEscrito(t).Trim().Replace(',', '.'), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out valor)
+        && valor > 0 && valor <= t.Importe && decimal.Round(valor, 2) == valor;
+
+    private void EscribirImporte(TransferenciaDto t, string? texto) => _importes[Clave(t)] = texto ?? "";
+
+    private bool ImporteValido(TransferenciaDto t) => TryImporte(t, out _);
+
     private Task RegistrarPagoAsync(TransferenciaDto t) =>
         EjecutarAsync(async () =>
         {
-            await Api.CrearPagoLiquidacionAsync(new CrearPagoLiquidacionRequest(_mes, t.De, t.A, t.Importe, null, null));
-            return "Pago registrado";
+            if (!TryImporte(t, out var importe)) throw new ApiException(System.Net.HttpStatusCode.BadRequest, "Introduce un importe mayor que 0 con máximo 2 decimales y sin pasar de lo pendiente.");
+            await Api.CrearPagoLiquidacionAsync(new CrearPagoLiquidacionRequest(_mes, t.De, t.A, importe, null, null));
+            _importes.Remove(Clave(t));
+            return importe == t.Importe ? "Pago registrado" : "Pago parcial registrado";
         });
 
     private Task EliminarPagoAsync(PagoLiquidacionDto p) =>

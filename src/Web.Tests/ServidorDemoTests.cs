@@ -37,6 +37,28 @@ public class ServidorDemoTests
     }
 
     [Fact]
+    public async Task Los_filtros_de_gastos_por_categoria_miembro_y_texto_se_combinan()
+    {
+        var api = Cliente();
+        var todos = await api.ListarGastosAsync("2026-10");
+        var categoria = todos.First(g => g.Concepto == "Luz").CategoriaId;
+
+        var porCategoria = await api.ListarGastosAsync("2026-10", categoria, null, null);
+        Assert.NotEmpty(porCategoria);
+        Assert.All(porCategoria, g => Assert.Equal(categoria, g.CategoriaId));
+
+        var porTexto = await api.ListarGastosAsync("2026-10", null, null, "lUz");
+        Assert.All(porTexto, g => Assert.Contains("luz", g.Concepto, StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(porTexto, g => g.Concepto == "Luz");
+
+        var miembro = todos.First(g => g.PagadoPor is not null).PagadoPor!.Value;
+        var deMiembro = await api.ListarGastosAsync("2026-10", null, miembro, null);
+        Assert.All(deMiembro, g => Assert.True(g.PagadoPor == miembro || g.Repartos.Any(r => r.MiembroId == miembro && r.ImporteAsumido > 0m)));
+        Assert.True(deMiembro.Count <= todos.Count);
+        Assert.Empty(await api.ListarGastosAsync("2026-10", null, null, "no existe este concepto"));
+    }
+
+    [Fact]
     public async Task Un_gasto_nuevo_se_reparte_y_suma_su_importe()
     {
         var api = Cliente();

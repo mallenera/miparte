@@ -106,7 +106,23 @@ public sealed class CoreApiClient
     /// <param name="mes">Mes en formato <c>YYYY-MM</c>, o null para todos.</param>
     /// <param name="ct">Token de cancelación.</param>
     public Task<List<GastoResponse>> ListarGastosAsync(string? mes = null, CancellationToken ct = default) =>
-        ObtenerAsync<List<GastoResponse>>(mes is null ? "api/gastos" : $"api/gastos?mes={Uri.EscapeDataString(mes)}", ct);
+        ListarGastosAsync(mes, null, null, null, ct);
+
+    /// <summary>Gastos del hogar filtrados (<c>GET /api/gastos</c>); los filtros nulos o vacíos no se envían.</summary>
+    /// <param name="mes">Mes en formato <c>YYYY-MM</c>, o null para todos.</param>
+    /// <param name="categoriaId">Solo gastos de esta categoría.</param>
+    /// <param name="miembroId">Solo gastos que paga o en cuyo reparto asume algo este miembro.</param>
+    /// <param name="buscar">Texto que debe contener el concepto.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<List<GastoResponse>> ListarGastosAsync(string? mes, Guid? categoriaId, Guid? miembroId, string? buscar, CancellationToken ct = default)
+    {
+        var filtros = new List<string>();
+        if (mes is not null) filtros.Add($"mes={Uri.EscapeDataString(mes)}");
+        if (categoriaId is { } c) filtros.Add($"categoriaId={c}");
+        if (miembroId is { } m) filtros.Add($"miembroId={m}");
+        if (!string.IsNullOrWhiteSpace(buscar)) filtros.Add($"buscar={Uri.EscapeDataString(buscar.Trim())}");
+        return ObtenerAsync<List<GastoResponse>>(filtros.Count == 0 ? "api/gastos" : "api/gastos?" + string.Join('&', filtros), ct);
+    }
 
     /// <summary>Crea un gasto; el servidor calcula y guarda el reparto (<c>POST /api/gastos</c>).</summary>
     /// <param name="peticion">Datos del gasto.</param>

@@ -73,7 +73,7 @@ public sealed partial class ServidorDemo
             ("perfiles", 3, "PUT") when id is { } i => GuardarPerfil(i, (await Cuerpo<GuardarPerfilRequest>())!),
             ("perfiles", 3, "DELETE") when id is { } i => EliminarPerfil(i),
 
-            ("gastos", 2, "GET") => ListarGastos(mes),
+            ("gastos", 2, "GET") => ListarGastos(mes, Consulta(uri, "categoriaId"), Consulta(uri, "miembroId"), Consulta(uri, "buscar")),
             ("gastos", 2, "POST") => GuardarGasto(null, (await Cuerpo<GastoRequest>())!),
             ("gastos", 3, "PUT") when id is { } i => GuardarGasto(i, (await Cuerpo<GastoRequest>())!),
             ("gastos", 3, "DELETE") when id is { } i => _gastos.RemoveAll(x => x.Id == i) > 0 ? Sin() : NoEncontrado(),
@@ -287,9 +287,13 @@ public sealed partial class ServidorDemo
         g.Id, g.Fecha, g.Importe, g.CategoriaId, g.PagadoPor, g.PerfilRepartoId, g.Concepto, g.GastoRecurrenteId,
         g.Repartos.OrderBy(r => r.MiembroId).ToList(), g.ACargoCuentaComun);
 
-    private HttpResponseMessage ListarGastos(string? mes)
+    private HttpResponseMessage ListarGastos(string? mes, string? categoriaId, string? miembroId, string? buscar)
     {
         var lista = _gastos.AsEnumerable();
+        if (Guid.TryParse(categoriaId, out var cat)) lista = lista.Where(g => g.CategoriaId == cat);
+        if (Guid.TryParse(miembroId, out var mie)) lista = lista.Where(g => g.PagadoPor == mie || g.Repartos.Any(r => r.MiembroId == mie && r.ImporteAsumido > 0m));
+        if (!string.IsNullOrWhiteSpace(buscar))
+            lista = lista.Where(g => g.Concepto?.Contains(buscar.Trim(), StringComparison.OrdinalIgnoreCase) == true);
         if (mes is not null)
         {
             if (!TryMes(mes, out var inicio)) return MesInvalido();

@@ -117,7 +117,7 @@ Los ingresos del hogar **no se guardan** y no hay endpoints de ingresos. Los per
 
 | Método y ruta | Descripción | Request | Response | Errores | Permisos |
 |---|---|---|---|---|---|
-| `GET /api/gastos?mes=YYYY-MM&categoriaId=` | Lista con repartos; filtros opcionales | - | `GastoResponse[]` 200 | 400 mes inválido; 409 | miembro |
+| `GET /api/gastos?mes=YYYY-MM&categoriaId=&miembroId=&buscar=` | Lista con repartos; filtros opcionales y combinables. `miembroId` deja los gastos que paga ese miembro o en cuyo reparto asume un importe > 0; `buscar` es un texto contenido en el concepto (sin distinguir mayúsculas, máx. 200 caracteres; vacío = sin filtro) | - | `GastoResponse[]` 200 | 400 mes inválido o `buscar` demasiado largo; 409 | miembro |
 | `GET /api/gastos/{id}` | Uno | - | `GastoResponse` 200 | 404; 409 | miembro |
 | `POST /api/gastos` | Crea; el servidor calcula y guarda el reparto | `GastoRequest` | `GastoResponse` 201 | 400 importe, concepto, fecha, categoría o perfil inexistente, pagador no adulto activo, perfil sin valores para los adultos, sin adultos, `pagadoDesdeAhorro` con pagador; 409 sin hogar o ahorro disponible insuficiente (`{ error, disponible }`) | miembro |
 | `PUT /api/gastos/{id}` | Edita y recalcula el reparto de este gasto | `GastoRequest` | `GastoResponse` 200 | 400, 404, 409 (también si el ahorro no cubre el gasto) | miembro |
@@ -140,7 +140,7 @@ Los ingresos del hogar **no se guardan** y no hay endpoints de ingresos. Los per
 |---|---|---|---|---|---|
 | `GET /api/resumen?mes=YYYY-MM` | Gastos del mes, por miembro y por categoría. `mes` obligatorio | - | `ResumenMensualResponse` 200 | 400 mes inválido; 409 sin hogar | miembro |
 | `GET /api/liquidacion?mes=YYYY-MM` | Saldos (ya descontando pagos), transferencias sugeridas y pagos registrados. `mes` obligatorio | - | `LiquidacionResponse` 200 | 400; 409 | miembro |
-| `POST /api/pagos-liquidacion` | Registra un pago entre dos miembros del mes | `CrearPagoLiquidacionRequest` | `PagoLiquidacionDto` 201 | 400 mes no es día 1, mismo miembro, importe, miembros fuera del hogar; 409 importe mayor que la deuda pendiente (`{ error, pendiente }`) o sin hogar | miembro |
+| `POST /api/pagos-liquidacion` | Registra un pago entre dos miembros del mes. El importe puede ser parcial o distinto del sugerido: cualquier valor > 0 (máx. 2 decimales) hasta la deuda pendiente del par; `GET /api/liquidacion` recalcula saldos y transferencias descontándolo, y se pueden registrar varios pagos hasta saldar | `CrearPagoLiquidacionRequest` | `PagoLiquidacionDto` 201 | 400 mes no es día 1, mismo miembro, importe (≤ 0 o más de 2 decimales), miembros fuera del hogar; 409 importe mayor que la deuda pendiente (`{ error, pendiente }`) o sin hogar | miembro |
 | `DELETE /api/pagos-liquidacion/{id}` | Elimina un pago | - | 204 | 404; 409 sin hogar | miembro |
 
 ### 3.9 Cuenta común

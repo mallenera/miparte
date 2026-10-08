@@ -397,6 +397,9 @@ input.invalid, input[aria-invalid="true"] { border-color: var(--err); outline: 0
 @media (max-width: 430px) { .fields { grid-template-columns: minmax(0, 1fr); } }
 .form { display: grid; gap: 14px; align-content: start; }
 .fieldrow { display: grid; gap: 4px; }
+.separador { display: flex; align-items: center; gap: 12px; color: var(--ink-2); font-size: .85rem; }
+.separador::before, .separador::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.btn-google .g { width: 18px; height: 18px; flex: none; }
 .pwd { position: relative; display: grid; }
 .pwd input { padding-right: 46px; }
 .pwd-ver {

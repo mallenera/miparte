@@ -39,6 +39,9 @@ services:
         value: "8080"
       - key: Supabase__Url
         sync: false
+      # Solo si el proyecto aún usa el secreto HS256 legado; déjalo vacío para validar con JWKS.
+      - key: Supabase__JwtSecret
+        sync: false
       # URL de Core.Api, p. ej. https://miparte-core.onrender.com
       - key: Asistente__CoreUrl
         sync: false

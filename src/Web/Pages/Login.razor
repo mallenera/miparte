@@ -23,8 +23,8 @@
         <EditForm Model="_modelo" OnValidSubmit="EnviarAsync">
             <DataAnnotationsValidator />
             <div class="fieldrow">
-                <label for="email">Correo o usuario</label>
-                <InputText id="email" type="text" inputmode="email" autocomplete="username" @bind-Value="_modelo.Email" />
+                <label for="email">Correo</label>
+                <InputText id="email" type="email" inputmode="email" autocomplete="username" @bind-Value="_modelo.Email" />
                 <ValidationMessage For="() => _modelo.Email" />
             </div>
             <div class="fieldrow">
@@ -52,8 +52,7 @@
             <Icono Nombre="sparkles" />Probar la demo
         </button>
         <p class="muted">
-            La demo local no necesita cuenta ni conexión y no guarda nada. También puedes entrar con la cuenta de ejemplo:
-            usuario <b>@CuentaDemo.Usuario</b>, contraseña <b>@CuentaDemo.Contrasena</b>.
+            La demo local no necesita cuenta ni conexión y no guarda nada.
         </p>
 
         <p class="muted">¿No tienes cuenta? <a href="registro">Regístrate</a></p>
@@ -94,7 +93,7 @@
         _sinConfirmar = false;
         try
         {
-            await Sesion.IniciarSesionAsync(CuentaDemo.ACorreo(_modelo.Email), _modelo.Password);
+            await Sesion.IniciarSesionAsync(_modelo.Email.Trim(), _modelo.Password);
             Navegacion.NavigateTo("", replace: true);
         }
         catch (AuthException e)
@@ -122,21 +121,10 @@
     private sealed class Modelo
     {
         [Required(ErrorMessage = "Indica tu correo.")]
-        [CorreoOUsuarioDemo]
+        [EmailAddress(ErrorMessage = "El correo no es válido.")]
         public string Email { get; set; } = "";
 
         [Required(ErrorMessage = "Indica tu contraseña.")]
         public string Password { get; set; } = "";
-    }
-
-    /// <summary>Acepta un correo válido o el usuario de la cuenta demo.</summary>
-    private sealed class CorreoOUsuarioDemoAttribute : ValidationAttribute
-    {
-        public CorreoOUsuarioDemoAttribute() : base("El correo no es válido.") { }
-
-        public override bool IsValid(object? value) =>
-            value is not string texto || string.IsNullOrWhiteSpace(texto)
-            || string.Equals(texto.Trim(), CuentaDemo.Usuario, StringComparison.OrdinalIgnoreCase)
-            || new EmailAddressAttribute().IsValid(texto.Trim());
     }
 }

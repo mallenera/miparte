@@ -75,12 +75,6 @@
                     <a href="login" @onclick="CerrarSesionAsync" @onclick:preventDefault>Salir de la demo</a>
                 </div>
             }
-            else if (Sesion.EsDemo)
-            {
-                <div class="aviso warn aviso-demo" role="status">
-                    Estás en la cuenta demo compartida: cualquiera puede verla y modificarla, así que no escribas datos personales.
-                </div>
-            }
         </Authorized>
     </AuthorizeView>
 

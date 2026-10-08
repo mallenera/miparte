@@ -29,9 +29,6 @@ public sealed class ServicioSesion
     /// <summary>Indica si la sesión actual es la del modo demo local (datos en memoria, sin servidor).</summary>
     public bool EsDemoLocal => CuentaDemo.EsLocal(SesionActual?.UserId);
 
-    /// <summary>Indica si la sesión es de alguna de las dos demos: la local o la cuenta demo real compartida.</summary>
-    public bool EsDemo => EsDemoLocal || string.Equals(SesionActual?.Email, CuentaDemo.Correo, StringComparison.OrdinalIgnoreCase);
-
     /// <summary>Crea el servicio.</summary>
     /// <param name="auth">Cliente de Supabase Auth.</param>
     /// <param name="almacen">Almacén persistente del navegador.</param>

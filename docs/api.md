@@ -81,7 +81,7 @@ Permisos: "miembro" = cualquier miembro activo del hogar (incluye admin). "admin
 
 | Método y ruta | Descripción | Request | Response | Errores | Permisos |
 |---|---|---|---|---|---|
-| `GET /api/miembros` | Miembros activos del hogar, por nombre | - | `MiembroDto[]` 200 | - | miembro |
+| `GET /api/miembros?incluirInactivos=` | Miembros activos del hogar, por nombre; con `incluirInactivos=true` también los desactivados (el historial los necesita para poner nombre a quien ya no está) | - | `MiembroDto[]` 200 | - | miembro |
 | `POST /api/miembros` | Alta de persona sin cuenta (`tipo`: `adulto` o `a_cargo`) | `CrearMiembroRequest` | `MiembroDto` 201 | 400 nombre vacío/> 100, tipo inválido, `a_cargo` sin responsable adulto activo, adulto con responsable; 403 no admin | admin |
 | `PUT /api/miembros/{id}` | Edita; campos `null` = sin cambios | `ActualizarMiembroRequest` | `MiembroDto` 200 | 400 nombre vacío, rol inválido, responsable no válido o miembro no `a_cargo`; 403; 404; 409 último admin vinculado, o responsable de miembros a cargo activos | admin; un miembro solo puede cambiar su propio `nombre` |
 | `DELETE /api/miembros/{id}` | Borrado lógico (= PUT `activo=false`, mismas reglas) | - | `MiembroDto` 200 | igual que PUT | admin (un no admin recibe 403) |

@@ -189,6 +189,21 @@ public class MiembrosTests
     }
 
     [Fact]
+    public async Task Listar_IncluirInactivos_DevuelveTambienLosDesactivados()
+    {
+        var s = await Crear();
+        using var _ = s.F;
+        await s.ComoAna.DeleteAsync($"/api/miembros/{s.BetoId}");
+
+        var activos = await Leer<List<MiembroDto>>(await s.ComoAna.GetAsync("/api/miembros"));
+        var todos = await Leer<List<MiembroDto>>(await s.ComoAna.GetAsync("/api/miembros?incluirInactivos=true"));
+
+        Assert.DoesNotContain(activos, m => m.Id == s.BetoId);
+        var beto = Assert.Single(todos, m => m.Id == s.BetoId);
+        Assert.False(beto.Activo);
+    }
+
+    [Fact]
     public async Task Actualizar_Admin_PromocionaYDesactivaConDeleteLogico()
     {
         var s = await Crear();

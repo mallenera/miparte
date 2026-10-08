@@ -14,6 +14,9 @@ services:
       # El Dockerfile escucha en 8080; sin esto Render espera el puerto 10000.
       - key: PORT
         value: "8080"
+      # Render es un proxy inverso: sin esto el limitador por IP vería siempre la IP del proxy.
+      - key: ProxyInverso__Confiar
+        value: "true"
       - key: Supabase__Url
         sync: false
       - key: ConnectionStrings__Default

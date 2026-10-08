@@ -12,8 +12,12 @@ on:
 concurrency:
   group: deploy-web
   cancel-in-progress: true
+permissions:
+  contents: read
 jobs:
   desplegar:
+    # workflow_dispatch puede lanzarse desde cualquier rama: solo master publica en producción.
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     env:
       CORE_URL: ${{ vars.CORE_URL }}

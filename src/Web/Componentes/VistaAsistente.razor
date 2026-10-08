@@ -1,0 +1,146 @@
+@* Pestaña Asistente: chat de solo consulta sobre los gastos del hogar. El texto de las respuestas se pinta siempre como texto (nunca como HTML). *@
+@inject AsistenteApiClient Api
+@inject EstadoHogar Hogar
+@inject ServicioSesion Sesion
+@inject MiParte.Web.Configuracion.OpcionesWeb Opciones
+
+<h1 class="sr">Asistente de @Hogar.HogarActual?.Nombre</h1>
+
+<section class="card" aria-labelledby="t-asistente">
+    <div class="card-head">
+        <h2 id="t-asistente">Asistente</h2>
+        @if (_mensajes.Count > 0)
+        {
+            <button class="linkbtn" type="button" @onclick="Reiniciar" disabled="@_enviando">Nueva conversación</button>
+        }
+    </div>
+    <p class="muted">Pregunta por los gastos del hogar. Solo consulta: no crea, cambia ni borra nada, y las cifras salen de tus datos, no de la imaginación del modelo.</p>
+
+    @if (!Disponible)
+    {
+        <div class="aviso warn" role="status" style="margin-top: 12px">
+            El asistente no está configurado en esta instalación (falta <code>Api:AssistantUrl</code>).
+        </div>
+    }
+    else
+    {
+        <div class="chat" role="log" aria-live="polite" aria-label="Conversación con el asistente">
+            @if (_mensajes.Count == 0)
+            {
+                <div class="empty">
+                    <Icono Nombre="message-circle" Tamano="28" />
+                    <div>Prueba con una de estas preguntas</div>
+                    <div class="sugerencias">
+                        @foreach (var s in Sugerencias)
+                        {
+                            var pregunta = s;
+                            <button class="btn btn-ghost btn-sm" type="button" disabled="@_enviando" @onclick="() => EnviarAsync(pregunta)">@pregunta</button>
+                        }
+                    </div>
+                </div>
+            }
+            @foreach (var m in _mensajes)
+            {
+                <div class="@(m.EsMio ? "burbuja mia" : "burbuja")">
+                    <span class="quien">@(m.EsMio ? "Tú" : "Asistente")</span>
+                    <div class="texto">@m.Texto</div>
+                    @if (m.Herramientas.Count > 0)
+                    {
+                        <div class="fuente muted">Consultado: @string.Join(", ", m.Herramientas.Select(NombreHerramienta))</div>
+                    }
+                </div>
+            }
+            @if (_enviando)
+            {
+                <div class="burbuja" role="status">
+                    <span class="quien">Asistente</span>
+                    <div class="texto muted">Consultando tus datos…</div>
+                </div>
+            }
+        </div>
+
+        @if (_error is not null)
+        {
+            <div class="aviso err" role="alert" style="margin-top: 12px">@_error</div>
+        }
+
+        <form class="chatform" @onsubmit="() => EnviarAsync(_texto)">
+            <label class="sr" for="pregunta">Tu pregunta</label>
+            <input id="pregunta" type="text" autocomplete="off" maxlength="@MaxCaracteres" placeholder="Escribe tu pregunta…"
+                   @bind="_texto" @bind:event="oninput" disabled="@_enviando" />
+            <button class="btn" type="submit" disabled="@(_enviando || string.IsNullOrWhiteSpace(_texto))">Enviar</button>
+        </form>
+    }
+</section>
+
+@code {
+    /// <summary>Tope del cuadro de texto; coincide con el límite por defecto de Assistant.Api.</summary>
+    private const int MaxCaracteres = 1500;
+
+    /// <summary>Mensajes del historial que se envían como contexto (los más recientes).</summary>
+    private const int MaxHistorial = 20;
+
+    private static readonly string[] Sugerencias =
+    [
+        "¿Cuánto hemos gastado este mes?",
+        "¿En qué se nos fue el dinero el mes pasado?",
+        "¿Quién debe a quién este mes?",
+        "¿Gastamos más que el mes pasado?",
+    ];
+
+    private sealed record Burbuja(bool EsMio, string Texto, IReadOnlyList<string> Herramientas);
+
+    private readonly List<Burbuja> _mensajes = [];
+    private string _texto = "";
+    private string? _error;
+    private bool _enviando;
+
+    private bool Disponible => Opciones.AsistenteConfigurado || Sesion.EsDemoLocal;
+
+    private static string NombreHerramienta(string nombre) => nombre switch
+    {
+        "gasto_total" => "gasto total",
+        "gasto_por_categoria" => "gasto por categoría",
+        "balance_mes" => "balance del mes",
+        "liquidacion_mes" => "liquidación del mes",
+        "comparar_meses" => "comparación de meses",
+        _ => nombre,
+    };
+
+    private void Reiniciar()
+    {
+        _mensajes.Clear();
+        _error = null;
+        _texto = "";
+    }
+
+    private async Task EnviarAsync(string? pregunta)
+    {
+        pregunta = pregunta?.Trim();
+        if (_enviando || string.IsNullOrEmpty(pregunta)) return; // evita el doble envío
+        _enviando = true;
+        _error = null;
+        _mensajes.Add(new Burbuja(true, pregunta, []));
+        _texto = "";
+        var historial = _mensajes
+            .TakeLast(MaxHistorial)
+            .Select(m => new MensajeChatDto(m.EsMio ? "user" : "assistant", m.Texto))
+            .ToList();
+        try
+        {
+            var respuesta = await Api.PreguntarAsync(historial);
+            _mensajes.Add(new Burbuja(false, respuesta.Respuesta, respuesta.Herramientas));
+        }
+        catch (ApiException e)
+        {
+            // La pregunta no llegó a contestarse: se devuelve al cuadro para poder reintentarla.
+            _mensajes.RemoveAt(_mensajes.Count - 1);
+            _texto = pregunta;
+            _error = e.Message;
+        }
+        finally
+        {
+            _enviando = false;
+        }
+    }
+}

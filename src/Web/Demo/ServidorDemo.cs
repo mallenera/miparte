@@ -89,6 +89,11 @@ public sealed partial class ServidorDemo
             ("cuenta-comun", 3, "POST") when subruta == "reembolsos" => CrearReembolso((await Cuerpo<CrearReembolsoRequest>())!),
             ("cuenta-comun", 4, "DELETE") when id is { } i => _reembolsos.RemoveAll(x => x.Id == i) > 0 ? Sin() : NoEncontrado(),
 
+            ("chat", 2, "POST") => Ok(new ChatResponse(
+                "En el modo demo el asistente no está conectado a un modelo de lenguaje, así que no puedo consultar los datos de ejemplo. "
+                + "Con una cuenta real respondo preguntas como «¿cuánto gasté en alimentación en junio?» o «¿quién debe a quién este mes?».",
+                [])),
+
             ("resumen", 2, "GET") => Resumen(mes),
             ("liquidacion", 2, "GET") => Liquidacion(mes),
             ("pagos-liquidacion", 2, "POST") => CrearPago((await Cuerpo<CrearPagoLiquidacionRequest>())!),

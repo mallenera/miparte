@@ -59,17 +59,17 @@ else
 
         @if (MesCerrado)
         {
-            <div class="aviso warn" role="status" style="margin-top: 12px">
+            <div class="aviso warn u-mt12" role="status">
                 Este mes está cerrado: sus gastos no se pueden añadir, editar ni borrar. Un administrador puede reabrirlo desde Resumen.
             </div>
         }
 
         @if (_error is not null)
         {
-            <div class="aviso err" role="alert" style="margin-top: 12px">@_error</div>
+            <div class="aviso err u-mt12" role="alert">@_error</div>
         }
 
-        <div style="margin-top: 10px">
+        <div class="u-mt10">
             @foreach (var g in _gastos)
             {
                 <div class="gastorow">
@@ -119,12 +119,12 @@ else
 
         @if (_adultos.Count == 0 || _categorias.Count == 0 || _perfiles.Count == 0)
         {
-            <div class="aviso warn" style="margin-top: 14px">Para registrar gastos hace falta al menos un adulto, una categoría y un perfil de reparto.</div>
+            <div class="aviso warn u-mt14">Para registrar gastos hace falta al menos un adulto, una categoría y un perfil de reparto.</div>
         }
         else
         {
             <form class="addcat" @onsubmit="GuardarAsync">
-                <h3 style="flex: 1 1 100%; margin: 0">@(_editando is null ? "Nuevo gasto" : "Editar gasto")</h3>
+                <h3 class="u-titulo-form">@(_editando is null ? "Nuevo gasto" : "Editar gasto")</h3>
                 <label>Fecha
                     <input type="date" required @bind="_fecha" />
                 </label>
@@ -145,7 +145,7 @@ else
                         {
                             <option value="@m.Id">@m.Nombre</option>
                         }
-                        @if (_cuentaConfigurada && PerfilCuentaComun is not null)
+                        @if (_cuentaActiva && PerfilCuentaComun is not null)
                         {
                             <option value="">Cuenta común (la paga directamente)</option>
                             <option value="ahorro">Ahorro (se descuenta del ahorro)</option>
@@ -154,11 +154,15 @@ else
                 </label>
                 <label>Reparto
                     <select @bind="_perfil">
-                        @foreach (var p in _perfiles)
+                        @foreach (var p in PerfilesOfrecidos)
                         {
                             <option value="@p.Id">@p.Nombre</option>
                         }
                     </select>
+                    @if (CategoriaACargoDeLaCuenta)
+                    {
+                        <span class="muted">Esta categoría va por defecto a cargo de la cuenta común.</span>
+                    }
                 </label>
                 <label>Concepto
                     <input maxlength="200" placeholder="Opcional" @bind="_concepto" @bind:event="oninput" />
@@ -191,7 +195,7 @@ else
     private string _importe = "", _concepto = "";
     private Guid _categoria, _perfil;
     private Guid? _pagador;
-    private bool _cuentaConfigurada, _desdeAhorro;
+    private bool _cuentaActiva, _desdeAhorro;
 
     /// <summary>Quién paga en el selector: un adulto (su id), la cuenta común ("") o el ahorro ("ahorro").</summary>
     private string OrigenPago
@@ -211,6 +215,22 @@ else
 
     /// <summary>El mes mostrado está cerrado: el servidor rechazaría cualquier cambio en sus gastos.</summary>
     private bool MesCerrado => _cierres.Any(c => c.Mes == _mes.ToString("yyyy-MM", CultureInfo.InvariantCulture));
+
+    /// <summary>Perfiles que se ofrecen: el de cuenta común solo con la cuenta activada (si no, la API rechazaría el gasto).</summary>
+    private IEnumerable<PerfilRepartoDto> PerfilesOfrecidos
+    {
+        get
+        {
+            var ofrecidos = _cuentaActiva ? _perfiles : _perfiles.Where(p => p.Modo != "cuenta_comun").ToList();
+            // Al editar un gasto cuyo perfil ya no se ofrece se mantiene como opción, para que el formulario muestre lo que envía.
+            return _editando is not null && _perfiles.FirstOrDefault(p => p.Id == _perfil) is { } actual && !ofrecidos.Contains(actual)
+                ? ofrecidos.Append(actual)
+                : ofrecidos;
+        }
+    }
+
+    /// <summary>La categoría elegida está marcada «a cargo de la cuenta común» y la cuenta está activada.</summary>
+    private bool CategoriaACargoDeLaCuenta => _cuentaActiva && _categorias.FirstOrDefault(c => c.Id == _categoria)?.ACargoCuentaComun == true;
 
     private string NombreMes => _mes.ToString("MMMM yyyy", Es);
 
@@ -233,7 +253,7 @@ else
             _categorias = categorias.Result;
             _perfiles = perfiles.Result;
             _arbol = ArbolCategorias.Aplanar(_categorias);
-            _cuentaConfigurada = await CuentaConfiguradaAsync();
+            _cuentaActiva = await CuentaActivaAsync();
             await RecargarGastosAsync();
             ReiniciarFormulario();
         }
@@ -245,13 +265,13 @@ else
         _cargando = false;
     }
 
-    /// <summary>La cuenta común está configurada si algún adulto tiene aportación definida; si la consulta falla se trata como no configurada.</summary>
-    private async Task<bool> CuentaConfiguradaAsync()
+    /// <summary>La cuenta común se ofrece si el hogar la tiene activada; si la consulta falla se trata como desactivada.</summary>
+    private async Task<bool> CuentaActivaAsync()
     {
         try
         {
             var cuenta = await Api.ObtenerCuentaComunAsync(_mes.ToString("yyyy-MM", CultureInfo.InvariantCulture));
-            return cuenta.Aportaciones.Count > 0 || cuenta.AhorroAcumulado > 0;
+            return cuenta.Activa;
         }
         catch (ApiException)
         {
@@ -354,14 +374,20 @@ else
         _categoria = _arbol.Count > 0 ? _arbol[0].Categoria.Id : Guid.Empty;
         _pagador = (_adultos.FirstOrDefault(m => m.EsYo) ?? _adultos.FirstOrDefault())?.Id ?? Guid.Empty;
         _desdeAhorro = false;
-        _perfil = _perfiles.FirstOrDefault()?.Id ?? Guid.Empty;
+        _perfil = PerfilesOfrecidos.FirstOrDefault()?.Id ?? Guid.Empty;
         AlCambiarCategoria();
     }
 
-    /// <summary>Al elegir una categoría se propone su perfil de reparto por defecto.</summary>
+    /// <summary>
+    /// Al elegir una categoría se propone su perfil de reparto por defecto; si va a cargo de la cuenta común (y está activada),
+    /// el de cuenta común. Sin la cuenta activada no se propone un perfil de cuenta común.
+    /// </summary>
     private void AlCambiarCategoria()
     {
-        if (_editando is null && _categorias.FirstOrDefault(c => c.Id == _categoria)?.PerfilRepartoId is { } p) _perfil = p;
+        if (_editando is not null) return;
+        var categoria = _categorias.FirstOrDefault(c => c.Id == _categoria);
+        if (CategoriaACargoDeLaCuenta && PerfilCuentaComun is { } cuenta) _perfil = cuenta.Id;
+        else if (categoria?.PerfilRepartoId is { } p && PerfilesOfrecidos.Any(x => x.Id == p)) _perfil = p;
     }
 
     private void EmpezarEdicion(GastoResponse g)

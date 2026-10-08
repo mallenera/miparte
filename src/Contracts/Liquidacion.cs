@@ -21,14 +21,28 @@ public record ResumenMiembroDto(Guid MiembroId, string Nombre, decimal Pagado, d
 public record ResumenCategoriaDto(
     Guid CategoriaId, string Nombre, decimal Total, IReadOnlyList<ImporteMiembroDto> PorMiembro);
 
+/// <summary>Saldos de la cuenta común dentro del resumen mensual (solo con la cuenta común activada).</summary>
+/// <param name="AportadoMes">Aportaciones del mes (incluido el ahorro).</param>
+/// <param name="GastadoMes">Gastos cargados a la cuenta en el mes, también los pagados desde el ahorro.</param>
+/// <param name="Saldo">Saldo de gastos al final del mes (aportado sin ahorro menos gastado), acumulado.</param>
+/// <param name="Efectivo">Dinero de gastos que hay en la cuenta al final del mes (saldo más lo pendiente de reembolsar).</param>
+/// <param name="Pendiente">Total que la cuenta debe a quienes adelantaron gastos.</param>
+/// <param name="AhorroMes">Ahorro del mes (parte de ahorro de las aportaciones y depósitos).</param>
+/// <param name="AhorroDisponible">Ahorro disponible al final del mes.</param>
+public record ResumenCuentaComunDto(
+    decimal AportadoMes, decimal GastadoMes, decimal Saldo, decimal Efectivo, decimal Pendiente,
+    decimal AhorroMes, decimal AhorroDisponible);
+
 /// <summary>GET /api/resumen?mes=YYYY-MM.</summary>
 /// <param name="Mes">Mes consultado, en formato YYYY-MM.</param>
 /// <param name="GastosTotales">Suma de los gastos del mes.</param>
 /// <param name="Miembros">Pagado y asumido por cada miembro.</param>
 /// <param name="Categorias">Total y desglose por categoría.</param>
+/// <param name="CuentaComun">Saldos de la cuenta común al final del mes; null si el hogar no la tiene activada.</param>
 public record ResumenMensualResponse(
     string Mes, decimal GastosTotales,
-    IReadOnlyList<ResumenMiembroDto> Miembros, IReadOnlyList<ResumenCategoriaDto> Categorias);
+    IReadOnlyList<ResumenMiembroDto> Miembros, IReadOnlyList<ResumenCategoriaDto> Categorias,
+    ResumenCuentaComunDto? CuentaComun = null);
 
 /// <summary>Saldo positivo = le deben; negativo = debe. Ya descuenta los pagos registrados.</summary>
 /// <param name="MiembroId">Identificador del miembro.</param>

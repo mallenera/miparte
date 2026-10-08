@@ -66,6 +66,24 @@ public record CrearRetiradaAhorroRequest(Guid MiembroId, decimal Importe, DateOn
 /// <param name="Importe">Importe pendiente de reembolsar.</param>
 public record PendienteCuentaDto(Guid MiembroId, string Nombre, decimal Importe);
 
+/// <summary>«Su parte» de un miembro en la cuenta común: lo que ha puesto y la porción que le toca del saldo y del ahorro.</summary>
+/// <param name="MiembroId">Miembro.</param>
+/// <param name="Nombre">Nombre del miembro.</param>
+/// <param name="Aportado">Aportado para gastos (sin ahorro) hasta el mes.</param>
+/// <param name="Ahorrado">Apartado a ahorro hasta el mes: parte de ahorro de sus aportaciones más sus depósitos.</param>
+/// <param name="PorcentajeGastos">Su peso sobre lo aportado para gastos (0-100).</param>
+/// <param name="PorcentajeAhorro">Su peso sobre lo ahorrado (0-100).</param>
+/// <param name="ParteSaldo">Su porción del saldo de gastos, en proporción a lo aportado; negativa si la cuenta está en descubierto.</param>
+/// <param name="ParteAhorro">Su porción del ahorro disponible, en proporción a lo ahorrado.</param>
+/// <param name="Pendiente">Lo que la cuenta le debe por gastos que adelantó (puede ser 0).</param>
+public record PartePersonaDto(
+    Guid MiembroId, string Nombre, decimal Aportado, decimal Ahorrado, decimal PorcentajeGastos, decimal PorcentajeAhorro,
+    decimal ParteSaldo, decimal ParteAhorro, decimal Pendiente);
+
+/// <summary>PUT /api/cuenta-comun/activacion (solo admin): activa o desactiva la cuenta común del hogar.</summary>
+/// <param name="Activa">true para usar la cuenta común; false la oculta sin borrar sus datos.</param>
+public record ActivarCuentaComunRequest(bool Activa);
+
 /// <summary>GET /api/cuenta-comun?mes=YYYY-MM: estado de la cuenta común al final del mes.</summary>
 /// <param name="Mes">Mes consultado, en formato YYYY-MM.</param>
 /// <param name="AportadoMes">Suma de las aportaciones del mes.</param>
@@ -84,6 +102,8 @@ public record PendienteCuentaDto(Guid MiembroId, string Nombre, decimal Importe)
 /// <param name="AhorroDepositado">Parte del ahorro acumulado que entró como depósitos aparte de las aportaciones.</param>
 /// <param name="DepositosAhorro">Depósitos de ahorro registrados en el mes.</param>
 /// <param name="AhorroGastado">Gastos pagados desde el ahorro hasta el mes; restan del ahorro disponible.</param>
+/// <param name="Activa">Si el hogar tiene activada la cuenta común; si es false las escrituras de la cuenta y los gastos a su cargo responden 409 (las cifras se devuelven igualmente).</param>
+/// <param name="Partes">«Su parte» de cada miembro con aportaciones o depósitos hasta el mes.</param>
 public record CuentaComunResponse(
     string Mes, decimal AportadoMes, decimal Aportado, decimal Gastado, decimal Saldo,
     IReadOnlyList<PendienteCuentaDto> Pendientes, decimal Efectivo,
@@ -91,4 +111,4 @@ public record CuentaComunResponse(
     decimal AhorroMes = 0m, decimal AhorroAcumulado = 0m, decimal AhorroRetirado = 0m, decimal AhorroDisponible = 0m,
     IReadOnlyList<RetiradaAhorroDto>? RetiradasAhorro = null,
     decimal AhorroDepositado = 0m, IReadOnlyList<DepositoAhorroDto>? DepositosAhorro = null,
-    decimal AhorroGastado = 0m);
+    decimal AhorroGastado = 0m, bool Activa = true, IReadOnlyList<PartePersonaDto>? Partes = null);

@@ -46,6 +46,10 @@ public static class ServiciosWeb
             .AddHttpMessageHandler<ManejadorCoreApi>()
             .AddHttpMessageHandler<ManejadorDemo>();
 
+        servicios.AddHttpClient<AsistenteApiClient>(http => http.BaseAddress = Base(opciones.AssistantUrl, "/"))
+            .AddHttpMessageHandler<ManejadorCoreApi>()
+            .AddHttpMessageHandler<ManejadorDemo>();
+
         servicios.AddAuthorizationCore();
         servicios.AddCascadingAuthenticationState();
         servicios.AddScoped<AuthenticationStateProvider, ProveedorEstadoAutenticacion>();

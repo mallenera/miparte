@@ -2,6 +2,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Contracts\MiParte.Contracts.csproj" />
+    <ProjectReference Include="..\..\BuildingBlocks\Auth\MiParte.Auth.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Anthropic" Version="12.54.1" />
   </ItemGroup>
 
   <PropertyGroup>

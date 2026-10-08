@@ -23,6 +23,12 @@ services:
       Supabase__Url: ${Supabase__Url:-}
       Supabase__JwtSecret: ${Supabase__JwtSecret:-}
       Cors__OrigenesPermitidos__0: ${Cors__OrigenesPermitidos__0:-}
+      # Los datos del hogar se consultan a Core.Api (red interna de compose), con el JWT de la persona.
+      Asistente__CoreUrl: http://core:8080
+      Asistente__Modelo: ${Asistente__Modelo:-claude-sonnet-5-5}
+      # Solo por entorno (nunca en el repo). Sin ella el chat responde 503.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    depends_on: [core]
   web:
     build:
       context: .
@@ -32,4 +38,5 @@ services:
       # Orígenes de la CSP (connect-src): Supabase Auth y Core.Api tal como los ve el navegador.
       SUPABASE_URL: ${Supabase__Url:-}
       CORE_URL: ${CoreUrl:-http://localhost:5001}
+      ASSISTANT_URL: ${AssistantUrl:-http://localhost:5002}
     depends_on: [core, assistant]

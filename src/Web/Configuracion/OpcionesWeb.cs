@@ -12,6 +12,12 @@ public sealed class OpcionesWeb
     /// <summary>URL base de Core.Api.</summary>
     public string CoreUrl { get; init; } = "";
 
+    /// <summary>URL base de Assistant.Api (chat). Opcional: vacía, la pestaña Asistente avisa de que no está configurado.</summary>
+    public string AssistantUrl { get; init; } = "";
+
+    /// <summary>Indica si hay un asistente al que preguntar.</summary>
+    public bool AsistenteConfigurado => !string.IsNullOrWhiteSpace(AssistantUrl);
+
     /// <summary>Indica si están definidos los valores mínimos para autenticarse y hablar con Core.Api.</summary>
     public bool EstaConfigurada =>
         !string.IsNullOrWhiteSpace(SupabaseUrl) && !string.IsNullOrWhiteSpace(SupabaseAnonKey) && !string.IsNullOrWhiteSpace(CoreUrl);
@@ -23,5 +29,6 @@ public sealed class OpcionesWeb
         SupabaseUrl = configuracion["Supabase:Url"] ?? "",
         SupabaseAnonKey = configuracion["Supabase:AnonKey"] ?? "",
         CoreUrl = configuracion["Api:CoreUrl"] ?? "",
+        AssistantUrl = configuracion["Api:AssistantUrl"] ?? "",
     };
 }

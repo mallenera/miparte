@@ -71,6 +71,7 @@ if (!string.IsNullOrWhiteSpace(supabase.Url)
 
 app.UseCabecerasSeguridad(); // el primero: también cubre los rechazos del CORS, la autenticación y el limitador
 app.UseCors();
+app.UseErroresInesperados(); // tras el CORS: un 500 conserva Access-Control-Allow-Origin
 app.UseAuthentication();
 // Entre autenticar y autorizar: la partición es el usuario ya validado (un sub falsificado no cuenta) y
 // los 401 de quien no se autentica también se limitan por IP, porque UseAuthorization corta antes.

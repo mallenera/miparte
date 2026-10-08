@@ -1,3 +1,6 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Headers;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -73,5 +76,34 @@ public class CorsTests
         var r = await f.CreateClient().SendAsync(req);
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
         Assert.Equal(Permitido, r.Headers.GetValues("Access-Control-Allow-Origin").Single());
+    }
+
+    /// <summary>Endpoint solo de pruebas que lanza una excepción no controlada, como una base de datos caída.</summary>
+    private sealed class EndpointQueFallaFilter : IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+        {
+            next(app);
+            app.Run(ctx => ctx.Request.Path == "/prueba/falla"
+                ? throw new InvalidOperationException("detalle-interno-secreto")
+                : Task.CompletedTask);
+        };
+    }
+
+    [Fact]
+    public async Task ErrorInesperado_Responde500ConCabeceraCorsYSinDetalles()
+    {
+        using var f = ConOrigenes(Permitido).WithWebHostBuilder(b =>
+            b.ConfigureServices(s => s.AddSingleton<IStartupFilter, EndpointQueFallaFilter>()));
+        var c = f.CreateClient();
+        c.DefaultRequestHeaders.Add("Origin", Permitido);
+
+        var r = await c.GetAsync("/prueba/falla");
+
+        Assert.Equal(HttpStatusCode.InternalServerError, r.StatusCode);
+        Assert.Equal(Permitido, r.Headers.GetValues("Access-Control-Allow-Origin").Single());
+        var cuerpo = await r.Content.ReadAsStringAsync();
+        Assert.Contains("Error interno", cuerpo);
+        Assert.DoesNotContain("detalle-interno-secreto", cuerpo);
     }
 }

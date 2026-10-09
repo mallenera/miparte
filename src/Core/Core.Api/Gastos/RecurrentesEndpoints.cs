@@ -163,6 +163,10 @@ public static class RecurrentesEndpoints
                 {
                     await db.SaveChangesAsync(ct);
                 }
+                catch (DbUpdateException ex) when (CierreMes.EsRechazo(ex))
+                {
+                    return CierreMes.Rechazo(); // otra petición cerró el mes tras la comprobación previa
+                }
                 catch (DbUpdateException ex) when (intento < 3 && EsUnicidadViolada(ex))
                 {
                     // Otra petición generó alguno antes: se descartan los cambios y se recalcula.

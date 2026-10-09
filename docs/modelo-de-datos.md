@@ -58,6 +58,7 @@ erDiagram
 | ~~`ingreso`~~ | **Eliminada** por `20261007000000_perfiles_cuenta_comun_sin_ingresos.sql`: el diseño no guarda ingresos. |
 
 ## Invariantes que no se rompen
+- **Un mes cerrado no admite escrituras de gasto, ni con carreras.** Triggers `BEFORE` en `gasto`, `gasto_reparto` y `mes_cerrado` (migración `20261021120000_cierre_de_mes_concurrencia.sql`) toman `pg_advisory_xact_lock` por hogar + mes; las escrituras de gasto (insert, update con fecha antigua y nueva, delete y cambios solo del reparto) vuelven a comprobar `mes_cerrado` con el bloqueo tomado y lanzan SQLSTATE `MP409` si está cerrado. Así, un cierre concurrente espera a las escrituras en curso del mes y toda escritura posterior lo ve. La comprobación previa de Core.Api solo da el 409 temprano; la garantía es esta. Reabrir (borrar la fila) no bloquea.
 - Claves foráneas compuestas `(hogar_id, id)`: un registro nunca referencia datos de otro hogar.
 - Importes `numeric(12,2)`; en código `decimal`, nunca `float`. El último miembro absorbe el céntimo sobrante para que el reparto sume el importe.
 - Pagador y reparto solo para **adultos activos**; los `a_cargo` no pagan ni reparten.

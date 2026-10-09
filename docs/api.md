@@ -63,7 +63,7 @@ Detrás de un proxy inverso hay que configurar `ForwardedHeaders`; si no, todos 
    - **1**: seleccionarlo automáticamente (`hogarActual` viene relleno). Se puede omitir `X-Hogar-Id`, aunque conviene enviarlo siempre.
    - **N > 1**: mostrar selector, guardar la elección (p. ej. `localStorage`) y enviar `X-Hogar-Id` en todas las llamadas. Al arrancar, si la elección guardada ya no está en `hogares`, volver a pedir elegir. Con varios hogares y sin cabecera, `hogarActual` es `null`.
 3. Una vez elegido el hogar, cargar `GET /api/miembros`, `/api/categorias`, `/api/perfiles` y el mes actual.
-4. Un 409 en cualquier endpoint con hogar significa "falta `X-Hogar-Id`" (o no hay hogar): volver al paso 1.
+4. Un 409 de resolución del hogar (falta `X-Hogar-Id` o no hay hogar) obliga a volver al paso 1. Los 409 de negocio, como el de mes cerrado, se tratan según el endpoint: muestran su `error`, no cambian de hogar.
 
 ## 3. Endpoints
 
@@ -172,7 +172,7 @@ El importe de un mes es el de la aportación con `desde` más reciente que no pa
 | `POST /api/cierres-mes` | Cierra un mes (`mes` = `YYYY-MM`) | `CerrarMesRequest` | `MesCerradoDto` 201 | 400 mes inválido o que aún no ha terminado; 403 sin miembro activo vinculado; 409 ya cerrado o sin hogar | miembro |
 | `DELETE /api/cierres-mes/{mes}` | Reabre un mes cerrado (`mes` = `YYYY-MM`) | - | 204 | 400 mes inválido; 403 no admin; 404 no estaba cerrado; 409 sin hogar | admin |
 
-Un mes cerrado congela sus **gastos** y, con ellos, su reparto, su resumen y su liquidación (saldos y transferencias sugeridas): `POST /api/gastos` con fecha en ese mes, `PUT /api/gastos/{id}` (si la fecha actual **o** la nueva cae en un mes cerrado, es decir, tampoco se saca un gasto de él ni se mete uno), `DELETE /api/gastos/{id}` y `POST /api/gastos-recurrentes/generar?mes=` devuelven 409 `{ "error": "Ese mes está cerrado: ..." }`. Los pagos de liquidación (`/api/pagos-liquidacion`) siguen permitidos porque saldan lo congelado sin cambiarlo. Solo se cierra un mes ya terminado (el mes en curso y los futuros dan 400). Cualquier miembro activo cierra; reabrir es posible en cualquier momento, pero solo para un admin, y queda en el historial. Cerrar y reabrir quedan en la auditoría con la entidad `mes_cerrado`.
+Un mes cerrado congela sus **gastos** y, con ellos, su reparto, su resumen y su liquidación (saldos y transferencias sugeridas): `POST /api/gastos` con fecha en ese mes, `PUT /api/gastos/{id}` (si la fecha actual **o** la nueva cae en un mes cerrado, es decir, tampoco se saca un gasto de él ni se mete uno), `DELETE /api/gastos/{id}` y `POST /api/gastos-recurrentes/generar?mes=` devuelven 409 `{ "error": "Ese mes está cerrado: ..." }`. El 409 también se da si el mes se cierra *durante* la petición: la base de datos serializa el cierre y las escrituras de gasto del mismo hogar y mes y rechaza la escritura tardía (el gasto no se guarda). Los pagos de liquidación (`/api/pagos-liquidacion`) siguen permitidos porque saldan lo congelado sin cambiarlo. Solo se cierra un mes ya terminado (el mes en curso y los futuros dan 400). Cualquier miembro activo cierra; reabrir es posible en cualquier momento, pero solo para un admin, y queda en el historial. Cerrar y reabrir quedan en la auditoría con la entidad `mes_cerrado`.
 
 ### 3.11 Auditoría
 

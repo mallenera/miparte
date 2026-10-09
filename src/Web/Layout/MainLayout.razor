@@ -32,6 +32,7 @@
                                 }
                                 <div class="msep"></div>
                                 <a class="mitem" href="hogar/configuracion" role="menuitem"><Icono Nombre="settings" Tamano="16" />Configuración del hogar</a>
+                                <a class="mitem" href="categorias" role="menuitem"><Icono Nombre="tag" Tamano="16" />Categorías</a>
                                 @if (Permisos.Tiene(Claves.HistorialVer))
                                 {
                                     <a class="mitem" href="hogar/historial" role="menuitem"><Icono Nombre="history" Tamano="16" />Historial</a>
@@ -103,7 +104,6 @@
                     {
                         <NavLink class="tab" ActiveClass="active" href="cuenta-comun"><Icono Nombre="wallet" Tamano="16" />Cuenta común</NavLink>
                     }
-                    <NavLink class="tab" ActiveClass="active" href="categorias"><Icono Nombre="tag" Tamano="16" />Categorías</NavLink>
                     <NavLink class="tab" ActiveClass="active" href="asistente"><Icono Nombre="message-circle" Tamano="16" />Asistente</NavLink>
                 </nav>
             </Authorized>

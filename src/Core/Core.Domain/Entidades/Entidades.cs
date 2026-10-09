@@ -39,8 +39,8 @@ public class Miembro
     public Guid? ResponsableId { get; set; }
     /// <summary>Usuario de Supabase Auth vinculado (claim sub del JWT); null si aún no ha aceptado invitación.</summary>
     public Guid? UserId { get; set; }
-    /// <summary>Claves de <see cref="CatalogoPermisos"/> concedidas al miembro (un admin las tiene todas, sin guardarlas aquí).</summary>
-    public List<string> Permisos { get; set; } = [.. CatalogoPermisos.PorDefecto];
+    /// <summary>Claves de <see cref="CatalogoPermisos"/> asignadas al miembro; null = sigue la plantilla de su rol (admin todos, miembro los de por defecto).</summary>
+    public List<string>? Permisos { get; set; }
     /// <summary>Indica si el miembro está activo en el hogar.</summary>
     public bool Activo { get; set; } = true;
     /// <summary>Rol dentro del hogar (por defecto, miembro).</summary>

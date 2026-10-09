@@ -9,7 +9,7 @@ using MiParte.Web.Componentes;
 
 namespace MiParte.Web.Tests;
 
-public class HistorialTests : TestContext
+public class HistorialTests : BunitContext
 {
     private static readonly Guid AnaId = Guid.NewGuid(), LuisId = Guid.NewGuid();
     private static readonly List<MiembroDto> Miembros =
@@ -32,7 +32,7 @@ public class HistorialTests : TestContext
         return api;
     }
 
-    private IRenderedComponent<PanelHistorial> Panel() => RenderComponent<PanelHistorial>();
+    private IRenderedComponent<PanelHistorial> Panel() => Render<PanelHistorial>();
 
     [Fact]
     public void Frase_describe_la_accion_y_el_nombre()

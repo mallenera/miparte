@@ -3,13 +3,13 @@ using MiParte.Web.Componentes;
 
 namespace MiParte.Web.Tests;
 
-public class CampoContrasenaTests : TestContext
+public class CampoContrasenaTests : BunitContext
 {
     [Fact]
     public void Empieza_oculta_y_el_icono_alterna_la_visibilidad()
     {
         var valor = "secreto1";
-        var cut = RenderComponent<CampoContrasena>(p => p.Add(c => c.Id, "pwd").Add(c => c.Value, "secreto1").Add(c => c.ValueExpression, () => valor));
+        var cut = Render<CampoContrasena>(p => p.Add(c => c.Id, "pwd").Add(c => c.Value, "secreto1").Add(c => c.ValueExpression, () => valor));
         Assert.Equal("password", cut.Find("input").GetAttribute("type"));
         Assert.Equal("Mostrar contraseña", cut.Find("button").GetAttribute("aria-label"));
 

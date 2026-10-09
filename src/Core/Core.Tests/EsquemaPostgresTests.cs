@@ -254,7 +254,7 @@ public class EsquemaPostgresTests
     }
 
     [SkippableFact]
-    public async Task Permisos_PorDefectoSonLosDelCatalogo_YNoAdmitenClavesDesconocidas()
+    public async Task Permisos_SiguenLaPlantillaPorDefecto_YElCheckAdmiteElCatalogoEntero()
     {
         Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
 
@@ -264,9 +264,11 @@ public class EsquemaPostgresTests
         var hogar = (Guid)(await EscalarComoAsync(conn, tx, user, "select public.crear_hogar('Casa permisos', 'Ana')"))!;
         var miembro = (Guid)(await EscalarComoAsync(conn, tx, user, "select id from public.miembro where hogar_id = @h", ("h", hogar)))!;
 
-        // El defecto de la columna es el del catálogo de Core.Domain: si uno cambia sin el otro, un miembro nuevo no tendría lo previsto.
-        var porDefecto = (string[])(await EscalarComoAsync(conn, tx, user, "select permisos from public.miembro where id = @m", ("m", miembro)))!;
-        Assert.Equal(MiParte.Core.Domain.CatalogoPermisos.PorDefecto.Order(), porDefecto.Order());
+        // Sin lista propia el miembro sigue la plantilla de su rol (nulo), y el check de la base admite exactamente las claves del catálogo.
+        Assert.True(await EscalarComoAsync(conn, tx, user, "select permisos from public.miembro where id = @m", ("m", miembro)) is null or DBNull);
+        const string actualizarCada = "update public.miembro set permisos = array[@p] where id = @m returning 1";
+        foreach (var permiso in MiParte.Core.Domain.CatalogoPermisos.Todos)
+            Assert.Equal(1, await EscalarComoAsync(conn, tx, user, actualizarCada, ("p", permiso.Clave), ("m", miembro)));
 
         const string actualizar = "update public.miembro set permisos = array[@p] where id = @m returning 1";
         Assert.Equal(1, await EscalarComoAsync(conn, tx, user, actualizar, ("p", MiParte.Core.Domain.CatalogoPermisos.HistorialVer), ("m", miembro)));

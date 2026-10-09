@@ -82,8 +82,8 @@ public static class MiembrosEndpoints
     }
 
     /// <summary>
-    /// POST /api/miembros (solo admin): añade un miembro "adulto" o "a_cargo" sin usuario vinculado.
-    /// Un a_cargo exige un responsable adulto activo y un adulto no puede tenerlo. 403 si no es admin,
+    /// POST /api/miembros (permiso <c>miembros.gestionar</c>): añade un miembro "adulto" o "a_cargo" sin usuario vinculado.
+    /// Un a_cargo exige un responsable adulto activo y un adulto no puede tenerlo. 403 sin el permiso,
     /// 400 por datos inválidos, 201 con el miembro creado.
     /// </summary>
     private static async Task<IResult> CrearAsync(
@@ -92,7 +92,8 @@ public static class MiembrosEndpoints
     {
         if (!TryUsuario(ctx, out var userId)) return Results.Unauthorized();
         var yo = await Yo(db, userId, ct);
-        if (yo is null || yo.Rol != RolMiembro.Admin) return Error(403, "Solo un administrador puede añadir miembros.");
+        if (yo is null || !CatalogoPermisos.Efectivos(yo).Contains(CatalogoPermisos.MiembrosGestionar))
+            return Error(403, "No tienes permiso para añadir miembros.");
 
         var nombre = req.Nombre?.Trim();
         if (string.IsNullOrEmpty(nombre)) return Error(400, "El nombre es obligatorio.");
@@ -135,7 +136,7 @@ public static class MiembrosEndpoints
     }
 
     /// <summary>
-    /// PUT /api/miembros/{id}: cambia nombre, estado activo, rol o responsable. Un no-admin solo puede
+    /// PUT /api/miembros/{id}: cambia nombre, estado activo, rol, permisos o responsable. Sin <c>miembros.gestionar</c> solo se puede
     /// renombrarse a sí mismo (403 si intenta más). 404 si no existe; 400 por datos inválidos; 409 si
     /// dejaría al hogar sin administrador activo y vinculado, o si desactiva a un responsable de miembros
     /// a cargo activos.
@@ -151,14 +152,13 @@ public static class MiembrosEndpoints
         var m = await db.Miembros.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (m is null) return Error(404, "El miembro no existe en este hogar.");
 
-        var esAdmin = yo.Rol == RolMiembro.Admin;
-        if (!esAdmin)
-        {
-            // Un no-admin solo puede renombrarse a sí mismo.
-            if (m.Id != yo.Id) return Error(403, "Solo un administrador puede modificar a otros miembros.");
-            if (req.Activo is not null || req.ResponsableId is not null || req.Rol is not null || req.Permisos is not null)
-                return Error(403, "Solo un administrador puede cambiar el estado, el rol, el responsable o los permisos.");
-        }
+        var mios = CatalogoPermisos.Efectivos(yo);
+        // Renombrarse a uno mismo lo puede cualquiera; tocar a otros, el estado o el responsable exige gestionar miembros.
+        if (((req.Nombre is not null && m.Id != yo.Id) || req.Activo is not null || req.ResponsableId is not null)
+            && !mios.Contains(CatalogoPermisos.MiembrosGestionar))
+            return Error(403, "No tienes permiso para modificar a otros miembros, su estado o su responsable.");
+        if ((req.Rol is not null || req.Permisos is not null) && !mios.Contains(CatalogoPermisos.PermisosGestionar))
+            return Error(403, "No tienes permiso para cambiar el rol ni los permisos de los miembros.");
 
         string? nombre = null;
         if (req.Nombre is not null)
@@ -187,8 +187,6 @@ public static class MiembrosEndpoints
             var desconocido = req.Permisos.FirstOrDefault(p => !CatalogoPermisos.Existe(p));
             if (desconocido is not null) return Error(400, $"El permiso «{desconocido}» no existe.");
             nuevosPermisos = CatalogoPermisos.Todos.Select(p => p.Clave).Where(req.Permisos.Contains).ToList();
-            if (m.Rol == RolMiembro.Admin || nuevoRol == RolMiembro.Admin)
-                return Error(409, "Un administrador tiene todos los permisos y no se pueden cambiar.");
             if (m.Tipo != TipoMiembro.Adulto || m.UserId is null)
                 return Error(409, "Solo un adulto con cuenta tiene permisos propios.");
         }
@@ -214,6 +212,19 @@ public static class MiembrosEndpoints
             await db.Database.ExecuteSqlInterpolatedAsync(
                 $"select pg_advisory_xact_lock(hashtext({m.HogarId.ToString()}))", ct);
 
+        // Al cambiar de rol sin indicar permisos propios, el miembro vuelve a la plantilla de su rol nuevo.
+        var permisosFinales = nuevosPermisos ?? (nuevoRol is not null && nuevoRol != m.Rol ? null : m.Permisos);
+
+        // Siempre debe quedar alguien activo, con cuenta, que pueda cambiar permisos: si no, nadie podría arreglarlo.
+        var cambiaAcceso = req.Activo is not null || req.Rol is not null || req.Permisos is not null;
+        if (cambiaAcceso && PuedeGestionarPermisos(m, m.Rol, m.Permisos, m.Activo))
+        {
+            var sigue = PuedeGestionarPermisos(m, rolFinal, permisosFinales, seActiva)
+                || (await db.Miembros.Where(x => x.Id != m.Id && x.Activo && x.UserId != null).ToListAsync(ct))
+                    .Any(x => CatalogoPermisos.Efectivos(x).Contains(CatalogoPermisos.PermisosGestionar));
+            if (!sigue) return Error(409, "El hogar debe conservar al menos un miembro que pueda cambiar los permisos.");
+        }
+
         // No dejar al hogar sin administrador activo y vinculado.
         if (m.Rol == RolMiembro.Admin && m.Activo && m.UserId is not null
             && (!seActiva || rolFinal != RolMiembro.Admin))
@@ -231,13 +242,22 @@ public static class MiembrosEndpoints
         m.Activo = seActiva;
         m.Rol = rolFinal;
         // Se asigna una lista nueva solo si cambia: la auditoría compara por referencia y no debe registrar un cambio vacío.
-        if (nuevosPermisos is not null && !nuevosPermisos.ToHashSet().SetEquals(m.Permisos)) m.Permisos = nuevosPermisos;
+        if (!MismosPermisos(permisosFinales, m.Permisos)) m.Permisos = permisosFinales;
         if (req.ResponsableId is not null) m.ResponsableId = req.ResponsableId;
 
         await db.SaveChangesAsync(ct);
         if (tx is not null) await tx.CommitAsync(ct);
         return Results.Ok(ADto(m, userId));
     }
+
+    /// <summary>Si un miembro con el rol, los permisos propios y el estado dados podría cambiar permisos: activo, adulto con cuenta y con el permiso efectivo.</summary>
+    private static bool PuedeGestionarPermisos(Miembro m, RolMiembro rol, List<string>? permisos, bool activo)
+        => activo && CatalogoPermisos.Efectivos(new Miembro { Tipo = m.Tipo, UserId = m.UserId, Rol = rol, Permisos = permisos })
+            .Contains(CatalogoPermisos.PermisosGestionar);
+
+    /// <summary>Si dos listas propias de permisos son iguales como conjuntos (null = sin lista propia).</summary>
+    private static bool MismosPermisos(List<string>? a, List<string>? b)
+        => a is null || b is null ? a is null && b is null : a.ToHashSet().SetEquals(b);
 
     /// <summary>DELETE /api/miembros/{id}: borrado lógico, equivale a PUT con activo=false (mismas reglas y códigos).</summary>
     private static Task<IResult> DesactivarAsync(
@@ -247,7 +267,7 @@ public static class MiembrosEndpoints
     }
 
     /// <summary>
-    /// POST /api/invitaciones (solo admin): crea una invitación, opcionalmente para vincular un miembro
+    /// POST /api/invitaciones (permiso <c>invitaciones.crear</c>): crea una invitación, opcionalmente para vincular un miembro
     /// existente (404 si no existe; 409 si está desactivado o ya vinculado). El token se devuelve en claro
     /// solo en esta respuesta (201); en base de datos se guarda únicamente su hash SHA-256.
     /// </summary>
@@ -257,8 +277,8 @@ public static class MiembrosEndpoints
     {
         if (!TryUsuario(ctx, out var userId)) return Results.Unauthorized();
         var yo = await Yo(db, userId, ct);
-        if (yo is null || yo.Rol != RolMiembro.Admin)
-            return Error(403, "Solo un administrador puede crear invitaciones.");
+        if (yo is null || !CatalogoPermisos.Efectivos(yo).Contains(CatalogoPermisos.InvitacionesCrear))
+            return Error(403, "No tienes permiso para crear invitaciones.");
 
         if (req?.MiembroId is Guid destino)
         {

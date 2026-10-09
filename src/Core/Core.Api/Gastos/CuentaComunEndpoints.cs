@@ -15,8 +15,8 @@ public static class CuentaComunEndpoints
     public static IEndpointRouteBuilder MapCuentaComun(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/cuenta-comun", EstadoAsync).RequireAuthorization();
-        app.MapPut("/api/cuenta-comun/activacion", ActivarAsync).RequireAuthorization();
-        app.MapPut("/api/cuenta-comun/ahorro/activacion", ActivarAhorroAsync).RequireAuthorization();
+        app.MapPut("/api/cuenta-comun/activacion", ActivarAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.HogarFunciones);
+        app.MapPut("/api/cuenta-comun/ahorro/activacion", ActivarAhorroAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.HogarFunciones);
         app.MapPut("/api/cuenta-comun/aportaciones", FijarAportacionAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
         app.MapPost("/api/cuenta-comun/reembolsos", CrearReembolsoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
         app.MapDelete("/api/cuenta-comun/reembolsos/{id:guid}", BorrarReembolsoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
@@ -106,16 +106,13 @@ public static class CuentaComunEndpoints
         => await db.Hogares.AnyAsync(h => h.CuentaComunActiva, ct) ? null : CuentaInactiva();
 
     /// <summary>
-    /// PUT /api/cuenta-comun/activacion (solo admin): activa o desactiva la cuenta común del hogar. Desactivarla no borra datos:
-    /// solo bloquea nuevas escrituras y gastos a su cargo. 403 si no es admin; 409 sin hogar; 200 con el estado resultante.
+    /// PUT /api/cuenta-comun/activacion (permiso <c>hogar.funciones</c>): activa o desactiva la cuenta común del hogar. Desactivarla no borra datos:
+    /// solo bloquea nuevas escrituras y gastos a su cargo. 403 sin el permiso; 409 sin hogar; 200 con el estado resultante.
     /// </summary>
     private static async Task<IResult> ActivarAsync(
         ActivarCuentaComunRequest req, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
-        var esAdmin = hogar.UsuarioId is { } usuario
-            && await db.Miembros.AnyAsync(m => m.UserId == usuario && m.Activo && m.Rol == RolMiembro.Admin, ct);
-        if (!esAdmin) return Results.Json(new { error = "Solo un administrador puede activar o desactivar la cuenta común." }, statusCode: StatusCodes.Status403Forbidden);
 
         var h = await db.Hogares.FirstAsync(ct);
         h.CuentaComunActiva = req.Activa;
@@ -124,16 +121,13 @@ public static class CuentaComunEndpoints
     }
 
     /// <summary>
-    /// PUT /api/cuenta-comun/ahorro/activacion (solo admin): activa o desactiva el ahorro del hogar. Desactivarlo no borra datos:
-    /// solo bloquea nuevas escrituras del ahorro. 403 si no es admin; 409 sin hogar o con la cuenta común desactivada; 200 con el estado resultante.
+    /// PUT /api/cuenta-comun/ahorro/activacion (permiso <c>hogar.funciones</c>): activa o desactiva el ahorro del hogar. Desactivarlo no borra datos:
+    /// solo bloquea nuevas escrituras del ahorro. 403 sin el permiso; 409 sin hogar o con la cuenta común desactivada; 200 con el estado resultante.
     /// </summary>
     private static async Task<IResult> ActivarAhorroAsync(
         ActivarAhorroRequest req, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
-        var esAdmin = hogar.UsuarioId is { } usuario
-            && await db.Miembros.AnyAsync(m => m.UserId == usuario && m.Activo && m.Rol == RolMiembro.Admin, ct);
-        if (!esAdmin) return Results.Json(new { error = "Solo un administrador puede activar o desactivar el ahorro." }, statusCode: StatusCodes.Status403Forbidden);
         if (await ExigirActivaAsync(db, ct) is { } inactiva) return inactiva;
 
         var h = await db.Hogares.FirstAsync(ct);

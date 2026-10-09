@@ -16,7 +16,7 @@ public class PermisosTests
 
     private sealed record Escenario(HttpClient Admin, HttpClient Miembro, Guid AdminId, Guid MiembroId, Guid Categoria, Guid Perfil);
 
-    /// <summary>Hogar con un admin (Ana) y un miembro sin permisos concedidos salvo los indicados (Beto).</summary>
+    /// <summary>Hogar con un admin (Ana, plantilla de admin) y un miembro (Beto) con exactamente los permisos indicados.</summary>
     private static async Task<Escenario> Montar(params string[] permisosDeBeto)
     {
         var f = Crear(Secreto);
@@ -44,24 +44,43 @@ public class PermisosTests
     [Fact]
     public void Dominio_PorDefectoReproduceLoQueHaciaUnMiembro()
     {
-        Assert.DoesNotContain(CatalogoPermisos.MesReabrir, CatalogoPermisos.PorDefecto);
-        Assert.DoesNotContain(CatalogoPermisos.HistorialVer, CatalogoPermisos.PorDefecto);
-        Assert.Equal(CatalogoPermisos.Todos.Count - 2, CatalogoPermisos.PorDefecto.Count);
+        string[] soloConAsignacion =
+        [
+            CatalogoPermisos.MesReabrir, CatalogoPermisos.HistorialVer, CatalogoPermisos.MiembrosGestionar,
+            CatalogoPermisos.InvitacionesCrear, CatalogoPermisos.HogarFunciones, CatalogoPermisos.PermisosGestionar, CatalogoPermisos.HogarEliminar,
+        ];
+        Assert.All(soloConAsignacion, c => Assert.DoesNotContain(c, CatalogoPermisos.PorDefecto));
+        Assert.Equal(CatalogoPermisos.Todos.Count - soloConAsignacion.Length, CatalogoPermisos.PorDefecto.Count);
         Assert.Equal(CatalogoPermisos.Todos.Count, CatalogoPermisos.Todos.Select(p => p.Clave).Distinct().Count());
     }
 
     [Fact]
-    public void Dominio_EfectivosSegunPerfil()
+    public void Dominio_EfectivosSegunPlantillaDelRolOListaPropia()
     {
-        var admin = new Miembro { Tipo = TipoMiembro.Adulto, UserId = Guid.NewGuid(), Rol = RolMiembro.Admin, Permisos = [] };
-        var miembro = new Miembro { Tipo = TipoMiembro.Adulto, UserId = Guid.NewGuid(), Permisos = [CatalogoPermisos.GastosCrear, "inventado"] };
+        var adminPlantilla = new Miembro { Tipo = TipoMiembro.Adulto, UserId = Guid.NewGuid(), Rol = RolMiembro.Admin };
+        var adminRestringido = new Miembro { Tipo = TipoMiembro.Adulto, UserId = Guid.NewGuid(), Rol = RolMiembro.Admin, Permisos = [CatalogoPermisos.GastosCrear] };
+        var miembroPlantilla = new Miembro { Tipo = TipoMiembro.Adulto, UserId = Guid.NewGuid() };
+        var miembroPropio = new Miembro { Tipo = TipoMiembro.Adulto, UserId = Guid.NewGuid(), Permisos = [CatalogoPermisos.PermisosGestionar, "inventado"] };
         var sinCuenta = new Miembro { Tipo = TipoMiembro.Adulto };
         var aCargo = new Miembro { Tipo = TipoMiembro.ACargo, UserId = Guid.NewGuid() };
 
-        Assert.Equal(CatalogoPermisos.Todos.Count, CatalogoPermisos.Efectivos(admin).Count);
-        Assert.Equal([CatalogoPermisos.GastosCrear], CatalogoPermisos.Efectivos(miembro));
+        Assert.Equal(CatalogoPermisos.Todos.Count, CatalogoPermisos.Efectivos(adminPlantilla).Count);
+        Assert.Equal([CatalogoPermisos.GastosCrear], CatalogoPermisos.Efectivos(adminRestringido));
+        Assert.Equal(CatalogoPermisos.PorDefecto.Order(), CatalogoPermisos.Efectivos(miembroPlantilla).Order());
+        Assert.Equal([CatalogoPermisos.PermisosGestionar], CatalogoPermisos.Efectivos(miembroPropio));
         Assert.Empty(CatalogoPermisos.Efectivos(sinCuenta));
         Assert.Empty(CatalogoPermisos.Efectivos(aCargo));
+    }
+
+    [Fact]
+    public void Dominio_PlantillasSoloUsanClavesDelCatalogo()
+    {
+        Assert.All(CatalogoPermisos.Plantillas, p => Assert.All(p.Claves, c => Assert.True(CatalogoPermisos.Existe(c))));
+        Assert.Empty(CatalogoPermisos.Plantillas.Single(p => p.Nombre == "Solo lectura").Claves);
+        Assert.Equal(CatalogoPermisos.Todos.Count, CatalogoPermisos.Plantillas.Single(p => p.Nombre == "Administrador").Claves.Count);
+        var gestor = CatalogoPermisos.Plantillas.Single(p => p.Nombre == "Gestor").Claves;
+        Assert.DoesNotContain(CatalogoPermisos.PermisosGestionar, gestor);
+        Assert.DoesNotContain(CatalogoPermisos.HogarEliminar, gestor);
     }
 
     [Fact]
@@ -123,7 +142,7 @@ public class PermisosTests
     }
 
     [Fact]
-    public async Task EditarPermisos_SoloAdmin_ValidaClavesYSeReflejanEnElMiembro()
+    public async Task EditarPermisos_RequierePermisosGestionar_ValidaClavesYSeReflejanEnElMiembro()
     {
         var e = await Montar();
         var cuerpo = new ActualizarMiembroRequest(Permisos: [CatalogoPermisos.GastosCrear, CatalogoPermisos.HistorialVer]);
@@ -131,7 +150,6 @@ public class PermisosTests
         Assert.Equal(HttpStatusCode.Forbidden, (await e.Miembro.PutAsJsonAsync($"/api/miembros/{e.MiembroId}", cuerpo)).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await e.Admin.PutAsJsonAsync(
             $"/api/miembros/{e.MiembroId}", new ActualizarMiembroRequest(Permisos: ["inventado"]))).StatusCode);
-        Assert.Equal(HttpStatusCode.Conflict, (await e.Admin.PutAsJsonAsync($"/api/miembros/{e.AdminId}", cuerpo)).StatusCode);
 
         var ok = await e.Admin.PutAsJsonAsync($"/api/miembros/{e.MiembroId}", cuerpo);
         Assert.Equal(HttpStatusCode.OK, ok.StatusCode);
@@ -143,10 +161,94 @@ public class PermisosTests
     }
 
     [Fact]
+    public async Task Permisos_SeAsignanTambienAUnAdmin_YSiempreQuedaQuienPuedaGestionarlos()
+    {
+        var e = await Montar();
+        // Con Beto sin el permiso, Ana es la única que puede cambiar permisos: no se lo puede quitar.
+        var sinGestionar = new ActualizarMiembroRequest(Permisos: [CatalogoPermisos.GastosCrear]);
+        var rechazo = await e.Admin.PutAsJsonAsync($"/api/miembros/{e.AdminId}", sinGestionar);
+        Assert.Equal(HttpStatusCode.Conflict, rechazo.StatusCode);
+        Assert.Contains("cambiar los permisos", await rechazo.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.Conflict, (await e.Admin.PutAsJsonAsync($"/api/miembros/{e.AdminId}", new ActualizarMiembroRequest(Activo: false))).StatusCode);
+
+        // Beto recibe el permiso: ahora Ana sí puede quedarse con menos (aunque siga siendo rol admin).
+        Assert.Equal(HttpStatusCode.OK, (await e.Admin.PutAsJsonAsync(
+            $"/api/miembros/{e.MiembroId}", new ActualizarMiembroRequest(Permisos: [CatalogoPermisos.PermisosGestionar]))).StatusCode);
+        var ana = await e.Admin.PutAsJsonAsync($"/api/miembros/{e.AdminId}", sinGestionar);
+        Assert.Equal(HttpStatusCode.OK, ana.StatusCode);
+        var dto = (await ana.Content.ReadFromJsonAsync<MiembroDto>(Web))!;
+        Assert.Equal("admin", dto.Rol);
+        Assert.Equal([CatalogoPermisos.GastosCrear], dto.Permisos);
+
+        // Y ya no puede hacer lo que perdió, mientras que Beto lo hace por ella.
+        Assert.Equal(HttpStatusCode.Forbidden, (await e.Admin.PutAsJsonAsync(
+            $"/api/miembros/{e.MiembroId}", new ActualizarMiembroRequest(Permisos: []))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await e.Miembro.PutAsJsonAsync(
+            $"/api/miembros/{e.AdminId}", new ActualizarMiembroRequest(Permisos: [CatalogoPermisos.PermisosGestionar]))).StatusCode);
+    }
+
+    [Fact]
+    public async Task CambiarElRol_VuelveALaPlantillaDelRolNuevo()
+    {
+        var e = await Montar(CatalogoPermisos.GastosCrear);
+
+        var promo = await e.Admin.PutAsJsonAsync($"/api/miembros/{e.MiembroId}", new ActualizarMiembroRequest(Rol: "admin"));
+        Assert.Equal(CatalogoPermisos.Todos.Count, (await promo.Content.ReadFromJsonAsync<MiembroDto>(Web))!.Permisos!.Count);
+
+        var baja = await e.Admin.PutAsJsonAsync($"/api/miembros/{e.MiembroId}", new ActualizarMiembroRequest(Rol: "miembro"));
+        Assert.Equal(CatalogoPermisos.PorDefecto.Order(), (await baja.Content.ReadFromJsonAsync<MiembroDto>(Web))!.Permisos!.Order());
+    }
+
+    [Fact]
+    public async Task GestionDeMiembrosInvitacionesYFunciones_SeAsignanPorPermiso()
+    {
+        var e = await Montar(); // Beto sin ninguna de estas capacidades
+        Assert.Equal(HttpStatusCode.Forbidden, (await e.Miembro.PostAsJsonAsync("/api/miembros", new CrearMiembroRequest("Cris", "adulto"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await e.Miembro.PostAsJsonAsync("/api/invitaciones", new CrearInvitacionRequest(null))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await e.Miembro.PutAsJsonAsync("/api/cuenta-comun/activacion", new ActivarCuentaComunRequest(true))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await e.Miembro.PutAsJsonAsync("/api/cuenta-comun/ahorro/activacion", new ActivarAhorroRequest(true))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await e.Miembro.PutAsJsonAsync($"/api/miembros/{e.AdminId}", new ActualizarMiembroRequest(Nombre: "X"))).StatusCode);
+        // Renombrarse a sí mismo lo puede cualquiera.
+        Assert.Equal(HttpStatusCode.OK, (await e.Miembro.PutAsJsonAsync($"/api/miembros/{e.MiembroId}", new ActualizarMiembroRequest(Nombre: "Beto B"))).StatusCode);
+
+        await e.Admin.PutAsJsonAsync($"/api/miembros/{e.MiembroId}", new ActualizarMiembroRequest(Permisos:
+            [CatalogoPermisos.MiembrosGestionar, CatalogoPermisos.InvitacionesCrear, CatalogoPermisos.HogarFunciones]));
+
+        Assert.Equal(HttpStatusCode.Created, (await e.Miembro.PostAsJsonAsync("/api/miembros", new CrearMiembroRequest("Cris", "adulto"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await e.Miembro.PostAsJsonAsync("/api/invitaciones", new CrearInvitacionRequest(null))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await e.Miembro.PutAsJsonAsync("/api/cuenta-comun/activacion", new ActivarCuentaComunRequest(true))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await e.Miembro.PutAsJsonAsync($"/api/miembros/{e.AdminId}", new ActualizarMiembroRequest(Nombre: "Ana A"))).StatusCode);
+        // Gestionar miembros no incluye cambiar permisos.
+        Assert.Equal(HttpStatusCode.Forbidden, (await e.Miembro.PutAsJsonAsync($"/api/miembros/{e.AdminId}", new ActualizarMiembroRequest(Permisos: []))).StatusCode);
+    }
+
+    [Fact]
+    public async Task EliminarHogar_ExigePermisoYElNombreExacto_YDejaAlUsuarioSinHogar()
+    {
+        var e = await Montar(CatalogoPermisos.PermisosGestionar); // Beto puede gestionar permisos, pero no eliminar
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await e.Miembro.DeleteAsync("/api/hogar?nombre=Casa")).StatusCode);
+        var sinNombre = await e.Admin.DeleteAsync("/api/hogar");
+        Assert.Equal(HttpStatusCode.BadRequest, sinNombre.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await e.Admin.DeleteAsync("/api/hogar?nombre=casa")).StatusCode); // distingue mayúsculas
+        Assert.Single((await e.Admin.GetFromJsonAsync<List<HogarResumen>>("/api/hogares", Web))!); // sigue ahí
+
+        Assert.Equal(HttpStatusCode.NoContent, (await e.Admin.DeleteAsync("/api/hogar?nombre=Casa")).StatusCode);
+        Assert.Empty((await e.Admin.GetFromJsonAsync<List<HogarResumen>>("/api/hogares", Web))!);
+    }
+
+    [Fact]
+    public async Task EliminarHogar_SePuedeAsignarAUnMiembro()
+    {
+        var e = await Montar(CatalogoPermisos.HogarEliminar);
+        Assert.Equal(HttpStatusCode.NoContent, (await e.Miembro.DeleteAsync("/api/hogar?nombre=Casa")).StatusCode);
+    }
+
+    [Fact]
     public async Task EditarPermisos_AdultoSinCuenta_Devuelve409()
     {
         var e = await Montar();
-            // Un adulto sin cuenta no tiene permisos propios: se comprueba creándolo con la API.
+        // Un adulto sin cuenta no tiene permisos propios: se comprueba creándolo con la API.
         var creado = await e.Admin.PostAsJsonAsync("/api/miembros", new CrearMiembroRequest("Cris", "adulto"));
         var cris = (await creado.Content.ReadFromJsonAsync<MiembroDto>(Web))!;
 

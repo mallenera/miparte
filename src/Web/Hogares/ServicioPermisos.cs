@@ -15,7 +15,6 @@ public sealed class ServicioPermisos
     private IReadOnlySet<string> _claves = new HashSet<string>();
     private Guid? _hogarId;
     private bool _cargado;
-    private bool _esAdmin;
 
     /// <summary>Se dispara cuando cambian los permisos del usuario (carga, cambio de hogar o edición).</summary>
     public event Action? Cambiado;
@@ -32,9 +31,6 @@ public sealed class ServicioPermisos
 
     /// <summary>Si ya se conocen los permisos del hogar actual.</summary>
     public bool Cargado => _cargado;
-
-    /// <summary>Si el usuario es admin del hogar actual (los admins lo tienen todo y gestionan miembros y funciones).</summary>
-    public bool EsAdmin => _esAdmin;
 
     /// <summary>Si el usuario tiene el permiso <paramref name="clave"/> en el hogar actual.</summary>
     /// <param name="clave">Clave de <see cref="CatalogoPermisos"/>.</param>
@@ -59,16 +55,15 @@ public sealed class ServicioPermisos
     public void Establecer(IEnumerable<MiembroDto> miembros)
     {
         var yo = miembros.FirstOrDefault(m => m.EsYo);
-        Fijar(yo?.Permisos ?? [], yo?.Rol == "admin");
+        Fijar(yo?.Permisos ?? []);
     }
 
     /// <summary>Fija directamente los permisos del usuario en el hogar actual.</summary>
     /// <param name="claves">Claves concedidas.</param>
-    /// <param name="esAdmin">Si el usuario es admin.</param>
-    public void Fijar(IEnumerable<string> claves, bool esAdmin = false)
+    public void Fijar(IEnumerable<string> claves)
     {
         _claves = claves.ToHashSet();
-        _esAdmin = esAdmin;
+
         _hogarId = _hogar.HogarActual?.Id;
         _cargado = true;
         Cambiado?.Invoke();
@@ -79,7 +74,7 @@ public sealed class ServicioPermisos
         if (_cargado && _hogarId == _hogar.HogarActual?.Id) return;
         _cargado = false;
         _claves = new HashSet<string>();
-        _esAdmin = false;
+
         Cambiado?.Invoke();
         if (_hogar.HogarActual is not null) _ = AsegurarAsync();
     }

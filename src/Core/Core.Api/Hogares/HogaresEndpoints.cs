@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MiParte.Contracts;
+using MiParte.Core.Api.Gastos;
 using MiParte.Core.Api.Seguridad;
+using MiParte.Core.Domain;
 using MiParte.Core.Domain.Entidades;
 using MiParte.Core.Infrastructure.Auditoria;
 using MiParte.Core.Infrastructure.Persistencia;
@@ -42,11 +44,45 @@ public static class HogaresEndpoints
             .RequireAuthorization()
             .WithMetadata(new SinHogarActual());
 
+        // No lleva SinHogarActual: actúa sobre el hogar de la cabecera X-Hogar-Id, y así el filtro de permisos sabe de qué hogar se trata.
+        app.MapDelete("/api/hogar", EliminarAsync)
+            .RequireAuthorization()
+            .RequierePermiso(CatalogoPermisos.HogarEliminar)
+            .RequireRateLimiting(LimitacionPeticiones.Costosa);
+
         app.MapGet("/api/yo", YoAsync)
             .RequireAuthorization()
             .WithMetadata(new SinHogarActual());
 
         return app;
+    }
+
+    /// <summary>
+    /// DELETE /api/hogar?nombre=: elimina el hogar actual y, en cascada, todos sus datos (miembros, gastos, cuenta común, historial...).
+    /// No tiene vuelta atrás. Exige el permiso <c>hogar.eliminar</c> (403) y que <paramref name="nombre"/> sea el nombre exacto del
+    /// hogar (400), como confirmación. 409 sin hogar; 204 si se elimina.
+    /// </summary>
+    private static async Task<IResult> EliminarAsync(
+        [FromQuery] string? nombre, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
+    {
+        if (hogar.HogarId is not { } id) return ApiComun.SinHogar();
+        var h = await db.Hogares.FirstAsync(ct);
+        if (!string.Equals(nombre?.Trim(), h.Nombre, StringComparison.Ordinal))
+            return ApiComun.Invalido("Escribe el nombre exacto del hogar para confirmar que quieres eliminarlo.");
+
+        if (db.Database.IsRelational())
+        {
+            // Borrado directo: la base de datos elimina en cascada el resto de filas (y la auditoría del hogar, que solo admite ese borrado).
+            await db.Hogares.IgnoreQueryFilters().Where(x => x.Id == id).ExecuteDeleteAsync(ct);
+        }
+        else
+        {
+            // Proveedor InMemory (tests): no admite ExecuteDelete ni borrado en cascada; se quitan el hogar y sus miembros.
+            db.Miembros.RemoveRange(await db.Miembros.ToListAsync(ct));
+            db.Hogares.Remove(h);
+            await db.SaveChangesAsync(ct);
+        }
+        return Results.NoContent();
     }
 
     /// <summary>

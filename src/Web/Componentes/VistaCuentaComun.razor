@@ -32,7 +32,7 @@ else if (_estado is not null && !_estado.Activa)
         }
         else
         {
-            <div class="aviso warn u-mt12" role="status">Solo un administrador del hogar puede activarla.</div>
+            <div class="aviso warn u-mt12" role="status">No tienes permiso para activarla: pídeselo a un administrador del hogar.</div>
         }
     </section>
 }
@@ -342,7 +342,7 @@ else if (_estado is not null)
     private string _importeRetirada = "", _conceptoRetirada = "", _importeDeposito = "", _conceptoDeposito = "";
 
     /// <summary>Si el usuario es admin del hogar: solo él activa o desactiva la cuenta común.</summary>
-    private bool SoyAdmin => _miembros.Any(m => m.EsYo && m.Rol == "admin");
+    private bool SoyAdmin => Permisos.Tiene(Claves.HogarFunciones);
 
     private bool PuedeCuenta => Permisos.Tiene(Claves.CuentaMovimientos);
 

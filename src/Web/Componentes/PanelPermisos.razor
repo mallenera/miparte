@@ -1,10 +1,10 @@
-@* Permisos del hogar: matriz de lo que puede hacer cada perfil y, para un admin, los checks de cada miembro con cuenta. La API es quien los aplica. *@
+@* Permisos del hogar: matriz de lo que puede hacer cada perfil y, para quien puede cambiar permisos, los checks de cada adulto con cuenta (admins incluidos), con plantillas para asignar rápido. La API es quien los aplica. *@
 @inject CoreApiClient Api
 @inject ServicioAvisos Avisos
 
 <section class="card" aria-labelledby="t-permisos">
     <div class="card-head"><h2 id="t-permisos">Permisos</h2></div>
-    <p class="muted">Qué puede hacer cada perfil. Un admin lo puede todo y además gestiona miembros, invitaciones, funciones del hogar y permisos. Un miembro nuevo recibe los permisos de la columna «Miembro».</p>
+    <p class="muted">Cada adulto con cuenta tiene los permisos que se le asignen, también los admins. Sin asignación propia, un admin los tiene todos y un miembro los de la columna «Miembro». La tabla resume esas plantillas.</p>
 
     <div class="matriz-wrap">
         <table class="matriz">
@@ -33,21 +33,10 @@
                         </tr>
                     }
                 }
-                <tr class="grupo"><th scope="colgroup" colspan="5">Solo admin</th></tr>
-                @foreach (var texto in SoloAdmin)
-                {
-                    <tr>
-                        <th scope="row">@texto</th>
-                        <td><Marca Si="true" /></td>
-                        <td><Marca Si="false" /></td>
-                        <td><Marca Si="false" /></td>
-                        <td><Marca Si="false" /></td>
-                    </tr>
-                }
             </tbody>
         </table>
     </div>
-    <p class="muted u-mt12">«Adulto sin cuenta» y «A cargo» no entran en la aplicación: solo participan en el reparto y los pagos.</p>
+    <p class="muted u-mt12">«Adulto sin cuenta» y «A cargo» no entran en la aplicación: solo participan en el reparto y los pagos. Siempre debe quedar alguien con el permiso de cambiar permisos.</p>
 
     <h3 class="u-sec">Por miembro</h3>
     @if (_error is not null)
@@ -58,26 +47,19 @@
         @foreach (var m in Miembros.Where(m => m.Tipo == "adulto" && m.Activo && m.Vinculado))
         {
             var miembro = m;
-            var esAdminMiembro = miembro.Rol == "admin";
+            var total = miembro.Permisos?.Count ?? 0;
             <div class="mrow">
                 <Avatar Nombre="@miembro.Nombre" Color="@ColorMiembro.De(miembro.Id, Miembros)" Tamano="lg" />
                 <div class="mname">
                     <strong>@miembro.Nombre</strong>
                     @if (miembro.EsYo) { <span class="tag cur">Tú</span> }
-                    @if (esAdminMiembro) { <span class="tag admin">Admin</span> }
+                    @if (miembro.Rol == "admin") { <span class="tag admin">Admin</span> }
                 </div>
                 <div class="mmeta">
-                    @if (esAdminMiembro)
-                    {
-                        <span>Todos los permisos</span>
-                    }
-                    else
-                    {
-                        <span>@(miembro.Permisos?.Count ?? 0) de @Claves.Todos.Count permisos</span>
-                    }
+                    <span>@(total == Claves.Todos.Count ? "Todos los permisos" : $"{total} de {Claves.Todos.Count} permisos")</span>
                 </div>
                 <div class="macc">
-                    @if (!esAdminMiembro && Puede)
+                    @if (Puede)
                     {
                         <button class="linkbtn" type="button" aria-expanded="@((_abierto == miembro.Id).ToString().ToLowerInvariant())"
                                 aria-label="Permisos de @miembro.Nombre" @onclick="() => Alternar(miembro)">
@@ -88,6 +70,16 @@
                 @if (_abierto == miembro.Id)
                 {
                     <div class="permisos">
+                        <div class="plantillas" role="group" aria-label="Plantillas de permisos">
+                            <span class="muted">Plantilla:</span>
+                            @foreach (var plantilla in Claves.Plantillas)
+                            {
+                                var p = plantilla;
+                                <button class="btn btn-ghost btn-sm" type="button" title="@p.Descripcion" disabled="@_guardando" @onclick="() => Aplicar(p.Claves)">@p.Nombre</button>
+                            }
+                            <button class="linkbtn" type="button" disabled="@_guardando" @onclick="() => Aplicar(Claves.Todos.Select(x => x.Clave))">Marcar todo</button>
+                            <button class="linkbtn" type="button" disabled="@_guardando" @onclick="() => Aplicar([])">Desmarcar todo</button>
+                        </div>
                         @foreach (var grupo in Grupos)
                         {
                             <fieldset class="permisos-grupo">
@@ -96,12 +88,16 @@
                                 {
                                     var clave = p.Clave;
                                     <label class="chk">
-                                        <input type="checkbox" checked="@_borrador.Contains(clave)" disabled="@_guardando"
+                                        <input type="checkbox" @key="@(clave + _version)" checked="@_borrador.Contains(clave)" disabled="@_guardando"
                                                @onchange="e => Marcar(clave, (bool)e.Value!)" />
                                         @p.Etiqueta
                                     </label>
                                 }
                             </fieldset>
+                        }
+                        @if (miembro.EsYo && !_borrador.Contains(Claves.PermisosGestionar))
+                        {
+                            <div class="aviso warn u-mt12" role="status">Te quitas a ti mismo el permiso de cambiar permisos: después otra persona tendrá que devolvértelo.</div>
                         }
                         <div class="actions">
                             <button class="btn btn-sm" type="button" disabled="@_guardando" @onclick="() => GuardarAsync(miembro)">Guardar permisos</button>
@@ -114,30 +110,25 @@
     </div>
     @if (!Puede)
     {
-        <p class="muted u-mt12">Solo un administrador puede cambiar los permisos.</p>
+        <p class="muted u-mt12">No tienes permiso para cambiar los permisos. Pídeselo a un administrador del hogar.</p>
     }
 </section>
 
 @code {
-    private static readonly string[] SoloAdmin =
-    [
-        "Añadir, renombrar y desactivar miembros",
-        "Crear invitaciones",
-        "Habilitar la cuenta común y el ahorro",
-        "Cambiar los permisos",
-    ];
-
     private readonly HashSet<string> _borrador = [];
     private Guid? _abierto;
     private bool _guardando;
     private string? _error;
 
+    // Cambia al aplicar una plantilla para recrear las casillas: el navegador no debe quedarse con marcas que ya no coinciden con el borrador.
+    private int _version;
+
     private static IEnumerable<IGrouping<string, MiParte.Core.Domain.Permiso>> Grupos => Claves.Todos.GroupBy(p => p.Grupo);
 
-    /// <summary>Miembros del hogar con su rol y permisos efectivos.</summary>
+    /// <summary>Miembros del hogar con sus permisos efectivos.</summary>
     [Parameter] public List<MiembroDto> Miembros { get; set; } = [];
 
-    /// <summary>Si quien mira es admin y puede cambiar los permisos.</summary>
+    /// <summary>Si quien mira puede cambiar permisos (permiso <c>permisos.gestionar</c>).</summary>
     [Parameter] public bool Puede { get; set; }
 
     /// <summary>Se invoca tras guardar, para que la vista recargue los miembros.</summary>
@@ -152,8 +143,14 @@
             return;
         }
         _abierto = m.Id;
+        Aplicar(m.Permisos ?? []);
+    }
+
+    private void Aplicar(IEnumerable<string> claves)
+    {
         _borrador.Clear();
-        foreach (var clave in m.Permisos ?? []) _borrador.Add(clave);
+        foreach (var clave in claves) _borrador.Add(clave);
+        _version++;
     }
 
     private void Marcar(string clave, bool marcado)

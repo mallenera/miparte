@@ -36,12 +36,15 @@ public class CierreMesConcurrenciaTests
         return new Escenario(e, c, hogar.Id, ana.Id, categoria.Id, perfil.Id);
     }
 
+    /// <summary>Petición de gasto de 10 € de Ana en la fecha indicada.</summary>
     private static GastoRequest Pedido(Escenario s, DateOnly fecha)
         => new(fecha, 10m, s.Categoria, s.Ana, s.Perfil, "Compra");
 
+    /// <summary>Crea un gasto por la API y comprueba el 201.</summary>
     private static async Task<GastoResponse> CrearGasto(Escenario s, DateOnly fecha)
         => await Leer<GastoResponse>(await s.Cliente.PostAsJsonAsync("/api/gastos", Pedido(s, fecha)), HttpStatusCode.Created);
 
+    /// <summary>Cuenta los gastos del hogar directamente en la base de datos.</summary>
     private static async Task<int> ContarGastos(Guid hogar)
     {
         await using var conn = new NpgsqlConnection(Cadena);
@@ -74,6 +77,7 @@ public class CierreMesConcurrenciaTests
         return await peticion;
     }
 
+    /// <summary>Un alta que ya pasó la comprobación previa espera al cierre en curso y, al confirmarse, recibe 409 sin guardar nada.</summary>
     [SkippableFact]
     public async Task CrearGasto_ConCierreDelMesSinConfirmar_EsperaYDa409_EnPostgres()
     {
@@ -89,6 +93,7 @@ public class CierreMesConcurrenciaTests
         Assert.Equal(0, await ContarGastos(s.Hogar));
     }
 
+    /// <summary>Mover un gasto a un mes que se cierra a la vez da 409 y lo deja en su mes.</summary>
     [SkippableFact]
     public async Task EditarGasto_FechaNuevaEnMesQueSeCierraConcurrentemente_409_EnPostgres()
     {
@@ -105,6 +110,7 @@ public class CierreMesConcurrenciaTests
         Assert.Equal(new DateOnly(2020, 4, 10), Assert.Single(actual).Fecha); // sigue en su mes original
     }
 
+    /// <summary>Sacar un gasto de un mes que se cierra a la vez da 409 y lo deja donde estaba.</summary>
     [SkippableFact]
     public async Task EditarGasto_FechaAntiguaEnMesQueSeCierraConcurrentemente_409_EnPostgres()
     {
@@ -121,6 +127,7 @@ public class CierreMesConcurrenciaTests
         Assert.Equal(new DateOnly(2020, 3, 10), Assert.Single(actual).Fecha);
     }
 
+    /// <summary>Borrar un gasto de un mes que se cierra a la vez da 409 y el gasto se conserva.</summary>
     [SkippableFact]
     public async Task BorrarGasto_ConCierreDelMesSinConfirmar_409YSeConserva_EnPostgres()
     {
@@ -136,6 +143,7 @@ public class CierreMesConcurrenciaTests
         Assert.Equal(1, await ContarGastos(s.Hogar));
     }
 
+    /// <summary>Generar recurrentes en un mes que se cierra a la vez da 409 y no crea gastos.</summary>
     [SkippableFact]
     public async Task GenerarRecurrentes_ConCierreDelMesSinConfirmar_409YNoCreaGastos_EnPostgres()
     {
@@ -152,6 +160,7 @@ public class CierreMesConcurrenciaTests
         Assert.Equal(0, await ContarGastos(s.Hogar));
     }
 
+    /// <summary>El cierre espera a una escritura de gasto en curso del mismo mes; después el mes rechaza escrituras nuevas.</summary>
     [SkippableFact]
     public async Task CerrarMes_EsperaAUnaEscrituraDeGastoEnCurso_YLaEscrituraSeConserva_EnPostgres()
     {
@@ -186,6 +195,7 @@ public class CierreMesConcurrenciaTests
         Assert.Equal("MP409", ex.SqlState);
     }
 
+    /// <summary>Los triggers rechazan insert, update, delete y cambios de reparto en un mes cerrado, y no afectan a otros meses ni tras reabrir.</summary>
     [SkippableFact]
     public async Task Triggers_RechazanInsertUpdateDeleteYRepartoEnMesCerrado_PeroNoEnOtroMes_EnPostgres()
     {
@@ -215,6 +225,7 @@ public class CierreMesConcurrenciaTests
         await EjecutarAsync("update public.gasto set importe = 20 where id = @g", ("g", g.Id));
     }
 
+    /// <summary>Borrar un hogar con gastos en meses cerrados no queda bloqueado por los triggers (borrado en cascada).</summary>
     [SkippableFact]
     public async Task BorrarHogar_ConMesesCerradosYGastos_NoLoBloqueaElCierre_EnPostgres()
     {
@@ -229,6 +240,7 @@ public class CierreMesConcurrenciaTests
         Assert.Equal(0, await ContarGastos(s.Hogar));
     }
 
+    /// <summary>Inserta un gasto por SQL, saltándose la comprobación previa de Core.Api, para probar solo los triggers.</summary>
     private static Task InsertarGastoDirecto(Escenario s, DateOnly fecha)
         => EjecutarAsync(
             "insert into public.gasto (hogar_id, fecha, importe, categoria_id, pagado_por, perfil_reparto_id) values (@h, @f, 10, @c, @a, @p)",

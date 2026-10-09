@@ -1,4 +1,4 @@
-# Plantilla de nginx: la imagen nginx-unprivileged sustituye ${SUPABASE_URL} y ${CORE_URL} (envsubst solo toca las
+# Plantilla de nginx: la imagen nginx-unprivileged sustituye ${SUPABASE_URL}, ${CORE_URL} y ${ASSISTANT_URL} (envsubst solo toca las
 # variables definidas, así que $uri se conserva). Ver docs/api.md y CLAUDE.md. Las URLs van en la CSP porque el
 # front solo puede hablar con Supabase Auth y con Core.Api; cualquier otro destino (exfiltrar el token) se bloquea.
 server {
@@ -10,9 +10,9 @@ server {
 
     # Las cabeceras van en el server y no en los location: un add_header dentro de un location anula los heredados.
     # Scripts solo propios ('wasm-unsafe-eval' es lo único que exige Blazor WASM): un XSS no puede inyectar
-    # código en línea ni cargarlo de otro origen. Los estilos en línea (atributos style="") se permiten solo como
-    # atributo porque Blazor y algunos componentes (Avatar) los fijan en tiempo de ejecución.
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' https://fonts.googleapis.com; style-src-attr 'unsafe-inline'; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' ${SUPABASE_URL} ${CORE_URL}; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
+    # código en línea ni cargarlo de otro origen. Sin estilos en línea: ni atributos style="" (style-src-attr 'none') ni etiquetas <style>; los colores y
+    # espaciados salen de clases de app.css. No añadas style="" a los componentes (ver CLAUDE.md).
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' https://fonts.googleapis.com; style-src-attr 'none'; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' ${SUPABASE_URL} ${CORE_URL} ${ASSISTANT_URL}; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-Frame-Options "DENY" always;
     add_header Referrer-Policy "no-referrer" always;

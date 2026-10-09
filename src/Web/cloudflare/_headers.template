@@ -1,9 +1,9 @@
 # Equivalente en Cloudflare Pages de default.conf.template (nginx): mismas cabeceras y misma CSP. El workflow
-# deploy-web.yml sustituye ${SUPABASE_URL} y ${CORE_URL} con envsubst y deja el resultado como _headers en la
+# deploy-web.yml sustituye ${SUPABASE_URL}, ${CORE_URL} y ${ASSISTANT_URL} con envsubst y deja el resultado como _headers en la
 # salida publicada. Si cambias una cabecera aquí, cámbiala también en default.conf.template (y al revés).
 # El fallback a index.html de las rutas de Blazor lo hace Pages solo: sin 404.html, sirve la SPA.
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' https://fonts.googleapis.com; style-src-attr 'unsafe-inline'; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' ${SUPABASE_URL} ${CORE_URL}; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' https://fonts.googleapis.com; style-src-attr 'none'; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' ${SUPABASE_URL} ${CORE_URL} ${ASSISTANT_URL}; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: no-referrer

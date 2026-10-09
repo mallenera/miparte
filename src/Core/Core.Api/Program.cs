@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using MiParte.Auth;
@@ -40,20 +39,10 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
 var app = builder.Build();
 
 // Tras un proxy inverso (Render) RemoteIpAddress es la IP del proxy y todas las peticiones anónimas compartirían
-// el cubo del limitador. Solo se activa con ProxyInverso:Confiar (env ProxyInverso__Confiar): el contenedor solo
-// es alcanzable a través del proxy, por eso no hay lista de redes conocidas. ForwardLimit = 1 toma la última IP
-// de X-Forwarded-For, la que añadió el proxy de confianza, y descarta lo que el cliente haya puesto delante.
-if (app.Configuration.GetValue<bool>("ProxyInverso:Confiar"))
-{
-    var reenviadas = new ForwardedHeadersOptions
-    {
-        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
-        ForwardLimit = 1,
-    };
-    reenviadas.KnownIPNetworks.Clear();
-    reenviadas.KnownProxies.Clear();
-    app.UseForwardedHeaders(reenviadas);
-}
+// el cubo del limitador. Se activa con ProxyInverso:Proxies / ProxyInverso:Redes (solo esos remitentes pueden
+// reenviar cabeceras) o, si el contenedor solo es alcanzable a través del proxy, con ProxyInverso:Confiar.
+var reenviadas = ReenvioCabeceras.Crear(app.Configuration);
+if (reenviadas is not null) app.UseForwardedHeaders(reenviadas);
 
 // Deja en el log qué espera la validación del JWT (sin secretos): ayuda a diagnosticar 401.
 var supabase = app.Services.GetRequiredService<IOptions<SupabaseAuthOptions>>().Value;

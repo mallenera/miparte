@@ -18,6 +18,8 @@ public class Hogar
     public string Nombre { get; set; } = "";
     /// <summary>Fecha de creación, asignada por la base de datos.</summary>
     public DateTimeOffset CreadoEn { get; set; }
+    /// <summary>Si el hogar usa la cuenta común (aportaciones, saldo, reembolsos y ahorro); la activa un admin.</summary>
+    public bool CuentaComunActiva { get; set; }
 }
 
 /// <summary>Persona del hogar que participa en gastos e ingresos; puede o no tener usuario asociado.</summary>
@@ -218,6 +220,8 @@ public class Categoria
     public Guid? CategoriaPadreId { get; set; }
     /// <summary>Perfil de reparto por defecto de la categoría; null si no tiene.</summary>
     public Guid? PerfilRepartoId { get; set; }
+    /// <summary>Si los gastos de esta categoría van por defecto a cargo de la cuenta común (su perfil por defecto es el de cuenta común).</summary>
+    public bool ACargoCuentaComun { get; set; }
 }
 
 /// <summary>Plantilla de gasto que se genera periódicamente un día fijo del mes.</summary>
@@ -268,6 +272,8 @@ public class Gasto
     public bool ACargoCuentaComun { get; set; }
     /// <summary>Si se paga con el ahorro de la cuenta común: se descuenta del ahorro disponible, no del saldo de gastos.</summary>
     public bool PagadoDesdeAhorro { get; set; }
+    /// <summary>Si es un gasto personal de quien lo paga: se asume al 100 % y queda fuera de la liquidación y de los totales del hogar.</summary>
+    public bool EsPersonal { get; set; }
     /// <summary>Importe asumido por cada miembro.</summary>
     public List<GastoReparto> Repartos { get; set; } = [];
 }

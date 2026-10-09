@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MiParte.Contracts;
+using MiParte.Core.Api.Gastos;
 using MiParte.Core.Domain.Entidades;
 using MiParte.Core.Infrastructure.Persistencia;
 
@@ -23,7 +24,7 @@ public static class CategoriasEndpoints
     }
 
     /// <summary>Convierte una categoría en su DTO de respuesta.</summary>
-    private static CategoriaDto Dto(Categoria c) => new(c.Id, c.Nombre, c.CategoriaPadreId, c.PerfilRepartoId);
+    private static CategoriaDto Dto(Categoria c) => new(c.Id, c.Nombre, c.CategoriaPadreId, c.PerfilRepartoId, c.ACargoCuentaComun);
 
     /// <summary>GET /api/categorias: devuelve las categorías del hogar ordenadas por nombre.</summary>
     private static async Task<IResult> ListarAsync([FromServices] MiParteDbContext db, CancellationToken ct)
@@ -36,7 +37,7 @@ public static class CategoriasEndpoints
     private static async Task<IResult> CrearAsync(
         GuardarCategoriaRequest req, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
-        var (error, nombre) = await ValidarAsync(req, null, db, ct);
+        var (error, nombre, perfilId, aCargo) = await ValidarAsync(req, null, db, ct);
         if (error is not null) return error;
 
         var cat = new Categoria
@@ -45,7 +46,8 @@ public static class CategoriasEndpoints
             HogarId = hogar.HogarId!.Value,
             Nombre = nombre!,
             CategoriaPadreId = req.CategoriaPadreId,
-            PerfilRepartoId = req.PerfilRepartoId,
+            PerfilRepartoId = perfilId,
+            ACargoCuentaComun = aCargo,
         };
         db.Categorias.Add(cat);
         try { await db.SaveChangesAsync(ct); }
@@ -60,12 +62,13 @@ public static class CategoriasEndpoints
         var cat = await db.Categorias.FirstOrDefaultAsync(c => c.Id == id, ct);
         if (cat is null) return Results.NotFound();
 
-        var (error, nombre) = await ValidarAsync(req, id, db, ct);
+        var (error, nombre, perfilId, aCargo) = await ValidarAsync(req, id, db, ct);
         if (error is not null) return error;
 
         cat.Nombre = nombre!;
         cat.CategoriaPadreId = req.CategoriaPadreId;
-        cat.PerfilRepartoId = req.PerfilRepartoId;
+        cat.PerfilRepartoId = perfilId;
+        cat.ACargoCuentaComun = aCargo;
         try { await db.SaveChangesAsync(ct); }
         catch (DbUpdateException) { return Duplicada(); }
         return Results.Ok(Dto(cat));
@@ -97,24 +100,50 @@ public static class CategoriasEndpoints
     /// <summary>Respuesta 400 con el mensaje de error indicado.</summary>
     private static IResult Mal(string msg) => Results.BadRequest(new { error = msg });
 
-    /// <summary>Valida el cuerpo; devuelve el nombre normalizado o el resultado de error.</summary>
-    private static async Task<(IResult? Error, string? Nombre)> ValidarAsync(
+    /// <summary>
+    /// Valida el cuerpo; devuelve el resultado de error o el nombre normalizado, el perfil por defecto definitivo y si va a cargo de la cuenta común.
+    /// «A cargo de la cuenta común» y el perfil de cuenta común son la misma decisión: uno implica el otro, y sin perfil se asigna el de cuenta común del hogar.
+    /// </summary>
+    private static async Task<(IResult? Error, string? Nombre, Guid? PerfilId, bool ACargo)> ValidarAsync(
         GuardarCategoriaRequest req, Guid? idActual, MiParteDbContext db, CancellationToken ct)
     {
         var nombre = req.Nombre?.Trim();
-        if (string.IsNullOrEmpty(nombre)) return (Mal("El nombre es obligatorio."), null);
+        if (string.IsNullOrEmpty(nombre)) return (Mal("El nombre es obligatorio."), null, null, false);
         if (nombre.Length > MaxLongitudNombre)
-            return (Mal($"El nombre admite como máximo {MaxLongitudNombre} caracteres."), null);
+            return (Mal($"El nombre admite como máximo {MaxLongitudNombre} caracteres."), null, null, false);
 
-        if (req.PerfilRepartoId is { } perfilId && !await db.PerfilesReparto.AnyAsync(p => p.Id == perfilId, ct))
-            return (Mal("El perfil de reparto no existe en este hogar."), null);
+        PerfilReparto? perfil = null;
+        if (req.PerfilRepartoId is { } perfilId)
+        {
+            perfil = await db.PerfilesReparto.FirstOrDefaultAsync(p => p.Id == perfilId, ct);
+            if (perfil is null) return (Mal("El perfil de reparto no existe en este hogar."), null, null, false);
+        }
+
+        var aCargo = req.ACargoCuentaComun || perfil?.Modo == ModoReparto.CuentaComun;
+        if (aCargo)
+        {
+            if (perfil is null)
+            {
+                perfil = await db.PerfilesReparto.Where(p => p.Modo == ModoReparto.CuentaComun)
+                    .OrderBy(p => p.Nombre).ThenBy(p => p.Id).FirstOrDefaultAsync(ct);
+                if (perfil is null) return (Mal("El hogar no tiene un perfil de cuenta común: créalo antes de marcar la categoría."), null, null, false);
+            }
+            else if (perfil.Modo != ModoReparto.CuentaComun)
+            {
+                return (Mal("Una categoría a cargo de la cuenta común debe usar el perfil de cuenta común."), null, null, false);
+            }
+
+            // Pedir el indicador en una categoría que no lo tenía exige la cuenta activada; editar una ya marcada, o elegir su perfil de cuenta común a secas, no.
+            var yaMarcada = idActual is { } actual && await db.Categorias.AnyAsync(c => c.Id == actual && c.ACargoCuentaComun, ct);
+            if (req.ACargoCuentaComun && !yaMarcada && await CuentaComunEndpoints.ExigirActivaAsync(db, ct) is { } inactiva) return (inactiva, null, null, false);
+        }
 
         if (req.CategoriaPadreId is { } padreId)
         {
-            if (padreId == idActual) return (Mal("Una categoría no puede ser su propio padre."), null);
+            if (padreId == idActual) return (Mal("Una categoría no puede ser su propio padre."), null, null, false);
 
             var padres = await db.Categorias.ToDictionaryAsync(c => c.Id, c => c.CategoriaPadreId, ct);
-            if (!padres.ContainsKey(padreId)) return (Mal("La categoría padre no existe en este hogar."), null);
+            if (!padres.ContainsKey(padreId)) return (Mal("La categoría padre no existe en este hogar."), null, null, false);
 
             // Sin ciclos: subiendo desde el padre no debe aparecer la categoría que se edita.
             if (idActual is { } id)
@@ -123,7 +152,7 @@ public static class CategoriasEndpoints
                 var visitados = new HashSet<Guid>();
                 while (actual is { } a && visitados.Add(a))
                 {
-                    if (a == id) return (Mal("La categoría padre crearía un ciclo."), null);
+                    if (a == id) return (Mal("La categoría padre crearía un ciclo."), null, null, false);
                     actual = padres.GetValueOrDefault(a);
                 }
             }
@@ -131,8 +160,8 @@ public static class CategoriasEndpoints
 
         var existe = await db.Categorias.AnyAsync(c =>
             c.CategoriaPadreId == req.CategoriaPadreId && c.Nombre == nombre && c.Id != idActual, ct);
-        if (existe) return (Duplicada(), null);
+        if (existe) return (Duplicada(), null, null, false);
 
-        return (null, nombre);
+        return (null, nombre, perfil?.Id, aCargo);
     }
 }

@@ -85,6 +85,9 @@ Antes de registrar gastos, el hogar se configura una vez; después, cada pantall
 - Importe fijo que aporta cada adulto a la cuenta cada mes, guardado por mes y persona.
 - Al registrar un gasto se elige la cuenta común como pagador; ese gasto no genera deuda entre personas.
 - Tarjeta en el resumen con lo que aporta cada persona, su parte de los gastos de la cuenta, la diferencia y el saldo acumulado.
+- Cada hogar decide si la usa: un admin la activa (`hogar.cuenta_comun_activa`); sin activar no se pueden registrar aportaciones ni gastos a su cargo.
+- Una categoría puede marcarse «a cargo de la cuenta común»: sus gastos usan por defecto el perfil de cuenta común, sin reparto entre personas.
+- «Su parte» de cada persona es la porción del saldo (y del ahorro disponible) proporcional a lo que ha aportado (y ahorrado).
 
 **Mantenimiento de categorías:**
 
@@ -253,8 +256,8 @@ Siete decisiones condicionan el desarrollo; la D3 es la única que depende de un
 | D3 | Cómo se reparten los gastos del hijo | 100 % B; proporcional a ingresos (A asume 2/3); perfil propio (por ejemplo 50/50 o 70/30) | Perfil propio configurable; el porcentaje lo acordáis vosotros | Pendiente |
 | D4 | Reparto de la alimentación | Proporcional a ingresos; por partes 2:1 contando al hijo | Por decidir según si el hijo cuenta como una parte | Pendiente |
 | D5 | Interfaz | Streamlit; FastAPI con frontend web instalable (PWA) | Streamlit para el MVP; migrar después reutilizando lógica y base de datos | Pendiente |
-| D6 | Alcance de la IA | Solo chatbot; chatbot más categorización automática de gastos | Chatbot en el MVP; categorización como extra si da tiempo | Pendiente |
-| D7 | Modelo de lenguaje del chatbot y dominio | Proveedor, modelo y coste por definir; registrador del dominio por elegir | Comprobar requisitos del máster y precios actuales antes de decidir | Pendiente |
+| D6 | Alcance de la IA | Solo chatbot; chatbot más categorización automática de gastos | Chatbot en el MVP; categorización como extra si da tiempo | Chatbot hecho; categorización pendiente |
+| D7 | Modelo de lenguaje del chatbot y dominio | Proveedor, modelo y coste por definir; registrador del dominio por elegir | Comprobar requisitos del máster y precios actuales antes de decidir | Proveedor Anthropic, `claude-sonnet-5-5` por defecto y configurable (`Asistente__Modelo`); coste y dominio pendientes |
 
 ## Plan por fases, riesgos y calidad
 

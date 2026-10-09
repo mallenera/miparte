@@ -106,6 +106,37 @@ public class ApiPostgresTests
     }
 
     [SkippableFact]
+    public async Task CuentaComun_ActivacionYCategoriaACargo_SePersistenEnPostgres()
+    {
+        Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
+        await using var e = new Entorno();
+        var user = await e.CrearUsuarioAsync();
+        var hogar = await CrearHogar(e.Cliente(user), "Casa cuenta", "Ana");
+        var c = e.Cliente(user, hogar.Id);
+
+        Assert.False((await Leer<CuentaComunResponse>(await c.GetAsync("/api/cuenta-comun?mes=2027-01"))).Activa);
+        Assert.Equal(HttpStatusCode.Conflict, (await c.PostAsJsonAsync("/api/categorias",
+            new GuardarCategoriaRequest("Comunidad", null, null, true))).StatusCode);
+
+        Assert.Equal(HttpStatusCode.OK, (await c.PutAsJsonAsync("/api/cuenta-comun/activacion", new ActivarCuentaComunRequest(true))).StatusCode);
+        Assert.True((await Leer<CuentaComunResponse>(await c.GetAsync("/api/cuenta-comun?mes=2027-01"))).Activa);
+
+        var cuenta = (await Leer<List<PerfilRepartoDto>>(await c.GetAsync("/api/perfiles"))).Single(p => p.Modo == "cuenta_comun");
+        var cat = await Leer<CategoriaDto>(await c.PostAsJsonAsync("/api/categorias",
+            new GuardarCategoriaRequest("Comunidad", null, null, true)), HttpStatusCode.Created);
+        Assert.True(cat.ACargoCuentaComun);
+        Assert.Equal(cuenta.Id, cat.PerfilRepartoId);
+        Assert.True((await Leer<List<CategoriaDto>>(await c.GetAsync("/api/categorias"))).Single(x => x.Id == cat.Id).ACargoCuentaComun);
+
+        var ana = (await Leer<List<MiembroDto>>(await c.GetAsync("/api/miembros"))).Single();
+        var aport = await c.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(ana.Id, new DateOnly(2027, 1, 1), 300m, 50m));
+        Assert.Equal(HttpStatusCode.OK, aport.StatusCode);
+        var resumen = await Leer<ResumenMensualResponse>(await c.GetAsync("/api/resumen?mes=2027-01"));
+        Assert.Equal(250m, resumen.CuentaComun!.Saldo);
+        Assert.Equal(50m, resumen.CuentaComun.AhorroDisponible);
+    }
+
+    [SkippableFact]
     public async Task Yo_ListaVariosHogares_SinCabeceraYConCabecera_EnPostgres()
     {
         Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");

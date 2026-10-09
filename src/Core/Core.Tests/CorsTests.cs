@@ -109,6 +109,11 @@ public class CorsTests
         var cuerpo = await r.Content.ReadAsStringAsync();
         Assert.Contains("Error interno", cuerpo);
         Assert.DoesNotContain("detalle-interno-secreto", cuerpo);
+        Assert.Equal("application/problem+json", r.Content.Headers.ContentType?.MediaType);
+        using var json = System.Text.Json.JsonDocument.Parse(cuerpo);
+        Assert.Equal(500, json.RootElement.GetProperty("status").GetInt32());
+        Assert.Equal("Error interno del servidor.", json.RootElement.GetProperty("title").GetString());
+        Assert.Equal("Error interno del servidor.", json.RootElement.GetProperty("error").GetString());
     }
 
     [Fact]

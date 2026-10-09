@@ -14,6 +14,7 @@ public static class CuentaComunEndpoints
     public static IEndpointRouteBuilder MapCuentaComun(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/cuenta-comun", EstadoAsync).RequireAuthorization();
+        app.MapPut("/api/cuenta-comun/activacion", ActivarAsync).RequireAuthorization();
         app.MapPut("/api/cuenta-comun/aportaciones", FijarAportacionAsync).RequireAuthorization();
         app.MapPost("/api/cuenta-comun/reembolsos", CrearReembolsoAsync).RequireAuthorization();
         app.MapDelete("/api/cuenta-comun/reembolsos/{id:guid}", BorrarReembolsoAsync).RequireAuthorization();
@@ -85,6 +86,32 @@ public static class CuentaComunEndpoints
     private static IResult AhorroSinRespaldo(string accion, decimal falta)
         => Results.Conflict(new { error = $"No se puede {accion}: ya se ha retirado o gastado ese ahorro (faltarían {-falta:0.00}).", falta = -falta });
 
+    /// <summary>Respuesta 409 cuando el hogar no ha activado la cuenta común.</summary>
+    internal static IResult CuentaInactiva()
+        => Results.Conflict(new { error = "La cuenta común no está activada en este hogar. Un administrador puede activarla en la pestaña Cuenta común." });
+
+    /// <summary>Devuelve el 409 si el hogar actual no tiene la cuenta común activada, o null si puede seguir.</summary>
+    internal static async Task<IResult?> ExigirActivaAsync(MiParteDbContext db, CancellationToken ct)
+        => await db.Hogares.AnyAsync(h => h.CuentaComunActiva, ct) ? null : CuentaInactiva();
+
+    /// <summary>
+    /// PUT /api/cuenta-comun/activacion (solo admin): activa o desactiva la cuenta común del hogar. Desactivarla no borra datos:
+    /// solo bloquea nuevas escrituras y gastos a su cargo. 403 si no es admin; 409 sin hogar; 200 con el estado resultante.
+    /// </summary>
+    private static async Task<IResult> ActivarAsync(
+        ActivarCuentaComunRequest req, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
+    {
+        if (hogar.HogarId is null) return ApiComun.SinHogar();
+        var esAdmin = hogar.UsuarioId is { } usuario
+            && await db.Miembros.AnyAsync(m => m.UserId == usuario && m.Activo && m.Rol == RolMiembro.Admin, ct);
+        if (!esAdmin) return Results.Json(new { error = "Solo un administrador puede activar o desactivar la cuenta común." }, statusCode: StatusCodes.Status403Forbidden);
+
+        var h = await db.Hogares.FirstAsync(ct);
+        h.CuentaComunActiva = req.Activa;
+        await db.SaveChangesAsync(ct);
+        return Results.Ok(new { activa = h.CuentaComunActiva });
+    }
+
     /// <summary>Gastos cargados a la cuenta común, para el cálculo de saldo.</summary>
     private static async Task<List<GastoDeCuenta>> GastosDeCuenta(MiParteDbContext db, CancellationToken ct)
         => await db.Gastos.Where(g => g.ACargoCuentaComun)
@@ -103,12 +130,15 @@ public static class CuentaComunEndpoints
         var retiradas = await db.RetiradasAhorro.OrderBy(r => r.Fecha).ThenBy(r => r.Id).ToListAsync(ct);
         var depositos = await db.DepositosAhorro.OrderBy(d => d.Fecha).ThenBy(d => d.Id).ToListAsync(ct);
         var nombres = await db.Miembros.ToDictionaryAsync(m => m.Id, m => m.Nombre, ct);
+        var activa = await db.Hogares.AnyAsync(h => h.CuentaComunActiva, ct);
 
         var e = CuentaComun.Calcular(
             inicio, Vigentes(aportaciones),
             await GastosDeCuenta(db, ct), reembolsos.Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe)),
             retiradas.Select(r => new RetiradaDeAhorro(r.Fecha, r.Importe)),
-            depositos.Select(d => new DepositoDeAhorro(d.Fecha, d.Importe)));
+            depositos.Select(d => new DepositoDeAhorro(d.Fecha, d.Importe, d.MiembroId)));
+        var partes = CuentaComun.PartesPorPersona(
+            inicio, Vigentes(aportaciones), e, depositos.Select(d => new DepositoDeAhorro(d.Fecha, d.Importe, d.MiembroId)));
 
         return Results.Ok(new CuentaComunResponse(
             ApiComun.FormatoMes(inicio), e.AportadoMes, e.Aportado, e.Gastado, e.Saldo,
@@ -118,7 +148,10 @@ public static class CuentaComunEndpoints
             e.AhorroMes, e.AhorroAcumulado, e.AhorroRetirado, e.AhorroDisponible,
             retiradas.Where(r => r.Fecha >= inicio && r.Fecha < fin).Select(A).ToList(),
             e.AhorroDepositado, depositos.Where(d => d.Fecha >= inicio && d.Fecha < fin).Select(A).ToList(),
-            e.AhorroGastado));
+            e.AhorroGastado, activa,
+            partes.Select(p => new PartePersonaDto(
+                p.MiembroId, nombres.GetValueOrDefault(p.MiembroId, ""), p.Aportado, p.Ahorrado, p.PorcentajeGastos, p.PorcentajeAhorro,
+                p.ParteSaldo, p.ParteAhorro, p.Pendiente)).ToList()));
     }
 
     /// <summary>PUT /api/cuenta-comun/aportaciones: fija la aportación de un adulto desde un mes, con la parte que va a ahorro (si ya había una de ese mes, la sustituye). 400 si el mes no es día 1, el importe o el ahorro son inválidos (el ahorro no puede superar el importe) o el miembro no es adulto activo; 409 sin hogar o si la rebaja del ahorro dejaría sin respaldo lo ya retirado o gastado desde el ahorro (<c>{ error, falta }</c>).</summary>
@@ -126,6 +159,7 @@ public static class CuentaComunEndpoints
         FijarAportacionRequest req, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
+        if (await ExigirActivaAsync(db, ct) is { } inactiva) return inactiva;
         if (req.Desde.Day != 1) return ApiComun.Invalido("El mes de la aportación debe ser el día 1 del mes.");
         // Una aportación de 0 es válida: deja de aportar desde ese mes.
         var errorImporte = req.Importe < 0 ? "El importe no puede ser negativo."
@@ -163,6 +197,7 @@ public static class CuentaComunEndpoints
         CrearReembolsoRequest req, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
+        if (await ExigirActivaAsync(db, ct) is { } inactiva) return inactiva;
         var error = ApiComun.ValidarImporte(req.Importe) ?? ApiComun.ValidarConcepto(req.Concepto);
         if (error is not null) return ApiComun.Invalido(error);
         if (!await db.Miembros.AnyAsync(m => m.Id == req.MiembroId, ct))
@@ -200,6 +235,7 @@ public static class CuentaComunEndpoints
         CrearDepositoAhorroRequest req, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
+        if (await ExigirActivaAsync(db, ct) is { } inactiva) return inactiva;
         var error = ApiComun.ValidarImporte(req.Importe) ?? ApiComun.ValidarConcepto(req.Concepto);
         if (error is not null) return ApiComun.Invalido(error);
         if (!await db.Miembros.AnyAsync(m => m.Id == req.MiembroId, ct))
@@ -239,6 +275,7 @@ public static class CuentaComunEndpoints
         CrearRetiradaAhorroRequest req, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
+        if (await ExigirActivaAsync(db, ct) is { } inactiva) return inactiva;
         var error = ApiComun.ValidarImporte(req.Importe) ?? ApiComun.ValidarConcepto(req.Concepto);
         if (error is not null) return ApiComun.Invalido(error);
         if (!await db.Miembros.AnyAsync(m => m.Id == req.MiembroId, ct))

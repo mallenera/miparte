@@ -28,7 +28,7 @@ dotnet test --filter "FullyQualifiedName~RepartoTests"          # un test/clase 
 dotnet run --project src/Core/Core.Api                          # GET /health, GET /api/yo (no lee .env)
 ./scripts/arrancar-core.ps1                                     # Core.Api cargando antes el .env de la raíz
 ./scripts/probar-api.ps1 -SupabaseUrl https://xxxx.supabase.co -Email ...   # prueba de humo contra Supabase real
-dotnet run --project src/Assistant/Assistant.Api
+dotnet run --project src/Assistant/Assistant.Api                 # chatbot; necesita ANTHROPIC_API_KEY en el entorno
 dotnet run --project src/Web
 docker compose up --build                                       # web :8080 (nginx sin privilegios), core :5001, assistant :5002
 ```
@@ -73,7 +73,7 @@ MIPARTE_TEST_DB="Host=localhost;Database=miparte;Username=postgres" dotnet test
 
 ## Seguridad del front (CSP)
 
-`src/Web/default.conf.template` (nginx) fija la CSP y demás cabeceras; la imagen las aplica con envsubst a partir de `SUPABASE_URL` y `CORE_URL` (en `docker compose` salen de `Supabase__Url` y `CoreUrl`), que deben coincidir con `Supabase:Url` y `Api:CoreUrl` del `appsettings.json` del front. Consecuencias al desarrollar: **no añadas scripts en línea** a `index.html` (ponlos en `wwwroot/js/`), ni cargues JavaScript de otro origen, ni hables con otros hosts desde el front sin añadirlos a `connect-src`. Para comprobar un cambio con CSP real no hace falta Docker: publica el front (`dotnet publish src/Web`) y sírvelo con las cabeceras de la plantilla; la consola del navegador mostrará las violaciones.
+`src/Web/default.conf.template` (nginx) fija la CSP y demás cabeceras; la imagen las aplica con envsubst a partir de `SUPABASE_URL` y `CORE_URL` (en `docker compose` salen de `Supabase__Url` y `CoreUrl`), que deben coincidir con `Supabase:Url` y `Api:CoreUrl` del `appsettings.json` del front. Consecuencias al desarrollar: **no añadas scripts en línea** a `index.html` (ponlos en `wwwroot/js/`), **ni atributos `style=""`** (la CSP usa `style-src-attr 'none'`; usa clases de `app.css`, p. ej. `u-mt12` o `av c0..c7`), ni cargues JavaScript de otro origen, ni hables con otros hosts desde el front sin añadirlos a `connect-src`. Para comprobar un cambio con CSP real no hace falta Docker: publica el front (`dotnet publish src/Web`) y sírvelo con las cabeceras de la plantilla; la consola del navegador mostrará las violaciones.
 
 ## Arquitectura
 
@@ -81,7 +81,7 @@ MIPARTE_TEST_DB="Host=localhost;Database=miparte;Username=postgres" dotnet test
   - **Imagen de marca** (detalle en `docs/marca.md`): burdeos `#7A1F33` principal, naranja `#E8742A` acento, crema `#FBF5EF` fondo, tinta `#24161A`; Fraunces solo en logotipo y titulares grandes, Manrope en toda la interfaz; modo oscuro propio; el nombre en el logotipo va siempre en minúsculas. Los tokens están en `wwwroot/css/app.css` (no hay Bootstrap). Cada miembro tiene color + inicial (`--m0..--m7`, `Avatar` y `ColorMiembro`, derivado del orden por id porque la API no guarda color). Los colores de estado (ok/err/warn) nunca son burdeos ni naranja y siempre llevan texto o signo. Iconos PWA generados desde el símbolo del logo.
   - `MiembroDto.EsYo` (API) permite al front saber qué miembro es el usuario y si es admin.
 - `src/Core`: `Core.Domain` (entidades y lógica sin dependencias: `Reparto.Dividir` redondea a 2 decimales y el último miembro absorbe el céntimo sobrante; `RepartoMiembros` reparte entre N miembros; `Liquidacion` calcula transferencias mínimas), `Core.Infrastructure` (EF Core/Npgsql), `Core.Api` (minimal API), `Core.Tests` (xUnit).
-- `src/Assistant/Assistant.Api`: chatbot con tool calling (aún esqueleto: solo `/health`).
+- `src/Assistant/Assistant.Api`: chatbot con tool calling (`POST /api/chat`, cinco funciones de solo lectura que consultan Core.Api con el JWT y el hogar de la persona; cliente del SDK de Anthropic detrás de `IClienteModelo`; clave solo en `ANTHROPIC_API_KEY`). Tests en `src/Assistant/Assistant.Tests` con modelo falso. Contrato y seguridad en `docs/asistente.md`; actualízalo al tocar el asistente.
 - `src/BuildingBlocks/Auth` (`MiParte.Auth`): validación del JWT de Supabase compartida entre APIs.
 
 ### Core.Api: endpoints y reglas
@@ -95,7 +95,7 @@ Endpoints por carpeta en `src/Core/Core.Api`: `Hogares`, `Miembros`, `Reparto` (
 - Cada gasto guarda su reparto al crearse y no se recalcula salvo con `PUT` del gasto. Importes > 0 con máx. 2 decimales; meses con formato `YYYY-MM`.
 - Recurrentes: `diaMes` 1-28; `POST /api/gastos-recurrentes/generar?mes=` es idempotente. No hay proceso en segundo plano: lo dispara el cliente.
 - CORS: orígenes permitidos en `Cors__OrigenesPermitidos__N`.
-- **Ingresos no se guardan** (decisión de diseño): la migración `20261007000000_perfiles_cuenta_comun_sin_ingresos.sql` elimina la tabla `ingreso`; los perfiles son individual, porcentajes, partes y cuenta común (`cuenta_comun`: el gasto no se reparte ni genera deuda; `gasto.a_cargo_cuenta_comun`). **Cuenta común**: aportaciones, saldo, reembolsos y ahorro (parte de cada aportación que se aparta, ingresos aparte, retiradas y gastos pagados desde el ahorro) implementados (`/api/cuenta-comun`, `docs/api.md` §3.9); falta activarla por hogar.
+- **Ingresos no se guardan** (decisión de diseño): la migración `20261007000000_perfiles_cuenta_comun_sin_ingresos.sql` elimina la tabla `ingreso`; los perfiles son individual, porcentajes, partes y cuenta común (`cuenta_comun`: el gasto no se reparte ni genera deuda; `gasto.a_cargo_cuenta_comun`). **Cuenta común**: aportaciones, saldo, reembolsos y ahorro (parte de cada aportación que se aparta, ingresos aparte, retiradas y gastos pagados desde el ahorro) implementados (`/api/cuenta-comun`, `docs/api.md` §3.9); cada hogar la activa (un admin, `PUT /api/cuenta-comun/activacion`) y una categoría puede ir «a cargo de la cuenta común».
 
 ### Base de datos: el esquema es SQL, no EF
 

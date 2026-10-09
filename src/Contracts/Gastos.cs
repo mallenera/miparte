@@ -8,9 +8,10 @@ namespace MiParte.Contracts;
 /// <param name="PerfilRepartoId">Perfil de reparto con el que se divide el gasto.</param>
 /// <param name="Concepto">Descripción opcional del gasto.</param>
 /// <param name="PagadoDesdeAhorro">Si se paga con el ahorro de la cuenta común (descuenta del ahorro disponible); exige <paramref name="PagadoPor"/> nulo y el perfil «cuenta común».</param>
+/// <param name="Personal">Si es un gasto personal de <paramref name="PagadoPor"/> (obligatorio): lo asume él al 100 %, se ignora el modo del perfil y queda fuera de la liquidación.</param>
 public record GastoRequest(
     DateOnly Fecha, decimal Importe, Guid CategoriaId, Guid? PagadoPor, Guid PerfilRepartoId, string? Concepto,
-    bool PagadoDesdeAhorro = false);
+    bool PagadoDesdeAhorro = false, bool Personal = false);
 
 /// <summary>Parte de un gasto asumida por un miembro.</summary>
 /// <param name="MiembroId">Miembro que asume la parte.</param>
@@ -29,10 +30,11 @@ public record RepartoGastoDto(Guid MiembroId, decimal ImporteAsumido);
 /// <param name="Repartos">Importe asumido por cada miembro, guardado al crear el gasto; vacío si lo asume la cuenta común.</param>
 /// <param name="ACargoCuentaComun">Si lo asume la cuenta común (perfil «cuenta común»): sin reparto entre personas ni deuda.</param>
 /// <param name="PagadoDesdeAhorro">Si se pagó con el ahorro de la cuenta común.</param>
+/// <param name="Personal">Si es un gasto personal de quien lo pagó: fuera de la liquidación y de los totales del hogar.</param>
 public record GastoResponse(
     Guid Id, DateOnly Fecha, decimal Importe, Guid CategoriaId, Guid? PagadoPor, Guid PerfilRepartoId,
     string? Concepto, Guid? GastoRecurrenteId, IReadOnlyList<RepartoGastoDto> Repartos, bool ACargoCuentaComun = false,
-    bool PagadoDesdeAhorro = false);
+    bool PagadoDesdeAhorro = false, bool Personal = false);
 
 /// <summary>Plantilla de gasto mensual. DiaMes entre 1 y 28.</summary>
 /// <param name="Importe">Importe del gasto que se generará cada mes.</param>

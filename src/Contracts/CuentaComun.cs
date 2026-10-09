@@ -84,6 +84,10 @@ public record PartePersonaDto(
 /// <param name="Activa">true para usar la cuenta común; false la oculta sin borrar sus datos.</param>
 public record ActivarCuentaComunRequest(bool Activa);
 
+/// <summary>PUT /api/cuenta-comun/ahorro/activacion. Solo admin; exige la cuenta común activada.</summary>
+/// <param name="Activo">true para usar el ahorro; false lo bloquea sin borrar sus datos.</param>
+public record ActivarAhorroRequest(bool Activo);
+
 /// <summary>GET /api/cuenta-comun?mes=YYYY-MM: estado de la cuenta común al final del mes.</summary>
 /// <param name="Mes">Mes consultado, en formato YYYY-MM.</param>
 /// <param name="AportadoMes">Suma de las aportaciones del mes.</param>
@@ -104,6 +108,7 @@ public record ActivarCuentaComunRequest(bool Activa);
 /// <param name="AhorroGastado">Gastos pagados desde el ahorro hasta el mes; restan del ahorro disponible.</param>
 /// <param name="Activa">Si el hogar tiene activada la cuenta común; si es false las escrituras de la cuenta y los gastos a su cargo responden 409 (las cifras se devuelven igualmente).</param>
 /// <param name="Partes">«Su parte» de cada miembro con aportaciones o depósitos hasta el mes.</param>
+/// <param name="AhorroActivo">Si el hogar tiene activado el ahorro; si es false las escrituras del ahorro responden 409.</param>
 public record CuentaComunResponse(
     string Mes, decimal AportadoMes, decimal Aportado, decimal Gastado, decimal Saldo,
     IReadOnlyList<PendienteCuentaDto> Pendientes, decimal Efectivo,
@@ -111,4 +116,5 @@ public record CuentaComunResponse(
     decimal AhorroMes = 0m, decimal AhorroAcumulado = 0m, decimal AhorroRetirado = 0m, decimal AhorroDisponible = 0m,
     IReadOnlyList<RetiradaAhorroDto>? RetiradasAhorro = null,
     decimal AhorroDepositado = 0m, IReadOnlyList<DepositoAhorroDto>? DepositosAhorro = null,
-    decimal AhorroGastado = 0m, bool Activa = true, IReadOnlyList<PartePersonaDto>? Partes = null);
+    decimal AhorroGastado = 0m, bool Activa = true, IReadOnlyList<PartePersonaDto>? Partes = null,
+    bool AhorroActivo = true);

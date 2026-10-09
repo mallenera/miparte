@@ -2,6 +2,7 @@
 @inject CoreApiClient Api
 @inject EstadoHogar Hogar
 @inject ServicioAvisos Avisos
+@inject ServicioPermisos Permisos
 
 <h1 class="sr">Categorías de @Hogar.HogarActual?.Nombre</h1>
 
@@ -50,7 +51,7 @@ else
                             <button class="linkbtn danger" type="button" @onclick="() => EliminarAsync(c)">Sí</button>
                             <button class="linkbtn" type="button" @onclick="() => _confirmandoEliminar = null">No</button>
                         }
-                        else
+                        else if (Permisos.Tiene(Claves.CategoriasGestionar))
                         {
                             <button class="linkbtn" type="button" aria-label="Añadir subcategoría a @c.Nombre" @onclick="() => NuevaSubcategoria(c)">Subcategoría</button>
                             <button class="linkbtn" type="button" aria-label="Editar @c.Nombre" @onclick="() => EmpezarEdicion(c)">Editar</button>
@@ -98,6 +99,12 @@ else
             }
         </div>
 
+        @if (!Permisos.Tiene(Claves.CategoriasGestionar))
+        {
+            <div class="aviso warn u-mt14" role="status">No tienes permiso para gestionar categorías. Pídeselo a un administrador del hogar.</div>
+        }
+        else
+        {
         <form class="addcat" id="nueva-categoria" @onsubmit="AnadirAsync">
             <label>@(string.IsNullOrEmpty(_nuevoPadre) ? "Nueva categoría" : "Nueva subcategoría")
                 <input maxlength="100" placeholder="Nombre" @bind="_nuevoNombre" @bind:event="oninput" />
@@ -126,6 +133,7 @@ else
             </label>
             <button class="btn" type="submit" disabled="@string.IsNullOrWhiteSpace(_nuevoNombre)">Añadir</button>
         </form>
+        }
     </section>
 }
 
@@ -147,6 +155,7 @@ else
     {
         _cargando = true;
         _errorCarga = null;
+        await Permisos.AsegurarAsync();
         await RecargarAsync();
         _cargando = false;
     }

@@ -13,10 +13,15 @@ public class ComponentesTests : TestContext
     private static readonly HogarResumen Casa = new(Guid.NewGuid(), "Casa");
     private static readonly Guid AnaId = Guid.NewGuid(), LuisId = Guid.NewGuid();
 
+    private ServicioPermisos _permisos = null!;
+
     private void Registrar(ApiFalsa api)
     {
-        Services.AddSingleton(new CoreApiClient(new HttpClient(api) { BaseAddress = new Uri("http://localhost:5001/") }));
-        Services.AddSingleton(new EstadoHogar(new AlmacenMemoria()));
+        var cliente = new CoreApiClient(new HttpClient(api) { BaseAddress = new Uri("http://localhost:5001/") });
+        var hogar = new EstadoHogar(new AlmacenMemoria());
+        Services.AddSingleton(cliente);
+        Services.AddSingleton(hogar);
+        _permisos = PermisosDePrueba.Registrar(Services, cliente, hogar);
         Services.AddSingleton<ServicioAvisos>();
         Services.AddSingleton<TimeProvider>(new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 10, 7, 10, 0, 0, TimeSpan.Zero)));
     }
@@ -45,7 +50,7 @@ public class ComponentesTests : TestContext
     {
         Registrar(ApiConHogar(soyAdmin: true));
 
-        var c = RenderComponent<VistaHogar>();
+        var c = RenderComponent<VistaConfiguracionHogar>();
 
         Assert.Contains("Ana", c.Markup);
         Assert.Contains("Tú", c.Markup);
@@ -62,7 +67,7 @@ public class ComponentesTests : TestContext
     {
         Registrar(ApiConHogar(soyAdmin: false));
 
-        var c = RenderComponent<VistaHogar>();
+        var c = RenderComponent<VistaConfiguracionHogar>();
 
         Assert.Empty(c.FindAll("form.addm"));
         Assert.Contains("Solo un administrador", c.Markup);
@@ -79,7 +84,7 @@ public class ComponentesTests : TestContext
             .Responde("POST /api/invitaciones", HttpStatusCode.Created,
                 new InvitacionCreada(Guid.NewGuid(), "token-secreto-123", DateTimeOffset.UtcNow.AddDays(7)));
         Registrar(api);
-        var c = RenderComponent<VistaHogar>();
+        var c = RenderComponent<VistaConfiguracionHogar>();
 
         c.Find("#card-invite button.btn-orange").Click();
 
@@ -95,7 +100,7 @@ public class ComponentesTests : TestContext
         var api = ApiConHogar(soyAdmin: true)
             .Error($"PUT /api/miembros/{LuisId}", HttpStatusCode.Conflict, "El hogar necesita al menos un administrador.");
         Registrar(api);
-        var c = RenderComponent<VistaHogar>();
+        var c = RenderComponent<VistaConfiguracionHogar>();
 
         c.FindAll("button").First(b => b.GetAttribute("aria-label") == "Desactivar a Luis").Click();
         c.FindAll("button").First(b => b.TextContent.Contains("Sí, desactivar")).Click();
@@ -109,7 +114,7 @@ public class ComponentesTests : TestContext
         var api = ApiConHogar(soyAdmin: true)
             .Responde("POST /api/miembros", HttpStatusCode.Created, ApiFalsa.Miembro("Nico", tipo: "a_cargo", responsable: AnaId));
         Registrar(api);
-        var c = RenderComponent<VistaHogar>();
+        var c = RenderComponent<VistaConfiguracionHogar>();
 
         c.Find("form.addm input").Input("Nico");
         c.Find("form.addm select").Change("a_cargo");
@@ -958,22 +963,93 @@ public class ComponentesTests : TestContext
     }
 
     [Fact]
-    public void Cuenta_comun_sin_activar_deja_activarla_solo_a_un_admin()
+    public void Cuenta_comun_sin_activar_remite_a_la_configuracion_solo_a_un_admin()
     {
-        var inactiva = Cuenta(0m) with { Activa = false };
         var admin = ApiFalsa.Miembro("Ana", rol: "admin", esYo: true, id: AnaId);
         var api = new ApiFalsa()
             .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { admin })
-            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, inactiva)
-            .Responde("PUT /api/cuenta-comun/activacion", HttpStatusCode.OK, new { activa = true });
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, Cuenta(0m) with { Activa = false });
         Registrar(api);
         var c = RenderComponent<VistaCuentaComun>();
 
         Assert.Contains("Sin activar", c.Markup);
         Assert.Empty(c.FindAll("#form-aportacion"));
-        c.FindAll("button").First(b => b.TextContent == "Activar la cuenta común").Click();
+        Assert.Equal("hogar/configuracion", c.Find("a.btn").GetAttribute("href"));
+    }
+
+    [Fact]
+    public void Cuenta_comun_sin_ahorro_activado_oculta_el_ahorro_y_no_envia_ahorro_en_la_aportacion()
+    {
+        var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, Cuenta(0m) with { AhorroActivo = false })
+            .Responde("PUT /api/cuenta-comun/aportaciones", HttpStatusCode.OK, new AportacionCuentaDto(Guid.NewGuid(), AnaId, new DateOnly(2026, 10, 1), 100m));
+        Registrar(api);
+        var c = RenderComponent<VistaCuentaComun>();
+
+        Assert.Empty(c.FindAll("#ahorro"));
+        Assert.Empty(c.FindAll("#t-ahorro"));
+        Assert.Empty(c.FindAll("#ahorro-aportacion"));
+        c.Find("#form-aportacion input[inputmode=decimal]").Input("100");
+        c.Find("#form-aportacion").Submit();
+
+        Assert.Contains("\"ahorro\":0", api.Cuerpos["PUT /api/cuenta-comun/aportaciones"]);
+    }
+
+    private async Task<IRenderedComponent<VistaConfiguracionHogar>> ConfiguracionAsync(bool soyAdmin, HogarResumen hogar, ApiFalsa? api = null)
+    {
+        Registrar(api ?? ApiConHogar(soyAdmin));
+        await Services.GetRequiredService<EstadoHogar>().AplicarAsync(new YoResponse(null, [hogar], hogar));
+        return RenderComponent<VistaConfiguracionHogar>();
+    }
+
+    [Fact]
+    public async Task Configuracion_habilita_la_cuenta_comun_y_el_estado_del_hogar_lo_refleja()
+    {
+        var api = ApiConHogar(soyAdmin: true).Responde("PUT /api/cuenta-comun/activacion", HttpStatusCode.OK, new { activa = true });
+        var c = await ConfiguracionAsync(true, Casa, api);
+        var ahorro = c.FindAll(".chk input")[1];
+        Assert.True(ahorro.HasAttribute("disabled")); // sin cuenta común no hay ahorro
+
+        c.FindAll(".chk input")[0].Change(true);
 
         Assert.Contains("\"activa\":true", api.Cuerpos["PUT /api/cuenta-comun/activacion"]);
+        Assert.True(Services.GetRequiredService<EstadoHogar>().HogarActual!.CuentaComunActiva);
+        Assert.False(c.FindAll(".chk input")[1].HasAttribute("disabled"));
+    }
+
+    [Fact]
+    public async Task Configuracion_activa_el_ahorro_con_la_cuenta_comun_habilitada()
+    {
+        var api = ApiConHogar(soyAdmin: true).Responde("PUT /api/cuenta-comun/ahorro/activacion", HttpStatusCode.OK, new { activo = true });
+        var c = await ConfiguracionAsync(true, Casa with { CuentaComunActiva = true }, api);
+
+        c.FindAll(".chk input")[1].Change(true);
+
+        Assert.Contains("\"activo\":true", api.Cuerpos["PUT /api/cuenta-comun/ahorro/activacion"]);
+        Assert.True(Services.GetRequiredService<EstadoHogar>().HogarActual!.AhorroActivo);
+    }
+
+    [Fact]
+    public async Task Configuracion_no_deja_cambiar_las_funciones_a_quien_no_es_admin()
+    {
+        var c = await ConfiguracionAsync(false, Casa with { CuentaComunActiva = true });
+
+        Assert.All(c.FindAll(".chk input"), i => Assert.True(i.HasAttribute("disabled")));
+        Assert.Contains("Solo un administrador puede cambiar estas funciones", c.Markup);
+    }
+
+    [Fact]
+    public async Task Configuracion_muestra_el_error_de_la_api_si_rechaza_el_cambio()
+    {
+        var api = ApiConHogar(soyAdmin: true).Responde("PUT /api/cuenta-comun/activacion", HttpStatusCode.Forbidden, new { error = "No puedes." });
+        var c = await ConfiguracionAsync(true, Casa, api);
+
+        c.FindAll(".chk input")[0].Change(true);
+
+        Assert.Contains("No puedes.", c.Markup);
+        Assert.False(Services.GetRequiredService<EstadoHogar>().HogarActual!.CuentaComunActiva);
     }
 
     [Fact]
@@ -986,7 +1062,7 @@ public class ComponentesTests : TestContext
 
         var c = RenderComponent<VistaCuentaComun>();
 
-        Assert.DoesNotContain(c.FindAll("button"), b => b.TextContent == "Activar la cuenta común");
+        Assert.Empty(c.FindAll("a.btn"));
         Assert.Contains("Solo un administrador", c.Markup);
     }
 
@@ -1040,5 +1116,103 @@ public class ComponentesTests : TestContext
 
         Assert.Empty(c.FindAll("#cuenta-saldo"));
     }
-}
 
+    [Fact]
+    public void Historial_del_hogar_pide_el_permiso_historial_ver()
+    {
+        Registrar(ApiConHogar(soyAdmin: false));
+        _permisos.Fijar([]);
+        var sinPermiso = RenderComponent<VistaHistorialHogar>();
+        Assert.Contains("No tienes permiso para ver el historial", sinPermiso.Markup);
+        Assert.Empty(sinPermiso.FindAll("#t-historial"));
+
+        _permisos.Fijar([MiParte.Core.Domain.CatalogoPermisos.HistorialVer]);
+        var conPermiso = RenderComponent<VistaHistorialHogar>();
+        Assert.NotEmpty(conPermiso.FindAll("#t-historial"));
+    }
+
+    [Fact]
+    public void Gastos_sin_permiso_de_crear_ofrece_aviso_en_vez_del_formulario()
+    {
+        var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
+        var perfil = new PerfilRepartoDto(Guid.NewGuid(), "Individual", "individual", []);
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
+            .Responde("GET /api/categorias", HttpStatusCode.OK, new[] { new CategoriaDto(Guid.NewGuid(), "Casa", null, null) })
+            .Responde("GET /api/perfiles", HttpStatusCode.OK, new[] { perfil })
+            .Responde("GET /api/gastos", HttpStatusCode.OK, Array.Empty<GastoResponse>())
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, Cuenta(0m));
+        Registrar(api);
+        _permisos.Fijar([MiParte.Core.Domain.CatalogoPermisos.GastosEditar]);
+
+        var c = RenderComponent<VistaGastos>();
+
+        Assert.Empty(c.FindAll("form.addcat"));
+        Assert.Contains("No tienes permiso para crear gastos", c.Markup);
+    }
+
+    [Fact]
+    public void Categorias_sin_permiso_no_ofrece_formulario_ni_acciones()
+    {
+        var api = new ApiFalsa()
+            .Responde("GET /api/categorias", HttpStatusCode.OK, new[] { new CategoriaDto(Guid.NewGuid(), "Luz", null, null) })
+            .Responde("GET /api/perfiles", HttpStatusCode.OK, Array.Empty<PerfilRepartoDto>());
+        Registrar(api);
+        _permisos.Fijar([]);
+
+        var c = RenderComponent<VistaCategorias>();
+
+        Assert.Empty(c.FindAll("#nueva-categoria"));
+        Assert.DoesNotContain(c.FindAll("button"), b => b.TextContent.Trim() == "Editar");
+        Assert.Contains("No tienes permiso para gestionar categorías", c.Find("section").TextContent);
+    }
+
+    [Fact]
+    public void Panel_de_permisos_muestra_la_matriz_de_perfiles()
+    {
+        Registrar(new ApiFalsa());
+
+        var c = RenderComponent<PanelPermisos>(p => p.Add(x => x.Miembros, new List<MiembroDto>()).Add(x => x.Puede, true));
+
+        var cabecera = c.FindAll("thead th").Select(t => t.TextContent.Trim()).ToList();
+        Assert.Equal(["Permiso", "Admin", "Miembro", "Adulto sin cuenta", "A cargo"], cabecera);
+        var historial = c.FindAll("tbody tr").First(f => f.TextContent.Contains("Ver el historial"));
+        var celdas = historial.QuerySelectorAll("td").Select(t => t.TextContent.Trim()).ToList();
+        Assert.Equal(["✓Sí", "—No", "—No", "—No"], celdas); // solo el admin lo tiene por defecto
+        Assert.Contains("Crear invitaciones", c.Markup);
+    }
+
+    [Fact]
+    public void Panel_de_permisos_deja_a_un_admin_marcar_y_guardar_los_de_un_miembro()
+    {
+        var ana = ApiFalsa.Miembro("Ana", rol: "admin", esYo: true, id: AnaId);
+        var luis = ApiFalsa.Miembro("Luis", id: LuisId, permisos: [MiParte.Core.Domain.CatalogoPermisos.GastosCrear]);
+        var api = new ApiFalsa().Responde("PUT /api/miembros/" + LuisId, HttpStatusCode.OK, luis);
+        Registrar(api);
+        var c = RenderComponent<PanelPermisos>(p => p.Add(x => x.Miembros, new List<MiembroDto> { ana, luis }).Add(x => x.Puede, true));
+
+        Assert.Contains("Todos los permisos", c.Markup); // Ana
+        Assert.Contains("1 de 12 permisos", c.Markup); // Luis
+        c.Find("button[aria-label='Permisos de Luis']").Click();
+        var historial = c.FindAll(".permisos .chk").First(l => l.TextContent.Contains("Ver el historial")).QuerySelector("input")!;
+        historial.Change(true);
+        c.FindAll("button").First(b => b.TextContent.Trim() == "Guardar permisos").Click();
+
+        var cuerpo = api.Cuerpos["PUT /api/miembros/" + LuisId];
+        Assert.Contains("\"gastos.crear\"", cuerpo);
+        Assert.Contains("\"historial.ver\"", cuerpo);
+        Assert.DoesNotContain("\"gastos.borrar\"", cuerpo);
+    }
+
+    [Fact]
+    public void Panel_de_permisos_no_ofrece_editar_a_quien_no_es_admin()
+    {
+        var luis = ApiFalsa.Miembro("Luis", id: LuisId, permisos: []);
+        Registrar(new ApiFalsa());
+
+        var c = RenderComponent<PanelPermisos>(p => p.Add(x => x.Miembros, new List<MiembroDto> { luis }).Add(x => x.Puede, false));
+
+        Assert.Empty(c.FindAll("button[aria-label='Permisos de Luis']"));
+        Assert.Contains("Solo un administrador puede cambiar los permisos", c.Markup);
+    }
+}

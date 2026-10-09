@@ -43,6 +43,16 @@ public class HistorialTests : TestContext
         Assert.Equal("aceptó una invitación", TextoAuditoria.Frase(Evento("usar", "invitacion", null, null)));
     }
 
+
+    [Fact]
+    public void Cambios_de_permisos_se_muestran_con_el_texto_del_catalogo()
+    {
+        var e = Evento("editar", "miembro", """{"permisos":["gastos.crear"]}""", """{"permisos":["gastos.crear","historial.ver"]}""");
+
+        var cambios = TextoAuditoria.Cambios(e, _ => null);
+
+        Assert.Contains(new CambioAuditoria("Permisos", "Crear gastos", "Crear gastos, Ver el historial de cambios"), cambios);
+    }
     [Fact]
     public void Cambios_muestra_antes_y_despues_oculta_ids_internos_y_resuelve_miembros()
     {

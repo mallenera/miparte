@@ -3,6 +3,7 @@
 @inject CoreApiClient Api
 @inject EstadoHogar Hogar
 @inject ServicioAvisos Avisos
+@inject ServicioPermisos Permisos
 
 <h1 class="sr">Gastos de @Hogar.HogarActual?.Nombre</h1>
 
@@ -113,8 +114,14 @@ else
                         }
                         else if (!MesCerrado)
                         {
-                            <button class="linkbtn" type="button" aria-label="Editar gasto @g.Concepto" @onclick="() => EmpezarEdicion(g)">Editar</button>
-                            <button class="linkbtn danger" type="button" aria-label="Eliminar gasto @g.Concepto" @onclick="() => _confirmandoEliminar = g.Id">Eliminar</button>
+                            @if (Permisos.Tiene(Claves.GastosEditar))
+                            {
+                                <button class="linkbtn" type="button" aria-label="Editar gasto @g.Concepto" @onclick="() => EmpezarEdicion(g)">Editar</button>
+                            }
+                            @if (Permisos.Tiene(Claves.GastosBorrar))
+                            {
+                                <button class="linkbtn danger" type="button" aria-label="Eliminar gasto @g.Concepto" @onclick="() => _confirmandoEliminar = g.Id">Eliminar</button>
+                            }
                         }
                     </div>
                 </div>
@@ -129,6 +136,10 @@ else
         @if (_adultos.Count == 0 || _categorias.Count == 0 || _perfiles.Count == 0)
         {
             <div class="aviso warn u-mt14">Para registrar gastos hace falta al menos un adulto, una categoría y un perfil de reparto.</div>
+        }
+        else if (!Permisos.Tiene(_editando is null ? Claves.GastosCrear : Claves.GastosEditar))
+        {
+            <div class="aviso warn u-mt14" role="status">No tienes permiso para @(_editando is null ? "crear" : "editar") gastos. Pídeselo a un administrador del hogar.</div>
         }
         else
         {
@@ -157,7 +168,10 @@ else
                         @if (_cuentaActiva && PerfilCuentaComun is not null)
                         {
                             <option value="">Cuenta común (la paga directamente)</option>
-                            <option value="ahorro">Ahorro (se descuenta del ahorro)</option>
+                            @if (_ahorroActivo || _desdeAhorro)
+                            {
+                                <option value="ahorro">Ahorro (se descuenta del ahorro)</option>
+                            }
                         }
                     </select>
                 </label>
@@ -213,7 +227,7 @@ else
     private string _importe = "", _concepto = "";
     private Guid _categoria, _perfil;
     private Guid? _pagador;
-    private bool _cuentaActiva, _desdeAhorro, _personal;
+    private bool _cuentaActiva, _ahorroActivo, _desdeAhorro, _personal;
 
     /// <summary>Quién paga en el selector: un adulto (su id), la cuenta común ("") o el ahorro ("ahorro").</summary>
     private string OrigenPago
@@ -267,6 +281,7 @@ else
     {
         _cargando = true;
         _errorCarga = null;
+        await Permisos.AsegurarAsync();
         try
         {
             var miembros = Api.ListarMiembrosAsync();
@@ -296,10 +311,12 @@ else
         try
         {
             var cuenta = await Api.ObtenerCuentaComunAsync(_mes.ToString("yyyy-MM", CultureInfo.InvariantCulture));
+            _ahorroActivo = cuenta.Activa && cuenta.AhorroActivo;
             return cuenta.Activa;
         }
         catch (ApiException)
         {
+            _ahorroActivo = false;
             return false;
         }
     }

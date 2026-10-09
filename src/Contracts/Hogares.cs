@@ -8,7 +8,9 @@ public record CrearHogarRequest(string NombreHogar, string NombreMiembro);
 /// <summary>Datos básicos de un hogar.</summary>
 /// <param name="Id">Identificador del hogar.</param>
 /// <param name="Nombre">Nombre del hogar.</param>
-public record HogarResumen(Guid Id, string Nombre);
+/// <param name="CuentaComunActiva">Si el hogar tiene activada la cuenta común.</param>
+/// <param name="AhorroActivo">Si el hogar tiene activado el ahorro de la cuenta común.</param>
+public record HogarResumen(Guid Id, string Nombre, bool CuentaComunActiva = false, bool AhorroActivo = false);
 
 /// <summary>Respuesta de GET /api/yo: usuario, sus hogares y el hogar actual (null si no se puede determinar).</summary>
 /// <param name="UserId">Identificador del usuario (claim "sub" del JWT), o null si no consta.</param>

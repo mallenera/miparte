@@ -743,3 +743,18 @@ section.card + section.card { margin-top: 24px; }
 .hist-antes { text-decoration: line-through; color: var(--ink-2); }
 .hist-mas { display: flex; justify-content: center; margin-top: 12px; }
 .hist-filtro select { min-width: 0; }
+
+/* Permisos: matriz de perfiles y editor por miembro */
+.matriz-wrap { overflow-x: auto; margin-top: 12px; }
+.matriz { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.matriz th, .matriz td { padding: 8px 10px; text-align: center; border-top: 1px solid var(--line); }
+.matriz thead th { border-top: 0; color: var(--ink-2); font-weight: 700; vertical-align: bottom; }
+.matriz th:first-child, .matriz td:first-child { text-align: left; }
+.matriz tbody th { font-weight: 600; color: var(--ink); }
+.matriz tr.grupo th { padding-top: 14px; font-size: .75rem; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-2); }
+.matriz .si { color: var(--ok); font-weight: 700; }
+.matriz .no { color: var(--ink-2); }
+.permisos-grupo { margin: 10px 0 0; padding: 0; border: 0; }
+.permisos-grupo legend { padding: 0; font-size: .75rem; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-2); font-weight: 700; }
+.permisos-grupo .chk { padding: 6px 0; }
+.mrow .permisos { flex: 1 1 100%; padding: 4px 0 8px 44px; }

@@ -1,3 +1,4 @@
+using MiParte.Core.Api.Seguridad;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MiParte.Contracts;
@@ -17,9 +18,9 @@ public static class GastosEndpoints
         var g = app.MapGroup("/api/gastos").RequireAuthorization();
         g.MapGet("", ListarAsync);
         g.MapGet("{id:guid}", ObtenerAsync);
-        g.MapPost("", CrearAsync);
-        g.MapPut("{id:guid}", EditarAsync);
-        g.MapDelete("{id:guid}", BorrarAsync);
+        g.MapPost("", CrearAsync).RequierePermiso(CatalogoPermisos.GastosCrear);
+        g.MapPut("{id:guid}", EditarAsync).RequierePermiso(CatalogoPermisos.GastosEditar);
+        g.MapDelete("{id:guid}", BorrarAsync).RequierePermiso(CatalogoPermisos.GastosBorrar);
         return app;
     }
 
@@ -95,6 +96,7 @@ public static class GastosEndpoints
     private static async Task<IResult?> ComprobarAhorroAsync(GastoRequest r, Guid? excluir, MiParteDbContext db, CancellationToken ct)
     {
         if (!r.PagadoDesdeAhorro) return null;
+        if (await CuentaComunEndpoints.ExigirAhorroAsync(db, ct) is { } inactivo) return inactivo;
         var disponible = Math.Max(0m, await CuentaComunEndpoints.AhorroDisponibleAsync(db, r.Fecha, excluir, ct));
         return r.Importe <= disponible ? null
             : Results.Conflict(new { error = $"El ahorro disponible ({disponible:0.00}) no cubre el gasto.", disponible });

@@ -60,9 +60,9 @@ public static class HogaresEndpoints
             .Where(h => db.Miembros.IgnoreQueryFilters()
                 .Any(m => m.HogarId == h.Id && m.UserId == userId && m.Activo))
             .OrderBy(h => h.Nombre)
-            .Select(h => new { h.Id, h.Nombre })
+            .Select(h => new { h.Id, h.Nombre, h.CuentaComunActiva, h.AhorroActivo })
             .ToListAsync(ct);
-        return filas.Select(h => new HogarResumen(h.Id, h.Nombre)).ToList();
+        return filas.Select(h => new HogarResumen(h.Id, h.Nombre, h.CuentaComunActiva, h.AhorroActivo)).ToList();
     }
 
     /// <summary>

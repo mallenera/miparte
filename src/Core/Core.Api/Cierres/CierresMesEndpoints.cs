@@ -1,3 +1,5 @@
+using MiParte.Core.Domain;
+using MiParte.Core.Api.Seguridad;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MiParte.Contracts;
@@ -18,8 +20,8 @@ public static class CierresMesEndpoints
     {
         var g = app.MapGroup("/api/cierres-mes").RequireAuthorization();
         g.MapGet("", ListarAsync);
-        g.MapPost("", CerrarAsync);
-        g.MapDelete("{mes}", ReabrirAsync);
+        g.MapPost("", CerrarAsync).RequierePermiso(CatalogoPermisos.MesCerrar);
+        g.MapDelete("{mes}", ReabrirAsync).RequierePermiso(CatalogoPermisos.MesReabrir);
         return app;
     }
 
@@ -31,14 +33,6 @@ public static class CierresMesEndpoints
         return yo is null
             ? (null, Results.Json(new { error = "Solo un miembro activo del hogar puede cerrar un mes." }, statusCode: StatusCodes.Status403Forbidden))
             : (yo, null);
-    }
-
-    /// <summary>Como <see cref="ExigirMiembroAsync"/>, pero además exige rol admin: reabrir un mes es más delicado que cerrarlo.</summary>
-    private static async Task<(Miembro? Yo, IResult? Error)> ExigirAdminAsync(HttpContext ctx, MiParteDbContext db, CancellationToken ct)
-    {
-        var (yo, error) = await ExigirMiembroAsync(ctx, db, ct);
-        if (error is not null || yo!.Rol == RolMiembro.Admin) return (yo, error);
-        return (null, Results.Json(new { error = "Solo un administrador puede reabrir un mes." }, statusCode: StatusCodes.Status403Forbidden));
     }
 
     /// <summary>Convierte un cierre en su DTO, con el nombre de quien lo cerró.</summary>
@@ -55,7 +49,7 @@ public static class CierresMesEndpoints
         return Results.Ok(cierres.Select(c => A(c, autores)).ToList());
     }
 
-    /// <summary>POST /api/cierres-mes: cierra un mes. Cualquier miembro activo vinculado (403 si no). 400 si el mes es inválido o aún no ha terminado; 409 sin hogar o si ya está cerrado. 201 si se cierra.</summary>
+    /// <summary>POST /api/cierres-mes: cierra un mes. Exige el permiso <c>mes.cerrar</c> (403 si no). 400 si el mes es inválido o aún no ha terminado; 409 sin hogar o si ya está cerrado. 201 si se cierra.</summary>
     private static async Task<IResult> CerrarAsync(
         CerrarMesRequest req, HttpContext ctx, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
@@ -83,14 +77,13 @@ public static class CierresMesEndpoints
         return Results.Created($"/api/cierres-mes/{ApiComun.FormatoMes(inicio)}", A(cierre, new Dictionary<Guid, string> { [yo.UserId!.Value] = yo.Nombre }));
     }
 
-    /// <summary>DELETE /api/cierres-mes/{mes}: reabre un mes cerrado. Solo admin (403). 400 si el mes es inválido; 404 si no estaba cerrado; 409 sin hogar. 204 si se reabre.</summary>
+    /// <summary>DELETE /api/cierres-mes/{mes}: reabre un mes cerrado. Exige el permiso <c>mes.reabrir</c> (403 si no). 400 si el mes es inválido; 404 si no estaba cerrado; 409 sin hogar. 204 si se reabre.</summary>
     private static async Task<IResult> ReabrirAsync(
         string mes, HttpContext ctx, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
-        var (_, error) = await ExigirAdminAsync(ctx, db, ct);
-        if (error is not null) return error;
-        if (!ApiComun.TryMes(mes, out var inicio)) return ApiComun.MesInvalido();
+        if (!ApiComun.TryMes(mes, out var inicio))
+ return ApiComun.MesInvalido();
         var cierre = await db.MesesCerrados.FirstOrDefaultAsync(c => c.Mes == inicio, ct);
         if (cierre is null) return Results.NotFound();
         db.MesesCerrados.Remove(cierre);
@@ -103,7 +96,7 @@ public static class CierresMesEndpoints
 public static class CierreMes
 {
     /// <summary>Mensaje de error cuando se intenta tocar un mes cerrado.</summary>
-    public const string Mensaje = "Ese mes está cerrado: un administrador debe reabrirlo para cambiar sus gastos.";
+    public const string Mensaje = "Ese mes está cerrado: quien tenga permiso para reabrir meses (un administrador) debe reabrirlo para cambiar sus gastos.";
 
     /// <summary>SQLSTATE con el que los triggers de la base de datos rechazan una escritura de gasto en un mes cerrado.</summary>
     public const string SqlState = "MP409";

@@ -53,6 +53,6 @@ internal sealed class ApiFalsa : HttpMessageHandler
     }
 
     public static MiembroDto Miembro(string nombre, string rol = "miembro", bool esYo = false, bool vinculado = true,
-        string tipo = "adulto", Guid? responsable = null, Guid? id = null) =>
-        new(id ?? Guid.NewGuid(), nombre, tipo, responsable, true, rol, vinculado, esYo);
+        string tipo = "adulto", Guid? responsable = null, Guid? id = null, IReadOnlyList<string>? permisos = null) =>
+        new(id ?? Guid.NewGuid(), nombre, tipo, responsable, true, rol, vinculado, esYo, permisos);
 }

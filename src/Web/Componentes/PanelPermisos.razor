@@ -1,0 +1,185 @@
+@* Permisos del hogar: matriz de lo que puede hacer cada perfil y, para un admin, los checks de cada miembro con cuenta. La API es quien los aplica. *@
+@inject CoreApiClient Api
+@inject ServicioAvisos Avisos
+
+<section class="card" aria-labelledby="t-permisos">
+    <div class="card-head"><h2 id="t-permisos">Permisos</h2></div>
+    <p class="muted">Qué puede hacer cada perfil. Un admin lo puede todo y además gestiona miembros, invitaciones, funciones del hogar y permisos. Un miembro nuevo recibe los permisos de la columna «Miembro».</p>
+
+    <div class="matriz-wrap">
+        <table class="matriz">
+            <caption class="sr">Permisos por perfil</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Permiso</th>
+                    <th scope="col">Admin</th>
+                    <th scope="col">Miembro</th>
+                    <th scope="col">Adulto sin cuenta</th>
+                    <th scope="col">A cargo</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var grupo in Grupos)
+                {
+                    <tr class="grupo"><th scope="colgroup" colspan="5">@grupo.Key</th></tr>
+                    @foreach (var p in grupo)
+                    {
+                        <tr>
+                            <th scope="row">@p.Etiqueta</th>
+                            <td><Marca Si="true" /></td>
+                            <td><Marca Si="p.PorDefecto" /></td>
+                            <td><Marca Si="false" /></td>
+                            <td><Marca Si="false" /></td>
+                        </tr>
+                    }
+                }
+                <tr class="grupo"><th scope="colgroup" colspan="5">Solo admin</th></tr>
+                @foreach (var texto in SoloAdmin)
+                {
+                    <tr>
+                        <th scope="row">@texto</th>
+                        <td><Marca Si="true" /></td>
+                        <td><Marca Si="false" /></td>
+                        <td><Marca Si="false" /></td>
+                        <td><Marca Si="false" /></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <p class="muted u-mt12">«Adulto sin cuenta» y «A cargo» no entran en la aplicación: solo participan en el reparto y los pagos.</p>
+
+    <h3 class="u-sec">Por miembro</h3>
+    @if (_error is not null)
+    {
+        <div class="aviso err" role="alert">@_error</div>
+    }
+    <div class="mlist">
+        @foreach (var m in Miembros.Where(m => m.Tipo == "adulto" && m.Activo && m.Vinculado))
+        {
+            var miembro = m;
+            var esAdminMiembro = miembro.Rol == "admin";
+            <div class="mrow">
+                <Avatar Nombre="@miembro.Nombre" Color="@ColorMiembro.De(miembro.Id, Miembros)" Tamano="lg" />
+                <div class="mname">
+                    <strong>@miembro.Nombre</strong>
+                    @if (miembro.EsYo) { <span class="tag cur">Tú</span> }
+                    @if (esAdminMiembro) { <span class="tag admin">Admin</span> }
+                </div>
+                <div class="mmeta">
+                    @if (esAdminMiembro)
+                    {
+                        <span>Todos los permisos</span>
+                    }
+                    else
+                    {
+                        <span>@(miembro.Permisos?.Count ?? 0) de @Claves.Todos.Count permisos</span>
+                    }
+                </div>
+                <div class="macc">
+                    @if (!esAdminMiembro && Puede)
+                    {
+                        <button class="linkbtn" type="button" aria-expanded="@((_abierto == miembro.Id).ToString().ToLowerInvariant())"
+                                aria-label="Permisos de @miembro.Nombre" @onclick="() => Alternar(miembro)">
+                            @(_abierto == miembro.Id ? "Cerrar" : "Permisos")
+                        </button>
+                    }
+                </div>
+                @if (_abierto == miembro.Id)
+                {
+                    <div class="permisos">
+                        @foreach (var grupo in Grupos)
+                        {
+                            <fieldset class="permisos-grupo">
+                                <legend>@grupo.Key</legend>
+                                @foreach (var p in grupo)
+                                {
+                                    var clave = p.Clave;
+                                    <label class="chk">
+                                        <input type="checkbox" checked="@_borrador.Contains(clave)" disabled="@_guardando"
+                                               @onchange="e => Marcar(clave, (bool)e.Value!)" />
+                                        @p.Etiqueta
+                                    </label>
+                                }
+                            </fieldset>
+                        }
+                        <div class="actions">
+                            <button class="btn btn-sm" type="button" disabled="@_guardando" @onclick="() => GuardarAsync(miembro)">Guardar permisos</button>
+                            <button class="linkbtn" type="button" @onclick="() => _abierto = null">Cancelar</button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+    @if (!Puede)
+    {
+        <p class="muted u-mt12">Solo un administrador puede cambiar los permisos.</p>
+    }
+</section>
+
+@code {
+    private static readonly string[] SoloAdmin =
+    [
+        "Añadir, renombrar y desactivar miembros",
+        "Crear invitaciones",
+        "Habilitar la cuenta común y el ahorro",
+        "Cambiar los permisos",
+    ];
+
+    private readonly HashSet<string> _borrador = [];
+    private Guid? _abierto;
+    private bool _guardando;
+    private string? _error;
+
+    private static IEnumerable<IGrouping<string, MiParte.Core.Domain.Permiso>> Grupos => Claves.Todos.GroupBy(p => p.Grupo);
+
+    /// <summary>Miembros del hogar con su rol y permisos efectivos.</summary>
+    [Parameter] public List<MiembroDto> Miembros { get; set; } = [];
+
+    /// <summary>Si quien mira es admin y puede cambiar los permisos.</summary>
+    [Parameter] public bool Puede { get; set; }
+
+    /// <summary>Se invoca tras guardar, para que la vista recargue los miembros.</summary>
+    [Parameter] public EventCallback OnCambiado { get; set; }
+
+    private void Alternar(MiembroDto m)
+    {
+        _error = null;
+        if (_abierto == m.Id)
+        {
+            _abierto = null;
+            return;
+        }
+        _abierto = m.Id;
+        _borrador.Clear();
+        foreach (var clave in m.Permisos ?? []) _borrador.Add(clave);
+    }
+
+    private void Marcar(string clave, bool marcado)
+    {
+        if (marcado) _borrador.Add(clave);
+        else _borrador.Remove(clave);
+    }
+
+    private async Task GuardarAsync(MiembroDto m)
+    {
+        _error = null;
+        _guardando = true;
+        try
+        {
+            await Api.ActualizarMiembroAsync(m.Id, new ActualizarMiembroRequest(Permisos: Claves.Todos.Select(p => p.Clave).Where(_borrador.Contains).ToList()));
+            _abierto = null;
+            Avisos.Mostrar($"Permisos de {m.Nombre} guardados");
+            await OnCambiado.InvokeAsync();
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+        finally
+        {
+            _guardando = false;
+        }
+    }
+}

@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using MiParte.Contracts;
 using MiParte.Core.Api.Hogares;
 using MiParte.Core.Api.Seguridad;
+using MiParte.Core.Domain;
 using MiParte.Core.Domain.Entidades;
 using MiParte.Core.Infrastructure.Auditoria;
 using MiParte.Core.Infrastructure.Persistencia;
@@ -53,7 +54,8 @@ public static class MiembrosEndpoints
     private static MiembroDto ADto(Miembro m, Guid? usuarioActual = null) => new(
         m.Id, m.Nombre, m.Tipo == TipoMiembro.Adulto ? "adulto" : "a_cargo", m.ResponsableId, m.Activo,
         m.Rol == RolMiembro.Admin ? "admin" : "miembro", m.UserId is not null,
-        usuarioActual is not null && m.UserId == usuarioActual);
+        usuarioActual is not null && m.UserId == usuarioActual,
+        CatalogoPermisos.Todos.Select(p => p.Clave).Where(CatalogoPermisos.Efectivos(m).Contains).ToList());
 
     /// <summary>Obtiene el id del usuario autenticado del claim "sub"; false si falta o no es un GUID.</summary>
     private static bool TryUsuario(HttpContext ctx, out Guid userId)
@@ -154,8 +156,8 @@ public static class MiembrosEndpoints
         {
             // Un no-admin solo puede renombrarse a sí mismo.
             if (m.Id != yo.Id) return Error(403, "Solo un administrador puede modificar a otros miembros.");
-            if (req.Activo is not null || req.ResponsableId is not null || req.Rol is not null)
-                return Error(403, "Solo un administrador puede cambiar el estado, el rol o el responsable.");
+            if (req.Activo is not null || req.ResponsableId is not null || req.Rol is not null || req.Permisos is not null)
+                return Error(403, "Solo un administrador puede cambiar el estado, el rol, el responsable o los permisos.");
         }
 
         string? nombre = null;
@@ -177,6 +179,18 @@ public static class MiembrosEndpoints
                 _ => null,
             };
             if (nuevoRol is null) return Error(400, "El rol debe ser 'admin' o 'miembro'.");
+        }
+
+        List<string>? nuevosPermisos = null;
+        if (req.Permisos is not null)
+        {
+            var desconocido = req.Permisos.FirstOrDefault(p => !CatalogoPermisos.Existe(p));
+            if (desconocido is not null) return Error(400, $"El permiso «{desconocido}» no existe.");
+            nuevosPermisos = CatalogoPermisos.Todos.Select(p => p.Clave).Where(req.Permisos.Contains).ToList();
+            if (m.Rol == RolMiembro.Admin || nuevoRol == RolMiembro.Admin)
+                return Error(409, "Un administrador tiene todos los permisos y no se pueden cambiar.");
+            if (m.Tipo != TipoMiembro.Adulto || m.UserId is null)
+                return Error(409, "Solo un adulto con cuenta tiene permisos propios.");
         }
 
         if (req.ResponsableId is not null)
@@ -216,6 +230,8 @@ public static class MiembrosEndpoints
         if (nombre is not null) m.Nombre = nombre;
         m.Activo = seActiva;
         m.Rol = rolFinal;
+        // Se asigna una lista nueva solo si cambia: la auditoría compara por referencia y no debe registrar un cambio vacío.
+        if (nuevosPermisos is not null && !nuevosPermisos.ToHashSet().SetEquals(m.Permisos)) m.Permisos = nuevosPermisos;
         if (req.ResponsableId is not null) m.ResponsableId = req.ResponsableId;
 
         await db.SaveChangesAsync(ct);
@@ -370,6 +386,6 @@ public static class MiembrosEndpoints
         }
 
         var h = await db.Hogares.IgnoreQueryFilters().FirstAsync(x => x.Id == inv.HogarId, ct);
-        return Results.Ok(new HogarResumen(h.Id, h.Nombre));
+        return Results.Ok(new HogarResumen(h.Id, h.Nombre, h.CuentaComunActiva, h.AhorroActivo));
     }
 }

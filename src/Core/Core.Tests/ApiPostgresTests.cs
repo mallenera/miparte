@@ -129,6 +129,8 @@ public class ApiPostgresTests
         Assert.True((await Leer<List<CategoriaDto>>(await c.GetAsync("/api/categorias"))).Single(x => x.Id == cat.Id).ACargoCuentaComun);
 
         var ana = (await Leer<List<MiembroDto>>(await c.GetAsync("/api/miembros"))).Single();
+        Assert.Equal(HttpStatusCode.Conflict, (await c.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(ana.Id, new DateOnly(2027, 1, 1), 300m, 50m))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await c.PutAsJsonAsync("/api/cuenta-comun/ahorro/activacion", new ActivarAhorroRequest(true))).StatusCode);
         var aport = await c.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(ana.Id, new DateOnly(2027, 1, 1), 300m, 50m));
         Assert.Equal(HttpStatusCode.OK, aport.StatusCode);
         var resumen = await Leer<ResumenMensualResponse>(await c.GetAsync("/api/resumen?mes=2027-01"));

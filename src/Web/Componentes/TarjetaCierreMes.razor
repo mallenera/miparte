@@ -1,4 +1,4 @@
-@* Cierre del mes mostrado: estado y botón de cerrar (cualquier miembro) o reabrir (solo admin). Un mes cerrado congela sus gastos. *@
+@* Cierre del mes mostrado: estado y botón de cerrar (permiso mes.cerrar) o reabrir (permiso mes.reabrir). Un mes cerrado congela sus gastos. *@
 @using System.Globalization
 @inject CoreApiClient Api
 @inject ServicioAvisos Avisos
@@ -28,9 +28,13 @@
     {
         <p class="muted">Solo se puede cerrar un mes que ya ha terminado.</p>
     }
-    else if (Cierre is not null && !EsAdmin)
+    else if (Cierre is null && !PuedeCerrar)
     {
-        <p class="muted">Solo un administrador puede reabrir el mes.</p>
+        <p class="muted">No tienes permiso para cerrar el mes. Pídeselo a un administrador del hogar.</p>
+    }
+    else if (Cierre is not null && !PuedeReabrir)
+    {
+        <p class="muted">No tienes permiso para reabrir el mes: pídeselo a un administrador del hogar.</p>
     }
     else if (_confirmando)
     {
@@ -58,8 +62,11 @@
     /// <summary>Cierre del mes, o null si está abierto.</summary>
     [Parameter] public MesCerradoDto? Cierre { get; set; }
 
-    /// <summary>Si el usuario es admin: solo él puede reabrir (cerrar puede cualquier miembro).</summary>
-    [Parameter] public bool EsAdmin { get; set; }
+    /// <summary>Si el usuario tiene el permiso <c>mes.reabrir</c>.</summary>
+    [Parameter] public bool PuedeReabrir { get; set; }
+
+    /// <summary>Si el usuario tiene el permiso <c>mes.cerrar</c>.</summary>
+    [Parameter] public bool PuedeCerrar { get; set; } = true;
 
     /// <summary>Se invoca tras cerrar o reabrir, para que la vista recargue.</summary>
     [Parameter] public EventCallback Cambiado { get; set; }

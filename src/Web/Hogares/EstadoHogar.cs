@@ -75,6 +75,21 @@ public sealed class EstadoHogar
         await FijarAsync(hogar);
     }
 
+    /// <summary>
+    /// Actualiza las funciones activadas del hogar actual (cuenta común y ahorro) tras cambiarlas, para que el menú y las
+    /// pestañas reaccionen sin volver a pedir <c>/api/yo</c>.
+    /// </summary>
+    /// <param name="cuentaComunActiva">Si el hogar usa la cuenta común.</param>
+    /// <param name="ahorroActivo">Si el hogar usa el ahorro.</param>
+    public void ActualizarFunciones(bool cuentaComunActiva, bool ahorroActivo)
+    {
+        if (HogarActual is not { } actual) return;
+        var nuevo = actual with { CuentaComunActiva = cuentaComunActiva, AhorroActivo = ahorroActivo };
+        Hogares = Hogares.Select(h => h.Id == nuevo.Id ? nuevo : h).ToList();
+        HogarActual = nuevo;
+        Cambiado?.Invoke();
+    }
+
     /// <summary>Olvida hogares y elección (al cerrar sesión), para que otro usuario del mismo navegador no la herede.</summary>
     public async Task LimpiarAsync()
     {

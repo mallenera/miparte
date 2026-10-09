@@ -39,8 +39,8 @@ erDiagram
 
 | Tabla | Contenido y reglas |
 |---|---|
-| `hogar` | Nombre y `cuenta_comun_activa` (false por defecto; la activa un admin y Core.Api bloquea las escrituras de la cuenta común mientras esté a false). Al crearlo (`crear_hogar`) se siembran 4 perfiles y 6 categorías y el creador entra como admin y adulto. |
-| `miembro` | `tipo` `adulto` \| `a_cargo`; un `a_cargo` **exige** `responsable_id` y un adulto no lo tiene. `user_id` enlaza con `auth.users` (puede ser nulo: p. ej. el hijo). `rol` (admin/miembro), `activo`. Siempre queda un admin activo y vinculado. |
+| `hogar` | Nombre, `cuenta_comun_activa` y `ahorro_activo` (false por defecto; los activa un admin desde la configuración del hogar; Core.Api bloquea las escrituras de la cuenta común mientras la primera esté a false, y las del ahorro —parte de ahorro de las aportaciones, depósitos, retiradas y gastos pagados desde el ahorro— mientras lo esté la segunda; migración `20261024120000_ahorro_activo.sql`). Al crearlo (`crear_hogar`) se siembran 4 perfiles y 6 categorías y el creador entra como admin y adulto. |
+| `miembro` | `tipo` `adulto` \| `a_cargo`; un `a_cargo` **exige** `responsable_id` y un adulto no lo tiene. `user_id` enlaza con `auth.users` (puede ser nulo: p. ej. el hijo). `rol` (admin/miembro), `activo`. Siempre queda un admin activo y vinculado. `permisos` (`text[]`, check contra el catÃ¡logo de `Core.Domain.CatalogoPermisos`; por defecto todo menos reabrir mes y ver historial): lo que puede hacer un adulto con cuenta que no es admin, que Core.Api exige con 403 (migraciÃ³n `20261025120000_permisos_miembro.sql`). |
 | `perfil_reparto` | `modo`: `porcentaje`, `partes`, `cuenta_comun` (lo asume la cuenta común) o `individual`. Nombre único por hogar. |
 | `perfil_reparto_detalle` | Valor (% o partes) por miembro y perfil. No se usa en `cuenta_comun` ni en `individual`. |
 | `categoria` | Jerárquica (`categoria_padre_id`) con perfil de reparto por defecto. `a_cargo_cuenta_comun`: sus gastos van por defecto a cargo de la cuenta común (Core.Api exige entonces el perfil de cuenta común). |

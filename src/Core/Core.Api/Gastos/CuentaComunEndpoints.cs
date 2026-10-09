@@ -1,3 +1,4 @@
+using MiParte.Core.Api.Seguridad;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MiParte.Contracts;
@@ -15,13 +16,14 @@ public static class CuentaComunEndpoints
     {
         app.MapGet("/api/cuenta-comun", EstadoAsync).RequireAuthorization();
         app.MapPut("/api/cuenta-comun/activacion", ActivarAsync).RequireAuthorization();
-        app.MapPut("/api/cuenta-comun/aportaciones", FijarAportacionAsync).RequireAuthorization();
-        app.MapPost("/api/cuenta-comun/reembolsos", CrearReembolsoAsync).RequireAuthorization();
-        app.MapDelete("/api/cuenta-comun/reembolsos/{id:guid}", BorrarReembolsoAsync).RequireAuthorization();
-        app.MapPost("/api/cuenta-comun/depositos-ahorro", CrearDepositoAsync).RequireAuthorization();
-        app.MapDelete("/api/cuenta-comun/depositos-ahorro/{id:guid}", BorrarDepositoAsync).RequireAuthorization();
-        app.MapPost("/api/cuenta-comun/retiradas-ahorro", CrearRetiradaAsync).RequireAuthorization();
-        app.MapDelete("/api/cuenta-comun/retiradas-ahorro/{id:guid}", BorrarRetiradaAsync).RequireAuthorization();
+        app.MapPut("/api/cuenta-comun/ahorro/activacion", ActivarAhorroAsync).RequireAuthorization();
+        app.MapPut("/api/cuenta-comun/aportaciones", FijarAportacionAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
+        app.MapPost("/api/cuenta-comun/reembolsos", CrearReembolsoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
+        app.MapDelete("/api/cuenta-comun/reembolsos/{id:guid}", BorrarReembolsoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
+        app.MapPost("/api/cuenta-comun/depositos-ahorro", CrearDepositoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.AhorroMovimientos);
+        app.MapDelete("/api/cuenta-comun/depositos-ahorro/{id:guid}", BorrarDepositoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.AhorroMovimientos);
+        app.MapPost("/api/cuenta-comun/retiradas-ahorro", CrearRetiradaAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.AhorroMovimientos);
+        app.MapDelete("/api/cuenta-comun/retiradas-ahorro/{id:guid}", BorrarRetiradaAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.AhorroMovimientos);
         return app;
     }
 
@@ -88,7 +90,16 @@ public static class CuentaComunEndpoints
 
     /// <summary>Respuesta 409 cuando el hogar no ha activado la cuenta común.</summary>
     internal static IResult CuentaInactiva()
-        => Results.Conflict(new { error = "La cuenta común no está activada en este hogar. Un administrador puede activarla en la pestaña Cuenta común." });
+        => Results.Conflict(new { error = "La cuenta común no está activada en este hogar. Un administrador puede activarla en la configuración del hogar." });
+
+    /// <summary>Respuesta 409 cuando el hogar no ha activado el ahorro.</summary>
+    internal static IResult AhorroInactivo()
+        => Results.Conflict(new { error = "El ahorro no está activado en este hogar. Un administrador puede activarlo en la configuración del hogar." });
+
+    /// <summary>Devuelve el 409 si el hogar actual no tiene activados la cuenta común y el ahorro, o null si puede seguir.</summary>
+    internal static async Task<IResult?> ExigirAhorroAsync(MiParteDbContext db, CancellationToken ct)
+        => await ExigirActivaAsync(db, ct)
+            ?? (await db.Hogares.AnyAsync(h => h.AhorroActivo, ct) ? null : AhorroInactivo());
 
     /// <summary>Devuelve el 409 si el hogar actual no tiene la cuenta común activada, o null si puede seguir.</summary>
     internal static async Task<IResult?> ExigirActivaAsync(MiParteDbContext db, CancellationToken ct)
@@ -112,6 +123,25 @@ public static class CuentaComunEndpoints
         return Results.Ok(new { activa = h.CuentaComunActiva });
     }
 
+    /// <summary>
+    /// PUT /api/cuenta-comun/ahorro/activacion (solo admin): activa o desactiva el ahorro del hogar. Desactivarlo no borra datos:
+    /// solo bloquea nuevas escrituras del ahorro. 403 si no es admin; 409 sin hogar o con la cuenta común desactivada; 200 con el estado resultante.
+    /// </summary>
+    private static async Task<IResult> ActivarAhorroAsync(
+        ActivarAhorroRequest req, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
+    {
+        if (hogar.HogarId is null) return ApiComun.SinHogar();
+        var esAdmin = hogar.UsuarioId is { } usuario
+            && await db.Miembros.AnyAsync(m => m.UserId == usuario && m.Activo && m.Rol == RolMiembro.Admin, ct);
+        if (!esAdmin) return Results.Json(new { error = "Solo un administrador puede activar o desactivar el ahorro." }, statusCode: StatusCodes.Status403Forbidden);
+        if (await ExigirActivaAsync(db, ct) is { } inactiva) return inactiva;
+
+        var h = await db.Hogares.FirstAsync(ct);
+        h.AhorroActivo = req.Activo;
+        await db.SaveChangesAsync(ct);
+        return Results.Ok(new { activo = h.AhorroActivo });
+    }
+
     /// <summary>Gastos cargados a la cuenta común, para el cálculo de saldo.</summary>
     private static async Task<List<GastoDeCuenta>> GastosDeCuenta(MiParteDbContext db, CancellationToken ct)
         => await db.Gastos.Where(g => g.ACargoCuentaComun)
@@ -131,6 +161,7 @@ public static class CuentaComunEndpoints
         var depositos = await db.DepositosAhorro.OrderBy(d => d.Fecha).ThenBy(d => d.Id).ToListAsync(ct);
         var nombres = await db.Miembros.ToDictionaryAsync(m => m.Id, m => m.Nombre, ct);
         var activa = await db.Hogares.AnyAsync(h => h.CuentaComunActiva, ct);
+        var ahorroActivo = await db.Hogares.AnyAsync(h => h.AhorroActivo, ct);
 
         var e = CuentaComun.Calcular(
             inicio, Vigentes(aportaciones),
@@ -151,7 +182,8 @@ public static class CuentaComunEndpoints
             e.AhorroGastado, activa,
             partes.Select(p => new PartePersonaDto(
                 p.MiembroId, nombres.GetValueOrDefault(p.MiembroId, ""), p.Aportado, p.Ahorrado, p.PorcentajeGastos, p.PorcentajeAhorro,
-                p.ParteSaldo, p.ParteAhorro, p.Pendiente)).ToList()));
+                p.ParteSaldo, p.ParteAhorro, p.Pendiente)).ToList(),
+            ahorroActivo));
     }
 
     /// <summary>PUT /api/cuenta-comun/aportaciones: fija la aportación de un adulto desde un mes, con la parte que va a ahorro (si ya había una de ese mes, la sustituye). 400 si el mes no es día 1, el importe o el ahorro son inválidos (el ahorro no puede superar el importe) o el miembro no es adulto activo; 409 sin hogar o si la rebaja del ahorro dejaría sin respaldo lo ya retirado o gastado desde el ahorro (<c>{ error, falta }</c>).</summary>
@@ -169,6 +201,7 @@ public static class CuentaComunEndpoints
             : req.Ahorro > req.Importe ? "El ahorro no puede superar la aportación."
             : decimal.Round(req.Ahorro, 2) != req.Ahorro ? "El ahorro admite como máximo 2 decimales." : null;
         if (errorAhorro is not null) return ApiComun.Invalido(errorAhorro);
+        if (req.Ahorro > 0 && await ExigirAhorroAsync(db, ct) is { } sinAhorro) return sinAhorro;
         if (!await ApiComun.EsAdultoActivo(db, req.MiembroId, ct))
             return ApiComun.Invalido("Solo los adultos activos del hogar aportan a la cuenta común.");
 
@@ -235,7 +268,7 @@ public static class CuentaComunEndpoints
         CrearDepositoAhorroRequest req, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
-        if (await ExigirActivaAsync(db, ct) is { } inactiva) return inactiva;
+        if (await ExigirAhorroAsync(db, ct) is { } inactivo) return inactivo;
         var error = ApiComun.ValidarImporte(req.Importe) ?? ApiComun.ValidarConcepto(req.Concepto);
         if (error is not null) return ApiComun.Invalido(error);
         if (!await db.Miembros.AnyAsync(m => m.Id == req.MiembroId, ct))
@@ -275,7 +308,7 @@ public static class CuentaComunEndpoints
         CrearRetiradaAhorroRequest req, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
-        if (await ExigirActivaAsync(db, ct) is { } inactiva) return inactiva;
+        if (await ExigirAhorroAsync(db, ct) is { } inactivo) return inactivo;
         var error = ApiComun.ValidarImporte(req.Importe) ?? ApiComun.ValidarConcepto(req.Concepto);
         if (error is not null) return ApiComun.Invalido(error);
         if (!await db.Miembros.AnyAsync(m => m.Id == req.MiembroId, ct))

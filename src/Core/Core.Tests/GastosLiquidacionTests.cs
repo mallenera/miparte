@@ -19,7 +19,7 @@ public class GastosLiquidacionTests
         HttpClient Cliente, WebApplicationFactory<Program> F, Guid Hogar, Guid Ana, Guid? Beto, Guid Categoria,
         Guid Perfil5050, Guid Perfil6040, Guid PerfilCuentaComun, Guid PerfilIndividual);
 
-    private static async Task<Escenario> Montar(bool conBeto = true, bool cuentaActiva = true, bool admin = true)
+    private static async Task<Escenario> Montar(bool conBeto = true, bool cuentaActiva = true, bool admin = true, bool? ahorroActivo = null)
     {
         var f = Crear(Secreto);
         var user = Guid.NewGuid();
@@ -35,7 +35,7 @@ public class GastosLiquidacionTests
         using (var scope = f.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<MiParteDbContext>();
-            db.Hogares.Add(new Hogar { Id = hogar, Nombre = "Casa", CuentaComunActiva = cuentaActiva });
+            db.Hogares.Add(new Hogar { Id = hogar, Nombre = "Casa", CuentaComunActiva = cuentaActiva, AhorroActivo = ahorroActivo ?? cuentaActiva });
             db.Miembros.Add(new Miembro { Id = ana, HogarId = hogar, Nombre = "Ana", Tipo = TipoMiembro.Adulto, UserId = user, Rol = admin ? RolMiembro.Admin : RolMiembro.Miembro });
             if (beto is not null)
                 db.Miembros.Add(new Miembro { Id = beto.Value, HogarId = hogar, Nombre = "Beto", Tipo = TipoMiembro.Adulto });
@@ -436,6 +436,52 @@ public class GastosLiquidacionTests
         var tras = await Leer<CuentaComunResponse>(await e.Cliente.GetAsync("/api/cuenta-comun?mes=2026-09"));
         Assert.False(tras.Activa);
         Assert.Equal(100m, tras.Aportado);
+    }
+
+    [Fact]
+    public async Task Ahorro_SinActivar_BloqueaSuEscrituraYElGastoDesdeAhorro_PeroNoLaCuentaNiLaAportacionSinAhorro()
+    {
+        var e = await Montar(ahorroActivo: false);
+        var mes = new DateOnly(2026, 9, 1);
+
+        var estado = await Leer<CuentaComunResponse>(await e.Cliente.GetAsync("/api/cuenta-comun?mes=2026-09"));
+        Assert.True(estado.Activa);
+        Assert.False(estado.AhorroActivo);
+
+        Assert.Equal(HttpStatusCode.OK, (await e.Cliente.PutAsJsonAsync(
+            "/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, mes, 100m))).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await e.Cliente.PutAsJsonAsync(
+            "/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, mes, 100m, 20m))).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await e.Cliente.PostAsJsonAsync(
+            "/api/cuenta-comun/depositos-ahorro", new CrearDepositoAhorroRequest(e.Ana, 10m, mes, null))).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await e.Cliente.PostAsJsonAsync(
+            "/api/cuenta-comun/retiradas-ahorro", new CrearRetiradaAhorroRequest(e.Ana, 10m, mes, null))).StatusCode);
+        var desdeAhorro = Gasto(e, 5m, e.PerfilCuentaComun, pagador: null) with { PagadoPor = null, PagadoDesdeAhorro = true };
+        Assert.Equal(HttpStatusCode.Conflict, (await e.Cliente.PostAsJsonAsync("/api/gastos", desdeAhorro)).StatusCode);
+        // Los gastos a cargo de la cuenta que no salen del ahorro siguen funcionando.
+        Assert.Equal(HttpStatusCode.Created, (await e.Cliente.PostAsJsonAsync("/api/gastos", Gasto(e, 5m, e.PerfilCuentaComun, pagador: null) with { PagadoPor = null })).StatusCode);
+    }
+
+    [Fact]
+    public async Task Ahorro_Activacion_SoloAdmin_ExigeLaCuentaYDesbloqueaElAhorro()
+    {
+        var noAdmin = await Montar(admin: false, ahorroActivo: false);
+        Assert.Equal(HttpStatusCode.Forbidden, (await noAdmin.Cliente.PutAsJsonAsync("/api/cuenta-comun/ahorro/activacion", new ActivarAhorroRequest(true))).StatusCode);
+
+        var sinCuenta = await Montar(cuentaActiva: false);
+        Assert.Equal(HttpStatusCode.Conflict, (await sinCuenta.Cliente.PutAsJsonAsync("/api/cuenta-comun/ahorro/activacion", new ActivarAhorroRequest(true))).StatusCode);
+
+        var e = await Montar(ahorroActivo: false);
+        Assert.Equal(HttpStatusCode.OK, (await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/ahorro/activacion", new ActivarAhorroRequest(true))).StatusCode);
+        Assert.True((await Leer<CuentaComunResponse>(await e.Cliente.GetAsync("/api/cuenta-comun?mes=2026-09"))).AhorroActivo);
+        Assert.Equal(HttpStatusCode.Created, (await e.Cliente.PostAsJsonAsync(
+            "/api/cuenta-comun/depositos-ahorro", new CrearDepositoAhorroRequest(e.Ana, 10m, new DateOnly(2026, 9, 1), null))).StatusCode);
+
+        // Desactivarlo no borra nada: el depósito sigue contando.
+        await e.Cliente.PutAsJsonAsync("/api/cuenta-comun/ahorro/activacion", new ActivarAhorroRequest(false));
+        var tras = await Leer<CuentaComunResponse>(await e.Cliente.GetAsync("/api/cuenta-comun?mes=2026-09"));
+        Assert.False(tras.AhorroActivo);
+        Assert.Equal(10m, tras.AhorroDepositado);
     }
 
     [Fact]

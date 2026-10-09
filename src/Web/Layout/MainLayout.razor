@@ -4,6 +4,7 @@
 @inject EstadoHogar Hogar
 @inject ServicioAvisos Avisos
 @inject ServicioTema Apariencia
+@inject ServicioPermisos Permisos
 @inject NavigationManager Navegacion
 
 <div class="wrap">
@@ -28,6 +29,12 @@
                                             @onclick="() => CambiarHogarAsync(id)">
                                         <span class="tick">@if (id == actual.Id) { <Icono Nombre="check" Tamano="16" /> }</span>@h.Nombre
                                     </button>
+                                }
+                                <div class="msep"></div>
+                                <a class="mitem" href="hogar/configuracion" role="menuitem"><Icono Nombre="settings" Tamano="16" />Configuración del hogar</a>
+                                @if (Permisos.Tiene(Claves.HistorialVer))
+                                {
+                                    <a class="mitem" href="hogar/historial" role="menuitem"><Icono Nombre="history" Tamano="16" />Historial</a>
                                 }
                                 <div class="msep"></div>
                                 <a class="mitem" href="sin-hogar" role="menuitem"><Icono Nombre="plus" Tamano="16" />Crear otro hogar o unirme a uno</a>
@@ -92,8 +99,10 @@
                     <NavLink class="tab" ActiveClass="active" href="" Match="NavLinkMatch.All"><Icono Nombre="layout-dashboard" Tamano="16" />Resumen</NavLink>
                     <NavLink class="tab" ActiveClass="active" href="gastos"><Icono Nombre="receipt" Tamano="16" />Gastos</NavLink>
                     <NavLink class="tab" ActiveClass="active" href="recurrentes"><Icono Nombre="repeat" Tamano="16" />Recurrentes</NavLink>
-                    <NavLink class="tab" ActiveClass="active" href="cuenta-comun"><Icono Nombre="wallet" Tamano="16" />Cuenta común</NavLink>
-                    <NavLink class="tab" ActiveClass="active" href="hogar"><Icono Nombre="users" Tamano="16" />Hogar</NavLink>
+                    @if (Hogar.HogarActual.CuentaComunActiva)
+                    {
+                        <NavLink class="tab" ActiveClass="active" href="cuenta-comun"><Icono Nombre="wallet" Tamano="16" />Cuenta común</NavLink>
+                    }
                     <NavLink class="tab" ActiveClass="active" href="categorias"><Icono Nombre="tag" Tamano="16" />Categorías</NavLink>
                     <NavLink class="tab" ActiveClass="active" href="asistente"><Icono Nombre="message-circle" Tamano="16" />Asistente</NavLink>
                 </nav>
@@ -120,6 +129,7 @@
         Hogar.Cambiado += Refrescar;
         Avisos.Cambiado += Refrescar;
         Apariencia.Cambiado += Refrescar;
+        Permisos.Cambiado += Refrescar;
         await Apariencia.IniciarAsync();
     }
 
@@ -143,5 +153,6 @@
         Hogar.Cambiado -= Refrescar;
         Avisos.Cambiado -= Refrescar;
         Apariencia.Cambiado -= Refrescar;
+        Permisos.Cambiado -= Refrescar;
     }
 }

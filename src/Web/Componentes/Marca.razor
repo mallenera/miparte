@@ -1,0 +1,14 @@
+@* Celda de la matriz de permisos: ✓ o — con texto para lectores de pantalla (el estado nunca va solo en color). *@
+@if (Si)
+{
+    <span class="si" aria-hidden="true">✓</span><span class="sr">Sí</span>
+}
+else
+{
+    <span class="no" aria-hidden="true">—</span><span class="sr">No</span>
+}
+
+@code {
+    /// <summary>Si el perfil tiene el permiso.</summary>
+    [Parameter] public bool Si { get; set; }
+}

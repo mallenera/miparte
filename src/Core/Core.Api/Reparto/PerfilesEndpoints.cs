@@ -1,3 +1,5 @@
+using MiParte.Core.Domain;
+using MiParte.Core.Api.Seguridad;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MiParte.Contracts;
@@ -19,9 +21,9 @@ public static class PerfilesEndpoints
     {
         app.MapGet("/api/perfiles", ListarAsync).RequireAuthorization();
         app.MapGet("/api/perfiles/{id:guid}", ObtenerAsync).RequireAuthorization();
-        app.MapPost("/api/perfiles", CrearAsync).RequireAuthorization();
-        app.MapPut("/api/perfiles/{id:guid}", ActualizarAsync).RequireAuthorization();
-        app.MapDelete("/api/perfiles/{id:guid}", EliminarAsync).RequireAuthorization();
+        app.MapPost("/api/perfiles", CrearAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.PerfilesGestionar);
+        app.MapPut("/api/perfiles/{id:guid}", ActualizarAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.PerfilesGestionar);
+        app.MapDelete("/api/perfiles/{id:guid}", EliminarAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.PerfilesGestionar);
         return app;
     }
 

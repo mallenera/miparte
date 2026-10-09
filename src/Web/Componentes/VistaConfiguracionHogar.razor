@@ -1,10 +1,11 @@
-@* Pestaña Hogar: miembros, invitaciones y perfiles de reparto del hogar actual. *@
+@* Configuración del hogar (menú del hogar): funciones activadas, miembros, invitaciones y perfiles de reparto del hogar actual. *@
 @inject CoreApiClient Api
 @inject EstadoHogar Hogar
 @inject ServicioAvisos Avisos
+@inject ServicioPermisos Permisos
 @inject IJSRuntime JS
 
-<h1 class="sr">Hogar @Hogar.HogarActual?.Nombre</h1>
+<h1 class="sr">Configuración de @Hogar.HogarActual?.Nombre</h1>
 
 @if (_cargando)
 {
@@ -19,6 +20,36 @@ else if (_errorCarga is not null)
 }
 else
 {
+    <section class="card" aria-labelledby="t-funciones">
+        <div class="card-head"><h2 id="t-funciones">Funciones del hogar</h2></div>
+        <p class="muted">Elige qué partes de la aplicación usa este hogar. Desactivar una función no borra sus datos: solo bloquea nuevos movimientos hasta volver a activarla.</p>
+        @if (_errorFunciones is not null)
+        {
+            <div class="aviso err u-mt12" role="alert">@_errorFunciones</div>
+        }
+        <div class="u-mt12">
+            <label class="chk">
+                <input type="checkbox" @key="ClaveCuenta" checked="@CuentaComunActiva" disabled="@(!EsAdmin || _guardandoFunciones)"
+                       @onchange="e => CambiarCuentaComunAsync((bool)e.Value!)" />
+                Habilitar cuenta común
+            </label>
+            <p class="muted">Un fondo del hogar al que cada adulto aporta una cantidad fija al mes, para pagar gastos sin repartirlos y reembolsar a quien adelanta dinero.</p>
+        </div>
+        <div class="u-mt12">
+            <label class="chk">
+                <input type="checkbox" @key="ClaveAhorro" checked="@(CuentaComunActiva && AhorroActivo)"
+                       disabled="@(!EsAdmin || !CuentaComunActiva || _guardandoFunciones)"
+                       @onchange="e => CambiarAhorroAsync((bool)e.Value!)" />
+                Activar ahorro
+            </label>
+            <p class="muted">@(CuentaComunActiva ? "Parte de las aportaciones que se aparta, con ingresos, retiradas y gastos pagados desde el ahorro." : "Necesita la cuenta común habilitada.")</p>
+        </div>
+        @if (!EsAdmin)
+        {
+            <p class="muted u-mt12">Solo un administrador puede cambiar estas funciones.</p>
+        }
+    </section>
+
     <div class="cols-even">
         <section class="card" aria-labelledby="t-miembros">
             <div class="card-head">
@@ -162,12 +193,9 @@ else
         </div>
     </div>
 
-    <PanelPerfiles Perfiles="_perfiles" Miembros="_miembros" OnCambiado="CargarSinParpadeoAsync" />
+    <PanelPerfiles Perfiles="_perfiles" Miembros="_miembros" PuedeGestionar="Permisos.Tiene(Claves.PerfilesGestionar)" OnCambiado="CargarSinParpadeoAsync" />
 
-    @if (EsAdmin)
-    {
-        <PanelHistorial />
-    }
+    <PanelPermisos Miembros="_miembros" Puede="EsAdmin" OnCambiado="CargarSinParpadeoAsync" />
 }
 
 @code {
@@ -185,7 +213,21 @@ else
     private string? _invitacionPara;
     private bool _creandoInvitacion;
 
+    private string? _errorFunciones;
+    private bool _guardandoFunciones;
+
+    // Cambia tras cada intento para recrear las casillas: si la API rechaza el cambio, el navegador no debe quedarse con la marca que puso la persona.
+    private int _versionFunciones;
+
+    private string ClaveCuenta => $"cuenta-{_versionFunciones}";
+
+    private string ClaveAhorro => $"ahorro-{_versionFunciones}";
+
     private bool EsAdmin => _miembros.FirstOrDefault(m => m.EsYo)?.Rol == "admin";
+
+    private bool CuentaComunActiva => Hogar.HogarActual?.CuentaComunActiva ?? false;
+
+    private bool AhorroActivo => Hogar.HogarActual?.AhorroActivo ?? false;
 
     private IEnumerable<MiembroDto> Adultos => _miembros.Where(m => m.Tipo == "adulto" && m.Activo);
 
@@ -209,11 +251,44 @@ else
             var perfiles = Api.ListarPerfilesAsync();
             await Task.WhenAll(miembros, perfiles);
             _miembros = miembros.Result;
+            Permisos.Establecer(_miembros);
             _perfiles = perfiles.Result;
         }
         catch (ApiException e)
         {
             _errorCarga = e.Message;
+        }
+    }
+
+    private Task CambiarCuentaComunAsync(bool activa) =>
+        EjecutarFuncionAsync(
+            () => Api.ActivarCuentaComunAsync(activa), activa, AhorroActivo,
+            activa ? "Cuenta común habilitada" : "Cuenta común deshabilitada");
+
+    private Task CambiarAhorroAsync(bool activo) =>
+        EjecutarFuncionAsync(
+            () => Api.ActivarAhorroAsync(activo), CuentaComunActiva, activo,
+            activo ? "Ahorro activado" : "Ahorro desactivado");
+
+    /// <summary>Aplica un cambio de funciones del hogar y, si la API lo acepta, lo refleja en el estado compartido (menú y pestañas).</summary>
+    private async Task EjecutarFuncionAsync(Func<Task> accion, bool cuentaComun, bool ahorro, string aviso)
+    {
+        _errorFunciones = null;
+        _guardandoFunciones = true;
+        try
+        {
+            await accion();
+            Hogar.ActualizarFunciones(cuentaComun, ahorro);
+            Avisos.Mostrar(aviso);
+        }
+        catch (ApiException e)
+        {
+            _errorFunciones = e.Message;
+        }
+        finally
+        {
+            _guardandoFunciones = false;
+            _versionFunciones++;
         }
     }
 

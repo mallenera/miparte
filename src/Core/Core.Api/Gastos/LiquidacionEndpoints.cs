@@ -1,3 +1,4 @@
+using MiParte.Core.Api.Seguridad;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MiParte.Contracts;
@@ -15,8 +16,8 @@ public static class LiquidacionEndpoints
     {
         app.MapGet("/api/resumen", ResumenAsync).RequireAuthorization();
         app.MapGet("/api/liquidacion", LiquidacionAsync).RequireAuthorization();
-        app.MapPost("/api/pagos-liquidacion", CrearPagoAsync).RequireAuthorization();
-        app.MapDelete("/api/pagos-liquidacion/{id:guid}", BorrarPagoAsync).RequireAuthorization();
+        app.MapPost("/api/pagos-liquidacion", CrearPagoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.PagosRegistrar);
+        app.MapDelete("/api/pagos-liquidacion/{id:guid}", BorrarPagoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.PagosRegistrar);
         return app;
     }
 

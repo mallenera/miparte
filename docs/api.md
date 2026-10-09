@@ -63,7 +63,7 @@ Detrás de un proxy inverso hay que configurar `ForwardedHeaders`; si no, todos 
    - **1**: seleccionarlo automáticamente (`hogarActual` viene relleno). Se puede omitir `X-Hogar-Id`, aunque conviene enviarlo siempre.
    - **N > 1**: mostrar selector, guardar la elección (p. ej. `localStorage`) y enviar `X-Hogar-Id` en todas las llamadas. Al arrancar, si la elección guardada ya no está en `hogares`, volver a pedir elegir. Con varios hogares y sin cabecera, `hogarActual` es `null`.
 3. Una vez elegido el hogar, cargar `GET /api/miembros`, `/api/categorias`, `/api/perfiles` y el mes actual.
-4. Un 409 en cualquier endpoint con hogar significa "falta `X-Hogar-Id`" (o no hay hogar): volver al paso 1.
+4. Un 409 de resolución del hogar (falta `X-Hogar-Id` o no hay hogar) obliga a volver al paso 1. Los 409 de negocio, como el de mes cerrado, se tratan según el endpoint: muestran su `error`, no cambian de hogar.
 
 ## 3. Endpoints
 

@@ -81,7 +81,7 @@ public sealed class ServicioSesion
 
     /// <summary>Confirma la cuenta con el código recibido por correo e inicia sesión.</summary>
     /// <param name="email">Correo.</param>
-    /// <param name="codigo">Código de 6 dígitos.</param>
+    /// <param name="codigo">Código numérico de 6 a 8 dígitos.</param>
     /// <exception cref="AuthException">Código incorrecto o caducado.</exception>
     public async Task VerificarCodigoAsync(string email, string codigo)
     {

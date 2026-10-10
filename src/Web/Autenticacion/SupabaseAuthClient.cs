@@ -41,7 +41,7 @@ public sealed class SupabaseAuthClient
         return LeerSesion(json);
     }
 
-    /// <summary>Confirma la cuenta con el código de 6 dígitos que Supabase envió por correo; devuelve la sesión ya iniciada.</summary>
+    /// <summary>Confirma la cuenta con el código numérico (6 a 8 dígitos según el proyecto) que Supabase envió por correo; devuelve la sesión ya iniciada.</summary>
     /// <param name="email">Correo con el que se registró.</param>
     /// <param name="codigo">Código recibido por correo.</param>
     /// <param name="ct">Token de cancelación.</param>

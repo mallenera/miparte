@@ -25,18 +25,18 @@
             <div class="aviso ok" role="status">
                 @if (_desdeUrl)
                 {
-                    <text>Escribe el código de 6 dígitos que te enviamos a <strong>@_modelo.Email.Trim()</strong>. Si no lo tienes, pide uno nuevo.</text>
+                    <text>Escribe el código que te enviamos a <strong>@_modelo.Email.Trim()</strong>. Si no lo tienes, pide uno nuevo.</text>
                 }
                 else
                 {
-                    <text>Te hemos enviado un código de 6 dígitos a <strong>@_modelo.Email.Trim()</strong>. Escríbelo para confirmar tu cuenta.</text>
+                    <text>Te hemos enviado un código a <strong>@_modelo.Email.Trim()</strong>. Escríbelo para confirmar tu cuenta.</text>
                 }
             </div>
             <EditForm Model="_verificacion" OnValidSubmit="VerificarAsync">
                 <DataAnnotationsValidator />
                 <div class="fieldrow">
                     <label for="codigo">Código de confirmación</label>
-                    <InputText id="codigo" class="codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6" @bind-Value="_verificacion.Codigo" />
+                    <InputText id="codigo" class="codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="8" @bind-Value="_verificacion.Codigo" />
                     <ValidationMessage For="() => _verificacion.Codigo" />
                 </div>
                 @if (_error is not null)
@@ -193,7 +193,7 @@
     private sealed class Verificacion
     {
         [Required(ErrorMessage = "Escribe el código.")]
-        [RegularExpression(@"^\s*\d{6}\s*$", ErrorMessage = "El código tiene 6 dígitos.")]
+        [RegularExpression(@"^\s*\d{6,8}\s*$", ErrorMessage = "El código tiene entre 6 y 8 dígitos.")]
         public string Codigo { get; set; } = "";
     }
 

@@ -329,6 +329,42 @@ public class DashboardTests : BunitContext
         Assert.Empty(c.FindAll(".dash-filtros"));
     }
 
+    [Fact]
+    public void Un_periodo_cuyo_anterior_se_sale_del_calendario_no_es_admitido()
+    {
+        Assert.True(AnalisisGastos.PeriodoAdmitido(new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 7)));
+        Assert.False(AnalisisGastos.PeriodoAdmitido(new DateOnly(2026, 10, 7), new DateOnly(2026, 10, 1)));
+        Assert.False(AnalisisGastos.PeriodoAdmitido(new DateOnly(1, 1, 10), new DateOnly(2026, 10, 7)));
+    }
+
+    [Fact]
+    public void Un_desde_muy_antiguo_avisa_y_no_pide_datos_ni_se_rompe()
+    {
+        var api = Registrar([]);
+        var c = Render<VistaDashboard>();
+        var antes = api.Consultas.Count;
+
+        c.FindAll("input[type=date]")[0].Change("0001-01-10");
+
+        Assert.Contains("demasiado largo", c.Find("[role=alert]").TextContent);
+        Assert.Equal(antes, api.Consultas.Count);
+    }
+
+    [Fact]
+    public void El_enlace_a_gastos_filtra_por_quien_paga_y_por_la_cuenta_comun()
+    {
+        Registrar(Datos);
+        var c = Render<VistaDashboard>();
+
+        c.FindAll("button.dash-miembro").First(b => b.TextContent.Contains("Ana")).Click();
+        var href = c.Find("#ver-gastos").GetAttribute("href")!;
+        Assert.Contains($"pagador={AnaId}", href);
+        Assert.DoesNotContain("miembro=", href);
+
+        c.FindAll("button.dash-miembro").First(b => b.TextContent.Contains("Ana")).Click(); // quita
+        Assert.DoesNotContain("pagador=", c.Find("#ver-gastos").GetAttribute("href"));
+    }
+
     // ───── Servidor demo ─────
 
     [Fact]

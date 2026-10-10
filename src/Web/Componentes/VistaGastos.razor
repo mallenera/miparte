@@ -79,6 +79,10 @@ else
                 <button class="linkbtn" type="button" @onclick="LimpiarFiltrosAsync">Quitar filtros</button>
             }
         </div>
+        @if (_soloPaga is not null || _soloCuenta)
+        {
+            <p class="muted u-mt10" role="status">Solo lo que paga <b>@(_soloPaga is { } p ? NombreMiembro(p) : "la cuenta común o el ahorro")</b>, no lo que solo asume.</p>
+        }
         <p class="muted">@(HayFiltros ? "Total filtrado" : _modoRango ? "Total del periodo" : "Total del mes"): <b>@Euros(_gastos.Where(g => !g.Personal).Sum(g => g.Importe))</b> en @_gastos.Count(g => !g.Personal) @(_gastos.Count(g => !g.Personal) == 1 ? "gasto" : "gastos").
             @if (_gastos.Any(g => g.Personal))
             {
@@ -271,6 +275,15 @@ else
     /// <summary>Persona con la que se abre la lista (enlace desde el Dashboard).</summary>
     [Parameter] public Guid? MiembroInicial { get; set; }
 
+    /// <summary>Solo los gastos que paga esta persona (enlace del Dashboard): a diferencia de <see cref="MiembroInicial"/>, no incluye los que solo asume en parte.</summary>
+    [Parameter] public Guid? PagadorInicial { get; set; }
+
+    /// <summary>Solo los gastos pagados por la cuenta común o el ahorro, sin persona (enlace del Dashboard).</summary>
+    [Parameter] public bool CuentaComunInicial { get; set; }
+
+    private Guid? _soloPaga;
+    private bool _soloCuenta;
+
     /// <summary>Primer día del periodo con el que se abre la lista; con <see cref="HastaInicial"/> activa el modo «entre fechas».</summary>
     [Parameter] public DateOnly? DesdeInicial { get; set; }
 
@@ -327,6 +340,8 @@ else
     {
         if (CategoriaInicial is { } c) _filtroCategoria = c.ToString();
         if (MiembroInicial is { } m) _filtroMiembro = m.ToString();
+        _soloPaga = PagadorInicial;
+        _soloCuenta = CuentaComunInicial && PagadorInicial is null;
         if (DesdeInicial is { } d && HastaInicial is { } h && d <= h)
         {
             _modoRango = true;
@@ -389,7 +404,7 @@ else
         if (_pagador is null && PerfilCuentaComun is { } p) _perfil = p.Id;
     }
 
-    private bool HayFiltros => _filtroMiembro != "" || _filtroCategoria != "" || !string.IsNullOrWhiteSpace(_filtroTexto);
+    private bool HayFiltros => _filtroMiembro != "" || _filtroCategoria != "" || !string.IsNullOrWhiteSpace(_filtroTexto) || _soloPaga is not null || _soloCuenta;
 
     /// <summary>Versión de la última petición de gastos: una respuesta tardía de otra selección no pisa la actual.</summary>
     private int _versionCarga;
@@ -409,6 +424,10 @@ else
                 var ids = ArbolCategorias.ConDescendientes(_categorias, categoria);
                 gastos = gastos.Where(g => ids.Contains(g.CategoriaId)).ToList();
             }
+
+            // Quién paga (no quién asume): lo que reproduce el filtro de persona del Dashboard.
+            if (_soloPaga is { } paga) gastos = gastos.Where(g => g.PagadoPor == paga).ToList();
+            else if (_soloCuenta) gastos = gastos.Where(g => g.PagadoPor is null).ToList();
 
             if (version == _versionCarga) _gastos = gastos.OrderByDescending(g => g.Fecha).ThenBy(g => g.Id).ToList();
         }
@@ -445,6 +464,8 @@ else
     private Task LimpiarFiltrosAsync()
     {
         _filtroMiembro = _filtroCategoria = _filtroTexto = "";
+        _soloPaga = null;
+        _soloCuenta = false;
         return AplicarFiltrosAsync();
     }
 

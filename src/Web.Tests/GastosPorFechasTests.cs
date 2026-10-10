@@ -92,6 +92,41 @@ public class GastosPorFechasTests : BunitContext
     }
 
     [Fact]
+    public void Con_pagador_solo_lista_lo_que_paga_esa_persona_y_no_lo_que_asume()
+    {
+        var luis = Guid.NewGuid();
+        var pagadoPorLuisYCompartido = Gasto(new DateOnly(2026, 9, 3), 40m, Ocio, "Cena") with
+        {
+            PagadoPor = luis, Repartos = [new RepartoGastoDto(luis, 20m), new RepartoGastoDto(AnaId, 20m)],
+        };
+        var api = Registrar(Gasto(new DateOnly(2026, 9, 3), 10m, Ocio, "Cine"), pagadoPorLuisYCompartido);
+
+        var c = Render<VistaGastos>(p => p
+            .Add(x => x.DesdeInicial, new DateOnly(2026, 8, 1)).Add(x => x.HastaInicial, new DateOnly(2026, 10, 31))
+            .Add(x => x.PagadorInicial, AnaId));
+
+        Assert.Contains("Cine", c.Markup);
+        Assert.DoesNotContain("Cena", c.Markup); // Ana solo asume una parte
+        Assert.Contains("Solo lo que paga", c.Markup);
+        Assert.DoesNotContain(api.Consultas, q => q.Contains("miembroId="));
+    }
+
+    [Fact]
+    public void Con_cuenta_comun_solo_lista_lo_que_no_paga_ninguna_persona()
+    {
+        var delaCuenta = Gasto(new DateOnly(2026, 9, 3), 40m, Ocio, "Hipoteca") with { PagadoPor = null, Repartos = [] };
+        Registrar(Gasto(new DateOnly(2026, 9, 3), 10m, Ocio, "Cine"), delaCuenta);
+
+        var c = Render<VistaGastos>(p => p
+            .Add(x => x.DesdeInicial, new DateOnly(2026, 8, 1)).Add(x => x.HastaInicial, new DateOnly(2026, 10, 31))
+            .Add(x => x.CuentaComunInicial, true));
+
+        Assert.Contains("Hipoteca", c.Markup);
+        Assert.DoesNotContain("Cine", c.Markup);
+        Assert.Contains("cuenta común o el ahorro", c.Markup);
+    }
+
+    [Fact]
     public void Cambiar_las_fechas_vuelve_a_pedir_los_gastos()
     {
         var api = Registrar();

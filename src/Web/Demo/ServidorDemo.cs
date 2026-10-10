@@ -95,7 +95,7 @@ public sealed partial class ServidorDemo
             ("auditoria", 2, "GET") => Ok(new List<EventoAuditoriaDto>()),
 
             ("cuenta-comun", 2, "GET") => EstadoCuentaComun(mes),
-            ("cuenta-comun", 4, "PUT") when subruta == "ahorro" => ActivarAhorro((await Cuerpo<ActivarAhorroRequest>())!),
+            ("cuenta-comun", 4, "PUT") when subruta == "ahorro" && ruta[3] == "activacion" => ActivarAhorro((await Cuerpo<ActivarAhorroRequest>())!),
             ("cuenta-comun", 3, "PUT") when subruta == "activacion" => Activar((await Cuerpo<ActivarCuentaComunRequest>())!),
             ("cuenta-comun", 3, "PUT") when subruta == "aportaciones" => FijarAportacion((await Cuerpo<FijarAportacionRequest>())!),
             ("cuenta-comun", 3, "POST") when subruta == "reembolsos" => CrearReembolso((await Cuerpo<CrearReembolsoRequest>())!),

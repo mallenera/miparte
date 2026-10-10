@@ -86,7 +86,7 @@ DTOs en `src/Contracts/Asistente.cs` (`ChatRequest`, `MensajeChatDto`, `ChatResp
 | `Supabase__Url`, `Supabase__JwtSecret` | | Igual que Core.Api |
 | `Cors__OrigenesPermitidos__0` | | Origen del front |
 
-Front: `Api:AssistantUrl` en `wwwroot/appsettings.json` (público, sin secretos) y, para la CSP, `ASSISTANT_URL` (nginx) o la variable de repositorio `ASSISTANT_URL` (Cloudflare). Si falta, la pestaña Asistente avisa de que no está configurada.
+Front: `Api:AssistantUrl` en `wwwroot/appsettings.json` (público, sin secretos) y, para la CSP, `ASSISTANT_URL` (nginx) o la variable de repositorio `ASSISTANT_URL` (Cloudflare). Si falta, el asistente flotante avisa de que no está configurada.
 
 ## Probarlo en local
 

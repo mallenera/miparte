@@ -1,44 +1,10 @@
-@* Permisos del hogar: matriz de lo que puede hacer cada perfil y, para quien puede cambiar permisos, los checks de cada adulto con cuenta (admins incluidos), con plantillas para asignar rápido. La API es quien los aplica. *@
+@* Permisos del hogar: los adultos con cuenta (admins incluidos) y, para quien puede cambiar permisos, sus checks con plantillas para asignar rápido. La API es quien los aplica. *@
 @inject CoreApiClient Api
 @inject ServicioAvisos Avisos
 
 <section class="card" aria-labelledby="t-permisos">
     <div class="card-head"><h2 id="t-permisos">Permisos</h2></div>
-    <p class="muted">Cada adulto con cuenta tiene los permisos que se le asignen, también los admins. Sin asignación propia, un admin los tiene todos y un miembro los de la columna «Miembro». La tabla resume esas plantillas.</p>
-
-    <div class="matriz-wrap">
-        <table class="matriz">
-            <caption class="sr">Permisos por perfil</caption>
-            <thead>
-                <tr>
-                    <th scope="col">Permiso</th>
-                    <th scope="col">Admin</th>
-                    <th scope="col">Miembro</th>
-                    <th scope="col">Adulto sin cuenta</th>
-                    <th scope="col">A cargo</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var grupo in Grupos)
-                {
-                    <tr class="grupo"><th scope="colgroup" colspan="5">@grupo.Key</th></tr>
-                    @foreach (var p in grupo)
-                    {
-                        <tr>
-                            <th scope="row">@p.Etiqueta</th>
-                            <td><Marca Si="true" /></td>
-                            <td><Marca Si="p.PorDefecto" /></td>
-                            <td><Marca Si="false" /></td>
-                            <td><Marca Si="false" /></td>
-                        </tr>
-                    }
-                }
-            </tbody>
-        </table>
-    </div>
-    <p class="muted u-mt12">«Adulto sin cuenta» y «A cargo» no entran en la aplicación: solo participan en el reparto y los pagos. Siempre debe quedar alguien con el permiso de cambiar permisos.</p>
-
-    <h3 class="u-sec">Por miembro</h3>
+    <p class="muted">Cada adulto con cuenta tiene los permisos que se le asignen, también los admins. Siempre debe quedar alguien con el permiso de cambiar permisos.</p>
     @if (_error is not null)
     {
         <div class="aviso err" role="alert">@_error</div>

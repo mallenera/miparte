@@ -1,20 +1,15 @@
-@* Pestaña Asistente: chat de solo consulta sobre los gastos del hogar. El texto de las respuestas se pinta siempre como texto (nunca como HTML). *@
+@* Chat del asistente (vive en el panel flotante PanelAsistente): chat de solo consulta sobre los gastos del hogar. El texto de las respuestas se pinta siempre como texto (nunca como HTML). *@
 @inject AsistenteApiClient Api
 @inject EstadoHogar Hogar
 @inject ServicioSesion Sesion
 @inject MiParte.Web.Configuracion.OpcionesWeb Opciones
 
-<h1 class="sr">Asistente de @Hogar.HogarActual?.Nombre</h1>
-
-<section class="card" aria-labelledby="t-asistente">
-    <div class="card-head">
-        <h2 id="t-asistente">Asistente</h2>
-        @if (_mensajes.Count > 0)
-        {
-            <button class="linkbtn" type="button" @onclick="Reiniciar" disabled="@_enviando">Nueva conversación</button>
-        }
-    </div>
+<div class="asist">
     <p class="muted">Pregunta por los gastos del hogar. Solo consulta: no crea, cambia ni borra nada, y las cifras salen de tus datos, no de la imaginación del modelo.</p>
+    @if (_mensajes.Count > 0)
+    {
+        <button class="linkbtn" type="button" @onclick="Reiniciar" disabled="@_enviando">Nueva conversación</button>
+    }
 
     @if (!Disponible)
     {
@@ -71,7 +66,7 @@
             <button class="btn" type="submit" disabled="@(_enviando || string.IsNullOrWhiteSpace(_texto))">Enviar</button>
         </form>
     }
-</section>
+</div>
 
 @code {
     /// <summary>Tope del cuadro de texto; coincide con el límite por defecto de Assistant.Api.</summary>

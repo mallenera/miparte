@@ -1,0 +1,52 @@
+@* Asistente flotante: botón fijo abajo a la derecha que abre un panel lateral con el chat. El chat sigue montado al cerrar, así que la conversación sobrevive a cerrar el panel y a navegar entre secciones. *@
+@if (!_abierto)
+{
+    <button class="fab-asistente" type="button" aria-label="Abrir el asistente" aria-haspopup="dialog" @ref="_boton" @onclick="Abrir">
+        <Icono Nombre="message-circle" Tamano="26" />
+    </button>
+}
+
+@if (_abierto)
+{
+    <button class="panel-asist-fondo" type="button" tabindex="-1" aria-hidden="true" @onclick="Cerrar"></button>
+}
+
+<aside class="panel-asist" role="dialog" aria-label="Asistente" hidden="@(!_abierto)" @onkeydown="AlPulsarTecla">
+    <div class="panel-asist-cab">
+        <h2>Asistente</h2>
+        <button class="btn btn-ghost btn-sm" type="button" aria-label="Cerrar el asistente" @ref="_cerrar" @onclick="Cerrar"><Icono Nombre="x" Tamano="18" /></button>
+    </div>
+    <VistaAsistente />
+</aside>
+
+@code {
+    private ElementReference _boton;
+    private ElementReference _cerrar;
+    private bool _abierto;
+    private bool _moverFoco;
+
+    private void Abrir()
+    {
+        _abierto = true;
+        _moverFoco = true;
+    }
+
+    private void Cerrar()
+    {
+        _abierto = false;
+        _moverFoco = true;
+    }
+
+    private void AlPulsarTecla(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") Cerrar();
+    }
+
+    // Al abrir el foco pasa al panel y al cerrar vuelve al botón, para que el teclado no se pierda.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_moverFoco) return;
+        _moverFoco = false;
+        await (_abierto ? _cerrar : _boton).FocusAsync();
+    }
+}

@@ -104,7 +104,6 @@
                     {
                         <NavLink class="tab" ActiveClass="active" href="cuenta-comun"><Icono Nombre="wallet" Tamano="16" />Cuenta común</NavLink>
                     }
-                    <NavLink class="tab" ActiveClass="active" href="asistente"><Icono Nombre="message-circle" Tamano="16" />Asistente</NavLink>
                 </nav>
             </Authorized>
         </AuthorizeView>
@@ -117,6 +116,16 @@
 
     <PiePagina />
 </div>
+
+@if (Hogar.HogarActual is not null)
+{
+    <AuthorizeView>
+        <Authorized>
+            @* La clave reinicia la conversación al cambiar de hogar: no debe arrastrar respuestas con datos del anterior. *@
+            <PanelAsistente @key="Hogar.HogarActual.Id" />
+        </Authorized>
+    </AuthorizeView>
+}
 
 @if (Avisos.Texto is { } aviso)
 {

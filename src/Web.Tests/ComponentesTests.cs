@@ -96,6 +96,22 @@ public class ComponentesTests : BunitContext
     }
 
     [Fact]
+    public void Invitar_muestra_un_enlace_con_el_codigo_en_el_fragmento()
+    {
+        var api = ApiConHogar(soyAdmin: true)
+            .Responde("POST /api/invitaciones", HttpStatusCode.Created,
+                new InvitacionCreada(Guid.NewGuid(), "token-secreto-123", DateTimeOffset.UtcNow.AddDays(7)));
+        Registrar(api);
+        var c = Render<VistaConfiguracionHogar>();
+
+        c.Find("#card-invite button.btn-orange").Click();
+
+        var enlace = c.Find("#enlace-invitacion").TextContent;
+        Assert.EndsWith("/unirse#token=token-secreto-123", enlace);
+        Assert.DoesNotContain("?", enlace);
+    }
+
+    [Fact]
     public void Un_409_al_desactivar_se_muestra_con_el_mensaje_de_la_api()
     {
         var api = ApiConHogar(soyAdmin: true)

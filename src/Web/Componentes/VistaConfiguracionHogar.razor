@@ -165,7 +165,7 @@ else
         <div class="card-stack">
             <section class="card" id="card-invite" aria-labelledby="t-invitar">
                 <h2 id="t-invitar">Invitar a alguien con cuenta</h2>
-                <p class="muted">Genera un código de un solo uso que caduca a los 7 días. Quien lo reciba lo pega en «Unirme con una invitación».</p>
+                <p class="muted">Genera un enlace de un solo uso que caduca a los 7 días. Quien lo abra solo tiene que iniciar sesión (o crear su cuenta) y aceptar; también puede pegar el código en «Unirme con una invitación».</p>
                 @if (_errorInvitacion is not null)
                 {
                     <div class="aviso err u-mt12" role="alert">@_errorInvitacion</div>
@@ -173,18 +173,22 @@ else
                 @if (_invitacion is { } inv)
                 {
                     <div class="invite" role="status">
-                        <span class="lab2">Código@(_invitacionPara is null ? "" : " para " + _invitacionPara)</span>
+                        <span class="lab2">Enlace@(_invitacionPara is null ? "" : " para " + _invitacionPara)</span>
+                        <code class="token" id="enlace-invitacion">@Enlace(inv)</code>
+                        <span class="lab2">Código</span>
                         <code class="token" id="token-invitacion">@inv.Token</code>
                         <div class="aviso warn">Cópialo ahora: por seguridad no se vuelve a mostrar. Caduca el @inv.CaducaEn.ToLocalTime().ToString("dd/MM/yyyy HH:mm").</div>
                         <div class="actions u-mt0">
-                            <button class="btn btn-sm" type="button" @onclick="CopiarAsync">Copiar código</button>
+                            <button class="btn btn-sm" type="button" @onclick="CompartirAsync">Compartir enlace</button>
+                            <button class="btn btn-sm btn-ghost" type="button" @onclick="CopiarEnlaceAsync">Copiar enlace</button>
+                            <button class="btn btn-sm btn-ghost" type="button" @onclick="CopiarAsync">Copiar código</button>
                             <button class="linkbtn" type="button" @onclick="OcultarInvitacion">Cerrar aviso</button>
                         </div>
                     </div>
                 }
                 <div class="actions">
                     <button class="btn btn-orange" type="button" disabled="@(!PuedeInvitar || _creandoInvitacion)" @onclick="() => InvitarAsync(null)">
-                        @(_invitacion is null ? "Invitar miembro" : "Generar otro código")
+                        @(_invitacion is null ? "Invitar miembro" : "Generar otro enlace")
                     </button>
                     @if (!PuedeInvitar)
                     {
@@ -436,6 +440,47 @@ else
         finally
         {
             _creandoInvitacion = false;
+        }
+    }
+
+    // El código va en el fragmento (#token=...): el navegador no lo envía al servidor ni lo deja en Referer o registros.
+    private string Enlace(InvitacionCreada inv) =>
+        InvitacionPendiente.ConstruirEnlace(Navegacion.ToAbsoluteUri(InvitacionPendiente.Ruta).ToString(), inv.Token);
+
+    private async Task CopiarEnlaceAsync()
+    {
+        if (_invitacion is null) return;
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", Enlace(_invitacion));
+            Avisos.Mostrar("Enlace copiado");
+        }
+        catch (JSException)
+        {
+            Avisos.Mostrar("Selecciona el enlace y cópialo con Ctrl+C");
+        }
+    }
+
+    private async Task CompartirAsync()
+    {
+        if (_invitacion is null) return;
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.share", new
+            {
+                title = "Invitación a Mi parte, tu parte",
+                text = $"Te invito al hogar «{Hogar.HogarActual?.Nombre}» en Mi parte, tu parte:",
+                url = Enlace(_invitacion),
+            });
+        }
+        catch (JSException e) when (e.Message.Contains("AbortError", StringComparison.Ordinal))
+        {
+            // La persona cerró el selector de «Compartir»: no es un error.
+        }
+        catch (JSException)
+        {
+            // Sin Web Share (escritorio, navegador antiguo): se copia el enlace.
+            await CopiarEnlaceAsync();
         }
     }
 

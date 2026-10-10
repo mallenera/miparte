@@ -5,6 +5,7 @@
 @inject ServicioSesion Sesion
 @inject OpcionesWeb Opciones
 @inject NavigationManager Navegacion
+@inject IAlmacenLocal Almacen
 
 <PageTitle>Iniciar sesión · Mi parte, tu parte</PageTitle>
 
@@ -74,7 +75,7 @@
             var uri = Navegacion.ToAbsoluteUri(Navegacion.Uri);
             if (await Sesion.CompletarGoogleAsync($"{uri.Query}&{uri.Fragment}"))
             {
-                Navegacion.NavigateTo("", replace: true);
+                Navegacion.NavigateTo(await InvitacionPendiente.DestinoTrasAccesoAsync(Almacen), replace: true);
                 return;
             }
         }
@@ -83,7 +84,7 @@
             _error = e.Message;
         }
 
-        if (Sesion.SesionActual is not null) Navegacion.NavigateTo("", replace: true);
+        if (Sesion.SesionActual is not null) Navegacion.NavigateTo(await InvitacionPendiente.DestinoTrasAccesoAsync(Almacen), replace: true);
     }
 
     private async Task EnviarAsync()
@@ -94,7 +95,7 @@
         try
         {
             await Sesion.IniciarSesionAsync(CuentaDemo.ACorreo(_modelo.Email), _modelo.Password);
-            Navegacion.NavigateTo("", replace: true);
+            Navegacion.NavigateTo(await InvitacionPendiente.DestinoTrasAccesoAsync(Almacen), replace: true);
         }
         catch (AuthException e)
         {

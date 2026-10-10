@@ -73,7 +73,7 @@
 
     private string NombreMes => Mes.ToString("MMMM yyyy", Es);
 
-    private string Clave => Mes.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+    private string Clave => Formato.Mes(Mes);
 
     /// <summary>Un mes solo se cierra cuando ya ha terminado, igual que exige la API.</summary>
     private bool HaTerminado => Mes.AddMonths(1) <= DateOnly.FromDateTime(DateTime.UtcNow);

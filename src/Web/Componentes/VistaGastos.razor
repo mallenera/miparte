@@ -81,12 +81,12 @@ else
         </div>
         @if (_soloPaga is not null || _soloCuenta)
         {
-            <p class="muted u-mt10" role="status">Solo lo que paga <b>@(_soloPaga is { } p ? NombreMiembro(p) : "la cuenta común o el ahorro")</b>, no lo que solo asume.</p>
+            <p class="muted u-mt10" role="status">Solo lo que paga <b>@(_soloPaga is { } p ? Formato.NombreMiembro(p, _miembros) : "la cuenta común o el ahorro")</b>, no lo que solo asume.</p>
         }
-        <p class="muted">@(HayFiltros ? "Total filtrado" : _modoRango ? "Total del periodo" : "Total del mes"): <b>@Euros(_gastos.Where(g => !g.Personal).Sum(g => g.Importe))</b> en @_gastos.Count(g => !g.Personal) @(_gastos.Count(g => !g.Personal) == 1 ? "gasto" : "gastos").
+        <p class="muted">@(HayFiltros ? "Total filtrado" : _modoRango ? "Total del periodo" : "Total del mes"): <b>@Formato.Euros(_gastos.Where(g => !g.Personal).Sum(g => g.Importe))</b> en @_gastos.Count(g => !g.Personal) @(_gastos.Count(g => !g.Personal) == 1 ? "gasto" : "gastos").
             @if (_gastos.Any(g => g.Personal))
             {
-                <span>Personales (fuera de la liquidación): <b>@Euros(_gastos.Where(g => g.Personal).Sum(g => g.Importe))</b>.</span>
+                <span>Personales (fuera de la liquidación): <b>@Formato.Euros(_gastos.Where(g => g.Personal).Sum(g => g.Importe))</b>.</span>
             }
         </p>
 
@@ -117,7 +117,7 @@ else
                     <div class="g-main">
                         <div class="g-concepto">@(string.IsNullOrWhiteSpace(g.Concepto) ? NombreCategoria(g.CategoriaId) : g.Concepto)</div>
                         <div class="muted g-meta">
-                            @g.Fecha.ToString("dd/MM/yyyy", Es) · @NombreCategoria(g.CategoriaId) · paga @(g.PagadoDesdeAhorro ? "el ahorro" : g.PagadoPor is { } quien ? NombreMiembro(quien) : "la cuenta común")
+                            @g.Fecha.ToString("dd/MM/yyyy", Es) · @NombreCategoria(g.CategoriaId) · paga @(g.PagadoDesdeAhorro ? "el ahorro" : g.PagadoPor is { } quien ? Formato.NombreMiembro(quien, _miembros) : "la cuenta común")
                             @if (g.GastoRecurrenteId is not null) { <span class="tag off">recurrente</span> }
                         </div>
                         <div class="g-reparto">
@@ -135,11 +135,11 @@ else
                             }
                             @foreach (var r in g.Repartos)
                             {
-                                <span class="chip"><Avatar Nombre="@NombreMiembro(r.MiembroId)" Color="@ColorDe(r.MiembroId)" Tamano="sm" />@Euros(r.ImporteAsumido)</span>
+                                <span class="chip"><Avatar Nombre="@Formato.NombreMiembro(r.MiembroId, _miembros)" Color="@ColorDe(r.MiembroId)" Tamano="sm" />@Formato.Euros(r.ImporteAsumido)</span>
                             }
                         </div>
                     </div>
-                    <div class="g-importe">@Euros(g.Importe)</div>
+                    <div class="g-importe">@Formato.Euros(g.Importe)</div>
                     <div class="c-acc">
                         @if (_confirmandoEliminar == g.Id)
                         {
@@ -309,19 +309,19 @@ else
     }
 
     /// <summary>Perfil de modo cuenta común del hogar, el único con el que puede pagar la cuenta directamente.</summary>
-    private PerfilRepartoDto? PerfilCuentaComun => _perfiles.FirstOrDefault(p => p.Modo == "cuenta_comun");
+    private PerfilRepartoDto? PerfilCuentaComun => _perfiles.FirstOrDefault(p => p.Modo == ModosReparto.CuentaComun);
 
     private List<MesCerradoDto> _cierres = [];
 
     /// <summary>El mes mostrado está cerrado: el servidor rechazaría cualquier cambio en sus gastos.</summary>
-    private bool MesCerrado => _cierres.Any(c => c.Mes == _mes.ToString("yyyy-MM", CultureInfo.InvariantCulture));
+    private bool MesCerrado => _cierres.Any(c => c.Mes == Formato.Mes(_mes));
 
     /// <summary>Perfiles que se ofrecen: el de cuenta común solo con la cuenta activada (si no, la API rechazaría el gasto).</summary>
     private IEnumerable<PerfilRepartoDto> PerfilesOfrecidos
     {
         get
         {
-            var ofrecidos = _cuentaActiva ? _perfiles : _perfiles.Where(p => p.Modo != "cuenta_comun").ToList();
+            var ofrecidos = _cuentaActiva ? _perfiles : _perfiles.Where(p => p.Modo != ModosReparto.CuentaComun).ToList();
             // Al editar un gasto cuyo perfil ya no se ofrece se mantiene como opción, para que el formulario muestre lo que envía.
             return _editando is not null && _perfiles.FirstOrDefault(p => p.Id == _perfil) is { } actual && !ofrecidos.Contains(actual)
                 ? ofrecidos.Append(actual)
@@ -365,7 +365,7 @@ else
             var perfiles = Api.ListarPerfilesAsync();
             await Task.WhenAll(miembros, categorias, perfiles);
             _miembros = miembros.Result;
-            _adultos = _miembros.Where(m => m.Tipo == "adulto" && m.Activo).ToList();
+            _adultos = _miembros.Where(m => m.Tipo == TiposMiembro.Adulto && m.Activo).ToList();
             _categorias = categorias.Result;
             _perfiles = perfiles.Result;
             _arbol = ArbolCategorias.Aplanar(_categorias);
@@ -386,7 +386,7 @@ else
     {
         try
         {
-            var cuenta = await Api.ObtenerCuentaComunAsync(_mes.ToString("yyyy-MM", CultureInfo.InvariantCulture));
+            var cuenta = await Api.ObtenerCuentaComunAsync(Formato.Mes(_mes));
             _ahorroActivo = cuenta.Activa && cuenta.AhorroActivo;
             return cuenta.Activa;
         }
@@ -417,7 +417,7 @@ else
             Guid? miembro = Guid.TryParse(_filtroMiembro, out var m) ? m : null;
             var gastos = _modoRango
                 ? await Api.ListarGastosPorRangoAsync(_desdeR, _hastaR, miembro, _filtroTexto)
-                : await Api.ListarGastosAsync(_mes.ToString("yyyy-MM", CultureInfo.InvariantCulture), null, miembro, _filtroTexto);
+                : await Api.ListarGastosAsync(Formato.Mes(_mes), null, miembro, _filtroTexto);
             // La categoría se filtra aquí y no en la API para que incluya sus subcategorías.
             if (Guid.TryParse(_filtroCategoria, out var categoria))
             {
@@ -494,7 +494,7 @@ else
 
     /// <summary>El gasto cae en un mes cerrado: el servidor rechazaría editarlo o borrarlo.</summary>
     private bool CerradoGasto(GastoResponse g) =>
-        _cierres.Any(c => c.Mes == g.Fecha.ToString("yyyy-MM", CultureInfo.InvariantCulture));
+        _cierres.Any(c => c.Mes == Formato.Mes(g.Fecha));
 
     private async Task CambiarMesAsync(int delta)
     {
@@ -512,13 +512,9 @@ else
         }
     }
 
-    private string NombreMiembro(Guid id) => _miembros.FirstOrDefault(m => m.Id == id)?.Nombre ?? "—";
-
     private int ColorDe(Guid id) => ColorMiembro.De(id, _miembros);
 
     private string NombreCategoria(Guid id) => ArbolCategorias.Ruta(_categorias, id);
-
-    private static string Euros(decimal importe) => importe.ToString("C2", Es);
 
     private bool TryImporte(out decimal valor) =>
         decimal.TryParse(_importe.Trim().Replace(',', '.'), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out valor)

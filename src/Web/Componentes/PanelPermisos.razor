@@ -10,7 +10,7 @@
         <div class="aviso err" role="alert">@_error</div>
     }
     <div class="mlist">
-        @foreach (var m in Miembros.Where(m => m.Tipo == "adulto" && m.Activo && m.Vinculado))
+        @foreach (var m in Miembros.Where(m => m.Tipo == TiposMiembro.Adulto && m.Activo && m.Vinculado))
         {
             var miembro = m;
             var total = miembro.Permisos?.Count ?? 0;

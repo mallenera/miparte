@@ -83,11 +83,11 @@ else
                                 <strong>@miembro.Nombre</strong>
                                 @if (miembro.EsYo) { <span class="tag cur">Tú</span> }
                                 @if (miembro.Rol == "admin") { <span class="tag admin">Admin</span> }
-                                @if (miembro.Tipo == "a_cargo") { <span class="tag">A cargo</span> }
+                                @if (miembro.Tipo == TiposMiembro.ACargo) { <span class="tag">A cargo</span> }
                                 else if (!miembro.Vinculado) { <span class="tag off">Sin cuenta</span> }
                             </div>
                             <div class="mmeta">
-                                @if (miembro.Tipo == "a_cargo" && miembro.ResponsableId is { } resp)
+                                @if (miembro.Tipo == TiposMiembro.ACargo && miembro.ResponsableId is { } resp)
                                 {
                                     <span>Responsable: @NombreDe(resp)</span>
                                 }
@@ -106,13 +106,13 @@ else
                                         <button class="linkbtn" type="button" aria-label="Renombrar a @miembro.Nombre"
                                                 @onclick="() => EmpezarRenombrar(miembro)">Renombrar</button>
                                     }
-                                    @if (PuedePermisos && miembro.Tipo == "adulto" && miembro.Vinculado && !miembro.EsYo)
+                                    @if (PuedePermisos && miembro.Tipo == TiposMiembro.Adulto && miembro.Vinculado && !miembro.EsYo)
                                     {
                                         <button class="linkbtn" type="button" @onclick="() => CambiarRolAsync(miembro)">
                                             @(miembro.Rol == "admin" ? "Quitar admin" : "Hacer admin")
                                         </button>
                                     }
-                                    @if (PuedeInvitar && miembro.Tipo == "adulto" && !miembro.Vinculado)
+                                    @if (PuedeInvitar && miembro.Tipo == TiposMiembro.Adulto && !miembro.Vinculado)
                                     {
                                         <button class="linkbtn" type="button" aria-label="Invitar a @miembro.Nombre"
                                                 @onclick="() => InvitarAsync(miembro.Id)">Invitar</button>
@@ -137,11 +137,11 @@ else
                     </label>
                     <label>Tipo
                         <select @bind="_nuevoTipo">
-                            <option value="adulto">Adulto</option>
-                            <option value="a_cargo">A cargo</option>
+                            <option value="@TiposMiembro.Adulto">Adulto</option>
+                            <option value="@TiposMiembro.ACargo">A cargo</option>
                         </select>
                     </label>
-                    @if (_nuevoTipo == "a_cargo")
+                    @if (_nuevoTipo == TiposMiembro.ACargo)
                     {
                         <label>Responsable
                             <select @bind="_nuevoResponsable">
@@ -153,7 +153,7 @@ else
                             </select>
                         </label>
                     }
-                    <button class="btn" type="submit" disabled="@(string.IsNullOrWhiteSpace(_nuevoNombre) || (_nuevoTipo == "a_cargo" && string.IsNullOrEmpty(_nuevoResponsable)))">Añadir</button>
+                    <button class="btn" type="submit" disabled="@(string.IsNullOrWhiteSpace(_nuevoNombre) || (_nuevoTipo == TiposMiembro.ACargo && string.IsNullOrEmpty(_nuevoResponsable)))">Añadir</button>
                 </form>
             }
             else
@@ -239,7 +239,7 @@ else
     private Guid? _renombrando, _confirmandoDesactivar;
     private string _nombreNuevo = "";
 
-    private string _nuevoNombre = "", _nuevoTipo = "adulto", _nuevoResponsable = "";
+    private string _nuevoNombre = "", _nuevoTipo = TiposMiembro.Adulto, _nuevoResponsable = "";
 
     private InvitacionCreada? _invitacion;
     private string? _invitacionPara;
@@ -303,7 +303,7 @@ else
 
     private bool AhorroActivo => Hogar.HogarActual?.AhorroActivo ?? false;
 
-    private IEnumerable<MiembroDto> Adultos => _miembros.Where(m => m.Tipo == "adulto" && m.Activo);
+    private IEnumerable<MiembroDto> Adultos => _miembros.Where(m => m.Tipo == TiposMiembro.Adulto && m.Activo);
 
     protected override Task OnInitializedAsync() => CargarAsync();
 
@@ -399,7 +399,7 @@ else
     private Task AnadirMiembroAsync() =>
         EjecutarMiembroAsync(async () =>
         {
-            Guid? responsable = _nuevoTipo == "a_cargo" && Guid.TryParse(_nuevoResponsable, out var r) ? r : null;
+            Guid? responsable = _nuevoTipo == TiposMiembro.ACargo && Guid.TryParse(_nuevoResponsable, out var r) ? r : null;
             await Api.CrearMiembroAsync(new CrearMiembroRequest(_nuevoNombre.Trim(), _nuevoTipo, responsable));
             var nombre = _nuevoNombre.Trim();
             _nuevoNombre = "";

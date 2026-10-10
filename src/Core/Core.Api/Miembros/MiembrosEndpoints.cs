@@ -52,7 +52,7 @@ public static class MiembrosEndpoints
 
     /// <summary>Convierte un miembro en su DTO: tipo "adulto"/"a_cargo", rol "admin"/"miembro", si está vinculado a un usuario y si es el usuario autenticado (<paramref name="usuarioActual"/>).</summary>
     private static MiembroDto ADto(Miembro m, Guid? usuarioActual = null) => new(
-        m.Id, m.Nombre, m.Tipo == TipoMiembro.Adulto ? "adulto" : "a_cargo", m.ResponsableId, m.Activo,
+        m.Id, m.Nombre, m.Tipo == TipoMiembro.Adulto ? TiposMiembro.Adulto : TiposMiembro.ACargo, m.ResponsableId, m.Activo,
         m.Rol == RolMiembro.Admin ? "admin" : "miembro", m.UserId is not null,
         usuarioActual is not null && m.UserId == usuarioActual,
         CatalogoPermisos.Todos.Select(p => p.Clave).Where(CatalogoPermisos.Efectivos(m).Contains).ToList());
@@ -103,8 +103,8 @@ public static class MiembrosEndpoints
         TipoMiembro tipo;
         switch (req.Tipo)
         {
-            case "adulto": tipo = TipoMiembro.Adulto; break;
-            case "a_cargo": tipo = TipoMiembro.ACargo; break;
+            case TiposMiembro.Adulto: tipo = TipoMiembro.Adulto; break;
+            case TiposMiembro.ACargo: tipo = TipoMiembro.ACargo; break;
             default: return Error(400, "El tipo debe ser 'adulto' o 'a_cargo'.");
         }
 

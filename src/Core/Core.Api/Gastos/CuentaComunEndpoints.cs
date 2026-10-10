@@ -28,16 +28,16 @@ public static class CuentaComunEndpoints
     }
 
     /// <summary>Convierte una aportación en su DTO de respuesta.</summary>
-    private static AportacionCuentaDto A(AportacionCuenta a) => new(a.Id, a.MiembroId, a.Desde, a.Importe, a.Ahorro);
+    private static AportacionCuentaDto ADto(AportacionCuenta a) => new(a.Id, a.MiembroId, a.Desde, a.Importe, a.Ahorro);
 
     /// <summary>Convierte un reembolso en su DTO de respuesta.</summary>
-    private static ReembolsoCuentaDto A(ReembolsoCuenta r) => new(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto);
+    private static ReembolsoCuentaDto ADto(ReembolsoCuenta r) => new(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto);
 
     /// <summary>Convierte un depósito de ahorro en su DTO de respuesta.</summary>
-    private static DepositoAhorroDto A(DepositoAhorro d) => new(d.Id, d.MiembroId, d.Fecha, d.Importe, d.Concepto);
+    private static DepositoAhorroDto ADto(DepositoAhorro d) => new(d.Id, d.MiembroId, d.Fecha, d.Importe, d.Concepto);
 
     /// <summary>Convierte una retirada de ahorro en su DTO de respuesta.</summary>
-    private static RetiradaAhorroDto A(RetiradaAhorro r) => new(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto);
+    private static RetiradaAhorroDto ADto(RetiradaAhorro r) => new(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto);
 
     /// <summary>Aportaciones en la forma que usa el cálculo del dominio.</summary>
     private static List<AportacionVigente> Vigentes(IEnumerable<AportacionCuenta> aportaciones)
@@ -157,22 +157,23 @@ public static class CuentaComunEndpoints
         var activa = await db.Hogares.AnyAsync(h => h.CuentaComunActiva, ct);
         var ahorroActivo = await db.Hogares.AnyAsync(h => h.AhorroActivo, ct);
 
+        var depositosAhorro = depositos.Select(d => new DepositoDeAhorro(d.Fecha, d.Importe, d.MiembroId)).ToList();
+        var vigentes = Vigentes(aportaciones);
+
         var e = CuentaComun.Calcular(
-            inicio, Vigentes(aportaciones),
+            inicio, vigentes,
             await GastosDeCuenta(db, ct), reembolsos.Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe)),
-            retiradas.Select(r => new RetiradaDeAhorro(r.Fecha, r.Importe)),
-            depositos.Select(d => new DepositoDeAhorro(d.Fecha, d.Importe, d.MiembroId)));
-        var partes = CuentaComun.PartesPorPersona(
-            inicio, Vigentes(aportaciones), e, depositos.Select(d => new DepositoDeAhorro(d.Fecha, d.Importe, d.MiembroId)));
+            retiradas.Select(r => new RetiradaDeAhorro(r.Fecha, r.Importe)), depositosAhorro);
+        var partes = CuentaComun.PartesPorPersona(inicio, vigentes, e, depositosAhorro);
 
         return Results.Ok(new CuentaComunResponse(
             ApiComun.FormatoMes(inicio), e.AportadoMes, e.Aportado, e.Gastado, e.Saldo,
             e.Pendientes.Select(p => new PendienteCuentaDto(p.MiembroId, nombres.GetValueOrDefault(p.MiembroId, ""), p.Importe)).ToList(),
-            e.Efectivo, aportaciones.Select(A).ToList(),
-            reembolsos.Where(r => r.Fecha >= inicio && r.Fecha < fin).Select(A).ToList(),
+            e.Efectivo, aportaciones.Select(ADto).ToList(),
+            reembolsos.Where(r => r.Fecha >= inicio && r.Fecha < fin).Select(ADto).ToList(),
             e.AhorroMes, e.AhorroAcumulado, e.AhorroRetirado, e.AhorroDisponible,
-            retiradas.Where(r => r.Fecha >= inicio && r.Fecha < fin).Select(A).ToList(),
-            e.AhorroDepositado, depositos.Where(d => d.Fecha >= inicio && d.Fecha < fin).Select(A).ToList(),
+            retiradas.Where(r => r.Fecha >= inicio && r.Fecha < fin).Select(ADto).ToList(),
+            e.AhorroDepositado, depositos.Where(d => d.Fecha >= inicio && d.Fecha < fin).Select(ADto).ToList(),
             e.AhorroGastado, activa,
             partes.Select(p => new PartePersonaDto(
                 p.MiembroId, nombres.GetValueOrDefault(p.MiembroId, ""), p.Aportado, p.Ahorrado, p.PorcentajeGastos, p.PorcentajeAhorro,
@@ -216,7 +217,7 @@ public static class CuentaComunEndpoints
         a.Importe = req.Importe;
         a.Ahorro = req.Ahorro;
         await db.SaveChangesAsync(ct);
-        return Results.Ok(A(a));
+        return Results.Ok(ADto(a));
     }
 
     /// <summary>POST /api/cuenta-comun/reembolsos: registra un pago de la cuenta a quien adelantó gastos. 400 si el importe es inválido o el miembro no es del hogar; 409 sin hogar o si supera lo pendiente de reembolsar al miembro. 201 si se crea.</summary>
@@ -242,7 +243,7 @@ public static class CuentaComunEndpoints
         };
         db.ReembolsosCuenta.Add(r);
         await db.SaveChangesAsync(ct);
-        return Results.Created($"/api/cuenta-comun/reembolsos/{r.Id}", A(r));
+        return Results.Created($"/api/cuenta-comun/reembolsos/{r.Id}", ADto(r));
     }
 
     /// <summary>DELETE /api/cuenta-comun/reembolsos/{id}: borra un reembolso. 409 sin hogar; 404 si no existe; 204 si se borra.</summary>
@@ -275,7 +276,7 @@ public static class CuentaComunEndpoints
         };
         db.DepositosAhorro.Add(d);
         await db.SaveChangesAsync(ct);
-        return Results.Created($"/api/cuenta-comun/depositos-ahorro/{d.Id}", A(d));
+        return Results.Created($"/api/cuenta-comun/depositos-ahorro/{d.Id}", ADto(d));
     }
 
     /// <summary>DELETE /api/cuenta-comun/depositos-ahorro/{id}: borra un depósito de ahorro. 409 sin hogar o si dejaría sin respaldo lo ya retirado o gastado desde el ahorro (<c>{ error, falta }</c>); 404 si no existe; 204 si se borra.</summary>
@@ -321,7 +322,7 @@ public static class CuentaComunEndpoints
         };
         db.RetiradasAhorro.Add(r);
         await db.SaveChangesAsync(ct);
-        return Results.Created($"/api/cuenta-comun/retiradas-ahorro/{r.Id}", A(r));
+        return Results.Created($"/api/cuenta-comun/retiradas-ahorro/{r.Id}", ADto(r));
     }
 
     /// <summary>DELETE /api/cuenta-comun/retiradas-ahorro/{id}: borra una retirada de ahorro. 409 sin hogar; 404 si no existe; 204 si se borra.</summary>

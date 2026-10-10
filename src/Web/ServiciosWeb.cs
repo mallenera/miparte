@@ -30,6 +30,7 @@ public static class ServiciosWeb
         servicios.AddSingleton<ServicioAvisos>();
         servicios.AddSingleton<ServicioTema>();
         servicios.AddScoped<ServicioArranque>();
+        servicios.AddScoped<ServicioPermisos>();
         servicios.AddSingleton<ServicioConexion>();
         servicios.AddTransient<ManejadorReintentos>();
         servicios.AddTransient<ManejadorCoreApi>();

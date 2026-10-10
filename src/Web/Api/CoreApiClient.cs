@@ -202,6 +202,20 @@ public sealed class CoreApiClient
     public Task ActivarCuentaComunAsync(bool activa, CancellationToken ct = default) =>
         EnviarAsync<System.Text.Json.JsonElement>(HttpMethod.Put, "api/cuenta-comun/activacion", new ActivarCuentaComunRequest(activa), ct);
 
+    /// <summary>
+    /// Elimina el hogar actual con todos sus datos, sin vuelta atrás (<c>DELETE /api/hogar</c>); exige el permiso <c>hogar.eliminar</c> y el nombre exacto del hogar.
+    /// </summary>
+    /// <param name="nombre">Nombre del hogar, como confirmación.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task EliminarHogarAsync(string nombre, CancellationToken ct = default) =>
+        EnviarSinRespuestaAsync(HttpMethod.Delete, $"api/hogar?nombre={Uri.EscapeDataString(nombre)}", ct);
+
+    /// <summary>Activa o desactiva el ahorro del hogar; solo un admin y con la cuenta común activada (<c>PUT /api/cuenta-comun/ahorro/activacion</c>).</summary>
+    /// <param name="activo">true para usar el ahorro.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task ActivarAhorroAsync(bool activo, CancellationToken ct = default) =>
+        EnviarAsync<System.Text.Json.JsonElement>(HttpMethod.Put, "api/cuenta-comun/ahorro/activacion", new ActivarAhorroRequest(activo), ct);
+
     /// <summary>Fija lo que aporta un adulto a la cuenta común desde un mes (<c>PUT /api/cuenta-comun/aportaciones</c>).</summary>
     /// <param name="peticion">Adulto, mes de inicio (día 1) e importe.</param>
     /// <param name="ct">Token de cancelación.</param>

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using Microsoft.Extensions.DependencyInjection;
 using MiParte.Web.Autenticacion;
 
 namespace MiParte.Web.Tests;
@@ -42,5 +43,20 @@ internal sealed class ManejadorFalso : HttpMessageHandler
     {
         Peticiones.Add(request);
         return Task.FromResult(_responder(request));
+    }
+}
+
+/// <summary>Registro de <see cref="MiParte.Web.Hogares.ServicioPermisos"/> en las pruebas de componentes.</summary>
+internal static class PermisosDePrueba
+{
+    /// <summary>Registra el servicio con los permisos indicados (todos por defecto, como un admin) para no depender de <c>/api/miembros</c>.</summary>
+    public static MiParte.Web.Hogares.ServicioPermisos Registrar(
+        Microsoft.Extensions.DependencyInjection.IServiceCollection servicios, MiParte.Web.Api.CoreApiClient api,
+        MiParte.Web.Hogares.EstadoHogar hogar, IEnumerable<string>? claves = null)
+    {
+        var permisos = new MiParte.Web.Hogares.ServicioPermisos(api, hogar);
+        permisos.Fijar(claves ?? MiParte.Core.Domain.CatalogoPermisos.Todos.Select(p => p.Clave));
+        servicios.AddSingleton(permisos);
+        return permisos;
     }
 }

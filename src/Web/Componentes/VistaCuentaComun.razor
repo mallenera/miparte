@@ -3,6 +3,7 @@
 @inject CoreApiClient Api
 @inject EstadoHogar Hogar
 @inject ServicioAvisos Avisos
+@inject ServicioPermisos Permisos
 
 <h1 class="sr">Cuenta común de @Hogar.HogarActual?.Nombre</h1>
 
@@ -25,17 +26,13 @@ else if (_estado is not null && !_estado.Activa)
             La cuenta común es un fondo del hogar al que cada adulto aporta una cantidad fija al mes. Con ella puedes pagar gastos
             sin repartirlos entre personas, reembolsar a quien adelanta dinero y apartar un ahorro. Este hogar todavía no la usa.
         </p>
-        @if (_error is not null)
-        {
-            <div class="aviso err u-mt12" role="alert">@_error</div>
-        }
         @if (SoyAdmin)
         {
-            <button class="btn u-mt12" type="button" disabled="@_enviando" @onclick="() => CambiarActivacionAsync(true)">Activar la cuenta común</button>
+            <a class="btn u-mt12" href="hogar/configuracion">Habilitarla en la configuración del hogar</a>
         }
         else
         {
-            <div class="aviso warn u-mt12" role="status">Solo un administrador del hogar puede activarla.</div>
+            <div class="aviso warn u-mt12" role="status">No tienes permiso para activarla: pídeselo a un administrador del hogar.</div>
         }
     </section>
 }
@@ -63,7 +60,10 @@ else if (_estado is not null)
             <span class="chip">Aportado este mes&nbsp;<b>@Euros(_estado.AportadoMes)</b></span>
             <span class="chip">Aportado en total&nbsp;<b>@Euros(_estado.Aportado)</b></span>
             <span class="chip">Gastado en total&nbsp;<b>@Euros(_estado.Gastado)</b></span>
-            <span class="chip">Ahorro disponible&nbsp;<b id="ahorro">@Euros(_estado.AhorroDisponible)</b></span>
+            @if (_estado.AhorroActivo)
+            {
+                <span class="chip">Ahorro disponible&nbsp;<b id="ahorro">@Euros(_estado.AhorroDisponible)</b></span>
+            }
         </div>
 
         @if (_estado.Saldo < 0)
@@ -76,16 +76,22 @@ else if (_estado is not null)
 
     <section class="card" aria-labelledby="t-partes">
         <div class="card-head"><h2 id="t-partes">Su parte</h2></div>
-        <p class="muted">Lo que ha puesto cada persona y la porción que le corresponde del saldo (en proporción a lo aportado para gastos) y del ahorro (en proporción a lo ahorrado).</p>
+        <p class="muted">Lo que ha puesto cada persona y la porción que le corresponde del saldo (en proporción a lo aportado para gastos) @(_estado.AhorroActivo ? "y del ahorro (en proporción a lo ahorrado)." : "")</p>
         @foreach (var p in _estado.Partes ?? [])
         {
             <div class="catrow parte">
                 <div class="c-name"><Avatar Nombre="@p.Nombre" Color="@ColorMiembro.De(p.MiembroId, _miembros)" Tamano="sm" /> @p.Nombre</div>
                 <div class="c-sel">
                     <span class="chip">Ha puesto&nbsp;<b>@Euros(p.Aportado)</b>&nbsp;para gastos (@Porcentaje(p.PorcentajeGastos))</span>
-                    <span class="chip">Ahorro&nbsp;<b>@Euros(p.Ahorrado)</b>&nbsp;(@Porcentaje(p.PorcentajeAhorro))</span>
+                    @if (_estado.AhorroActivo)
+                    {
+                        <span class="chip">Ahorro&nbsp;<b>@Euros(p.Ahorrado)</b>&nbsp;(@Porcentaje(p.PorcentajeAhorro))</span>
+                    }
                     <span class="chip">Su parte del saldo&nbsp;<b>@Euros(p.ParteSaldo)</b></span>
-                    <span class="chip">Su parte del ahorro&nbsp;<b>@Euros(p.ParteAhorro)</b></span>
+                    @if (_estado.AhorroActivo)
+                    {
+                        <span class="chip">Su parte del ahorro&nbsp;<b>@Euros(p.ParteAhorro)</b></span>
+                    }
                     @if (p.Pendiente > 0)
                     {
                         <span class="chip">La cuenta le debe&nbsp;<b>@Euros(p.Pendiente)</b></span>
@@ -101,7 +107,7 @@ else if (_estado is not null)
 
     <section class="card" aria-labelledby="t-aportaciones">
         <div class="card-head"><h2 id="t-aportaciones">Aportación mensual</h2></div>
-        <p class="muted">Importe fijo que aporta cada adulto al mes; una parte puede ir a ahorro y el resto queda para gastos. Un cambio vale desde el mes elegido en adelante.</p>
+        <p class="muted">Importe fijo que aporta cada adulto al mes@(_estado.AhorroActivo ? "; una parte puede ir a ahorro y el resto queda para gastos" : ""). Un cambio vale desde el mes elegido en adelante.</p>
         <div class="u-mt10">
             @foreach (var a in _adultos)
             {
@@ -116,7 +122,7 @@ else if (_estado is not null)
             }
         </div>
 
-        @if (_adultos.Count > 0)
+        @if (_adultos.Count > 0 && PuedeCuenta)
         {
             <form class="addcat" id="form-aportacion" @onsubmit="FijarAportacionAsync">
                 <label>Adulto
@@ -130,9 +136,12 @@ else if (_estado is not null)
                 <label>Importe al mes (€)
                     <input inputmode="decimal" required placeholder="0,00" @bind="_importeAportacion" @bind:event="oninput" />
                 </label>
-                <label>De ese importe, a ahorro (€)
-                    <input id="ahorro-aportacion" inputmode="decimal" placeholder="0,00" @bind="_ahorroAportacion" @bind:event="oninput" />
-                </label>
+                @if (_estado.AhorroActivo)
+                {
+                    <label>De ese importe, a ahorro (€)
+                        <input id="ahorro-aportacion" inputmode="decimal" placeholder="0,00" @bind="_ahorroAportacion" @bind:event="oninput" />
+                    </label>
+                }
                 <button class="btn" type="submit" disabled="@(!AportacionValida || _enviando)">Fijar desde @NombreMes</button>
             </form>
         }
@@ -177,7 +186,7 @@ else if (_estado is not null)
             </div>
         }
 
-        @if (_estado.Pendientes.Count > 0)
+        @if (_estado.Pendientes.Count > 0 && PuedeCuenta)
         {
             <form class="addcat" id="form-reembolso" @onsubmit="ReembolsarAsync">
                 <h3 class="u-titulo-form">Nuevo reembolso</h3>
@@ -200,133 +209,118 @@ else if (_estado is not null)
         }
     </section>
 
-    <section class="card" aria-labelledby="t-ahorro">
-        <div class="card-head"><h2 id="t-ahorro">Ahorro</h2></div>
-        <p class="muted">Suma la parte de las aportaciones que se aparta y lo que ingreses aparte (ahorro inicial, lotería…). Los gastos no la tocan: solo baja al retirarla o al pagar un gasto desde el ahorro.</p>
-        <div class="u-fila-mt10">
-            <span class="chip">Ahorrado este mes&nbsp;<b>@Euros(_estado.AhorroMes)</b></span>
-            <span class="chip">Ahorrado en total&nbsp;<b>@Euros(_estado.AhorroAcumulado)</b></span>
-            <span class="chip">Ingresado aparte&nbsp;<b>@Euros(_estado.AhorroDepositado)</b></span>
-            <span class="chip">Retirado&nbsp;<b>@Euros(_estado.AhorroRetirado)</b></span>
-            <span class="chip">Gastado del ahorro&nbsp;<b>@Euros(_estado.AhorroGastado)</b></span>
-        </div>
-
-        @if (_estado.AhorroDisponible < 0)
-        {
-            <div class="aviso warn u-mt12" role="status">
-                Se ha retirado más de lo ahorrado: faltan @Euros(-_estado.AhorroDisponible) (revisa las aportaciones o las retiradas).
-            </div>
-        }
-
-        @foreach (var d in (_estado.DepositosAhorro ?? []).OrderByDescending(d => d.Fecha))
-        {
-            <div class="gastorow">
-                <div class="g-main">
-                    <div class="g-concepto">Ingreso de @NombreMiembro(d.MiembroId)</div>
-                    <div class="muted g-meta">@d.Fecha.ToString("dd/MM/yyyy", Es)@(string.IsNullOrWhiteSpace(d.Concepto) ? "" : " · " + d.Concepto)</div>
-                </div>
-                <div class="g-importe">@Euros(d.Importe)</div>
-                <div class="c-acc">
-                    @if (_confirmandoEliminar == d.Id)
-                    {
-                        <span class="muted">¿Eliminar?</span>
-                        <button class="linkbtn danger" type="button" @onclick="() => EliminarDepositoAsync(d)">Sí</button>
-                        <button class="linkbtn" type="button" @onclick="() => _confirmandoEliminar = null">No</button>
-                    }
-                    else
-                    {
-                        <button class="linkbtn danger" type="button" aria-label="Eliminar ingreso de @NombreMiembro(d.MiembroId)" @onclick="() => _confirmandoEliminar = d.Id">Eliminar</button>
-                    }
-                </div>
-            </div>
-        }
-
-        @if (_adultos.Count > 0)
-        {
-            <form class="addcat" id="form-deposito" @onsubmit="IngresarAhorroAsync">
-                <h3 class="u-titulo-form">Añadir al ahorro</h3>
-                <label>Lo ingresa
-                    <select @bind="_depositante">
-                        @foreach (var a in _adultos)
-                        {
-                            <option value="@a.Id">@a.Nombre</option>
-                        }
-                    </select>
-                </label>
-                <label>Importe (€)
-                    <input inputmode="decimal" required placeholder="0,00" @bind="_importeDeposito" @bind:event="oninput" />
-                </label>
-                <label>Concepto
-                    <input maxlength="200" placeholder="Ahorro inicial, lotería…" @bind="_conceptoDeposito" @bind:event="oninput" />
-                </label>
-                <button class="btn" type="submit" disabled="@(!DepositoValido || _enviando)">Añadir</button>
-            </form>
-        }
-
-        @foreach (var r in (_estado.RetiradasAhorro ?? []).OrderByDescending(r => r.Fecha))
-        {
-            <div class="gastorow">
-                <div class="g-main">
-                    <div class="g-concepto">Retirada de @NombreMiembro(r.MiembroId)</div>
-                    <div class="muted g-meta">@r.Fecha.ToString("dd/MM/yyyy", Es)@(string.IsNullOrWhiteSpace(r.Concepto) ? "" : " · " + r.Concepto)</div>
-                </div>
-                <div class="g-importe">@Euros(r.Importe)</div>
-                <div class="c-acc">
-                    @if (_confirmandoEliminar == r.Id)
-                    {
-                        <span class="muted">¿Eliminar?</span>
-                        <button class="linkbtn danger" type="button" @onclick="() => EliminarRetiradaAsync(r)">Sí</button>
-                        <button class="linkbtn" type="button" @onclick="() => _confirmandoEliminar = null">No</button>
-                    }
-                    else
-                    {
-                        <button class="linkbtn danger" type="button" aria-label="Eliminar retirada de @NombreMiembro(r.MiembroId)" @onclick="() => _confirmandoEliminar = r.Id">Eliminar</button>
-                    }
-                </div>
-            </div>
-        }
-
-        @if (_estado.AhorroDisponible > 0 && _adultos.Count > 0)
-        {
-            <form class="addcat" id="form-retirada" @onsubmit="RetirarAhorroAsync">
-                <h3 class="u-titulo-form">Retirar del ahorro</h3>
-                <label>Lo retira
-                    <select @bind="_retirante">
-                        @foreach (var a in _adultos)
-                        {
-                            <option value="@a.Id">@a.Nombre</option>
-                        }
-                    </select>
-                </label>
-                <label>Importe (€)
-                    <input inputmode="decimal" required placeholder="0,00" @bind="_importeRetirada" @bind:event="oninput" />
-                </label>
-                <label>Concepto
-                    <input maxlength="200" placeholder="Opcional" @bind="_conceptoRetirada" @bind:event="oninput" />
-                </label>
-                <button class="btn" type="submit" disabled="@(!RetiradaValida || _enviando)">Retirar</button>
-            </form>
-        }
-        else if (_estado.AhorroDisponible <= 0)
-        {
-            <div class="empty">No hay ahorro disponible para retirar.</div>
-        }
-    </section>
-
-    @if (SoyAdmin)
+    @if (_estado.AhorroActivo)
     {
-        <section class="card" aria-labelledby="t-ajustes">
-            <div class="card-head"><h2 id="t-ajustes">Ajustes</h2></div>
-            <p class="muted">Desactivar la cuenta común la oculta y bloquea nuevos movimientos y gastos a su cargo; no borra nada y se puede volver a activar.</p>
-            @if (_confirmandoDesactivar)
+        <section class="card" aria-labelledby="t-ahorro">
+            <div class="card-head"><h2 id="t-ahorro">Ahorro</h2></div>
+            <p class="muted">Suma la parte de las aportaciones que se aparta y lo que ingreses aparte (ahorro inicial, lotería…). Los gastos no la tocan: solo baja al retirarla o al pagar un gasto desde el ahorro.</p>
+            <div class="u-fila-mt10">
+                <span class="chip">Ahorrado este mes&nbsp;<b>@Euros(_estado.AhorroMes)</b></span>
+                <span class="chip">Ahorrado en total&nbsp;<b>@Euros(_estado.AhorroAcumulado)</b></span>
+                <span class="chip">Ingresado aparte&nbsp;<b>@Euros(_estado.AhorroDepositado)</b></span>
+                <span class="chip">Retirado&nbsp;<b>@Euros(_estado.AhorroRetirado)</b></span>
+                <span class="chip">Gastado del ahorro&nbsp;<b>@Euros(_estado.AhorroGastado)</b></span>
+            </div>
+
+            @if (_estado.AhorroDisponible < 0)
             {
-                <span class="muted">¿Desactivar la cuenta común?</span>
-                <button class="linkbtn danger" type="button" @onclick="() => CambiarActivacionAsync(false)">Sí, desactivar</button>
-                <button class="linkbtn" type="button" @onclick="() => _confirmandoDesactivar = false">No</button>
+                <div class="aviso warn u-mt12" role="status">
+                    Se ha retirado más de lo ahorrado: faltan @Euros(-_estado.AhorroDisponible) (revisa las aportaciones o las retiradas).
+                </div>
             }
-            else
+
+            @foreach (var d in (_estado.DepositosAhorro ?? []).OrderByDescending(d => d.Fecha))
             {
-                <button class="linkbtn danger" type="button" @onclick="() => _confirmandoDesactivar = true">Desactivar la cuenta común</button>
+                <div class="gastorow">
+                    <div class="g-main">
+                        <div class="g-concepto">Ingreso de @NombreMiembro(d.MiembroId)</div>
+                        <div class="muted g-meta">@d.Fecha.ToString("dd/MM/yyyy", Es)@(string.IsNullOrWhiteSpace(d.Concepto) ? "" : " · " + d.Concepto)</div>
+                    </div>
+                    <div class="g-importe">@Euros(d.Importe)</div>
+                    <div class="c-acc">
+                        @if (_confirmandoEliminar == d.Id)
+                        {
+                            <span class="muted">¿Eliminar?</span>
+                            <button class="linkbtn danger" type="button" @onclick="() => EliminarDepositoAsync(d)">Sí</button>
+                            <button class="linkbtn" type="button" @onclick="() => _confirmandoEliminar = null">No</button>
+                        }
+                        else
+                        {
+                            <button class="linkbtn danger" type="button" aria-label="Eliminar ingreso de @NombreMiembro(d.MiembroId)" @onclick="() => _confirmandoEliminar = d.Id">Eliminar</button>
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (_adultos.Count > 0 && PuedeAhorro)
+            {
+                <form class="addcat" id="form-deposito" @onsubmit="IngresarAhorroAsync">
+                    <h3 class="u-titulo-form">Añadir al ahorro</h3>
+                    <label>Lo ingresa
+                        <select @bind="_depositante">
+                            @foreach (var a in _adultos)
+                            {
+                                <option value="@a.Id">@a.Nombre</option>
+                            }
+                        </select>
+                    </label>
+                    <label>Importe (€)
+                        <input inputmode="decimal" required placeholder="0,00" @bind="_importeDeposito" @bind:event="oninput" />
+                    </label>
+                    <label>Concepto
+                        <input maxlength="200" placeholder="Ahorro inicial, lotería…" @bind="_conceptoDeposito" @bind:event="oninput" />
+                    </label>
+                    <button class="btn" type="submit" disabled="@(!DepositoValido || _enviando)">Añadir</button>
+                </form>
+            }
+
+            @foreach (var r in (_estado.RetiradasAhorro ?? []).OrderByDescending(r => r.Fecha))
+            {
+                <div class="gastorow">
+                    <div class="g-main">
+                        <div class="g-concepto">Retirada de @NombreMiembro(r.MiembroId)</div>
+                        <div class="muted g-meta">@r.Fecha.ToString("dd/MM/yyyy", Es)@(string.IsNullOrWhiteSpace(r.Concepto) ? "" : " · " + r.Concepto)</div>
+                    </div>
+                    <div class="g-importe">@Euros(r.Importe)</div>
+                    <div class="c-acc">
+                        @if (_confirmandoEliminar == r.Id)
+                        {
+                            <span class="muted">¿Eliminar?</span>
+                            <button class="linkbtn danger" type="button" @onclick="() => EliminarRetiradaAsync(r)">Sí</button>
+                            <button class="linkbtn" type="button" @onclick="() => _confirmandoEliminar = null">No</button>
+                        }
+                        else
+                        {
+                            <button class="linkbtn danger" type="button" aria-label="Eliminar retirada de @NombreMiembro(r.MiembroId)" @onclick="() => _confirmandoEliminar = r.Id">Eliminar</button>
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (_estado.AhorroDisponible > 0 && _adultos.Count > 0 && PuedeAhorro)
+            {
+                <form class="addcat" id="form-retirada" @onsubmit="RetirarAhorroAsync">
+                    <h3 class="u-titulo-form">Retirar del ahorro</h3>
+                    <label>Lo retira
+                        <select @bind="_retirante">
+                            @foreach (var a in _adultos)
+                            {
+                                <option value="@a.Id">@a.Nombre</option>
+                            }
+                        </select>
+                    </label>
+                    <label>Importe (€)
+                        <input inputmode="decimal" required placeholder="0,00" @bind="_importeRetirada" @bind:event="oninput" />
+                    </label>
+                    <label>Concepto
+                        <input maxlength="200" placeholder="Opcional" @bind="_conceptoRetirada" @bind:event="oninput" />
+                    </label>
+                    <button class="btn" type="submit" disabled="@(!RetiradaValida || _enviando)">Retirar</button>
+                </form>
+            }
+            else if (_estado.AhorroDisponible <= 0)
+            {
+                <div class="empty">No hay ahorro disponible para retirar.</div>
             }
         </section>
     }
@@ -337,7 +331,7 @@ else if (_estado is not null)
 
     private CuentaComunResponse? _estado;
     private List<MiembroDto> _miembros = [], _adultos = [];
-    private bool _cargando = true, _enviando, _confirmandoDesactivar;
+    private bool _cargando = true, _enviando;
     private string? _errorCarga, _error;
     private DateOnly _mes = new(DateTime.Today.Year, DateTime.Today.Month, 1);
     private Guid? _confirmandoEliminar;
@@ -348,13 +342,17 @@ else if (_estado is not null)
     private string _importeRetirada = "", _conceptoRetirada = "", _importeDeposito = "", _conceptoDeposito = "";
 
     /// <summary>Si el usuario es admin del hogar: solo él activa o desactiva la cuenta común.</summary>
-    private bool SoyAdmin => _miembros.Any(m => m.EsYo && m.Rol == "admin");
+    private bool SoyAdmin => Permisos.Tiene(Claves.HogarFunciones);
+
+    private bool PuedeCuenta => Permisos.Tiene(Claves.CuentaMovimientos);
+
+    private bool PuedeAhorro => Permisos.Tiene(Claves.AhorroMovimientos);
 
     private static string Porcentaje(decimal p) => $"{p.ToString("0.##", Es)} %";
 
     private string NombreMes => _mes.ToString("MMMM yyyy", Es);
     private bool AportacionValida => TryImporte(_importeAportacion, permitirCero: true, out var importe)
-        && TryImporte(string.IsNullOrWhiteSpace(_ahorroAportacion) ? "0" : _ahorroAportacion, permitirCero: true, out var ahorro) && ahorro <= importe;
+        && TryImporte(string.IsNullOrWhiteSpace(_ahorroAportacion) || _estado?.AhorroActivo == false ? "0" : _ahorroAportacion, permitirCero: true, out var ahorro) && ahorro <= importe;
     private bool DepositoValido => TryImporte(_importeDeposito, permitirCero: false, out _);
     private bool RetiradaValida => TryImporte(_importeRetirada, permitirCero: false, out _);
     private bool ReembolsoValido => TryImporte(_importeReembolso, permitirCero: false, out _);
@@ -365,6 +363,7 @@ else if (_estado is not null)
     {
         _cargando = true;
         _errorCarga = null;
+        await Permisos.AsegurarAsync();
         try
         {
             _miembros = await Api.ListarMiembrosAsync();
@@ -427,21 +426,14 @@ else if (_estado is not null)
         decimal.TryParse(texto.Trim().Replace(',', '.'), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out valor)
         && (valor > 0 || (permitirCero && valor == 0)) && decimal.Round(valor, 2) == valor;
 
-    private Task CambiarActivacionAsync(bool activa) =>
-        EjecutarAsync(async () =>
-        {
-            await Api.ActivarCuentaComunAsync(activa);
-            _confirmandoDesactivar = false;
-            return activa ? "Cuenta común activada" : "Cuenta común desactivada";
-        });
-
     private Task FijarAportacionAsync() =>
         EjecutarAsync(async () =>
         {
             if (!TryImporte(_importeAportacion, permitirCero: true, out var importe))
                 throw new ApiException(System.Net.HttpStatusCode.BadRequest, "Introduce un importe de 0 o más con máximo 2 decimales.");
             var ahorro = 0m;
-            if (!string.IsNullOrWhiteSpace(_ahorroAportacion) && (!TryImporte(_ahorroAportacion, permitirCero: true, out ahorro) || ahorro > importe))
+            // Sin ahorro activado el campo no se muestra y la aportación queda entera para gastos.
+            if (_estado!.AhorroActivo && !string.IsNullOrWhiteSpace(_ahorroAportacion) && (!TryImporte(_ahorroAportacion, permitirCero: true, out ahorro) || ahorro > importe))
                 throw new ApiException(System.Net.HttpStatusCode.BadRequest, "El ahorro debe estar entre 0 y la aportación, con máximo 2 decimales.");
             await Api.FijarAportacionAsync(new FijarAportacionRequest(_aportante, _mes, importe, ahorro));
             return "Aportación guardada";

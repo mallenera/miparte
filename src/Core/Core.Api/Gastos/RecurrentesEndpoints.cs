@@ -1,3 +1,4 @@
+using MiParte.Core.Domain;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MiParte.Contracts;
@@ -15,12 +16,13 @@ public static class RecurrentesEndpoints
     public static IEndpointRouteBuilder MapGastosRecurrentes(this IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/gastos-recurrentes").RequireAuthorization();
+        var escritura = g.MapGroup("").RequierePermiso(CatalogoPermisos.RecurrentesGestionar);
         g.MapGet("", ListarAsync);
         g.MapGet("{id:guid}", ObtenerAsync);
-        g.MapPost("", CrearAsync);
-        g.MapPut("{id:guid}", EditarAsync);
-        g.MapDelete("{id:guid}", BorrarAsync);
-        g.MapPost("generar", GenerarAsync).RequireRateLimiting(LimitacionPeticiones.Costosa);
+        escritura.MapPost("", CrearAsync);
+        escritura.MapPut("{id:guid}", EditarAsync);
+        escritura.MapDelete("{id:guid}", BorrarAsync);
+        escritura.MapPost("generar", GenerarAsync).RequireRateLimiting(LimitacionPeticiones.Costosa);
         return app;
     }
 

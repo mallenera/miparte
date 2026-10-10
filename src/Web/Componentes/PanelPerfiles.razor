@@ -4,9 +4,12 @@
 <section class="card" aria-labelledby="t-perfiles">
     <div class="card-head">
         <h2 id="t-perfiles">Perfiles de reparto</h2>
-        <button class="btn btn-ghost btn-sm" type="button" @onclick="() => _nuevo = !_nuevo">
-            @(_nuevo ? "Cancelar" : "Nuevo perfil")
-        </button>
+        @if (PuedeGestionar)
+        {
+            <button class="btn btn-ghost btn-sm" type="button" @onclick="() => _nuevo = !_nuevo">
+                @(_nuevo ? "Cancelar" : "Nuevo perfil")
+            </button>
+        }
     </div>
     <p class="muted">Cómo se reparte un gasto entre los adultos; con «cuenta común» el gasto no se reparte ni genera deuda. Cada categoría puede llevar uno por defecto. Cambiar un perfil no modifica los gastos ya registrados.</p>
 
@@ -34,7 +37,7 @@
                 </span>
             </button>
             <div class="pbody">
-                @if (_abierto == perfil.Id)
+                @if (_abierto == perfil.Id && PuedeGestionar)
                 {
                     <EditorPerfil Perfil="perfil" Miembros="Miembros" OnGuardado="AlGuardar" OnEliminado="AlGuardar" />
                 }
@@ -51,6 +54,9 @@
 @code {
     /// <summary>Perfiles del hogar con su detalle.</summary>
     [Parameter] public List<PerfilRepartoDto> Perfiles { get; set; } = [];
+
+    /// <summary>Si quien mira puede crear, editar y borrar perfiles (permiso <c>perfiles.gestionar</c>); si no, solo los consulta.</summary>
+    [Parameter] public bool PuedeGestionar { get; set; } = true;
 
     /// <summary>Miembros activos del hogar (los adultos reparten; todos dan color al avatar).</summary>
     [Parameter] public List<MiembroDto> Miembros { get; set; } = [];

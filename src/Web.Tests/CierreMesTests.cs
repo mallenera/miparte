@@ -9,7 +9,7 @@ using MiParte.Web.Hogares;
 
 namespace MiParte.Web.Tests;
 
-public class CierreMesTests : TestContext
+public class CierreMesTests : BunitContext
 {
     // Mes de 2020: siempre terminado, sin depender de la fecha actual.
     private static readonly DateOnly Marzo = new(2020, 3, 1);
@@ -17,8 +17,11 @@ public class CierreMesTests : TestContext
 
     private void Registrar(ApiFalsa api)
     {
-        Services.AddSingleton(new CoreApiClient(new HttpClient(api) { BaseAddress = new Uri("http://localhost:5001/") }));
-        Services.AddSingleton(new EstadoHogar(new AlmacenMemoria()));
+        var cliente = new CoreApiClient(new HttpClient(api) { BaseAddress = new Uri("http://localhost:5001/") });
+        var hogar = new EstadoHogar(new AlmacenMemoria());
+        Services.AddSingleton(cliente);
+        Services.AddSingleton(hogar);
+        PermisosDePrueba.Registrar(Services, cliente, hogar);
         Services.AddSingleton<ServicioAvisos>();
     }
 
@@ -29,8 +32,8 @@ public class CierreMesTests : TestContext
         Registrar(api);
         var cambios = 0;
 
-        var c = RenderComponent<TarjetaCierreMes>(p => p
-            .Add(x => x.Mes, Marzo).Add(x => x.EsAdmin, false)
+        var c = Render<TarjetaCierreMes>(p => p
+            .Add(x => x.Mes, Marzo).Add(x => x.PuedeReabrir, false)
             .Add(x => x.Cambiado, () => cambios++));
         c.FindAll("button").First(b => b.TextContent.Trim() == "Cerrar mes").Click();
         Assert.DoesNotContain("POST /api/cierres-mes", api.Recibidas); // pide confirmación antes
@@ -46,7 +49,7 @@ public class CierreMesTests : TestContext
         var api = new ApiFalsa().Responde("DELETE /api/cierres-mes/2020-03", HttpStatusCode.NoContent);
         Registrar(api);
 
-        var c = RenderComponent<TarjetaCierreMes>(p => p.Add(x => x.Mes, Marzo).Add(x => x.EsAdmin, true).Add(x => x.Cierre, Cierre));
+        var c = Render<TarjetaCierreMes>(p => p.Add(x => x.Mes, Marzo).Add(x => x.PuedeReabrir, true).Add(x => x.Cierre, Cierre));
         Assert.Contains("Cerrado", c.Markup);
         c.FindAll("button").First(b => b.TextContent.Trim() == "Reabrir mes").Click();
         c.FindAll("button").First(b => b.TextContent.Contains("Sí, reabrir")).Click();
@@ -59,10 +62,10 @@ public class CierreMesTests : TestContext
     {
         Registrar(new ApiFalsa());
 
-        var abierto = RenderComponent<TarjetaCierreMes>(p => p.Add(x => x.Mes, Marzo).Add(x => x.EsAdmin, false));
+        var abierto = Render<TarjetaCierreMes>(p => p.Add(x => x.Mes, Marzo).Add(x => x.PuedeReabrir, false));
         Assert.Contains(abierto.FindAll("button"), b => b.TextContent.Trim() == "Cerrar mes");
 
-        var cerrado = RenderComponent<TarjetaCierreMes>(p => p.Add(x => x.Mes, Marzo).Add(x => x.EsAdmin, false).Add(x => x.Cierre, Cierre));
+        var cerrado = Render<TarjetaCierreMes>(p => p.Add(x => x.Mes, Marzo).Add(x => x.PuedeReabrir, false).Add(x => x.Cierre, Cierre));
         Assert.Empty(cerrado.FindAll("button"));
         Assert.Contains("administrador", cerrado.Markup);
     }
@@ -73,8 +76,8 @@ public class CierreMesTests : TestContext
         Registrar(new ApiFalsa());
         var proximo = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1));
 
-        var c = RenderComponent<TarjetaCierreMes>(p => p
-            .Add(x => x.Mes, new DateOnly(proximo.Year, proximo.Month, 1)).Add(x => x.EsAdmin, true));
+        var c = Render<TarjetaCierreMes>(p => p
+            .Add(x => x.Mes, new DateOnly(proximo.Year, proximo.Month, 1)).Add(x => x.PuedeReabrir, true));
 
         Assert.Empty(c.FindAll("button"));
         Assert.Contains("ya ha terminado", c.Markup);
@@ -86,7 +89,7 @@ public class CierreMesTests : TestContext
         var api = new ApiFalsa().Error("POST /api/cierres-mes", HttpStatusCode.Conflict, "Ese mes ya está cerrado.");
         Registrar(api);
 
-        var c = RenderComponent<TarjetaCierreMes>(p => p.Add(x => x.Mes, Marzo).Add(x => x.EsAdmin, false));
+        var c = Render<TarjetaCierreMes>(p => p.Add(x => x.Mes, Marzo).Add(x => x.PuedeReabrir, false));
         c.FindAll("button").First(b => b.TextContent.Trim() == "Cerrar mes").Click();
         c.FindAll("button").First(b => b.TextContent.Contains("Sí, cerrar")).Click();
 
@@ -109,7 +112,7 @@ public class CierreMesTests : TestContext
             .Responde("GET /api/cierres-mes", HttpStatusCode.OK, new[] { new MesCerradoDto($"{hoy:yyyy-MM}", DateTimeOffset.UtcNow, "Ana") });
         Registrar(api);
 
-        var c = RenderComponent<VistaGastos>();
+        var c = Render<VistaGastos>();
 
         Assert.Contains("cerrado", c.Markup);
         Assert.DoesNotContain(c.FindAll("button"), b => b.TextContent.Trim() is "Editar" or "Eliminar");

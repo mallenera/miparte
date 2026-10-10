@@ -26,9 +26,9 @@ public sealed partial class ServidorDemo
     private readonly List<ReembolsoCuentaDto> _reembolsos = [];
     private readonly List<PagoLiquidacionDto> _pagos = [];
     private readonly List<MesCerradoDto> _cierres = [];
-    private readonly HogarResumen _hogar = new(IdHogar, "Casa de Ana y Marcos");
+    private HogarResumen _hogar => new(IdHogar, "Casa de Ana y Marcos", _cuentaActiva, _ahorroActivo);
     private readonly DateOnly _hoy;
-    private bool _cuentaActiva = true;
+    private bool _cuentaActiva = true, _ahorroActivo = true;
 
     /// <summary>Crea el servidor con el hogar de ejemplo, fechado respecto a hoy.</summary>
     /// <param name="reloj">Reloj para situar los gastos de ejemplo en el mes actual y el anterior.</param>
@@ -57,6 +57,7 @@ public sealed partial class ServidorDemo
         return (ruta[1], ruta.Length, peticion.Method.Method) switch
         {
             ("yo", 2, "GET") => Ok(new YoResponse(CuentaDemo.IdUsuarioLocal, [_hogar], _hogar)),
+            ("hogar", 2, "DELETE") => Mal(HttpStatusCode.Conflict, "En el modo demo no se puede eliminar el hogar."),
             ("hogares", 2, "POST") => Mal(HttpStatusCode.Conflict, "En el modo demo no se pueden crear hogares."),
             ("invitaciones", 3, "POST") when subruta == "aceptar" => Mal(HttpStatusCode.Conflict, "En el modo demo no se pueden aceptar invitaciones."),
 
@@ -94,6 +95,7 @@ public sealed partial class ServidorDemo
             ("auditoria", 2, "GET") => Ok(new List<EventoAuditoriaDto>()),
 
             ("cuenta-comun", 2, "GET") => EstadoCuentaComun(mes),
+            ("cuenta-comun", 4, "PUT") when subruta == "ahorro" && ruta[3] == "activacion" => ActivarAhorro((await Cuerpo<ActivarAhorroRequest>())!),
             ("cuenta-comun", 3, "PUT") when subruta == "activacion" => Activar((await Cuerpo<ActivarCuentaComunRequest>())!),
             ("cuenta-comun", 3, "PUT") when subruta == "aportaciones" => FijarAportacion((await Cuerpo<FijarAportacionRequest>())!),
             ("cuenta-comun", 3, "POST") when subruta == "reembolsos" => CrearReembolso((await Cuerpo<CrearReembolsoRequest>())!),
@@ -115,7 +117,19 @@ public sealed partial class ServidorDemo
 
     // ───── Miembros e invitaciones ─────
 
-    private static MiembroDto ADto(MiembroDemo m) => new(m.Id, m.Nombre, m.Tipo, m.ResponsableId, m.Activo, m.Rol, m.Vinculado, m.EsYo);
+    /// <summary>Permisos efectivos de un miembro de la demo, con las mismas reglas que Core.Api (plantilla del rol o lista propia).</summary>
+    private static IReadOnlySet<string> Efectivos(MiembroDemo m, string? rol = null, List<string>? propios = null, bool usarPropios = false)
+        => CatalogoPermisos.Efectivos(new Miembro
+        {
+            Tipo = m.Tipo == "adulto" ? TipoMiembro.Adulto : TipoMiembro.ACargo,
+            UserId = m.Vinculado ? Guid.Empty : null,
+            Rol = (rol ?? m.Rol) == "admin" ? RolMiembro.Admin : RolMiembro.Miembro,
+            Permisos = usarPropios ? propios : m.Permisos,
+        });
+
+    private static MiembroDto ADto(MiembroDemo m) => new(
+        m.Id, m.Nombre, m.Tipo, m.ResponsableId, m.Activo, m.Rol, m.Vinculado, m.EsYo,
+        CatalogoPermisos.Todos.Select(p => p.Clave).Where(Efectivos(m).Contains).ToList());
 
     private HttpResponseMessage CrearMiembro(CrearMiembroRequest r)
     {
@@ -156,8 +170,23 @@ public sealed partial class ServidorDemo
             if (!EsAdultoActivo(responsable)) return Mal("El responsable debe ser un adulto activo del hogar.");
         }
 
+        List<string>? permisos = null;
+        if (r.Permisos is not null)
+        {
+            if (r.Permisos.FirstOrDefault(p => !CatalogoPermisos.Existe(p)) is { } desconocido) return Mal($"El permiso «{desconocido}» no existe.");
+            if (m.Tipo != "adulto" || !m.Vinculado) return Mal(HttpStatusCode.Conflict, "Solo un adulto con cuenta tiene permisos propios.");
+            permisos = r.Permisos.ToList();
+        }
+
         var activo = r.Activo ?? m.Activo;
         var rol = r.Rol ?? m.Rol;
+        // Al cambiar de rol sin indicar permisos propios, el miembro vuelve a la plantilla de su rol nuevo.
+        var propios = permisos ?? (r.Rol is not null && r.Rol != m.Rol ? null : m.Permisos);
+        // Siempre debe quedar alguien activo, con cuenta, que pueda cambiar permisos.
+        if (m.Activo && Efectivos(m).Contains(CatalogoPermisos.PermisosGestionar)
+            && !(activo && Efectivos(m, rol, propios, usarPropios: true).Contains(CatalogoPermisos.PermisosGestionar))
+            && !_miembros.Any(x => x.Id != m.Id && x.Activo && Efectivos(x).Contains(CatalogoPermisos.PermisosGestionar)))
+            return Mal(HttpStatusCode.Conflict, "El hogar debe conservar al menos un miembro que pueda cambiar los permisos.");
         // El hogar siempre conserva un administrador activo y vinculado.
         if (m.Rol == "admin" && m.Activo && m.Vinculado && (!activo || rol != "admin")
             && !_miembros.Any(x => x.Id != m.Id && x.Rol == "admin" && x.Activo && x.Vinculado))
@@ -168,6 +197,7 @@ public sealed partial class ServidorDemo
         if (nombre is not null) m.Nombre = nombre;
         m.Activo = activo;
         m.Rol = rol;
+        m.Permisos = propios;
         if (r.ResponsableId is not null) m.ResponsableId = r.ResponsableId;
         return Ok(ADto(m));
     }
@@ -536,14 +566,21 @@ public sealed partial class ServidorDemo
             e.Pendientes.Select(p => new PendienteCuentaDto(p.MiembroId, Nombre(p.MiembroId), p.Importe)).ToList(), e.Efectivo,
             _aportaciones.OrderBy(a => a.MiembroId).ThenBy(a => a.Desde).ToList(),
             _reembolsos.Where(r => r.Fecha >= inicio && r.Fecha < fin).OrderBy(r => r.Fecha).ThenBy(r => r.Id).ToList(),
-            Activa: _cuentaActiva,
+            Activa: _cuentaActiva, AhorroActivo: _ahorroActivo,
             Partes: partes.Select(p => new PartePersonaDto(
                 p.MiembroId, Nombre(p.MiembroId), p.Aportado, p.Ahorrado, p.PorcentajeGastos, p.PorcentajeAhorro,
                 p.ParteSaldo, p.ParteAhorro, p.Pendiente)).ToList()));
     }
 
     private HttpResponseMessage CuentaInactiva() =>
-        Mal(HttpStatusCode.Conflict, "La cuenta común no está activada en este hogar. Un administrador puede activarla en la pestaña Cuenta común.");
+        Mal(HttpStatusCode.Conflict, "La cuenta común no está activada en este hogar. Un administrador puede activarla en la configuración del hogar.");
+
+    private HttpResponseMessage ActivarAhorro(ActivarAhorroRequest r)
+    {
+        if (!_cuentaActiva) return CuentaInactiva();
+        _ahorroActivo = r.Activo;
+        return Ok(new { activo = _ahorroActivo });
+    }
 
     private HttpResponseMessage Activar(ActivarCuentaComunRequest r)
     {
@@ -751,6 +788,7 @@ public sealed partial class ServidorDemo
         public string Rol { get; set; } = "miembro";
         public bool Vinculado { get; init; }
         public bool EsYo { get; init; }
+        public List<string>? Permisos { get; set; }
     }
 
     private sealed class PerfilDemo

@@ -4,6 +4,7 @@
 @inject EstadoHogar Hogar
 @inject ServicioAvisos Avisos
 @inject TimeProvider Reloj
+@inject ServicioPermisos Permisos
 
 <h1 class="sr">Gastos recurrentes de @Hogar.HogarActual?.Nombre</h1>
 
@@ -31,7 +32,7 @@ else
         </div>
         <p class="muted">Crea el gasto de cada plantilla activa que aún no lo tenga en el mes. Se puede repetir sin duplicar gastos.</p>
         <div class="actions u-mt10">
-            <button class="btn" id="generar" type="button" disabled="@(_generando || _plantillas.All(p => !p.Activo))" @onclick="GenerarAsync">Generar gastos de @NombreMes</button>
+            <button class="btn" id="generar" type="button" disabled="@(_generando || !Permisos.Tiene(Claves.RecurrentesGestionar) || _plantillas.All(p => !p.Activo))" @onclick="GenerarAsync">Generar gastos de @NombreMes</button>
         </div>
         @if (_resultado is not null)
         {
@@ -77,7 +78,7 @@ else
                             <button class="linkbtn danger" type="button" disabled="@_guardando" @onclick="() => EliminarAsync(p)">Sí</button>
                             <button class="linkbtn" type="button" @onclick="() => _confirmandoEliminar = null">No</button>
                         }
-                        else
+                        else if (Permisos.Tiene(Claves.RecurrentesGestionar))
                         {
                             <button class="linkbtn" type="button" aria-label="Editar @NombrePlantilla(p)" @onclick="() => EmpezarEdicion(p)">Editar</button>
                             <button class="linkbtn" type="button" disabled="@_guardando" aria-label="@(p.Activo ? "Pausar" : "Reanudar") @NombrePlantilla(p)" @onclick="() => AlternarActivaAsync(p)">@(p.Activo ? "Pausar" : "Reanudar")</button>
@@ -96,6 +97,10 @@ else
         @if (_adultos.Count == 0 || _categorias.Count == 0 || _perfiles.Count == 0)
         {
             <div class="aviso warn u-mt14">Para crear plantillas hace falta al menos un adulto, una categoría y un perfil de reparto.</div>
+        }
+        else if (!Permisos.Tiene(Claves.RecurrentesGestionar))
+        {
+            <div class="aviso warn u-mt14" role="status">No tienes permiso para gestionar los gastos recurrentes. Pídeselo a un administrador del hogar.</div>
         }
         else
         {
@@ -182,6 +187,7 @@ else
     {
         _cargando = true;
         _errorCarga = null;
+        await Permisos.AsegurarAsync();
         try
         {
             var miembros = Api.ListarMiembrosAsync();

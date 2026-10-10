@@ -1,3 +1,5 @@
+using MiParte.Core.Domain;
+using MiParte.Core.Api.Seguridad;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -8,7 +10,7 @@ using MiParte.Core.Infrastructure.Persistencia;
 
 namespace MiParte.Core.Api.Auditoria;
 
-/// <summary>Historial de cambios del hogar. Solo lectura y solo para admins: los eventos los escribe la propia API al guardar.</summary>
+/// <summary>Historial de cambios del hogar. Solo lectura y solo con el permiso <c>historial.ver</c> (los admins lo tienen siempre): los eventos los escribe la propia API al guardar.</summary>
 public static class AuditoriaEndpoints
 {
     /// <summary>Eventos devueltos por defecto en una página.</summary>
@@ -17,10 +19,10 @@ public static class AuditoriaEndpoints
     /// <summary>Máximo de eventos por página.</summary>
     private const int LimiteMaximo = 200;
 
-    /// <summary>Registra GET /api/auditoria; requiere autorización y rol admin.</summary>
+    /// <summary>Registra GET /api/auditoria; requiere autorización y el permiso <c>historial.ver</c>.</summary>
     public static IEndpointRouteBuilder MapAuditoria(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/auditoria", ListarAsync).RequireAuthorization();
+        app.MapGet("/api/auditoria", ListarAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.HistorialVer);
         return app;
     }
 
@@ -28,7 +30,7 @@ public static class AuditoriaEndpoints
     /// GET /api/auditoria?entidad=&amp;entidadId=&amp;limite=&amp;hasta=&amp;despuesDeId=: eventos del hogar de más reciente a más
     /// antiguo (empates por id). Se pagina con un cursor compuesto: <c>hasta</c> y <c>despuesDeId</c> son el <c>cuando</c> y el
     /// <c>id</c> del último evento recibido. Solo con el instante se perderían los eventos de un mismo guardado, que
-    /// comparten <c>cuando</c>. 403 si no es admin; 400 si el límite no es 1-200; 409 sin hogar.
+    /// comparten <c>cuando</c>. 403 sin el permiso <c>historial.ver</c>; 400 si el límite no es 1-200; 409 sin hogar.
     /// </summary>
     private static async Task<IResult> ListarAsync(
         HttpContext ctx, [FromQuery] string? entidad, [FromQuery] Guid? entidadId, [FromQuery] int? limite,
@@ -36,10 +38,7 @@ public static class AuditoriaEndpoints
         [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
-        if (!Guid.TryParse(ctx.User.FindFirst("sub")?.Value, out var userId)) return Results.Unauthorized();
-        var yo = await db.Miembros.FirstOrDefaultAsync(m => m.UserId == userId && m.Activo, ct);
-        if (yo is null || yo.Rol != RolMiembro.Admin)
-            return Results.Json(new { error = "Solo un administrador puede ver el historial." }, statusCode: StatusCodes.Status403Forbidden);
+
 
         var n = limite ?? LimitePorDefecto;
         if (n is < 1 or > LimiteMaximo) return ApiComun.Invalido($"El límite debe estar entre 1 y {LimiteMaximo}.");

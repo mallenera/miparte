@@ -9,7 +9,7 @@ using MiParte.Web.Componentes;
 
 namespace MiParte.Web.Tests;
 
-public class HistorialTests : TestContext
+public class HistorialTests : BunitContext
 {
     private static readonly Guid AnaId = Guid.NewGuid(), LuisId = Guid.NewGuid();
     private static readonly List<MiembroDto> Miembros =
@@ -32,7 +32,7 @@ public class HistorialTests : TestContext
         return api;
     }
 
-    private IRenderedComponent<PanelHistorial> Panel() => RenderComponent<PanelHistorial>();
+    private IRenderedComponent<PanelHistorial> Panel() => Render<PanelHistorial>();
 
     [Fact]
     public void Frase_describe_la_accion_y_el_nombre()
@@ -43,6 +43,16 @@ public class HistorialTests : TestContext
         Assert.Equal("aceptó una invitación", TextoAuditoria.Frase(Evento("usar", "invitacion", null, null)));
     }
 
+
+    [Fact]
+    public void Cambios_de_permisos_se_muestran_con_el_texto_del_catalogo()
+    {
+        var e = Evento("editar", "miembro", """{"permisos":["gastos.crear"]}""", """{"permisos":["gastos.crear","historial.ver"]}""");
+
+        var cambios = TextoAuditoria.Cambios(e, _ => null);
+
+        Assert.Contains(new CambioAuditoria("Permisos", "Crear gastos", "Crear gastos, Ver el historial de cambios"), cambios);
+    }
     [Fact]
     public void Cambios_muestra_antes_y_despues_oculta_ids_internos_y_resuelve_miembros()
     {

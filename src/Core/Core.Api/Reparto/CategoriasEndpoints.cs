@@ -1,3 +1,5 @@
+using MiParte.Core.Domain;
+using MiParte.Core.Api.Seguridad;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MiParte.Contracts;
@@ -17,9 +19,9 @@ public static class CategoriasEndpoints
     public static IEndpointRouteBuilder MapCategorias(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/categorias", ListarAsync).RequireAuthorization();
-        app.MapPost("/api/categorias", CrearAsync).RequireAuthorization();
-        app.MapPut("/api/categorias/{id:guid}", ActualizarAsync).RequireAuthorization();
-        app.MapDelete("/api/categorias/{id:guid}", EliminarAsync).RequireAuthorization();
+        app.MapPost("/api/categorias", CrearAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CategoriasGestionar);
+        app.MapPut("/api/categorias/{id:guid}", ActualizarAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CategoriasGestionar);
+        app.MapDelete("/api/categorias/{id:guid}", EliminarAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CategoriasGestionar);
         return app;
     }
 

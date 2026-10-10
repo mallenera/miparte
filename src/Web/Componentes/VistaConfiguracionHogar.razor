@@ -1,10 +1,13 @@
-@* Pestaña Hogar: miembros, invitaciones y perfiles de reparto del hogar actual. *@
+@* Configuración del hogar (menú del hogar): funciones activadas, miembros, invitaciones y perfiles de reparto del hogar actual. *@
 @inject CoreApiClient Api
 @inject EstadoHogar Hogar
 @inject ServicioAvisos Avisos
+@inject ServicioPermisos Permisos
 @inject IJSRuntime JS
+@inject ServicioArranque Arranque
+@inject NavigationManager Navegacion
 
-<h1 class="sr">Hogar @Hogar.HogarActual?.Nombre</h1>
+<h1 class="sr">Configuración de @Hogar.HogarActual?.Nombre</h1>
 
 @if (_cargando)
 {
@@ -19,6 +22,36 @@ else if (_errorCarga is not null)
 }
 else
 {
+    <section class="card" aria-labelledby="t-funciones">
+        <div class="card-head"><h2 id="t-funciones">Funciones del hogar</h2></div>
+        <p class="muted">Elige qué partes de la aplicación usa este hogar. Desactivar una función no borra sus datos: solo bloquea nuevos movimientos hasta volver a activarla.</p>
+        @if (_errorFunciones is not null)
+        {
+            <div class="aviso err u-mt12" role="alert">@_errorFunciones</div>
+        }
+        <div class="u-mt12">
+            <label class="chk">
+                <input type="checkbox" @key="ClaveCuenta" checked="@CuentaComunActiva" disabled="@(!PuedeFunciones || _guardandoFunciones)"
+                       @onchange="e => CambiarCuentaComunAsync((bool)e.Value!)" />
+                Habilitar cuenta común
+            </label>
+            <p class="muted">Un fondo del hogar al que cada adulto aporta una cantidad fija al mes, para pagar gastos sin repartirlos y reembolsar a quien adelanta dinero.</p>
+        </div>
+        <div class="u-mt12">
+            <label class="chk">
+                <input type="checkbox" @key="ClaveAhorro" checked="@(CuentaComunActiva && AhorroActivo)"
+                       disabled="@(!PuedeFunciones || !CuentaComunActiva || _guardandoFunciones)"
+                       @onchange="e => CambiarAhorroAsync((bool)e.Value!)" />
+                Activar ahorro
+            </label>
+            <p class="muted">@(CuentaComunActiva ? "Parte de las aportaciones que se aparta, con ingresos, retiradas y gastos pagados desde el ahorro." : "Necesita la cuenta común habilitada.")</p>
+        </div>
+        @if (!PuedeFunciones)
+        {
+            <p class="muted u-mt12">No tienes permiso para cambiar estas funciones. Pídeselo a un administrador del hogar.</p>
+        }
+    </section>
+
     <div class="cols-even">
         <section class="card" aria-labelledby="t-miembros">
             <div class="card-head">
@@ -68,23 +101,23 @@ else
                                 }
                                 else
                                 {
-                                    @if (EsAdmin || miembro.EsYo)
+                                    @if (PuedeMiembros || miembro.EsYo)
                                     {
                                         <button class="linkbtn" type="button" aria-label="Renombrar a @miembro.Nombre"
                                                 @onclick="() => EmpezarRenombrar(miembro)">Renombrar</button>
                                     }
-                                    @if (EsAdmin && miembro.Tipo == "adulto" && miembro.Vinculado && !miembro.EsYo)
+                                    @if (PuedePermisos && miembro.Tipo == "adulto" && miembro.Vinculado && !miembro.EsYo)
                                     {
                                         <button class="linkbtn" type="button" @onclick="() => CambiarRolAsync(miembro)">
                                             @(miembro.Rol == "admin" ? "Quitar admin" : "Hacer admin")
                                         </button>
                                     }
-                                    @if (EsAdmin && miembro.Tipo == "adulto" && !miembro.Vinculado)
+                                    @if (PuedeInvitar && miembro.Tipo == "adulto" && !miembro.Vinculado)
                                     {
                                         <button class="linkbtn" type="button" aria-label="Invitar a @miembro.Nombre"
                                                 @onclick="() => InvitarAsync(miembro.Id)">Invitar</button>
                                     }
-                                    @if (EsAdmin && !miembro.EsYo)
+                                    @if (PuedeMiembros && !miembro.EsYo)
                                     {
                                         <button class="linkbtn danger" type="button" aria-label="Desactivar a @miembro.Nombre"
                                                 @onclick="() => _confirmandoDesactivar = miembro.Id">Desactivar</button>
@@ -96,7 +129,7 @@ else
                 }
             </div>
 
-            @if (EsAdmin)
+            @if (PuedeMiembros)
             {
                 <form class="addm" @onsubmit="AnadirMiembroAsync">
                     <label>Nombre
@@ -125,7 +158,7 @@ else
             }
             else
             {
-                <p class="muted u-mt14">Solo un administrador puede añadir o desactivar miembros.</p>
+                <p class="muted u-mt14">No tienes permiso para añadir o desactivar miembros.</p>
             }
         </section>
 
@@ -150,24 +183,47 @@ else
                     </div>
                 }
                 <div class="actions">
-                    <button class="btn btn-orange" type="button" disabled="@(!EsAdmin || _creandoInvitacion)" @onclick="() => InvitarAsync(null)">
+                    <button class="btn btn-orange" type="button" disabled="@(!PuedeInvitar || _creandoInvitacion)" @onclick="() => InvitarAsync(null)">
                         @(_invitacion is null ? "Invitar miembro" : "Generar otro código")
                     </button>
-                    @if (!EsAdmin)
+                    @if (!PuedeInvitar)
                     {
-                        <span class="muted">Solo un administrador puede invitar.</span>
+                        <span class="muted">No tienes permiso para invitar.</span>
                     }
                 </div>
             </section>
         </div>
     </div>
 
-    <PanelPerfiles Perfiles="_perfiles" Miembros="_miembros" OnCambiado="CargarSinParpadeoAsync" />
+    <PanelPerfiles Perfiles="_perfiles" Miembros="_miembros" PuedeGestionar="Permisos.Tiene(Claves.PerfilesGestionar)" OnCambiado="CargarSinParpadeoAsync" />
 
-    @if (EsAdmin)
-    {
-        <PanelHistorial />
-    }
+    <PanelPermisos Miembros="_miembros" Puede="PuedePermisos" OnCambiado="CargarSinParpadeoAsync" />
+
+    <section class="card peligro" aria-labelledby="t-eliminar">
+        <div class="card-head"><h2 id="t-eliminar">Eliminar hogar</h2></div>
+        <div class="aviso err" role="alert">
+            <b>Esta acción es irreversible.</b> Eliminar «@Hogar.HogarActual?.Nombre» borra de forma definitiva el hogar y todos sus datos:
+            miembros, gastos y recurrentes, cuenta común y ahorro, cierres de mes, categorías, perfiles de reparto, invitaciones y el
+            historial de cambios. No se puede deshacer ni recuperar, y todas las personas del hogar perderán el acceso.
+        </div>
+        @if (_errorEliminar is not null)
+        {
+            <div class="aviso err u-mt12" role="alert">@_errorEliminar</div>
+        }
+        @if (!PuedeEliminar)
+        {
+            <p class="muted u-mt12">No tienes permiso para eliminar el hogar. Pídeselo a un administrador del hogar.</p>
+        }
+        else
+        {
+            <form class="addm" @onsubmit="EliminarHogarAsync" @onsubmit:preventDefault>
+                <label>Para confirmarlo, escribe el nombre del hogar: <b>@Hogar.HogarActual?.Nombre</b>
+                    <input id="confirmar-eliminar" autocomplete="off" maxlength="100" @bind="_confirmarNombre" @bind:event="oninput" />
+                </label>
+                <button class="btn btn-danger" type="submit" disabled="@(!NombreCoincide || _eliminando)">Eliminar hogar definitivamente</button>
+            </form>
+        }
+    </section>
 }
 
 @code {
@@ -183,9 +239,65 @@ else
 
     private InvitacionCreada? _invitacion;
     private string? _invitacionPara;
+
+    private string _confirmarNombre = "";
+    private string? _errorEliminar;
+    private bool _eliminando;
     private bool _creandoInvitacion;
 
-    private bool EsAdmin => _miembros.FirstOrDefault(m => m.EsYo)?.Rol == "admin";
+    private string? _errorFunciones;
+    private bool _guardandoFunciones;
+
+    // Cambia tras cada intento para recrear las casillas: si la API rechaza el cambio, el navegador no debe quedarse con la marca que puso la persona.
+    private int _versionFunciones;
+
+    private string ClaveCuenta => $"cuenta-{_versionFunciones}";
+
+    private string ClaveAhorro => $"ahorro-{_versionFunciones}";
+
+    private bool PuedeMiembros => Permisos.Tiene(Claves.MiembrosGestionar);
+
+    private bool PuedeInvitar => Permisos.Tiene(Claves.InvitacionesCrear);
+
+    private bool PuedeFunciones => Permisos.Tiene(Claves.HogarFunciones);
+
+    private bool PuedePermisos => Permisos.Tiene(Claves.PermisosGestionar);
+
+    private bool PuedeEliminar => Permisos.Tiene(Claves.HogarEliminar);
+
+    private bool NombreCoincide => _confirmarNombre.Trim() == Hogar.HogarActual?.Nombre;
+
+    /// <summary>Elimina el hogar actual (la API verifica permiso y nombre) y lleva al usuario a donde le corresponda sin él.</summary>
+    private async Task EliminarHogarAsync()
+    {
+        if (!NombreCoincide || Hogar.HogarActual is not { } actual) return;
+        _errorEliminar = null;
+        _eliminando = true;
+        try
+        {
+            await Api.EliminarHogarAsync(actual.Nombre);
+            Avisos.Mostrar($"Hogar «{actual.Nombre}» eliminado");
+            var destino = await Arranque.CargarAsync();
+            Navegacion.NavigateTo(destino switch
+            {
+                DestinoArranque.SinHogar => "sin-hogar",
+                DestinoArranque.ElegirHogar => "elegir-hogar",
+                _ => "",
+            }, replace: true);
+        }
+        catch (ApiException e)
+        {
+            _errorEliminar = e.Message;
+        }
+        finally
+        {
+            _eliminando = false;
+        }
+    }
+
+    private bool CuentaComunActiva => Hogar.HogarActual?.CuentaComunActiva ?? false;
+
+    private bool AhorroActivo => Hogar.HogarActual?.AhorroActivo ?? false;
 
     private IEnumerable<MiembroDto> Adultos => _miembros.Where(m => m.Tipo == "adulto" && m.Activo);
 
@@ -209,11 +321,44 @@ else
             var perfiles = Api.ListarPerfilesAsync();
             await Task.WhenAll(miembros, perfiles);
             _miembros = miembros.Result;
+            Permisos.Establecer(_miembros);
             _perfiles = perfiles.Result;
         }
         catch (ApiException e)
         {
             _errorCarga = e.Message;
+        }
+    }
+
+    private Task CambiarCuentaComunAsync(bool activa) =>
+        EjecutarFuncionAsync(
+            () => Api.ActivarCuentaComunAsync(activa), activa, AhorroActivo,
+            activa ? "Cuenta común habilitada" : "Cuenta común deshabilitada");
+
+    private Task CambiarAhorroAsync(bool activo) =>
+        EjecutarFuncionAsync(
+            () => Api.ActivarAhorroAsync(activo), CuentaComunActiva, activo,
+            activo ? "Ahorro activado" : "Ahorro desactivado");
+
+    /// <summary>Aplica un cambio de funciones del hogar y, si la API lo acepta, lo refleja en el estado compartido (menú y pestañas).</summary>
+    private async Task EjecutarFuncionAsync(Func<Task> accion, bool cuentaComun, bool ahorro, string aviso)
+    {
+        _errorFunciones = null;
+        _guardandoFunciones = true;
+        try
+        {
+            await accion();
+            Hogar.ActualizarFunciones(cuentaComun, ahorro);
+            Avisos.Mostrar(aviso);
+        }
+        catch (ApiException e)
+        {
+            _errorFunciones = e.Message;
+        }
+        finally
+        {
+            _guardandoFunciones = false;
+            _versionFunciones++;
         }
     }
 

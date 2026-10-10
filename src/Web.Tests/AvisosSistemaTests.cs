@@ -8,7 +8,7 @@ using MiParte.Web.Componentes;
 namespace MiParte.Web.Tests;
 
 /// <summary>Reintentos ante un servidor caído, aviso de versión nueva y pie de página.</summary>
-public class AvisosSistemaTests : TestContext
+public class AvisosSistemaTests : BunitContext
 {
     private static readonly TimeSpan[] SinEspera = [TimeSpan.Zero, TimeSpan.Zero];
 
@@ -114,7 +114,7 @@ public class AvisosSistemaTests : TestContext
     {
         var conexion = new ServicioConexion();
         Services.AddSingleton(conexion);
-        var cut = RenderComponent<AvisoConexion>();
+        var cut = Render<AvisoConexion>();
         Assert.Empty(cut.FindAll(".aviso"));
 
         conexion.Empezar();
@@ -127,7 +127,7 @@ public class AvisosSistemaTests : TestContext
     private IRenderedComponent<AvisoActualizacion> RenderizarAvisoActualizacion(out DotNetObjectReference<AvisoActualizacion> referencia)
     {
         JSInterop.SetupVoid("miparteActualizacion.suscribir", _ => true).SetVoidResult();
-        var cut = RenderComponent<AvisoActualizacion>();
+        var cut = Render<AvisoActualizacion>();
         referencia = (DotNetObjectReference<AvisoActualizacion>)JSInterop.Invocations["miparteActualizacion.suscribir"].Single().Arguments[0]!;
         return cut;
     }
@@ -173,7 +173,7 @@ public class AvisosSistemaTests : TestContext
     [Fact]
     public void El_pie_muestra_copyright_y_fecha_de_actualizacion()
     {
-        var cut = RenderComponent<PiePagina>(p => p.Add(c => c.Fecha, new DateOnly(2026, 10, 8)));
+        var cut = Render<PiePagina>(p => p.Add(c => c.Fecha, new DateOnly(2026, 10, 8)));
 
         Assert.Contains("© 2026 Mi parte, tu parte", cut.Markup);
         Assert.Equal("8 de octubre de 2026", cut.Find("time").TextContent);

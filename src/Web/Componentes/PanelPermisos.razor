@@ -1,0 +1,182 @@
+@* Permisos del hogar: matriz de lo que puede hacer cada perfil y, para quien puede cambiar permisos, los checks de cada adulto con cuenta (admins incluidos), con plantillas para asignar rápido. La API es quien los aplica. *@
+@inject CoreApiClient Api
+@inject ServicioAvisos Avisos
+
+<section class="card" aria-labelledby="t-permisos">
+    <div class="card-head"><h2 id="t-permisos">Permisos</h2></div>
+    <p class="muted">Cada adulto con cuenta tiene los permisos que se le asignen, también los admins. Sin asignación propia, un admin los tiene todos y un miembro los de la columna «Miembro». La tabla resume esas plantillas.</p>
+
+    <div class="matriz-wrap">
+        <table class="matriz">
+            <caption class="sr">Permisos por perfil</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Permiso</th>
+                    <th scope="col">Admin</th>
+                    <th scope="col">Miembro</th>
+                    <th scope="col">Adulto sin cuenta</th>
+                    <th scope="col">A cargo</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var grupo in Grupos)
+                {
+                    <tr class="grupo"><th scope="colgroup" colspan="5">@grupo.Key</th></tr>
+                    @foreach (var p in grupo)
+                    {
+                        <tr>
+                            <th scope="row">@p.Etiqueta</th>
+                            <td><Marca Si="true" /></td>
+                            <td><Marca Si="p.PorDefecto" /></td>
+                            <td><Marca Si="false" /></td>
+                            <td><Marca Si="false" /></td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+    <p class="muted u-mt12">«Adulto sin cuenta» y «A cargo» no entran en la aplicación: solo participan en el reparto y los pagos. Siempre debe quedar alguien con el permiso de cambiar permisos.</p>
+
+    <h3 class="u-sec">Por miembro</h3>
+    @if (_error is not null)
+    {
+        <div class="aviso err" role="alert">@_error</div>
+    }
+    <div class="mlist">
+        @foreach (var m in Miembros.Where(m => m.Tipo == "adulto" && m.Activo && m.Vinculado))
+        {
+            var miembro = m;
+            var total = miembro.Permisos?.Count ?? 0;
+            <div class="mrow">
+                <Avatar Nombre="@miembro.Nombre" Color="@ColorMiembro.De(miembro.Id, Miembros)" Tamano="lg" />
+                <div class="mname">
+                    <strong>@miembro.Nombre</strong>
+                    @if (miembro.EsYo) { <span class="tag cur">Tú</span> }
+                    @if (miembro.Rol == "admin") { <span class="tag admin">Admin</span> }
+                </div>
+                <div class="mmeta">
+                    <span>@(total == Claves.Todos.Count ? "Todos los permisos" : $"{total} de {Claves.Todos.Count} permisos")</span>
+                </div>
+                <div class="macc">
+                    @if (Puede)
+                    {
+                        <button class="linkbtn" type="button" aria-expanded="@((_abierto == miembro.Id).ToString().ToLowerInvariant())"
+                                aria-label="Permisos de @miembro.Nombre" @onclick="() => Alternar(miembro)">
+                            @(_abierto == miembro.Id ? "Cerrar" : "Permisos")
+                        </button>
+                    }
+                </div>
+                @if (_abierto == miembro.Id)
+                {
+                    <div class="permisos">
+                        <div class="plantillas" role="group" aria-label="Plantillas de permisos">
+                            <span class="muted">Plantilla:</span>
+                            @foreach (var plantilla in Claves.Plantillas)
+                            {
+                                var p = plantilla;
+                                <button class="btn btn-ghost btn-sm" type="button" title="@p.Descripcion" disabled="@_guardando" @onclick="() => Aplicar(p.Claves)">@p.Nombre</button>
+                            }
+                            <button class="linkbtn" type="button" disabled="@_guardando" @onclick="() => Aplicar(Claves.Todos.Select(x => x.Clave))">Marcar todo</button>
+                            <button class="linkbtn" type="button" disabled="@_guardando" @onclick="() => Aplicar([])">Desmarcar todo</button>
+                        </div>
+                        @foreach (var grupo in Grupos)
+                        {
+                            <fieldset class="permisos-grupo">
+                                <legend>@grupo.Key</legend>
+                                @foreach (var p in grupo)
+                                {
+                                    var clave = p.Clave;
+                                    <label class="chk">
+                                        <input type="checkbox" @key="@(clave + _version)" checked="@_borrador.Contains(clave)" disabled="@_guardando"
+                                               @onchange="e => Marcar(clave, (bool)e.Value!)" />
+                                        @p.Etiqueta
+                                    </label>
+                                }
+                            </fieldset>
+                        }
+                        @if (miembro.EsYo && !_borrador.Contains(Claves.PermisosGestionar))
+                        {
+                            <div class="aviso warn u-mt12" role="status">Te quitas a ti mismo el permiso de cambiar permisos: después otra persona tendrá que devolvértelo.</div>
+                        }
+                        <div class="actions">
+                            <button class="btn btn-sm" type="button" disabled="@_guardando" @onclick="() => GuardarAsync(miembro)">Guardar permisos</button>
+                            <button class="linkbtn" type="button" @onclick="() => _abierto = null">Cancelar</button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+    @if (!Puede)
+    {
+        <p class="muted u-mt12">No tienes permiso para cambiar los permisos. Pídeselo a un administrador del hogar.</p>
+    }
+</section>
+
+@code {
+    private readonly HashSet<string> _borrador = [];
+    private Guid? _abierto;
+    private bool _guardando;
+    private string? _error;
+
+    // Cambia al aplicar una plantilla para recrear las casillas: el navegador no debe quedarse con marcas que ya no coinciden con el borrador.
+    private int _version;
+
+    private static IEnumerable<IGrouping<string, MiParte.Core.Domain.Permiso>> Grupos => Claves.Todos.GroupBy(p => p.Grupo);
+
+    /// <summary>Miembros del hogar con sus permisos efectivos.</summary>
+    [Parameter] public List<MiembroDto> Miembros { get; set; } = [];
+
+    /// <summary>Si quien mira puede cambiar permisos (permiso <c>permisos.gestionar</c>).</summary>
+    [Parameter] public bool Puede { get; set; }
+
+    /// <summary>Se invoca tras guardar, para que la vista recargue los miembros.</summary>
+    [Parameter] public EventCallback OnCambiado { get; set; }
+
+    private void Alternar(MiembroDto m)
+    {
+        _error = null;
+        if (_abierto == m.Id)
+        {
+            _abierto = null;
+            return;
+        }
+        _abierto = m.Id;
+        Aplicar(m.Permisos ?? []);
+    }
+
+    private void Aplicar(IEnumerable<string> claves)
+    {
+        _borrador.Clear();
+        foreach (var clave in claves) _borrador.Add(clave);
+        _version++;
+    }
+
+    private void Marcar(string clave, bool marcado)
+    {
+        if (marcado) _borrador.Add(clave);
+        else _borrador.Remove(clave);
+    }
+
+    private async Task GuardarAsync(MiembroDto m)
+    {
+        _error = null;
+        _guardando = true;
+        try
+        {
+            await Api.ActualizarMiembroAsync(m.Id, new ActualizarMiembroRequest(Permisos: Claves.Todos.Select(p => p.Clave).Where(_borrador.Contains).ToList()));
+            _abierto = null;
+            Avisos.Mostrar($"Permisos de {m.Nombre} guardados");
+            await OnCambiado.InvokeAsync();
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+        finally
+        {
+            _guardando = false;
+        }
+    }
+}

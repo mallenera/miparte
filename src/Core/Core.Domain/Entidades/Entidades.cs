@@ -20,6 +20,8 @@ public class Hogar
     public DateTimeOffset CreadoEn { get; set; }
     /// <summary>Si el hogar usa la cuenta común (aportaciones, saldo, reembolsos y ahorro); la activa un admin.</summary>
     public bool CuentaComunActiva { get; set; }
+    /// <summary>Si el hogar usa el ahorro de la cuenta común (aportaciones con ahorro, depósitos, retiradas y gastos desde el ahorro); solo tiene efecto con la cuenta común activada.</summary>
+    public bool AhorroActivo { get; set; }
 }
 
 /// <summary>Persona del hogar que participa en gastos e ingresos; puede o no tener usuario asociado.</summary>
@@ -37,6 +39,8 @@ public class Miembro
     public Guid? ResponsableId { get; set; }
     /// <summary>Usuario de Supabase Auth vinculado (claim sub del JWT); null si aún no ha aceptado invitación.</summary>
     public Guid? UserId { get; set; }
+    /// <summary>Claves de <see cref="CatalogoPermisos"/> asignadas al miembro; null = sigue la plantilla de su rol (admin todos, miembro los de por defecto).</summary>
+    public List<string>? Permisos { get; set; }
     /// <summary>Indica si el miembro está activo en el hogar.</summary>
     public bool Activo { get; set; } = true;
     /// <summary>Rol dentro del hogar (por defecto, miembro).</summary>

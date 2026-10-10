@@ -41,6 +41,7 @@ public static class TextoAuditoria
         ["tipo"] = "Tipo", ["modo"] = "Modo", ["notas"] = "Notas", ["pagadoPor"] = "Pagado por", ["miembroId"] = "Miembro",
         ["responsableId"] = "Responsable", ["repartos"] = "Reparto", ["detalle"] = "Detalle", ["ahorro"] = "Ahorro",
         ["aCargoCuentaComun"] = "A cargo de la cuenta común", ["pagadoDesdeAhorro"] = "Pagado desde el ahorro",
+        ["permisos"] = "Permisos", ["cuentaComunActiva"] = "Cuenta común activada", ["ahorroActivo"] = "Ahorro activado",
     };
 
     /// <summary>Frase del evento sin el autor: «creó un gasto "Compra"», «borró una categoría»…</summary>
@@ -104,6 +105,14 @@ public static class TextoAuditoria
         return char.ToUpperInvariant(texto[0]) + texto[1..];
     }
 
+    /// <summary>Permisos de un miembro con el texto del catálogo («Crear gastos, Editar gastos»); «ninguno» si no tiene.</summary>
+    private static string Permisos(JsonElement lista)
+    {
+        var etiquetas = lista.EnumerateArray().Select(e => e.GetString() is { } clave
+            ? MiParte.Core.Domain.CatalogoPermisos.Todos.FirstOrDefault(p => p.Clave == clave)?.Etiqueta ?? clave : "").Where(t => t.Length > 0).ToList();
+        return etiquetas.Count == 0 ? "ninguno" : string.Join(", ", etiquetas);
+    }
+
     /// <summary>
     /// Reparto de un gasto o detalle de un perfil: «Ana 60, Luis 40». Cualquier otra lista se resume por su número de líneas.
     /// </summary>
@@ -134,6 +143,7 @@ public static class TextoAuditoria
             case JsonValueKind.True: return "Sí";
             case JsonValueKind.False: return "No";
             case JsonValueKind.Number: return v.GetDecimal().ToString("0.##", Es);
+            case JsonValueKind.Array when clave == "permisos": return Permisos(v);
             case JsonValueKind.Array: return Lineas(v, miembro);
             case JsonValueKind.Object: return "…";
             default:

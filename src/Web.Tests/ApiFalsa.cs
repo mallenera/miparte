@@ -53,6 +53,12 @@ internal sealed class ApiFalsa : HttpMessageHandler
     }
 
     public static MiembroDto Miembro(string nombre, string rol = "miembro", bool esYo = false, bool vinculado = true,
-        string tipo = "adulto", Guid? responsable = null, Guid? id = null) =>
-        new(id ?? Guid.NewGuid(), nombre, tipo, responsable, true, rol, vinculado, esYo);
+        string tipo = "adulto", Guid? responsable = null, Guid? id = null, IReadOnlyList<string>? permisos = null) =>
+        new(id ?? Guid.NewGuid(), nombre, tipo, responsable, true, rol, vinculado, esYo, permisos ?? Efectivos(rol, vinculado, tipo));
+
+    /// <summary>Permisos que devolvería la API a un miembro sin lista propia: la plantilla de su rol, o ninguno si no entra en la aplicación.</summary>
+    private static IReadOnlyList<string> Efectivos(string rol, bool vinculado, string tipo) =>
+        tipo != "adulto" || !vinculado ? [] : rol == "admin"
+            ? MiParte.Core.Domain.CatalogoPermisos.Todos.Select(p => p.Clave).ToList()
+            : MiParte.Core.Domain.CatalogoPermisos.PorDefecto;
 }

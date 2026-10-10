@@ -11,7 +11,7 @@ using MiParte.Web.Hogares;
 
 namespace MiParte.Web.Tests;
 
-public class AsistenteTests : TestContext
+public class AsistenteTests : BunitContext
 {
     private static readonly HogarResumen Casa = new(Guid.NewGuid(), "Casa");
 
@@ -36,7 +36,7 @@ public class AsistenteTests : TestContext
     {
         Registrar(new ApiFalsa(), urlAsistente: "");
 
-        var c = RenderComponent<VistaAsistente>();
+        var c = Render<VistaAsistente>();
 
         Assert.Contains("no está configurado", c.Markup);
         Assert.Empty(c.FindAll("form.chatform"));
@@ -48,7 +48,7 @@ public class AsistenteTests : TestContext
         var api = new ApiFalsa().Responde("POST /api/chat", HttpStatusCode.OK,
             new ChatResponse("En junio gastasteis 80 €.", ["gasto_total"]));
         Registrar(api);
-        var c = RenderComponent<VistaAsistente>();
+        var c = Render<VistaAsistente>();
 
         c.Find("#pregunta").Input("¿Cuánto gasté en junio?");
         c.Find("form.chatform").Submit();
@@ -66,7 +66,7 @@ public class AsistenteTests : TestContext
     {
         var api = new ApiFalsa().Responde("POST /api/chat", HttpStatusCode.OK, new ChatResponse("Respuesta uno.", []));
         Registrar(api);
-        var c = RenderComponent<VistaAsistente>();
+        var c = Render<VistaAsistente>();
         c.Find("#pregunta").Input("Primera");
         c.Find("form.chatform").Submit();
 
@@ -85,7 +85,7 @@ public class AsistenteTests : TestContext
     {
         var api = new ApiFalsa().Error("POST /api/chat", HttpStatusCode.ServiceUnavailable, "El asistente no está disponible ahora mismo.");
         Registrar(api);
-        var c = RenderComponent<VistaAsistente>();
+        var c = Render<VistaAsistente>();
 
         c.Find("#pregunta").Input("Hola");
         c.Find("form.chatform").Submit();
@@ -101,7 +101,7 @@ public class AsistenteTests : TestContext
         var api = new ApiFalsa().Responde("POST /api/chat", HttpStatusCode.OK,
             new ChatResponse("<img src=x onerror=alert(1)> <script>alert(2)</script>", []));
         Registrar(api);
-        var c = RenderComponent<VistaAsistente>();
+        var c = Render<VistaAsistente>();
 
         c.Find("#pregunta").Input("xss");
         c.Find("form.chatform").Submit();
@@ -116,7 +116,7 @@ public class AsistenteTests : TestContext
     {
         var api = new ApiFalsa().Responde("POST /api/chat", HttpStatusCode.OK, new ChatResponse("Ok.", []));
         Registrar(api);
-        var c = RenderComponent<VistaAsistente>();
+        var c = Render<VistaAsistente>();
 
         c.FindAll(".sugerencias button")[0].Click();
 
@@ -128,7 +128,7 @@ public class AsistenteTests : TestContext
     {
         var api = new ApiFalsa().Responde("POST /api/chat", HttpStatusCode.OK, new ChatResponse("Ok.", []));
         Registrar(api);
-        var c = RenderComponent<VistaAsistente>();
+        var c = Render<VistaAsistente>();
         c.Find("#pregunta").Input("Hola");
         c.Find("form.chatform").Submit();
 

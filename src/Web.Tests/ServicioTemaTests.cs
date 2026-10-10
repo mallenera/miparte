@@ -8,7 +8,7 @@ public class ServicioTemaTests
     /// <summary>Crea el servicio con un almacén en memoria y un JS simulado.</summary>
     private static (ServicioTema servicio, AlmacenMemoria almacen, BunitJSInterop js) Crear()
     {
-        var contexto = new TestContext();
+        var contexto = new BunitContext();
         var almacen = new AlmacenMemoria();
         return (new ServicioTema(almacen, contexto.JSInterop.JSRuntime), almacen, contexto.JSInterop);
     }

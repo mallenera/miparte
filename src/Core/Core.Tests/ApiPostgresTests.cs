@@ -129,6 +129,8 @@ public class ApiPostgresTests
         Assert.True((await Leer<List<CategoriaDto>>(await c.GetAsync("/api/categorias"))).Single(x => x.Id == cat.Id).ACargoCuentaComun);
 
         var ana = (await Leer<List<MiembroDto>>(await c.GetAsync("/api/miembros"))).Single();
+        Assert.Equal(HttpStatusCode.Conflict, (await c.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(ana.Id, new DateOnly(2027, 1, 1), 300m, 50m))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await c.PutAsJsonAsync("/api/cuenta-comun/ahorro/activacion", new ActivarAhorroRequest(true))).StatusCode);
         var aport = await c.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(ana.Id, new DateOnly(2027, 1, 1), 300m, 50m));
         Assert.Equal(HttpStatusCode.OK, aport.StatusCode);
         var resumen = await Leer<ResumenMensualResponse>(await c.GetAsync("/api/resumen?mes=2027-01"));
@@ -155,6 +157,39 @@ public class ApiPostgresTests
         var lista = await Leer<List<HogarResumen>>(await e.Cliente(user).GetAsync("/api/hogares"));
         Assert.Equal([h1.Id, h2.Id], lista.Select(h => h.Id)); // la API ordena por nombre: "Casa A", "Casa B"
         Assert.Equal(HttpStatusCode.OK, (await e.Cliente(user).GetAsync($"/api/hogares/{h1.Id}")).StatusCode);
+    }
+
+    [SkippableFact]
+    public async Task EliminarHogar_BorraEnCascadaTodosSusDatos_EnPostgres()
+    {
+        Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
+        await using var e = new Entorno();
+        var user = await e.CrearUsuarioAsync();
+        var hogar = await CrearHogar(e.Cliente(user), "Casa a borrar", "Ana");
+        var otro = await CrearHogar(e.Cliente(user), "Casa que se queda", "Ana");
+        var c = e.Cliente(user, hogar.Id);
+
+        var ana = (await Leer<List<MiembroDto>>(await c.GetAsync("/api/miembros"))).Single();
+        var perfil = (await Leer<List<PerfilRepartoDto>>(await c.GetAsync("/api/perfiles"))).Single(p => p.Modo == "partes");
+        var categoria = (await Leer<List<CategoriaDto>>(await c.GetAsync("/api/categorias"))).Single(x => x.Nombre == "Alimentación");
+        await Leer<GastoResponse>(await c.PostAsJsonAsync("/api/gastos",
+            new GastoRequest(new DateOnly(2020, 3, 3), 20m, categoria.Id, ana.Id, perfil.Id, "Compra")), HttpStatusCode.Created);
+        // Un mes cerrado con gastos y el historial (solo de añadir) no deben impedir el borrado en cascada.
+        Assert.Equal(HttpStatusCode.Created, (await c.PostAsJsonAsync("/api/cierres-mes", new CerrarMesRequest("2020-03"))).StatusCode);
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.DeleteAsync("/api/hogar?nombre=otro")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await c.DeleteAsync("/api/hogar?nombre=Casa a borrar")).StatusCode);
+
+        var lista = await Leer<List<HogarResumen>>(await e.Cliente(user).GetAsync("/api/hogares"));
+        Assert.Equal([otro.Id], lista.Select(h => h.Id));
+        await using var conn = new NpgsqlConnection(Cadena);
+        await conn.OpenAsync();
+        foreach (var tabla in new[] { "miembro", "gasto", "gasto_reparto", "categoria", "perfil_reparto", "mes_cerrado", "auditoria" })
+        {
+            await using var cmd = new NpgsqlCommand($"select count(*) from public.{tabla} where hogar_id = @h", conn);
+            cmd.Parameters.AddWithValue("h", hogar.Id);
+            Assert.Equal(0L, await cmd.ExecuteScalarAsync());
+        }
     }
 
     [SkippableFact]

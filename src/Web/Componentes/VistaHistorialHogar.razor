@@ -1,0 +1,31 @@
+@* Historial del hogar (menú del hogar): lo ve quien tiene el permiso historial.ver (un admin siempre); el resto recibe una explicación en vez de un error de la API. *@
+@inject ServicioPermisos Permisos
+@inject EstadoHogar Hogar
+
+<h1 class="sr">Historial de @Hogar.HogarActual?.Nombre</h1>
+
+@if (_cargando)
+{
+    <div class="spinbox" role="status"><div class="spin"></div><span>Cargando el historial…</span></div>
+}
+else if (!Permisos.Tiene(Claves.HistorialVer))
+{
+    <section class="card" aria-labelledby="t-historial-admin">
+        <div class="card-head"><h2 id="t-historial-admin">Historial de cambios</h2></div>
+        <div class="aviso warn" role="status">No tienes permiso para ver el historial de cambios. Pídeselo a un administrador del hogar.</div>
+    </section>
+}
+else
+{
+    <PanelHistorial />
+}
+
+@code {
+    private bool _cargando = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Permisos.AsegurarAsync();
+        _cargando = false;
+    }
+}

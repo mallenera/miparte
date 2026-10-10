@@ -25,11 +25,11 @@
             <div class="aviso ok" role="status">
                 @if (_desdeUrl)
                 {
-                    <text>Escribe el código que te enviamos a <strong>@_modelo.Email.Trim()</strong>. Si no lo tienes, pide uno nuevo.</text>
+                    <text>Escribe el código de 8 dígitos que te enviamos a <strong>@_modelo.Email.Trim()</strong>. Si no lo tienes, pide uno nuevo.</text>
                 }
                 else
                 {
-                    <text>Te hemos enviado un código a <strong>@_modelo.Email.Trim()</strong>. Escríbelo para confirmar tu cuenta.</text>
+                    <text>Te hemos enviado un código de 8 dígitos a <strong>@_modelo.Email.Trim()</strong>. Escríbelo para confirmar tu cuenta.</text>
                 }
             </div>
             <EditForm Model="_verificacion" OnValidSubmit="VerificarAsync">
@@ -193,7 +193,7 @@
     private sealed class Verificacion
     {
         [Required(ErrorMessage = "Escribe el código.")]
-        [RegularExpression(@"^\s*\d{6,8}\s*$", ErrorMessage = "El código tiene entre 6 y 8 dígitos.")]
+        [RegularExpression(@"^\s*\d{8}\s*$", ErrorMessage = "El código tiene 8 dígitos.")]
         public string Codigo { get; set; } = "";
     }
 

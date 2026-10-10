@@ -40,8 +40,8 @@ enable_signup = true
 [auth.email]
 enable_signup = true
 enable_confirmations = true
-# Código de 6 dígitos que el usuario escribe en la web para confirmar la cuenta
-otp_length = 6
+# Código de 8 dígitos que el usuario escribe en la web para confirmar la cuenta
+otp_length = 8
 otp_expiry = 3600
 max_frequency = "60s"
 

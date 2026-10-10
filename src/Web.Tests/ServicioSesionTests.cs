@@ -103,7 +103,7 @@ public class ServicioSesionTests
     {
         var (servicio, almacen, _) = Crear(ManejadorFalso.Json(HttpStatusCode.OK, Token("a1", "r1")));
 
-        await servicio.VerificarCodigoAsync("a@b.com", "123456");
+        await servicio.VerificarCodigoAsync("a@b.com", "12345678");
 
         Assert.Equal("a1", servicio.SesionActual!.AccessToken);
         Assert.True(almacen.Datos.ContainsKey("miparte.sesion"));

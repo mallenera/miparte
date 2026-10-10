@@ -821,3 +821,8 @@ section.card + section.card { margin-top: 24px; }
 .dn-click.sel { stroke-width: 7.5; }
 .gr-sel { stroke: var(--wine); stroke-width: 1.5; stroke-dasharray: 4 3; }
 .kpi-val.kpi-texto { font-size: 1.15rem; overflow-wrap: break-word; }
+
+/* Gastos: con un gasto en edición el formulario sube sobre la lista y el selector de periodo se presenta como pestañas. */
+.gastos-cuerpo { display: flex; flex-direction: column; }
+.gastos-cuerpo > .editando { order: -1; margin-bottom: 14px; }
+.modo { display: flex; gap: 6px; flex-wrap: wrap; }

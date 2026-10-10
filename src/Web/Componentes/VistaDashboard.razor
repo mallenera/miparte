@@ -221,7 +221,10 @@ else if (_r is not null && _rCat is not null && _rMiembro is not null && _rSerie
         </div>
 
         <section class="card" aria-labelledby="t-mayores">
-            <div class="card-head"><h2 id="t-mayores">Mayores gastos</h2></div>
+            <div class="card-head">
+                <h2 id="t-mayores">Mayores gastos</h2>
+                <a class="btn" href="@UrlGastos" id="ver-gastos"><Icono Nombre="receipt" Tamano="16" />Ver y editar todos los gastos@(HayFiltros ? " de la selección" : "")</a>
+            </div>
             @foreach (var g in _r.Mayores)
             {
                 <div class="gastorow">
@@ -284,7 +287,20 @@ else if (_r is not null && _rCat is not null && _rMiembro is not null && _rSerie
 
     private bool HayFiltros => _filtro.Activo || _tramo is not null;
 
-    private bool HayMiembroElegido => _filtro.Miembro is not null || _filtro.CuentaComun;
+    /// <summary>Enlace a Gastos con la selección actual (periodo o tramo, categoría y persona) para ver la lista completa y editarla.</summary>
+    private string UrlGastos
+    {
+        get
+        {
+            var (desde, hasta) = _tramo is { } t ? (t.Inicio, t.Fin) : (_desde, _hasta);
+            var url = $"gastos?desde={desde.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}&hasta={hasta.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}";
+            if (_filtro.Categoria is { } c) url += $"&categoria={c}";
+            if (_filtro.Miembro is { } m) url += $"&miembro={m}";
+            return url;
+        }
+    }
+
+    private bool HayMiembroElegido =>_filtro.Miembro is not null || _filtro.CuentaComun;
 
     private int Dias => AnalisisGastos.Dias(_r?.Desde ?? _desde, _r?.Hasta ?? _hasta);
 

@@ -4,5 +4,16 @@
 <PageTitle>Gastos · Mi parte, tu parte</PageTitle>
 
 <RequiereHogar>
-    <VistaGastos />
+    <VistaGastos CategoriaInicial="Categoria" MiembroInicial="Miembro" DesdeInicial="Desde" HastaInicial="Hasta" />
 </RequiereHogar>
+
+@code {
+    // Los enlaces del Dashboard abren la lista ya filtrada: /gastos?categoria=…&miembro=…&desde=YYYY-MM-DD&hasta=YYYY-MM-DD.
+    [SupplyParameterFromQuery(Name = "categoria")] private Guid? Categoria { get; set; }
+
+    [SupplyParameterFromQuery(Name = "miembro")] private Guid? Miembro { get; set; }
+
+    [SupplyParameterFromQuery(Name = "desde")] private DateOnly? Desde { get; set; }
+
+    [SupplyParameterFromQuery(Name = "hasta")] private DateOnly? Hasta { get; set; }
+}

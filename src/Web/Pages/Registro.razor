@@ -82,7 +82,7 @@
 
             <BotonGoogle Deshabilitado="@(_enviando || !Opciones.EstaConfigurada)" Texto="Registrarse con Google" />
 
-            <p class="muted">¿Ya tienes cuenta? <a href="login">Inicia sesión</a></p>
+            <p class="muted">¿Ya tienes cuenta? <a href="@InvitacionPendiente.ConFragmento("login", _tokenUrl)">Inicia sesión</a></p>
         }
     </div>
 </div>
@@ -95,8 +95,12 @@
     /// <summary>Correo con la cuenta pendiente de confirmar (llega desde el login); abre directamente el paso del código.</summary>
     [SupplyParameterFromQuery(Name = "email")] private string? EmailPendiente { get; set; }
 
+    /// <summary>Código de invitación en el fragmento: alternativa al almacén cuando el navegador no permite guardarlo.</summary>
+    private string? _tokenUrl;
+
     protected override void OnInitialized()
     {
+        _tokenUrl = InvitacionPendiente.ExtraerToken(Navegacion.Uri);
         if (!string.IsNullOrWhiteSpace(EmailPendiente))
         {
             _modelo.Email = EmailPendiente.Trim();
@@ -123,7 +127,7 @@
         _error = null;
         try
         {
-            if (await Sesion.RegistrarAsync(_modelo.Email.Trim(), _modelo.Password)) Navegacion.NavigateTo(await InvitacionPendiente.DestinoTrasAccesoAsync(Almacen), replace: true);
+            if (await Sesion.RegistrarAsync(_modelo.Email.Trim(), _modelo.Password)) Navegacion.NavigateTo(await InvitacionPendiente.DestinoTrasAccesoAsync(Almacen, _tokenUrl), replace: true);
             else _pendienteConfirmar = true;
         }
         catch (AuthException e)
@@ -147,7 +151,7 @@
         try
         {
             await Sesion.VerificarCodigoAsync(_modelo.Email.Trim(), _verificacion.Codigo.Trim());
-            Navegacion.NavigateTo(await InvitacionPendiente.DestinoTrasAccesoAsync(Almacen), replace: true);
+            Navegacion.NavigateTo(await InvitacionPendiente.DestinoTrasAccesoAsync(Almacen, _tokenUrl), replace: true);
         }
         catch (AuthException e)
         {

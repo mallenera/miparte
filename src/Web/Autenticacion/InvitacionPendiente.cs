@@ -45,8 +45,21 @@ public static class InvitacionPendiente
     /// <param name="almacen">Almacén del navegador.</param>
     public static Task DescartarAsync(IAlmacenLocal almacen) => almacen.EliminarAsync(Clave);
 
-    /// <summary>Destino tras iniciar sesión: la página de unirse si hay una invitación pendiente, la raíz si no.</summary>
+    /// <summary>Añade el código como fragmento a una ruta relativa, o la devuelve igual si no hay código.</summary>
+    /// <param name="ruta">Ruta relativa (por ejemplo <c>login</c>).</param>
+    /// <param name="token">Código de la invitación, o null.</param>
+    public static string ConFragmento(string ruta, string? token) =>
+        token is null ? ruta : $"{ruta}#{Parametro}{Uri.EscapeDataString(token)}";
+
+    /// <summary>
+    /// Destino tras iniciar sesión: la página de unirse si hay una invitación pendiente, la raíz si no. El código de la
+    /// URL tiene prioridad sobre el almacén y se reenvía en el fragmento, porque sin almacenamiento del navegador es la única copia.
+    /// </summary>
     /// <param name="almacen">Almacén del navegador.</param>
-    public static async Task<string> DestinoTrasAccesoAsync(IAlmacenLocal almacen) =>
-        await LeerAsync(almacen) is null ? "" : Ruta;
+    /// <param name="tokenDeLaUrl">Código leído del fragmento de la página actual, o null.</param>
+    public static async Task<string> DestinoTrasAccesoAsync(IAlmacenLocal almacen, string? tokenDeLaUrl = null)
+    {
+        if (tokenDeLaUrl is not null) return ConFragmento(Ruta, tokenDeLaUrl);
+        return await LeerAsync(almacen) is null ? "" : Ruta;
+    }
 }

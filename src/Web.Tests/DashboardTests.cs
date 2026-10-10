@@ -145,6 +145,25 @@ public class DashboardTests : BunitContext
         Assert.Equal(30m, r.PorMiembro.First(m => m.MiembroId == AnaId).Asumido);
     }
 
+    [Fact]
+    public void Filtrar_por_categoria_de_primer_nivel_incluye_sus_subcategorias_y_por_quien_paga()
+    {
+        var desde = new DateOnly(2026, 10, 1);
+        var gastos = new[]
+        {
+            Gasto(desde, 40m, Super, AnaId),
+            Gasto(desde, 10m, Comida, LuisId),
+            Gasto(desde, 30m, Ocio, AnaId),
+            Gasto(desde, 5m, Ocio, null),
+        };
+
+        Assert.Equal(50m, AnalisisGastos.Filtrar(gastos, [Comida, Super, Ocio], new FiltroAnalisis(Categoria: Comida.Id)).Sum(g => g.Importe));
+        Assert.Equal(70m, AnalisisGastos.Filtrar(gastos, [Comida, Super, Ocio], new FiltroAnalisis(Miembro: AnaId)).Sum(g => g.Importe));
+        Assert.Equal(5m, AnalisisGastos.Filtrar(gastos, [Comida, Super, Ocio], new FiltroAnalisis(CuentaComun: true)).Sum(g => g.Importe));
+        Assert.Equal(30m, AnalisisGastos.Filtrar(gastos, [Comida, Super, Ocio], new FiltroAnalisis(Categoria: Ocio.Id, Miembro: AnaId)).Sum(g => g.Importe));
+        Assert.Equal(4, AnalisisGastos.Filtrar(gastos, [Comida, Super, Ocio], new FiltroAnalisis()).Count);
+    }
+
     // ───── Componente ─────
 
     private ApiFalsa Registrar(IReadOnlyList<GastoResponse> gastos)
@@ -234,6 +253,80 @@ public class DashboardTests : BunitContext
 
         Assert.Contains("no puede ser posterior", c.Find("[role=alert]").TextContent);
         Assert.Equal(antes, api.Consultas.Count);
+    }
+
+    private static readonly GastoResponse[] Datos =
+    [
+        Gasto(new DateOnly(2026, 9, 28), 100m, Ocio, AnaId, concepto: "Cine"),
+        Gasto(new DateOnly(2026, 10, 2), 60m, Super, AnaId, concepto: "Compra"),
+        Gasto(new DateOnly(2026, 10, 5), 140m, Ocio, LuisId, concepto: "Concierto"),
+    ];
+
+    private static string Total(IRenderedComponent<VistaDashboard> c) => c.Find("#kpi-total").TextContent;
+
+    [Fact]
+    public void Pinchar_una_categoria_recalcula_los_indicadores_y_conserva_el_resto_de_categorias()
+    {
+        Registrar(Datos);
+        var c = Render<VistaDashboard>();
+
+        c.FindAll("button.dash-click").First(b => b.TextContent.Contains("Ocio")).Click();
+
+        Assert.Contains("140,00", Total(c));
+        Assert.Contains("Ocio", c.Find("#kpi-categoria").TextContent);
+        Assert.Contains("Categoría: Ocio", c.Find(".dash-filtros").TextContent);
+        Assert.Equal("true", c.FindAll("button.dash-click").First(b => b.TextContent.Contains("Ocio")).GetAttribute("aria-pressed"));
+        Assert.Contains(c.FindAll("button.dash-click"), b => b.TextContent.Contains("Comida")); // la lista no pierde categorías
+        Assert.Single(c.FindAll("button.dash-click.sel"), b => b.TextContent.Contains("Ocio"));
+
+        c.FindAll("button.dash-click").First(b => b.TextContent.Contains("Ocio")).Click(); // segunda pulsación: quita el filtro
+        Assert.Contains("200,00", Total(c));
+        Assert.Empty(c.FindAll(".dash-filtros"));
+    }
+
+    [Fact]
+    public void Pinchar_una_persona_filtra_por_quien_paga_y_se_combina_con_la_categoria()
+    {
+        Registrar(Datos);
+        var c = Render<VistaDashboard>();
+
+        c.FindAll("button.dash-miembro").First(b => b.TextContent.Contains("Ana")).Click();
+        Assert.Contains("60,00", Total(c)); // lo que pagó Ana este periodo
+        Assert.Contains(c.FindAll("button.dash-click"), b => b.TextContent.Contains("Comida"));
+
+        c.FindAll("button.dash-click").First(b => b.TextContent.Contains("Comida")).Click();
+
+        Assert.Contains("60,00", Total(c));
+        Assert.Contains("Comida", c.Find(".dash-filtros").TextContent);
+        Assert.Contains("Ana", c.Find(".dash-filtros").TextContent);
+    }
+
+    [Fact]
+    public void Pinchar_un_punto_de_la_evolucion_limita_los_indicadores_a_ese_dia()
+    {
+        Registrar(Datos);
+        var c = Render<VistaDashboard>();
+
+        c.FindAll("circle.gr-hit").First(p => p.GetAttribute("aria-label")!.StartsWith("2 oct 2026")).Click();
+
+        Assert.Contains("60,00", Total(c));
+        Assert.Contains("Fechas:", c.Find(".dash-filtros").TextContent);
+        Assert.Equal(7, c.FindAll("circle.gr-hit").Count); // la gráfica sigue mostrando todo el periodo
+    }
+
+    [Fact]
+    public void Quitar_todos_los_filtros_y_cambiar_de_periodo_limpian_la_seleccion()
+    {
+        Registrar(Datos);
+        var c = Render<VistaDashboard>();
+        c.FindAll("button.dash-click").First(b => b.TextContent.Contains("Ocio")).Click();
+
+        c.FindAll(".dash-filtros button").First(b => b.TextContent == "Quitar todos").Click();
+        Assert.Contains("200,00", Total(c));
+
+        c.FindAll("button.dash-click").First(b => b.TextContent.Contains("Ocio")).Click();
+        c.FindAll("button.chip-btn").First(b => b.TextContent == "Este mes").Click();
+        Assert.Empty(c.FindAll(".dash-filtros"));
     }
 
     // ───── Servidor demo ─────

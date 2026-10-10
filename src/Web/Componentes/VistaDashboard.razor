@@ -1,4 +1,5 @@
-@* Pestaña Dashboard: indicadores y gráficos del gasto del hogar entre dos fechas, comparado con el periodo anterior de igual duración. *@
+@* Pestaña Dashboard: indicadores y gráficos del gasto del hogar entre dos fechas, comparado con el periodo anterior de igual duración.
+   Es interactivo como un cuadro de mando: pinchar una categoría, una persona o un tramo de la gráfica filtra el resto de elementos. *@
 @using System.Globalization
 @using MiParte.Web.Reparto
 @inject CoreApiClient Api
@@ -41,9 +42,37 @@ else if (_errorCarga is not null)
         <button class="linkbtn" type="button" @onclick="CargarAsync">Reintentar</button>
     </div>
 }
-else if (_r is not null)
+else if (_r is not null && _rCat is not null && _rMiembro is not null && _rSerie is not null && _base is not null)
 {
-    <section class="kpis" aria-label="Indicadores clave del periodo @Periodo">
+    @if (HayFiltros)
+    {
+        <div class="dash-filtros" role="group" aria-label="Filtros activos">
+            <span class="muted">Filtrando por:</span>
+            @if (_filtro.Categoria is { } cat)
+            {
+                <button class="chip chip-btn sel" type="button" aria-label="Quitar el filtro de categoría @NombreCategoriaRaiz(cat)" @onclick="() => ElegirCategoria(cat)">Categoría: @NombreCategoriaRaiz(cat) <Icono Nombre="x" Tamano="14" /></button>
+            }
+            @if (_filtro.Miembro is { } mie)
+            {
+                <button class="chip chip-btn sel" type="button" aria-label="Quitar el filtro de persona @NombreMiembro(mie)" @onclick="() => ElegirMiembro(mie)">Paga: @NombreMiembro(mie) <Icono Nombre="x" Tamano="14" /></button>
+            }
+            @if (_filtro.CuentaComun)
+            {
+                <button class="chip chip-btn sel" type="button" aria-label="Quitar el filtro de cuenta común" @onclick="() => ElegirMiembro(null)">Paga: cuenta común o ahorro <Icono Nombre="x" Tamano="14" /></button>
+            }
+            @if (_tramo is { } tr)
+            {
+                <button class="chip chip-btn sel" type="button" aria-label="Quitar el filtro de fechas" @onclick="() => ElegirTramo(tr)">Fechas: @EtiquetaTramo(tr) <Icono Nombre="x" Tamano="14" /></button>
+            }
+            <button class="linkbtn" type="button" @onclick="QuitarFiltros">Quitar todos</button>
+        </div>
+    }
+    else if (_base.NumeroGastos > 0)
+    {
+        <p class="muted u-mt12">Pincha en una categoría, una persona o un punto de la gráfica para filtrar el resto.</p>
+    }
+
+    <section class="kpis" aria-label="Indicadores clave del periodo @Periodo" aria-live="polite">
         <article class="kpi">
             <span class="kpi-lab">Gasto total</span>
             <b class="kpi-val" id="kpi-total">@Euros(_r.Total)</b>
@@ -54,7 +83,7 @@ else if (_r is not null)
             @if (_r.Variacion is { } v)
             {
                 <b class="kpi-val @(v > 0 ? "sube" : v < 0 ? "baja" : "")" id="kpi-variacion">@(v > 0 ? "▲ +" : v < 0 ? "▼ −" : "")@Math.Abs(v).ToString("P1", Es)</b>
-                <span class="kpi-sub">@(v > 0 ? "Gastáis más" : v < 0 ? "Gastáis menos" : "Igual") que los @AnteriorDias días previos (@Euros(_r.TotalAnterior))</span>
+                <span class="kpi-sub">@(v > 0 ? "Gastáis más" : v < 0 ? "Gastáis menos" : "Igual") que los @Dias @(Dias == 1 ? "día previo" : "días previos") (@Euros(_r.TotalAnterior))</span>
             }
             else
             {
@@ -77,7 +106,7 @@ else if (_r is not null)
             else
             {
                 <b class="kpi-val" id="kpi-categoria">—</b>
-                <span class="kpi-sub">Sin gastos en el periodo</span>
+                <span class="kpi-sub">Sin gastos con esta selección</span>
             }
         </article>
         <article class="kpi">
@@ -90,22 +119,22 @@ else if (_r is not null)
             else
             {
                 <b class="kpi-val" id="kpi-mayor">—</b>
-                <span class="kpi-sub">Sin gastos en el periodo</span>
+                <span class="kpi-sub">Sin gastos con esta selección</span>
             }
         </article>
     </section>
 
-    @if (_r.NumeroGastos == 0)
+    @if (_base.NumeroGastos == 0)
     {
         <section class="card">
-            <div class="empty">No hay gastos del hogar entre estas fechas.@(_r.Personales > 0 ? $" Hay {Euros(_r.Personales)} en gastos personales." : "")</div>
+            <div class="empty">No hay gastos del hogar entre estas fechas.@(_base.Personales > 0 ? $" Hay {Euros(_base.Personales)} en gastos personales." : "")</div>
         </section>
     }
     else
     {
         <section class="card" aria-labelledby="t-evolucion">
             <div class="card-head"><h2 id="t-evolucion">Evolución del gasto</h2><span class="tag">@TextoGranularidad</span></div>
-            <svg class="dash-svg" viewBox="0 0 520 220" role="img" aria-labelledby="t-evolucion">
+            <svg class="dash-svg" viewBox="0 0 520 220" role="group" aria-labelledby="t-evolucion">
                 @foreach (var g in Guias)
                 {
                     <line class="gr-eje" x1="@N(MargenIzq)" x2="@N(Ancho - MargenDer)" y1="@g.Y" y2="@g.Y" />
@@ -113,10 +142,15 @@ else if (_r is not null)
                 }
                 <path class="gr-area" d="@Area" />
                 <path class="gr-linea" d="@Linea" />
-                @for (var i = 0; i < _r.Serie.Count; i++)
+                @for (var i = 0; i < _rSerie.Serie.Count; i++)
                 {
-                    var p = _r.Serie[i];
-                    <circle class="gr-punto" cx="@N(X(i))" cy="@N(Y(p.Importe))" r="@(_r.Serie.Count > 62 ? "2.5" : "3.5")">
+                    var p = _rSerie.Serie[i];
+                    var elegido = _tramo?.Inicio == p.Inicio;
+                    <circle class="gr-punto @(elegido ? "sel" : _tramo is not null ? "apagado" : "")" cx="@N(X(i))" cy="@N(Y(p.Importe))" r="@(_rSerie.Serie.Count > 62 ? "2.5" : "3.5")" />
+                    @* Zona de pulsación más grande que el punto, también para el teclado. *@
+                    <circle class="gr-hit" cx="@N(X(i))" cy="@N(Y(p.Importe))" r="11" tabindex="0" role="button" aria-pressed="@(elegido ? "true" : "false")"
+                            aria-label="@EtiquetaTramo(p): @Euros(p.Importe). Filtrar por este tramo"
+                            @onclick="() => ElegirTramo(p)" @onkeydown="e => TeclaTramo(e, p)">
                         <title>@EtiquetaTramo(p): @Euros(p.Importe)</title>
                     </circle>
                     @if (RotulaEje(i))
@@ -132,14 +166,18 @@ else if (_r is not null)
                 <div class="card-head"><h2 id="t-categorias">Gasto por categoría</h2></div>
                 @foreach (var c in CategoriasMostradas)
                 {
-                    <div class="dash-fila">
-                        <div class="dash-fila-top">
+                    var elegida = c.CategoriaId != Guid.Empty && _filtro.Categoria == c.CategoriaId;
+                    var porcentaje = Porcentaje(c.Importe, _rCat.Total);
+                    <button class="dash-fila dash-click @(elegida ? "sel" : _filtro.Categoria is not null ? "apagada" : "")" type="button"
+                            aria-pressed="@(elegida ? "true" : "false")" disabled="@(c.CategoriaId == Guid.Empty)"
+                            aria-label="@c.Nombre: @Euros(c.Importe), @porcentaje. Filtrar por esta categoría" @onclick="() => ElegirCategoria(c.CategoriaId)">
+                        <span class="dash-fila-top">
                             <span class="dash-nombre">@c.Nombre</span>
                             <span class="g-importe">@Euros(c.Importe)</span>
-                        </div>
-                        <progress class="barra" max="100" value="@Math.Round(Porcentaje(c.Importe, _r.Total, 100m), 1).ToString(CultureInfo.InvariantCulture)" aria-label="@c.Nombre: @Porcentaje(c.Importe, _r.Total) del total"></progress>
-                        <span class="muted dash-pie">@Porcentaje(c.Importe, _r.Total) · @c.Gastos @(c.Gastos == 1 ? "gasto" : "gastos")</span>
-                    </div>
+                        </span>
+                        <progress class="barra" max="100" value="@Math.Round(Porcentaje(c.Importe, _rCat.Total, 100m), 1).ToString(CultureInfo.InvariantCulture)" aria-hidden="true"></progress>
+                        <span class="muted dash-pie">@porcentaje · @c.Gastos @(c.Gastos == 1 ? "gasto" : "gastos")</span>
+                    </button>
                 }
             </section>
 
@@ -150,12 +188,15 @@ else if (_r is not null)
                     <circle class="dn-fondo" cx="21" cy="21" r="15.915" fill="none" stroke-width="6" />
                     @foreach (var s in Rodajas)
                     {
-                        <circle class="@s.Clase" cx="21" cy="21" r="15.915" fill="none" stroke-width="6" stroke-dasharray="@s.Trazo" stroke-dashoffset="@s.Desfase" />
+                        <circle class="@s.Clase dn-click @(s.Elegida ? "sel" : HayMiembroElegido ? "apagada" : "")" cx="21" cy="21" r="15.915" fill="none" stroke-width="6"
+                                stroke-dasharray="@s.Trazo" stroke-dashoffset="@s.Desfase" @onclick="() => ElegirMiembro(s.Miembro)" />
                     }
                 </svg>
-                @foreach (var m in _r.PorMiembro)
+                @foreach (var m in _rMiembro.PorMiembro)
                 {
-                    <div class="dash-fila-top dash-miembro">
+                    var elegido = m.MiembroId is { } mid ? _filtro.Miembro == mid : _filtro.CuentaComun;
+                    <button class="dash-fila-top dash-miembro dash-click @(elegido ? "sel" : HayMiembroElegido ? "apagada" : "")" type="button"
+                            aria-pressed="@(elegido ? "true" : "false")" @onclick="() => ElegirMiembro(m.MiembroId)">
                         <span class="dash-nombre">
                             @if (m.MiembroId is { } id)
                             {
@@ -169,7 +210,7 @@ else if (_r is not null)
                             }
                         </span>
                         <span class="muted">paga <b class="g-importe">@Euros(m.Pagado)</b> · le toca <b class="g-importe">@Euros(m.Asumido)</b></span>
-                    </div>
+                    </button>
                 }
             </section>
         </div>
@@ -186,10 +227,14 @@ else if (_r is not null)
                     <div class="g-importe">@Euros(g.Importe)</div>
                 </div>
             }
+            @if (_r.Mayores.Count == 0)
+            {
+                <div class="empty">Ningún gasto del hogar con esta selección.</div>
+            }
         </section>
     }
 
-    @if (_r.Personales > 0 && _r.NumeroGastos > 0)
+    @if (_r.Personales > 0 && _base.NumeroGastos > 0)
     {
         <p class="muted">Además hay @Euros(_r.Personales) en gastos personales, fuera del total del hogar.</p>
     }
@@ -203,39 +248,63 @@ else if (_r is not null)
     private List<GastoResponse> _gastos = [];
     private List<CategoriaDto> _categorias = [];
     private List<MiembroDto> _miembros = [];
-    private ResultadoAnalisis? _r;
     private bool _cargando = true;
     private string? _errorCarga;
     private DateOnly _desde, _hasta;
+
+    // Selección cruzada. Cada gráfico se calcula con los filtros de los demás y no con el suyo, para poder
+    // verlo entero con su elemento resaltado (como un cuadro de mando) y cambiar o quitar la selección.
+    private FiltroAnalisis _filtro = new();
+    private PuntoSerie? _tramo;
+
+    /// <summary>Sin filtros: decide si hay algo que mostrar en el periodo.</summary>
+    private ResultadoAnalisis? _base;
+
+    /// <summary>Con todos los filtros: indicadores y mayores gastos.</summary>
+    private ResultadoAnalisis? _r;
+
+    /// <summary>Sin el filtro de categoría: gráfico de categorías.</summary>
+    private ResultadoAnalisis? _rCat;
+
+    /// <summary>Sin el filtro de persona: rosco y lista de quién paga.</summary>
+    private ResultadoAnalisis? _rMiembro;
+
+    /// <summary>Sin el filtro de fechas: gráfico de evolución, del periodo completo.</summary>
+    private ResultadoAnalisis? _rSerie;
 
     /// <summary>Versión de la última petición: una respuesta tardía de otro periodo no pisa la actual.</summary>
     private int _version;
 
     private DateOnly Hoy => DateOnly.FromDateTime(Reloj.GetLocalNow().DateTime);
 
-    private int Dias => AnalisisGastos.Dias(_r?.Desde ?? _desde, _r?.Hasta ?? _hasta);
+    private bool HayFiltros => _filtro.Activo || _tramo is not null;
 
-    private int AnteriorDias => Dias;
+    private bool HayMiembroElegido => _filtro.Miembro is not null || _filtro.CuentaComun;
+
+    private int Dias => AnalisisGastos.Dias(_r?.Desde ?? _desde, _r?.Hasta ?? _hasta);
 
     private string Periodo => _r is null ? "" : $"{_r.Desde.ToString("d MMM yyyy", Es)} y {_r.Hasta.ToString("d MMM yyyy", Es)}";
 
-    private string TextoGranularidad => AnalisisGastos.GranularidadPara(Dias) switch
+    private string TextoGranularidad => AnalisisGastos.GranularidadPara(AnalisisGastos.Dias(_desde, _hasta)) switch
     {
         Granularidad.Dia => "Por día",
         Granularidad.Semana => "Por semana",
         _ => "Por mes",
     };
 
-    /// <summary>Hasta 7 categorías y el resto agrupado, para que el gráfico se lea en una pantalla pequeña.</summary>
+    /// <summary>Hasta 7 categorías y el resto agrupado, para que el gráfico se lea en una pantalla pequeña; la elegida siempre se ve.</summary>
     private IReadOnlyList<GastoPorCategoria> CategoriasMostradas
     {
         get
         {
             const int max = 7;
-            var todas = _r!.PorCategoria;
+            var todas = _rCat!.PorCategoria;
             if (todas.Count <= max) return todas;
-            var resto = todas.Skip(max - 1).ToList();
-            return todas.Take(max - 1)
+            var visibles = todas.Take(max - 1).ToList();
+            if (_filtro.Categoria is { } elegida && todas.FirstOrDefault(c => c.CategoriaId == elegida) is { } c && !visibles.Contains(c))
+                visibles[^1] = c;
+            var resto = todas.Where(c => !visibles.Contains(c)).ToList();
+            return visibles
                 .Append(new GastoPorCategoria(Guid.Empty, "Otras categorías", resto.Sum(c => c.Importe), resto.Sum(c => c.Gastos)))
                 .ToList();
         }
@@ -282,12 +351,15 @@ else if (_r is not null)
             _gastos = gastos.Result;
             _categorias = categorias.Result;
             _miembros = miembros.Result;
-            _r = AnalisisGastos.Calcular(_gastos, _categorias, desde, hasta);
+            // Otro periodo es otra vista: la selección anterior ya no tiene por qué existir.
+            _filtro = new FiltroAnalisis();
+            _tramo = null;
+            Recalcular();
         }
         catch (ApiException e) when (version == _version)
         {
             _errorCarga = e.Message;
-            _r = null;
+            _r = _rCat = _rMiembro = _rSerie = _base = null;
         }
         catch (ApiException)
         {
@@ -297,7 +369,58 @@ else if (_r is not null)
         _cargando = false;
     }
 
+    /// <summary>Recalcula cada gráfico con los filtros de los demás, en el cliente: los gastos del periodo ya están cargados.</summary>
+    private void Recalcular()
+    {
+        var (desde, hasta) = _tramo is { } t ? (t.Inicio, t.Fin) : (_desde, _hasta);
+        List<GastoResponse> Con(FiltroAnalisis f) => AnalisisGastos.Filtrar(_gastos, _categorias, f);
+
+        _base = AnalisisGastos.Calcular(_gastos, _categorias, _desde, _hasta);
+        _r = AnalisisGastos.Calcular(Con(_filtro), _categorias, desde, hasta);
+        _rCat = AnalisisGastos.Calcular(Con(_filtro with { Categoria = null }), _categorias, desde, hasta);
+        _rMiembro = AnalisisGastos.Calcular(Con(_filtro with { Miembro = null, CuentaComun = false }), _categorias, desde, hasta);
+        _rSerie = AnalisisGastos.Calcular(Con(_filtro), _categorias, _desde, _hasta);
+    }
+
+    /// <summary>Pincha en una categoría: la elige, o la quita si ya estaba elegida. «Otras categorías» no se puede elegir.</summary>
+    private void ElegirCategoria(Guid id)
+    {
+        if (id == Guid.Empty) return;
+        _filtro = _filtro with { Categoria = _filtro.Categoria == id ? null : id };
+        Recalcular();
+    }
+
+    /// <summary>Pincha en una persona (o en la cuenta común si es null): la elige, o la quita si ya estaba elegida.</summary>
+    private void ElegirMiembro(Guid? id)
+    {
+        _filtro = id is { } m
+            ? _filtro with { Miembro = _filtro.Miembro == m ? null : m, CuentaComun = false }
+            : _filtro with { CuentaComun = !_filtro.CuentaComun, Miembro = null };
+        Recalcular();
+    }
+
+    /// <summary>Pincha en un punto de la gráfica: filtra por ese tramo de fechas, o lo quita si ya estaba elegido.</summary>
+    private void ElegirTramo(PuntoSerie p)
+    {
+        _tramo = _tramo?.Inicio == p.Inicio ? null : p;
+        Recalcular();
+    }
+
+    private void TeclaTramo(KeyboardEventArgs e, PuntoSerie p)
+    {
+        if (e.Key is "Enter" or " ") ElegirTramo(p);
+    }
+
+    private void QuitarFiltros()
+    {
+        _filtro = new FiltroAnalisis();
+        _tramo = null;
+        Recalcular();
+    }
+
     private string NombreMiembro(Guid id) => _miembros.FirstOrDefault(m => m.Id == id)?.Nombre ?? "—";
+
+    private string NombreCategoriaRaiz(Guid id) => _categorias.FirstOrDefault(c => c.Id == id)?.Nombre ?? "—";
 
     private string NombreGasto(GastoResponse g) =>
         string.IsNullOrWhiteSpace(g.Concepto) ? ArbolCategorias.Ruta(_categorias, g.CategoriaId) : g.Concepto;
@@ -328,16 +451,16 @@ else if (_r is not null)
     private static string N(double d) => d.ToString("0.##", CultureInfo.InvariantCulture);
 
     /// <summary>Importe máximo de la serie (el eje Y llega hasta él).</summary>
-    private double MaxSerie => Math.Max(1.0, (double)_r!.Serie.Max(p => p.Importe));
+    private double MaxSerie => Math.Max(1.0, (double)_rSerie!.Serie.Max(p => p.Importe));
 
     private double X(int i) =>
-        _r!.Serie.Count == 1 ? MargenIzq + AnchoUtil / 2 : MargenIzq + AnchoUtil * i / (_r.Serie.Count - 1);
+        _rSerie!.Serie.Count == 1 ? MargenIzq + AnchoUtil / 2 : MargenIzq + AnchoUtil * i / (_rSerie.Serie.Count - 1);
 
     private double Y(decimal v) => MargenSup + AltoUtil * (1 - (double)v / MaxSerie);
 
-    private string Linea => string.Join(' ', _r!.Serie.Select((p, i) => $"{(i == 0 ? "M" : "L")}{N(X(i))} {N(Y(p.Importe))}"));
+    private string Linea => string.Join(' ', _rSerie!.Serie.Select((p, i) => $"{(i == 0 ? "M" : "L")}{N(X(i))} {N(Y(p.Importe))}"));
 
-    private string Area => $"{Linea} L{N(X(_r!.Serie.Count - 1))} {N(MargenSup + AltoUtil)} L{N(X(0))} {N(MargenSup + AltoUtil)} Z";
+    private string Area => $"{Linea} L{N(X(_rSerie!.Serie.Count - 1))} {N(MargenSup + AltoUtil)} L{N(X(0))} {N(MargenSup + AltoUtil)} Z";
 
     /// <summary>Líneas guía horizontales: cero, mitad y máximo, con su importe.</summary>
     private IEnumerable<(string Y, string YTexto, string Texto)> Guias =>
@@ -348,11 +471,11 @@ else if (_r is not null)
         });
 
     /// <summary>Se rotula como mucho cada cuarto de la serie, para que las etiquetas no se pisen en pantallas estrechas.</summary>
-    private int PasoEtiquetas => Math.Max(1, (int)Math.Ceiling((_r!.Serie.Count - 1) / 4.0));
+    private int PasoEtiquetas => Math.Max(1, (int)Math.Ceiling((_rSerie!.Serie.Count - 1) / 4.0));
 
-    private bool RotulaEje(int i) => i % PasoEtiquetas == 0 || i == _r!.Serie.Count - 1;
+    private bool RotulaEje(int i) => i % PasoEtiquetas == 0 || i == _rSerie!.Serie.Count - 1;
 
-    private string AnclaEje(int i) => i == 0 ? "start" : i == _r!.Serie.Count - 1 ? "end" : "middle";
+    private string AnclaEje(int i) => i == 0 ? "start" : i == _rSerie!.Serie.Count - 1 ? "end" : "middle";
 
     private static string EtiquetaTramo(PuntoSerie p) => p.Granularidad switch
     {
@@ -370,17 +493,18 @@ else if (_r is not null)
     // ───── Rosco de quién paga ─────
 
     /// <summary>Un arco por persona (o por la cuenta común): circunferencia de 100 unidades, así el trazo es el porcentaje.</summary>
-    private IEnumerable<(string Clase, string Trazo, string Desfase)> Rodajas
+    private IEnumerable<(string Clase, string Trazo, string Desfase, Guid? Miembro, bool Elegida)> Rodajas
     {
         get
         {
-            var total = _r!.PorMiembro.Sum(m => m.Pagado);
+            var total = _rMiembro!.PorMiembro.Sum(m => m.Pagado);
             var acumulado = 0.0;
-            foreach (var m in _r.PorMiembro.Where(m => m.Pagado > 0))
+            foreach (var m in _rMiembro.PorMiembro.Where(m => m.Pagado > 0))
             {
                 var parte = (double)(m.Pagado / total) * 100;
                 var clase = m.MiembroId is { } id ? $"dn-m{ColorMiembro.De(id, _miembros)}" : "dn-comun";
-                yield return (clase, $"{N(parte)} {N(100 - parte)}", N(25 - acumulado));
+                var elegida = m.MiembroId is { } mid ? _filtro.Miembro == mid : _filtro.CuentaComun;
+                yield return (clase, $"{N(parte)} {N(100 - parte)}", N(25 - acumulado), m.MiembroId, elegida);
                 acumulado += parte;
             }
         }

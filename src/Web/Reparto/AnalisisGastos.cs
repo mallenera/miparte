@@ -15,9 +15,10 @@ public enum Granularidad
 
 /// <summary>Gasto de un tramo de la serie temporal.</summary>
 /// <param name="Inicio">Primer día del tramo (el del periodo si el tramo empieza antes).</param>
+/// <param name="Fin">Último día del tramo (el del periodo si el tramo termina después).</param>
 /// <param name="Granularidad">Tramo al que pertenece el punto.</param>
 /// <param name="Importe">Gasto del hogar en el tramo.</param>
-public sealed record PuntoSerie(DateOnly Inicio, Granularidad Granularidad, decimal Importe);
+public sealed record PuntoSerie(DateOnly Inicio, DateOnly Fin, Granularidad Granularidad, decimal Importe);
 
 /// <summary>Gasto acumulado de una categoría de primer nivel (con sus subcategorías).</summary>
 /// <param name="CategoriaId">Categoría raíz; <see cref="Guid.Empty"/> para el agrupado «Otras».</param>
@@ -107,13 +108,41 @@ public static class AnalisisGastos
             delHogar.OrderByDescending(g => g.Importe).ThenByDescending(g => g.Fecha).Take(NumeroMayores).ToList());
     }
 
+    /// <summary>Gastos que cumplen el filtro cruzado del dashboard (categoría de primer nivel y/o quién paga).</summary>
+    /// <param name="gastos">Gastos a filtrar.</param>
+    /// <param name="categorias">Categorías del hogar, para resolver la de primer nivel.</param>
+    /// <param name="filtro">Selección activa.</param>
+    public static List<GastoResponse> Filtrar(
+        IReadOnlyCollection<GastoResponse> gastos, IReadOnlyCollection<CategoriaDto> categorias, FiltroAnalisis filtro)
+    {
+        if (!filtro.Activo) return gastos.ToList();
+        var porId = categorias.ToDictionary(c => c.Id);
+        return gastos
+            .Where(g => filtro.Categoria is not { } c || Raiz(porId, g.CategoriaId) == c)
+            .Where(g => filtro.Miembro is not { } m || g.PagadoPor == m)
+            .Where(g => !filtro.CuentaComun || g.PagadoPor is null)
+            .ToList();
+    }
+
+    /// <summary>Categoría de primer nivel de la categoría dada.</summary>
+    private static Guid Raiz(Dictionary<Guid, CategoriaDto> porId, Guid id)
+    {
+        // El límite evita un bucle si los datos tuvieran un ciclo de padres.
+        for (var i = 0; i <= porId.Count && porId.TryGetValue(id, out var c) && c.CategoriaPadreId is { } padre && porId.ContainsKey(padre); i++)
+            id = padre;
+        return id;
+    }
+
     private static List<PuntoSerie> Serie(IReadOnlyCollection<GastoResponse> gastos, DateOnly desde, DateOnly hasta)
     {
         var granularidad = GranularidadPara(Dias(desde, hasta));
         var importes = gastos.GroupBy(g => InicioTramo(g.Fecha, granularidad)).ToDictionary(x => x.Key, x => x.Sum(g => g.Importe));
         var puntos = new List<PuntoSerie>();
         for (var tramo = InicioTramo(desde, granularidad); tramo <= hasta; tramo = Siguiente(tramo, granularidad))
-            puntos.Add(new PuntoSerie(tramo < desde ? desde : tramo, granularidad, importes.GetValueOrDefault(tramo)));
+        {
+            var fin = Siguiente(tramo, granularidad).AddDays(-1);
+            puntos.Add(new PuntoSerie(tramo < desde ? desde : tramo, fin > hasta ? hasta : fin, granularidad, importes.GetValueOrDefault(tramo)));
+        }
         return puntos;
     }
 
@@ -135,15 +164,7 @@ public static class AnalisisGastos
     {
         var porId = categorias.ToDictionary(c => c.Id);
 
-        Guid Raiz(Guid id)
-        {
-            // El límite evita un bucle si los datos tuvieran un ciclo de padres.
-            for (var i = 0; i <= porId.Count && porId.TryGetValue(id, out var c) && c.CategoriaPadreId is { } padre && porId.ContainsKey(padre); i++)
-                id = padre;
-            return id;
-        }
-
-        return gastos.GroupBy(g => Raiz(g.CategoriaId))
+        return gastos.GroupBy(g => Raiz(porId, g.CategoriaId))
             .Select(x => new GastoPorCategoria(x.Key, porId.TryGetValue(x.Key, out var c) ? c.Nombre : "Sin categoría", x.Sum(g => g.Importe), x.Count()))
             .OrderByDescending(c => c.Importe).ThenBy(c => c.Nombre, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
@@ -159,4 +180,14 @@ public static class AnalisisGastos
             .OrderByDescending(m => m.Pagado).ThenByDescending(m => m.Asumido)
             .ToList();
     }
+}
+
+/// <summary>Selección activa del dashboard: al pinchar en un gráfico se filtran los demás, como en un cuadro de mando.</summary>
+/// <param name="Categoria">Categoría de primer nivel elegida, o null.</param>
+/// <param name="Miembro">Persona que paga elegida, o null.</param>
+/// <param name="CuentaComun">Solo lo pagado por la cuenta común o el ahorro (sin persona).</param>
+public sealed record FiltroAnalisis(Guid? Categoria = null, Guid? Miembro = null, bool CuentaComun = false)
+{
+    /// <summary>Hay alguna selección.</summary>
+    public bool Activo => Categoria is not null || Miembro is not null || CuentaComun;
 }

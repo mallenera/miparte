@@ -802,3 +802,20 @@ section.card + section.card { margin-top: 24px; }
 .dn-punto { width: 14px; height: 14px; border-radius: 50%; background: var(--ink-2); display: inline-block; }
 .dn-m0 { stroke: var(--m0); } .dn-m1 { stroke: var(--m1); } .dn-m2 { stroke: var(--m2); } .dn-m3 { stroke: var(--m3); }
 .dn-m4 { stroke: var(--m4); } .dn-m5 { stroke: var(--m5); } .dn-m6 { stroke: var(--m6); } .dn-m7 { stroke: var(--m7); }
+
+/* Dashboard interactivo: elementos pulsables que filtran el resto; el elegido se resalta y los demás se atenúan. */
+.dash-click { appearance: none; width: 100%; font: inherit; color: inherit; text-align: left; background: transparent; border: 0; border-top: 1px solid var(--line); border-radius: 8px; padding: 8px 6px; cursor: pointer; }
+.dash-click:disabled { cursor: default; }
+.dash-click:hover:not(:disabled) { background: var(--surface-2); }
+.dash-click.sel { background: var(--wine-soft); box-shadow: inset 3px 0 0 var(--wine); }
+.dash-click.apagada, .dn-click.apagada { opacity: .45; }
+.dash-miembro.dash-click { display: flex; }
+.dash-filtros { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 16px 0 0; }
+.chip-btn.sel { background: var(--wine-soft); border-color: var(--wine); color: var(--wine-text); }
+.chip-btn .ico { vertical-align: -2px; }
+.gr-hit { fill: transparent; cursor: pointer; }
+.gr-hit:hover, .gr-hit:focus-visible { fill: var(--wine-soft); outline: 0; }
+.gr-punto.sel { fill: var(--wine); r: 5; }
+.gr-punto.apagado { opacity: .45; }
+.dn-click { cursor: pointer; }
+.dn-click.sel { stroke-width: 7.5; }

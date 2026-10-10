@@ -4,6 +4,7 @@
 @inject ServicioSesion Sesion
 @inject OpcionesWeb Opciones
 @inject NavigationManager Navegacion
+@inject IAlmacenLocal Almacen
 
 <PageTitle>Crear cuenta · Mi parte, tu parte</PageTitle>
 
@@ -122,7 +123,7 @@
         _error = null;
         try
         {
-            if (await Sesion.RegistrarAsync(_modelo.Email.Trim(), _modelo.Password)) Navegacion.NavigateTo("", replace: true);
+            if (await Sesion.RegistrarAsync(_modelo.Email.Trim(), _modelo.Password)) Navegacion.NavigateTo(await InvitacionPendiente.DestinoTrasAccesoAsync(Almacen), replace: true);
             else _pendienteConfirmar = true;
         }
         catch (AuthException e)
@@ -146,7 +147,7 @@
         try
         {
             await Sesion.VerificarCodigoAsync(_modelo.Email.Trim(), _verificacion.Codigo.Trim());
-            Navegacion.NavigateTo("", replace: true);
+            Navegacion.NavigateTo(await InvitacionPendiente.DestinoTrasAccesoAsync(Almacen), replace: true);
         }
         catch (AuthException e)
         {

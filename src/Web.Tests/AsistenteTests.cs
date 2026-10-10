@@ -112,6 +112,41 @@ public class AsistenteTests : BunitContext
     }
 
     [Fact]
+    public void El_panel_flotante_empieza_cerrado_y_el_boton_lo_abre()
+    {
+        Registrar(new ApiFalsa());
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        var c = Render<PanelAsistente>();
+
+        Assert.True(c.Find("aside.panel-asist").HasAttribute("hidden"));
+        c.Find("button.fab-asistente").Click();
+
+        Assert.False(c.Find("aside.panel-asist").HasAttribute("hidden"));
+        Assert.Empty(c.FindAll("button.fab-asistente"));
+    }
+
+    [Fact]
+    public void El_panel_se_cierra_con_el_boton_y_con_escape_y_conserva_la_conversacion()
+    {
+        var api = new ApiFalsa().Responde("POST /api/chat", HttpStatusCode.OK, new ChatResponse("Respuesta guardada.", []));
+        Registrar(api);
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        var c = Render<PanelAsistente>();
+        c.Find("button.fab-asistente").Click();
+        c.Find("#pregunta").Input("Hola");
+        c.Find("form.chatform").Submit();
+
+        c.Find("button[aria-label='Cerrar el asistente']").Click();
+        Assert.True(c.Find("aside.panel-asist").HasAttribute("hidden"));
+
+        c.Find("button.fab-asistente").Click();
+        c.Find("aside.panel-asist").KeyDown(new Microsoft.AspNetCore.Components.Web.KeyboardEventArgs { Key = "Escape" });
+
+        Assert.True(c.Find("aside.panel-asist").HasAttribute("hidden"));
+        Assert.Contains("Respuesta guardada.", c.Markup);
+    }
+
+    [Fact]
     public void Una_sugerencia_envia_la_pregunta_sin_escribirla()
     {
         var api = new ApiFalsa().Responde("POST /api/chat", HttpStatusCode.OK, new ChatResponse("Ok.", []));

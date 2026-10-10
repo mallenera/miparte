@@ -12,7 +12,7 @@ public sealed class OpcionesWeb
     /// <summary>URL base de Core.Api.</summary>
     public string CoreUrl { get; init; } = "";
 
-    /// <summary>URL base de Assistant.Api (chat). Opcional: vacía, la pestaña Asistente avisa de que no está configurado.</summary>
+    /// <summary>URL base de Assistant.Api (chat). Opcional: vacía, el asistente flotante avisa de que no está configurado.</summary>
     public string AssistantUrl { get; init; } = "";
 
     /// <summary>Indica si hay un asistente al que preguntar.</summary>

@@ -1,0 +1,140 @@
+@page "/unirse"
+@using System.ComponentModel.DataAnnotations
+@inject ServicioSesion Sesion
+@inject CoreApiClient Api
+@inject ServicioArranque Arranque
+@inject IAlmacenLocal Almacen
+@inject NavigationManager Navegacion
+
+<PageTitle>Unirme al hogar · Mi parte, tu parte</PageTitle>
+
+<div class="auth ancho">
+    <h1 class="page-title">Te han invitado a un hogar</h1>
+
+    @if (!_listo)
+    {
+        <p>Cargando…</p>
+    }
+    else if (_token is null)
+    {
+        <div class="aviso warn" role="alert">
+            El enlace no trae ninguna invitación. Pide que te lo envíen de nuevo o pega el código en
+            <a href="sin-hogar">«Unirme con una invitación»</a>.
+        </div>
+    }
+    else if (Sesion.SesionActual is null)
+    {
+        <section class="card">
+            <div class="card-body">
+                <p>Para unirte necesitas una cuenta. Al entrar volverás aquí y podrás aceptar la invitación.</p>
+                <div class="actions">
+                    <a class="btn" href="login">Iniciar sesión</a>
+                    <a class="btn btn-ghost" href="registro">Crear cuenta</a>
+                </div>
+            </div>
+        </section>
+    }
+    else
+    {
+        @if (_error is not null)
+        {
+            <div class="aviso err" role="alert">@_error</div>
+        }
+        <section class="card">
+            <div class="card-body">
+                @if (_aceptada)
+                {
+                    <button class="btn" type="button" disabled="@_enviando" @onclick="ContinuarAsync">Reintentar</button>
+                }
+                else
+                {
+                    <EditForm Model="_modelo" OnValidSubmit="UnirseAsync">
+                        <DataAnnotationsValidator />
+                        <div class="fieldrow">
+                            <label for="nombre">Tu nombre (si la invitación no lo trae)</label>
+                            <InputText id="nombre" @bind-Value="_modelo.Nombre" />
+                            <ValidationMessage For="() => _modelo.Nombre" />
+                        </div>
+                        <button class="btn" type="submit" disabled="@_enviando">Aceptar invitación</button>
+                    </EditForm>
+                }
+            </div>
+        </section>
+    }
+</div>
+
+@code {
+    private readonly Modelo _modelo = new();
+    private string? _token, _error;
+    private bool _listo, _enviando, _aceptada;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Sesion.InicializarAsync();
+
+        // El código llega en el fragmento; se guarda y se quita de la barra de direcciones para que no quede en el historial.
+        var delEnlace = InvitacionPendiente.ExtraerToken(Navegacion.Uri);
+        if (delEnlace is not null)
+        {
+            await InvitacionPendiente.GuardarAsync(Almacen, delEnlace);
+            // Sin almacenamiento (modo privado, datos bloqueados) el fragmento es la única copia: solo se quita si el código quedó guardado.
+            if (await InvitacionPendiente.LeerAsync(Almacen) == delEnlace) Navegacion.NavigateTo(InvitacionPendiente.Ruta, replace: true);
+        }
+
+        _token = delEnlace ?? await InvitacionPendiente.LeerAsync(Almacen);
+        _listo = true;
+    }
+
+    private async Task UnirseAsync()
+    {
+        // Enter y clic seguidos lanzarían dos aceptaciones (la segunda daría 409 por invitación usada).
+        if (_enviando || _token is null) return;
+        _enviando = true;
+        _error = null;
+        try
+        {
+            var nombre = string.IsNullOrWhiteSpace(_modelo.Nombre) ? null : _modelo.Nombre.Trim();
+            await Api.AceptarInvitacionAsync(new AceptarInvitacionRequest(_token, nombre));
+            _aceptada = true; // el código ya está gastado: a partir de aquí solo se reintenta la carga, nunca la aceptación
+            await InvitacionPendiente.DescartarAsync(Almacen);
+        }
+        catch (ApiException e)
+        {
+            // Con 404/409 el código ya no sirve (usado, caducado o inválido): no se vuelve a ofrecer en cada acceso.
+            if (e.Codigo is System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.Conflict) await InvitacionPendiente.DescartarAsync(Almacen);
+            _error = e.Message;
+        }
+        finally
+        {
+            _enviando = false;
+        }
+        if (_aceptada) await ContinuarAsync();
+    }
+
+    /// <summary>Carga hogares y navega tras una aceptación correcta; si falla, queda reintentable sin reenviar el código.</summary>
+    private async Task ContinuarAsync()
+    {
+        if (_enviando) return;
+        _enviando = true;
+        _error = null;
+        try
+        {
+            var destino = await Arranque.CargarAsync();
+            Navegacion.NavigateTo(destino == DestinoArranque.ElegirHogar ? "elegir-hogar" : "", replace: true);
+        }
+        catch (ApiException e)
+        {
+            _error = $"Ya te has unido al hogar, pero no se han podido cargar tus datos: {e.Message}";
+        }
+        finally
+        {
+            _enviando = false;
+        }
+    }
+
+    private sealed class Modelo
+    {
+        [StringLength(100, ErrorMessage = "Máximo 100 caracteres.")]
+        public string? Nombre { get; set; }
+    }
+}

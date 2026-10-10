@@ -96,6 +96,22 @@ public class ComponentesTests : BunitContext
     }
 
     [Fact]
+    public void Invitar_muestra_un_enlace_con_el_codigo_en_el_fragmento()
+    {
+        var api = ApiConHogar(soyAdmin: true)
+            .Responde("POST /api/invitaciones", HttpStatusCode.Created,
+                new InvitacionCreada(Guid.NewGuid(), "token-secreto-123", DateTimeOffset.UtcNow.AddDays(7)));
+        Registrar(api);
+        var c = Render<VistaConfiguracionHogar>();
+
+        c.Find("#card-invite button.btn-orange").Click();
+
+        var enlace = c.Find("#enlace-invitacion").TextContent;
+        Assert.EndsWith("/unirse#token=token-secreto-123", enlace);
+        Assert.DoesNotContain("?", enlace);
+    }
+
+    [Fact]
     public void Un_409_al_desactivar_se_muestra_con_el_mensaje_de_la_api()
     {
         var api = ApiConHogar(soyAdmin: true)
@@ -1170,18 +1186,18 @@ public class ComponentesTests : BunitContext
     }
 
     [Fact]
-    public void Panel_de_permisos_muestra_la_matriz_de_perfiles()
+    public void Panel_de_permisos_solo_lista_los_adultos_con_cuenta_y_no_muestra_la_matriz()
     {
+        var ana = ApiFalsa.Miembro("Ana", rol: "admin", esYo: true, id: AnaId);
+        var peque = ApiFalsa.Miembro("Peque", tipo: "a_cargo", vinculado: false);
         Registrar(new ApiFalsa());
 
-        var c = Render<PanelPermisos>(p => p.Add(x => x.Miembros, new List<MiembroDto>()).Add(x => x.Puede, true));
+        var c = Render<PanelPermisos>(p => p.Add(x => x.Miembros, new List<MiembroDto> { ana, peque }).Add(x => x.Puede, true));
 
-        var cabecera = c.FindAll("thead th").Select(t => t.TextContent.Trim()).ToList();
-        Assert.Equal(["Permiso", "Admin", "Miembro", "Adulto sin cuenta", "A cargo"], cabecera);
-        var historial = c.FindAll("tbody tr").First(f => f.TextContent.Contains("Ver el historial"));
-        var celdas = historial.QuerySelectorAll("td").Select(t => t.TextContent.Trim()).ToList();
-        Assert.Equal(["✓Sí", "—No", "—No", "—No"], celdas); // solo el admin lo tiene por defecto
-        Assert.Contains("Crear invitaciones", c.Markup);
+        Assert.Empty(c.FindAll("table"));
+        Assert.Single(c.FindAll(".mrow"));
+        Assert.Contains("Ana", c.Find(".mrow").TextContent);
+        Assert.NotEmpty(c.FindAll("button[aria-label='Permisos de Ana']"));
     }
 
     [Fact]

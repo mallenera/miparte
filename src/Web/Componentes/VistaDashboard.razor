@@ -25,9 +25,9 @@
         <button class="chip chip-btn" type="button" @onclick="() => ElegirAsync(PeriodoRapido.Ultimos30)">Últimos 30 días</button>
         <button class="chip chip-btn" type="button" @onclick="() => ElegirAsync(PeriodoRapido.EsteAnio)">Este año</button>
     </div>
-    @if (_desde > _hasta)
+    @if (ErrorPeriodo is { } errorPeriodo)
     {
-        <div class="aviso err u-mt12" role="alert">La fecha «Desde» no puede ser posterior a «Hasta».</div>
+        <div class="aviso err u-mt12" role="alert">@errorPeriodo</div>
     }
 </section>
 
@@ -295,7 +295,9 @@ else if (_r is not null && _rCat is not null && _rMiembro is not null && _rSerie
             var (desde, hasta) = _tramo is { } t ? (t.Inicio, t.Fin) : (_desde, _hasta);
             var url = $"gastos?desde={desde.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}&hasta={hasta.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}";
             if (_filtro.Categoria is { } c) url += $"&categoria={c}";
-            if (_filtro.Miembro is { } m) url += $"&miembro={m}";
+            // «pagador» (no «miembro»): el Dashboard filtra por quién paga, y «miembro» incluiría también a quien solo asume una parte.
+            if (_filtro.Miembro is { } m) url += $"&pagador={m}";
+            if (_filtro.CuentaComun) url += "&cuentacomun=true";
             return url;
         }
     }
@@ -352,10 +354,18 @@ else if (_r is not null && _rCat is not null && _rMiembro is not null && _rSerie
         return CargarAsync();
     }
 
-    private Task AplicarFechasAsync() => _desde > _hasta ? Task.CompletedTask : CargarAsync();
+    /// <summary>Por qué el periodo elegido no se puede analizar, o null si es válido.</summary>
+    private string? ErrorPeriodo =>
+        _desde > _hasta ? "La fecha «Desde» no puede ser posterior a «Hasta»."
+        : !AnalisisGastos.PeriodoAdmitido(_desde, _hasta) ? "El periodo es demasiado largo para compararlo con el anterior de igual duración: elige fechas más recientes."
+        : null;
+
+    private Task AplicarFechasAsync() => ErrorPeriodo is not null ? Task.CompletedTask : CargarAsync();
 
     private async Task CargarAsync()
     {
+        // Sin un periodo válido no se calcula el anterior: InicioAnterior se saldría del calendario.
+        if (ErrorPeriodo is not null) return;
         var version = ++_version;
         _cargando = true;
         _errorCarga = null;

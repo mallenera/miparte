@@ -71,6 +71,13 @@ public static class AnalisisGastos
     /// <param name="hasta">Último día.</param>
     public static int Dias(DateOnly desde, DateOnly hasta) => hasta.DayNumber - desde.DayNumber + 1;
 
+/// <summary>El periodo es válido y el anterior de igual duración cabe en el calendario (no se sale por debajo de 0001-01-01).</summary>    /// <param name="desde">Primer día.</param>    /// <param name="hasta">Último día.</param>    public static bool PeriodoAdmitido(DateOnly desde, DateOnly hasta) =>        desde <= hasta && desde.DayNumber - Dias(desde, hasta) >= DateOnly.MinValue.DayNumber;
+    /// <summary>El periodo es válido y el anterior de igual duración cabe en el calendario (no se sale por debajo de 0001-01-01).</summary>
+    /// <param name="desde">Primer día.</param>
+    /// <param name="hasta">Último día.</param>
+    public static bool PeriodoAdmitido(DateOnly desde, DateOnly hasta) =>
+        desde <= hasta && desde.DayNumber - Dias(desde, hasta) >= DateOnly.MinValue.DayNumber;
+
     /// <summary>Primer día del periodo anterior, de la misma duración y justo antes de <paramref name="desde"/>.</summary>
     /// <param name="desde">Primer día del periodo actual.</param>
     /// <param name="hasta">Último día del periodo actual.</param>

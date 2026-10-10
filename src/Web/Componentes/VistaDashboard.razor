@@ -54,7 +54,7 @@ else if (_r is not null && _rCat is not null && _rMiembro is not null && _rSerie
             }
             @if (_filtro.Miembro is { } mie)
             {
-                <button class="chip chip-btn sel" type="button" aria-label="Quitar el filtro de persona @NombreMiembro(mie)" @onclick="() => ElegirMiembro(mie)">Paga: @NombreMiembro(mie) <Icono Nombre="x" Tamano="14" /></button>
+                <button class="chip chip-btn sel" type="button" aria-label="Quitar el filtro de persona @Formato.NombreMiembro(mie, _miembros)" @onclick="() => ElegirMiembro(mie)">Paga: @Formato.NombreMiembro(mie, _miembros) <Icono Nombre="x" Tamano="14" /></button>
             }
             @if (_filtro.CuentaComun)
             {
@@ -75,7 +75,7 @@ else if (_r is not null && _rCat is not null && _rMiembro is not null && _rSerie
     <section class="kpis" aria-label="Indicadores clave del periodo @Periodo" aria-live="polite">
         <article class="kpi">
             <span class="kpi-lab">Gasto total</span>
-            <b class="kpi-val" id="kpi-total">@Euros(_r.Total)</b>
+            <b class="kpi-val" id="kpi-total">@Formato.Euros(_r.Total)</b>
             <span class="kpi-sub">@_r.NumeroGastos @(_r.NumeroGastos == 1 ? "gasto" : "gastos") entre @Periodo</span>
         </article>
         <article class="kpi">
@@ -83,7 +83,7 @@ else if (_r is not null && _rCat is not null && _rMiembro is not null && _rSerie
             @if (_r.Variacion is { } v)
             {
                 <b class="kpi-val @(v > 0 ? "sube" : v < 0 ? "baja" : "")" id="kpi-variacion">@(v > 0 ? "▲ +" : v < 0 ? "▼ −" : "")@Math.Abs(v).ToString("P1", Es)</b>
-                <span class="kpi-sub">@(v > 0 ? "Gastáis más" : v < 0 ? "Gastáis menos" : "Igual") que los @Dias @(Dias == 1 ? "día previo" : "días previos") (@Euros(_r.TotalAnterior))</span>
+                <span class="kpi-sub">@(v > 0 ? "Gastáis más" : v < 0 ? "Gastáis menos" : "Igual") que los @Dias @(Dias == 1 ? "día previo" : "días previos") (@Formato.Euros(_r.TotalAnterior))</span>
             }
             else
             {
@@ -93,7 +93,7 @@ else if (_r is not null && _rCat is not null && _rMiembro is not null && _rSerie
         </article>
         <article class="kpi">
             <span class="kpi-lab">Media diaria</span>
-            <b class="kpi-val" id="kpi-media">@Euros(_r.MediaDiaria)</b>
+            <b class="kpi-val" id="kpi-media">@Formato.Euros(_r.MediaDiaria)</b>
             <span class="kpi-sub">En @Dias @(Dias == 1 ? "día" : "días")</span>
         </article>
         <article class="kpi">
@@ -101,7 +101,7 @@ else if (_r is not null && _rCat is not null && _rMiembro is not null && _rSerie
             @if (_r.CategoriaPrincipal is { } cp)
             {
                 <b class="kpi-val kpi-texto" id="kpi-categoria">@cp.Nombre</b>
-                <span class="kpi-sub">@Euros(cp.Importe) · @Porcentaje(cp.Importe, _r.Total) del total</span>
+                <span class="kpi-sub">@Formato.Euros(cp.Importe) · @Porcentaje(cp.Importe, _r.Total) del total</span>
             }
             else
             {
@@ -113,7 +113,7 @@ else if (_r is not null && _rCat is not null && _rMiembro is not null && _rSerie
             <span class="kpi-lab">Mayor gasto</span>
             @if (_r.MayorGasto is { } mg)
             {
-                <b class="kpi-val" id="kpi-mayor">@Euros(mg.Importe)</b>
+                <b class="kpi-val" id="kpi-mayor">@Formato.Euros(mg.Importe)</b>
                 <span class="kpi-sub">@NombreGasto(mg) · @mg.Fecha.ToString("dd/MM/yyyy", Es)</span>
             }
             else
@@ -127,7 +127,7 @@ else if (_r is not null && _rCat is not null && _rMiembro is not null && _rSerie
     @if (_base.NumeroGastos == 0)
     {
         <section class="card">
-            <div class="empty">No hay gastos del hogar entre estas fechas.@(_base.Personales > 0 ? $" Hay {Euros(_base.Personales)} en gastos personales." : "")</div>
+            <div class="empty">No hay gastos del hogar entre estas fechas.@(_base.Personales > 0 ? $" Hay {Formato.Euros(_base.Personales)} en gastos personales." : "")</div>
         </section>
     }
     else
@@ -154,9 +154,9 @@ else if (_r is not null && _rCat is not null && _rMiembro is not null && _rSerie
                     <circle class="gr-punto @(elegido ? "sel" : _tramo is not null ? "apagado" : "")" cx="@N(X(i))" cy="@N(Y(p.Importe))" r="@(_rSerie.Serie.Count > 62 ? "2.5" : "3.5")" />
                     @* Zona de pulsación más grande que el punto, también para el teclado. *@
                     <circle class="gr-hit" cx="@N(X(i))" cy="@N(Y(p.Importe))" r="11" tabindex="0" role="button" aria-pressed="@(elegido ? "true" : "false")"
-                            aria-label="@EtiquetaTramo(p): @Euros(p.Importe). Filtrar por este tramo"
+                            aria-label="@EtiquetaTramo(p): @Formato.Euros(p.Importe). Filtrar por este tramo"
                             @onclick="() => ElegirTramo(p)" @onkeydown="e => TeclaTramo(e, p)">
-                        <title>@EtiquetaTramo(p): @Euros(p.Importe)</title>
+                        <title>@EtiquetaTramo(p): @Formato.Euros(p.Importe)</title>
                     </circle>
                     @if (RotulaEje(i))
                     {
@@ -175,12 +175,12 @@ else if (_r is not null && _rCat is not null && _rMiembro is not null && _rSerie
                     var porcentaje = Porcentaje(c.Importe, _rCat.Total);
                     <button class="dash-fila dash-click @(elegida ? "sel" : _filtro.Categoria is not null ? "apagada" : "")" type="button"
                             aria-pressed="@(elegida ? "true" : "false")" disabled="@(c.CategoriaId == Guid.Empty)"
-                            aria-label="@c.Nombre: @Euros(c.Importe), @porcentaje. Filtrar por esta categoría" @onclick="() => ElegirCategoria(c.CategoriaId)">
+                            aria-label="@c.Nombre: @Formato.Euros(c.Importe), @porcentaje. Filtrar por esta categoría" @onclick="() => ElegirCategoria(c.CategoriaId)">
                         <span class="dash-fila-top">
                             <span class="dash-nombre">@c.Nombre</span>
-                            <span class="g-importe">@Euros(c.Importe)</span>
+                            <span class="g-importe">@Formato.Euros(c.Importe)</span>
                         </span>
-                        <progress class="barra" max="100" value="@Math.Round(Porcentaje(c.Importe, _rCat.Total, 100m), 1).ToString(CultureInfo.InvariantCulture)" aria-hidden="true"></progress>
+                        <progress class="barra" max="100" value="@Math.Round(ProporcionPorCien(c.Importe, _rCat.Total), 1).ToString(CultureInfo.InvariantCulture)" aria-hidden="true"></progress>
                         <span class="muted dash-pie">@porcentaje · @c.Gastos @(c.Gastos == 1 ? "gasto" : "gastos")</span>
                     </button>
                 }
@@ -205,8 +205,8 @@ else if (_r is not null && _rCat is not null && _rMiembro is not null && _rSerie
                         <span class="dash-nombre">
                             @if (m.MiembroId is { } id)
                             {
-                                <Avatar Nombre="@NombreMiembro(id)" Color="@ColorMiembro.De(id, _miembros)" Tamano="sm" />
-                                @NombreMiembro(id)
+                                <Avatar Nombre="@Formato.NombreMiembro(id, _miembros)" Color="@ColorMiembro.De(id, _miembros)" Tamano="sm" />
+                                @Formato.NombreMiembro(id, _miembros)
                             }
                             else
                             {
@@ -214,7 +214,7 @@ else if (_r is not null && _rCat is not null && _rMiembro is not null && _rSerie
                                 @:Cuenta común o ahorro
                             }
                         </span>
-                        <span class="muted">paga <b class="g-importe">@Euros(m.Pagado)</b> · le toca <b class="g-importe">@Euros(m.Asumido)</b></span>
+                        <span class="muted">paga <b class="g-importe">@Formato.Euros(m.Pagado)</b> · le toca <b class="g-importe">@Formato.Euros(m.Asumido)</b></span>
                     </button>
                 }
             </section>
@@ -232,7 +232,7 @@ else if (_r is not null && _rCat is not null && _rMiembro is not null && _rSerie
                         <div class="g-concepto">@NombreGasto(g)</div>
                         <div class="muted g-meta">@g.Fecha.ToString("dd/MM/yyyy", Es) · @ArbolCategorias.Ruta(_categorias, g.CategoriaId)</div>
                     </div>
-                    <div class="g-importe">@Euros(g.Importe)</div>
+                    <div class="g-importe">@Formato.Euros(g.Importe)</div>
                 </div>
             }
             @if (_r.Mayores.Count == 0)
@@ -244,7 +244,7 @@ else if (_r is not null && _rCat is not null && _rMiembro is not null && _rSerie
 
     @if (_r.Personales > 0 && _base.NumeroGastos > 0)
     {
-        <p class="muted">Además hay @Euros(_r.Personales) en gastos personales, fuera del total del hogar.</p>
+        <p class="muted">Además hay @Formato.Euros(_r.Personales) en gastos personales, fuera del total del hogar.</p>
     }
 }
 
@@ -449,18 +449,14 @@ else if (_r is not null && _rCat is not null && _rMiembro is not null && _rSerie
         Recalcular();
     }
 
-    private string NombreMiembro(Guid id) => _miembros.FirstOrDefault(m => m.Id == id)?.Nombre ?? "—";
-
     private string NombreCategoriaRaiz(Guid id) => _categorias.FirstOrDefault(c => c.Id == id)?.Nombre ?? "—";
 
     private string NombreGasto(GastoResponse g) =>
         string.IsNullOrWhiteSpace(g.Concepto) ? ArbolCategorias.Ruta(_categorias, g.CategoriaId) : g.Concepto;
 
-    private static string Euros(decimal importe) => importe.ToString("C2", Es);
-
     private static string Porcentaje(decimal parte, decimal total) => (total > 0 ? parte / total : 0m).ToString("P1", Es);
 
-    private static decimal Porcentaje(decimal parte, decimal total, decimal escala) => total > 0 ? parte / total * escala : 0m;
+    private static decimal ProporcionPorCien(decimal parte, decimal total) => total > 0 ? parte / total * 100m : 0m;
 
     // ───── Gráfico de líneas (SVG con atributos y clases: la CSP no admite estilos en línea) ─────
 

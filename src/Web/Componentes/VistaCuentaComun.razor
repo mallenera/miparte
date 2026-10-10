@@ -55,21 +55,21 @@ else if (_estado is not null)
         }
 
         <div class="u-fila-mt10">
-            <span class="chip">Saldo&nbsp;<b id="saldo">@Euros(_estado.Saldo)</b></span>
-            <span class="chip">Efectivo&nbsp;<b>@Euros(_estado.Efectivo)</b></span>
-            <span class="chip">Aportado este mes&nbsp;<b>@Euros(_estado.AportadoMes)</b></span>
-            <span class="chip">Aportado en total&nbsp;<b>@Euros(_estado.Aportado)</b></span>
-            <span class="chip">Gastado en total&nbsp;<b>@Euros(_estado.Gastado)</b></span>
+            <span class="chip">Saldo&nbsp;<b id="saldo">@Formato.Euros(_estado.Saldo)</b></span>
+            <span class="chip">Efectivo&nbsp;<b>@Formato.Euros(_estado.Efectivo)</b></span>
+            <span class="chip">Aportado este mes&nbsp;<b>@Formato.Euros(_estado.AportadoMes)</b></span>
+            <span class="chip">Aportado en total&nbsp;<b>@Formato.Euros(_estado.Aportado)</b></span>
+            <span class="chip">Gastado en total&nbsp;<b>@Formato.Euros(_estado.Gastado)</b></span>
             @if (_estado.AhorroActivo)
             {
-                <span class="chip">Ahorro disponible&nbsp;<b id="ahorro">@Euros(_estado.AhorroDisponible)</b></span>
+                <span class="chip">Ahorro disponible&nbsp;<b id="ahorro">@Formato.Euros(_estado.AhorroDisponible)</b></span>
             }
         </div>
 
         @if (_estado.Saldo < 0)
         {
             <div class="aviso warn u-mt12" role="status">
-                La cuenta no cubre los gastos: faltan @Euros(-_estado.Saldo) para cubrirlos.
+                La cuenta no cubre los gastos: faltan @Formato.Euros(-_estado.Saldo) para cubrirlos.
             </div>
         }
     </section>
@@ -82,19 +82,19 @@ else if (_estado is not null)
             <div class="catrow parte">
                 <div class="c-name"><Avatar Nombre="@p.Nombre" Color="@ColorMiembro.De(p.MiembroId, _miembros)" Tamano="sm" /> @p.Nombre</div>
                 <div class="c-sel">
-                    <span class="chip">Ha puesto&nbsp;<b>@Euros(p.Aportado)</b>&nbsp;para gastos (@Porcentaje(p.PorcentajeGastos))</span>
+                    <span class="chip">Ha puesto&nbsp;<b>@Formato.Euros(p.Aportado)</b>&nbsp;para gastos (@Porcentaje(p.PorcentajeGastos))</span>
                     @if (_estado.AhorroActivo)
                     {
-                        <span class="chip">Ahorro&nbsp;<b>@Euros(p.Ahorrado)</b>&nbsp;(@Porcentaje(p.PorcentajeAhorro))</span>
+                        <span class="chip">Ahorro&nbsp;<b>@Formato.Euros(p.Ahorrado)</b>&nbsp;(@Porcentaje(p.PorcentajeAhorro))</span>
                     }
-                    <span class="chip">Su parte del saldo&nbsp;<b>@Euros(p.ParteSaldo)</b></span>
+                    <span class="chip">Su parte del saldo&nbsp;<b>@Formato.Euros(p.ParteSaldo)</b></span>
                     @if (_estado.AhorroActivo)
                     {
-                        <span class="chip">Su parte del ahorro&nbsp;<b>@Euros(p.ParteAhorro)</b></span>
+                        <span class="chip">Su parte del ahorro&nbsp;<b>@Formato.Euros(p.ParteAhorro)</b></span>
                     }
                     @if (p.Pendiente > 0)
                     {
-                        <span class="chip">La cuenta le debe&nbsp;<b>@Euros(p.Pendiente)</b></span>
+                        <span class="chip">La cuenta le debe&nbsp;<b>@Formato.Euros(p.Pendiente)</b></span>
                     }
                 </div>
             </div>
@@ -113,7 +113,7 @@ else if (_estado is not null)
             {
                 <div class="catrow">
                     <div class="c-name"><Avatar Nombre="@a.Nombre" Color="@ColorMiembro.De(a.Id, _miembros)" Tamano="sm" /> @a.Nombre</div>
-                    <div class="c-sel">@Euros(VigenteDe(a.Id)) al mes@(AhorroVigenteDe(a.Id) > 0 ? $" ({Euros(AhorroVigenteDe(a.Id))} de ahorro)" : "")</div>
+                    <div class="c-sel">@Formato.Euros(VigenteDe(a.Id)) al mes@(AhorroVigenteDe(a.Id) > 0 ? $" ({Formato.Euros(AhorroVigenteDe(a.Id))} de ahorro)" : "")</div>
                 </div>
             }
             @if (_adultos.Count == 0)
@@ -159,7 +159,7 @@ else if (_estado is not null)
         {
             <div class="catrow">
                 <div class="c-name">@p.Nombre</div>
-                <div class="c-sel">La cuenta le debe @Euros(p.Importe)</div>
+                <div class="c-sel">La cuenta le debe @Formato.Euros(p.Importe)</div>
             </div>
         }
 
@@ -167,10 +167,10 @@ else if (_estado is not null)
         {
             <div class="gastorow">
                 <div class="g-main">
-                    <div class="g-concepto">Reembolso a @NombreMiembro(r.MiembroId)</div>
+                    <div class="g-concepto">Reembolso a @Formato.NombreMiembro(r.MiembroId, _miembros)</div>
                     <div class="muted g-meta">@r.Fecha.ToString("dd/MM/yyyy", Es)@(string.IsNullOrWhiteSpace(r.Concepto) ? "" : " · " + r.Concepto)</div>
                 </div>
-                <div class="g-importe">@Euros(r.Importe)</div>
+                <div class="g-importe">@Formato.Euros(r.Importe)</div>
                 <div class="c-acc">
                     @if (_confirmandoEliminar == r.Id)
                     {
@@ -180,7 +180,7 @@ else if (_estado is not null)
                     }
                     else
                     {
-                        <button class="linkbtn danger" type="button" aria-label="Eliminar reembolso a @NombreMiembro(r.MiembroId)" @onclick="() => _confirmandoEliminar = r.Id">Eliminar</button>
+                        <button class="linkbtn danger" type="button" aria-label="Eliminar reembolso a @Formato.NombreMiembro(r.MiembroId, _miembros)" @onclick="() => _confirmandoEliminar = r.Id">Eliminar</button>
                     }
                 </div>
             </div>
@@ -215,17 +215,17 @@ else if (_estado is not null)
             <div class="card-head"><h2 id="t-ahorro">Ahorro</h2></div>
             <p class="muted">Suma la parte de las aportaciones que se aparta y lo que ingreses aparte (ahorro inicial, lotería…). Los gastos no la tocan: solo baja al retirarla o al pagar un gasto desde el ahorro.</p>
             <div class="u-fila-mt10">
-                <span class="chip">Ahorrado este mes&nbsp;<b>@Euros(_estado.AhorroMes)</b></span>
-                <span class="chip">Ahorrado en total&nbsp;<b>@Euros(_estado.AhorroAcumulado)</b></span>
-                <span class="chip">Ingresado aparte&nbsp;<b>@Euros(_estado.AhorroDepositado)</b></span>
-                <span class="chip">Retirado&nbsp;<b>@Euros(_estado.AhorroRetirado)</b></span>
-                <span class="chip">Gastado del ahorro&nbsp;<b>@Euros(_estado.AhorroGastado)</b></span>
+                <span class="chip">Ahorrado este mes&nbsp;<b>@Formato.Euros(_estado.AhorroMes)</b></span>
+                <span class="chip">Ahorrado en total&nbsp;<b>@Formato.Euros(_estado.AhorroAcumulado)</b></span>
+                <span class="chip">Ingresado aparte&nbsp;<b>@Formato.Euros(_estado.AhorroDepositado)</b></span>
+                <span class="chip">Retirado&nbsp;<b>@Formato.Euros(_estado.AhorroRetirado)</b></span>
+                <span class="chip">Gastado del ahorro&nbsp;<b>@Formato.Euros(_estado.AhorroGastado)</b></span>
             </div>
 
             @if (_estado.AhorroDisponible < 0)
             {
                 <div class="aviso warn u-mt12" role="status">
-                    Se ha retirado más de lo ahorrado: faltan @Euros(-_estado.AhorroDisponible) (revisa las aportaciones o las retiradas).
+                    Se ha retirado más de lo ahorrado: faltan @Formato.Euros(-_estado.AhorroDisponible) (revisa las aportaciones o las retiradas).
                 </div>
             }
 
@@ -233,10 +233,10 @@ else if (_estado is not null)
             {
                 <div class="gastorow">
                     <div class="g-main">
-                        <div class="g-concepto">Ingreso de @NombreMiembro(d.MiembroId)</div>
+                        <div class="g-concepto">Ingreso de @Formato.NombreMiembro(d.MiembroId, _miembros)</div>
                         <div class="muted g-meta">@d.Fecha.ToString("dd/MM/yyyy", Es)@(string.IsNullOrWhiteSpace(d.Concepto) ? "" : " · " + d.Concepto)</div>
                     </div>
-                    <div class="g-importe">@Euros(d.Importe)</div>
+                    <div class="g-importe">@Formato.Euros(d.Importe)</div>
                     <div class="c-acc">
                         @if (_confirmandoEliminar == d.Id)
                         {
@@ -246,7 +246,7 @@ else if (_estado is not null)
                         }
                         else
                         {
-                            <button class="linkbtn danger" type="button" aria-label="Eliminar ingreso de @NombreMiembro(d.MiembroId)" @onclick="() => _confirmandoEliminar = d.Id">Eliminar</button>
+                            <button class="linkbtn danger" type="button" aria-label="Eliminar ingreso de @Formato.NombreMiembro(d.MiembroId, _miembros)" @onclick="() => _confirmandoEliminar = d.Id">Eliminar</button>
                         }
                     </div>
                 </div>
@@ -278,10 +278,10 @@ else if (_estado is not null)
             {
                 <div class="gastorow">
                     <div class="g-main">
-                        <div class="g-concepto">Retirada de @NombreMiembro(r.MiembroId)</div>
+                        <div class="g-concepto">Retirada de @Formato.NombreMiembro(r.MiembroId, _miembros)</div>
                         <div class="muted g-meta">@r.Fecha.ToString("dd/MM/yyyy", Es)@(string.IsNullOrWhiteSpace(r.Concepto) ? "" : " · " + r.Concepto)</div>
                     </div>
-                    <div class="g-importe">@Euros(r.Importe)</div>
+                    <div class="g-importe">@Formato.Euros(r.Importe)</div>
                     <div class="c-acc">
                         @if (_confirmandoEliminar == r.Id)
                         {
@@ -291,7 +291,7 @@ else if (_estado is not null)
                         }
                         else
                         {
-                            <button class="linkbtn danger" type="button" aria-label="Eliminar retirada de @NombreMiembro(r.MiembroId)" @onclick="() => _confirmandoEliminar = r.Id">Eliminar</button>
+                            <button class="linkbtn danger" type="button" aria-label="Eliminar retirada de @Formato.NombreMiembro(r.MiembroId, _miembros)" @onclick="() => _confirmandoEliminar = r.Id">Eliminar</button>
                         }
                     </div>
                 </div>
@@ -367,7 +367,7 @@ else if (_estado is not null)
         try
         {
             _miembros = await Api.ListarMiembrosAsync();
-            _adultos = _miembros.Where(m => m.Tipo == "adulto" && m.Activo).ToList();
+            _adultos = _miembros.Where(m => m.Tipo == TiposMiembro.Adulto && m.Activo).ToList();
             _aportante = _retirante = _depositante = (_adultos.FirstOrDefault(m => m.EsYo) ?? _adultos.FirstOrDefault())?.Id ?? Guid.Empty;
             await RecargarAsync();
         }
@@ -381,7 +381,7 @@ else if (_estado is not null)
 
     private async Task RecargarAsync()
     {
-        _estado = await Api.ObtenerCuentaComunAsync(_mes.ToString("yyyy-MM", CultureInfo.InvariantCulture));
+        _estado = await Api.ObtenerCuentaComunAsync(Formato.Mes(_mes));
         if (_estado.Pendientes.All(p => p.MiembroId != _reembolsado)) _reembolsado = _estado.Pendientes.FirstOrDefault()?.MiembroId ?? Guid.Empty;
         AlCambiarAportante();
     }
@@ -400,10 +400,6 @@ else if (_estado is not null)
             _error = e.Message;
         }
     }
-
-    private string NombreMiembro(Guid id) => _miembros.FirstOrDefault(m => m.Id == id)?.Nombre ?? "—";
-
-    private static string Euros(decimal importe) => importe.ToString("C2", Es);
 
     /// <summary>Aportación de un adulto en el mes mostrado: la de la fila más reciente que no pase de ese mes.</summary>
     private decimal VigenteDe(Guid miembro) =>

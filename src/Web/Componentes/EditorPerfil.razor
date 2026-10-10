@@ -97,7 +97,7 @@
 
     protected override void OnInitialized()
     {
-        _adultos = Miembros.Where(m => m.Tipo == "adulto" && m.Activo).OrderBy(m => m.Nombre).ToList();
+        _adultos = Miembros.Where(m => m.Tipo == TiposMiembro.Adulto && m.Activo).OrderBy(m => m.Nombre).ToList();
         var ids = _adultos.Select(a => a.Id);
         _edicion = Perfil is null ? new EdicionPerfil(ids) : EdicionPerfil.Desde(Perfil, ids);
     }

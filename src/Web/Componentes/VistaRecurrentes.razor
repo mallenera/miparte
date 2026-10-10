@@ -66,11 +66,11 @@ else
                     <div class="g-main">
                         <div class="g-concepto">@(string.IsNullOrWhiteSpace(p.Concepto) ? NombreCategoria(p.CategoriaId) : p.Concepto)</div>
                         <div class="muted g-meta">
-                            Día @p.DiaMes · @NombreCategoria(p.CategoriaId) · paga @NombreMiembro(p.PagadoPor) · @NombrePerfil(p.PerfilRepartoId)
+                            Día @p.DiaMes · @NombreCategoria(p.CategoriaId) · paga @Formato.NombreMiembro(p.PagadoPor, _miembros) · @NombrePerfil(p.PerfilRepartoId)
                             @if (!p.Activo) { <span class="tag off">pausada</span> }
                         </div>
                     </div>
-                    <div class="g-importe">@Euros(p.Importe)</div>
+                    <div class="g-importe">@Formato.Euros(p.Importe)</div>
                     <div class="c-acc">
                         @if (_confirmandoEliminar == p.Id)
                         {
@@ -195,7 +195,7 @@ else
             var perfiles = Api.ListarPerfilesAsync();
             await Task.WhenAll(miembros, categorias, perfiles);
             _miembros = miembros.Result;
-            _adultos = _miembros.Where(m => m.Tipo == "adulto" && m.Activo).ToList();
+            _adultos = _miembros.Where(m => m.Tipo == TiposMiembro.Adulto && m.Activo).ToList();
             _categorias = categorias.Result;
             _perfiles = perfiles.Result;
             _arbol = ArbolCategorias.Aplanar(_categorias);
@@ -219,15 +219,11 @@ else
         _resultado = null;
     }
 
-    private string NombreMiembro(Guid id) => _miembros.FirstOrDefault(m => m.Id == id)?.Nombre ?? "—";
-
     private string NombreCategoria(Guid id) => ArbolCategorias.Ruta(_categorias, id);
 
     private string NombrePerfil(Guid id) => _perfiles.FirstOrDefault(p => p.Id == id)?.Nombre ?? "—";
 
     private string NombrePlantilla(GastoRecurrenteResponse p) => string.IsNullOrWhiteSpace(p.Concepto) ? NombreCategoria(p.CategoriaId) : p.Concepto;
-
-    private static string Euros(decimal importe) => importe.ToString("C2", Es);
 
     private bool TryImporte(out decimal valor) =>
         decimal.TryParse(_importe.Trim().Replace(',', '.'), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out valor)
@@ -332,7 +328,7 @@ else
         _generando = true;
         try
         {
-            var r = await Api.GenerarRecurrentesAsync(_mes.ToString("yyyy-MM", CultureInfo.InvariantCulture));
+            var r = await Api.GenerarRecurrentesAsync(Formato.Mes(_mes));
             _resultado = r.Creados == 0
                 ? $"No se ha creado ningún gasto: {r.YaExistentes} {(r.YaExistentes == 1 ? "plantilla ya tenía" : "plantillas ya tenían")} su gasto en {NombreMes}."
                 : $"Se {(r.Creados == 1 ? "ha creado 1 gasto" : $"han creado {r.Creados} gastos")} en {NombreMes}"

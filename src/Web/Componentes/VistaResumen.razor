@@ -76,21 +76,21 @@ else if (_resumen is not null && _liquidacion is not null)
             {
                 <div class="gastorow">
                     <div class="g-main">
-                        <div class="g-concepto">@NombreMiembro(t.De) paga a @NombreMiembro(t.A)</div>
-                        <div class="muted g-meta">Pendiente @Euros(t.Importe)</div>
+                        <div class="g-concepto">@Formato.NombreMiembro(t.De, _miembros) paga a @Formato.NombreMiembro(t.A, _miembros)</div>
+                        <div class="muted g-meta">Pendiente @Formato.Euros(t.Importe)</div>
                         @if (!ImporteValido(t))
                         {
-                            <div id="@IdError(t)" class="muted g-meta" role="status">Importe entre 0,01 y @Euros(t.Importe), con máximo 2 decimales.</div>
+                            <div id="@IdError(t)" class="muted g-meta" role="status">Importe entre 0,01 y @Formato.Euros(t.Importe), con máximo 2 decimales.</div>
                         }
                     </div>
                     <div class="c-acc pagoimp">
-                        <label class="sr" for="@IdImporte(t)">Importe a pagar de @NombreMiembro(t.De) a @NombreMiembro(t.A)</label>
+                        <label class="sr" for="@IdImporte(t)">Importe a pagar de @Formato.NombreMiembro(t.De, _miembros) a @Formato.NombreMiembro(t.A, _miembros)</label>
                         <input id="@IdImporte(t)" class="g-importe" inputmode="decimal" value="@ImporteEscrito(t)"
                                aria-invalid="@(ImporteValido(t) ? null : "true")" aria-describedby="@(ImporteValido(t) ? null : IdError(t))"
                                @oninput="e => EscribirImporte(t, e.Value?.ToString())" />
                         @if (Permisos.Tiene(Claves.PagosRegistrar))
                         {
-                            <button class="btn" type="button" aria-label="Registrar el pago de @NombreMiembro(t.De) a @NombreMiembro(t.A)"
+                            <button class="btn" type="button" aria-label="Registrar el pago de @Formato.NombreMiembro(t.De, _miembros) a @Formato.NombreMiembro(t.A, _miembros)"
                                     disabled="@(_guardando || !ImporteValido(t))" @onclick="() => RegistrarPagoAsync(t)">Registrar pago</button>
                         }
                         else
@@ -109,10 +109,10 @@ else if (_resumen is not null && _liquidacion is not null)
             {
                 <div class="gastorow">
                     <div class="g-main">
-                        <div class="g-concepto">@NombreMiembro(p.DeMiembroId) pagó a @NombreMiembro(p.AMiembroId)</div>
+                        <div class="g-concepto">@Formato.NombreMiembro(p.DeMiembroId, _miembros) pagó a @Formato.NombreMiembro(p.AMiembroId, _miembros)</div>
                         <div class="muted g-meta">@p.Fecha.ToString("dd/MM/yyyy", Es)@(string.IsNullOrWhiteSpace(p.Concepto) ? "" : " · " + p.Concepto)</div>
                     </div>
-                    <div class="g-importe">@Euros(p.Importe)</div>
+                    <div class="g-importe">@Formato.Euros(p.Importe)</div>
                     <div class="c-acc">
                         @if (_confirmandoEliminar == p.Id)
                         {
@@ -122,7 +122,7 @@ else if (_resumen is not null && _liquidacion is not null)
                         }
                         else if (Permisos.Tiene(Claves.PagosRegistrar))
                         {
-                            <button class="linkbtn danger" type="button" aria-label="Eliminar el pago de @NombreMiembro(p.DeMiembroId) a @NombreMiembro(p.AMiembroId)" @onclick="() => _confirmandoEliminar = p.Id">Eliminar</button>
+                            <button class="linkbtn danger" type="button" aria-label="Eliminar el pago de @Formato.NombreMiembro(p.DeMiembroId, _miembros) a @Formato.NombreMiembro(p.AMiembroId, _miembros)" @onclick="() => _confirmandoEliminar = p.Id">Eliminar</button>
                         }
                     </div>
                 </div>
@@ -136,19 +136,19 @@ else if (_resumen is not null && _liquidacion is not null)
             <div class="card-head"><h2 id="t-cuenta-resumen">Cuenta común</h2></div>
             <p class="muted">Saldos al final de @NombreMes. Los gastos a su cargo no entran en la liquidación entre personas.</p>
             <div class="u-fila-mt10">
-                <span class="chip">Saldo&nbsp;<b id="cuenta-saldo">@Euros(cuenta.Saldo)</b></span>
-                <span class="chip">Efectivo&nbsp;<b>@Euros(cuenta.Efectivo)</b></span>
-                <span class="chip">Aportado este mes&nbsp;<b>@Euros(cuenta.AportadoMes)</b></span>
-                <span class="chip">Gastado este mes&nbsp;<b>@Euros(cuenta.GastadoMes)</b></span>
-                <span class="chip">Ahorro disponible&nbsp;<b>@Euros(cuenta.AhorroDisponible)</b></span>
+                <span class="chip">Saldo&nbsp;<b id="cuenta-saldo">@Formato.Euros(cuenta.Saldo)</b></span>
+                <span class="chip">Efectivo&nbsp;<b>@Formato.Euros(cuenta.Efectivo)</b></span>
+                <span class="chip">Aportado este mes&nbsp;<b>@Formato.Euros(cuenta.AportadoMes)</b></span>
+                <span class="chip">Gastado este mes&nbsp;<b>@Formato.Euros(cuenta.GastadoMes)</b></span>
+                <span class="chip">Ahorro disponible&nbsp;<b>@Formato.Euros(cuenta.AhorroDisponible)</b></span>
                 @if (cuenta.Pendiente > 0)
                 {
-                    <span class="chip">Pendiente de reembolsar&nbsp;<b>@Euros(cuenta.Pendiente)</b></span>
+                    <span class="chip">Pendiente de reembolsar&nbsp;<b>@Formato.Euros(cuenta.Pendiente)</b></span>
                 }
             </div>
             @if (cuenta.Saldo < 0)
             {
-                <div class="aviso warn u-mt12" role="status">La cuenta no cubre los gastos: faltan @Euros(-cuenta.Saldo).</div>
+                <div class="aviso warn u-mt12" role="status">La cuenta no cubre los gastos: faltan @Formato.Euros(-cuenta.Saldo).</div>
             }
             <a class="linkbtn u-mt8-inline" href="cuenta-comun">Ver la cuenta común</a>
         </section>
@@ -167,14 +167,14 @@ else if (_resumen is not null && _liquidacion is not null)
             {
                 <div class="catrow">
                     <div class="c-name"><Avatar Nombre="@m.Nombre" Color="@ColorMiembro.De(m.MiembroId, _miembros)" Tamano="sm" /> @m.Nombre</div>
-                    <div class="c-sel"><span class="chip">La cuenta común le debe&nbsp;<b>@Euros(m.DebeCuentaComun)</b></span></div>
+                    <div class="c-sel"><span class="chip">La cuenta común le debe&nbsp;<b>@Formato.Euros(m.DebeCuentaComun)</b></span></div>
                 </div>
             }
         }
         else
         {
             <div class="u-fila-mt10">
-                <span class="chip">Gastos del mes&nbsp;<b id="total">@Euros(_resumen.GastosTotales)</b></span>
+                <span class="chip">Gastos del mes&nbsp;<b id="total">@Formato.Euros(_resumen.GastosTotales)</b></span>
             </div>
 
             <h3 class="u-sec">Por persona</h3>
@@ -183,10 +183,10 @@ else if (_resumen is not null && _liquidacion is not null)
                 <div class="catrow">
                     <div class="c-name"><Avatar Nombre="@m.Nombre" Color="@ColorMiembro.De(m.MiembroId, _miembros)" Tamano="sm" /> @m.Nombre</div>
                     <div class="c-sel">
-                        Ha pagado @Euros(m.Pagado) · le corresponden @Euros(m.Asumido)
+                        Ha pagado @Formato.Euros(m.Pagado) · le corresponden @Formato.Euros(m.Asumido)
                         @if (m.DebeCuentaComun > 0)
                         {
-                            <span class="chip">La cuenta común le debe&nbsp;<b>@Euros(m.DebeCuentaComun)</b></span>
+                            <span class="chip">La cuenta común le debe&nbsp;<b>@Formato.Euros(m.DebeCuentaComun)</b></span>
                         }
                     </div>
                 </div>
@@ -208,7 +208,7 @@ else if (_resumen is not null && _liquidacion is not null)
                         @(f.Directo ? "Sin subcategoría" : n.Nombre)
                     </div>
                     <div class="c-sel">
-                        <b class="g-importe">@Euros(importe)</b> <span class="muted">@Porcentaje(importe) %</span>
+                        <b class="g-importe">@Formato.Euros(importe)</b> <span class="muted">@Porcentaje(importe) %</span>
                         <progress class="barra" max="100" value="@Porcentaje(importe)" aria-label="@Porcentaje(importe) % del total del mes"></progress>
                         @if (!f.Directo && n.PorMiembro.Count > 0)
                         {
@@ -216,8 +216,8 @@ else if (_resumen is not null && _liquidacion is not null)
                                 @foreach (var p in n.PorMiembro)
                                 {
                                     <span class="chip">
-                                        <Avatar Nombre="@NombreMiembro(p.MiembroId)" Color="@ColorMiembro.De(p.MiembroId, _miembros)" Tamano="sm" />
-                                        @Euros(p.Importe)
+                                        <Avatar Nombre="@Formato.NombreMiembro(p.MiembroId, _miembros)" Color="@ColorMiembro.De(p.MiembroId, _miembros)" Tamano="sm" />
+                                        @Formato.Euros(p.Importe)
                                     </span>
                                 }
                             </span>
@@ -235,7 +235,7 @@ else if (_resumen is not null && _liquidacion is not null)
             {
                 <div class="catrow">
                     <div class="c-name"><Avatar Nombre="@m.Nombre" Color="@ColorMiembro.De(m.MiembroId, _miembros)" Tamano="sm" /> @m.Nombre</div>
-                    <div class="c-sel"><span class="tag admin">Personal</span> <b class="g-importe">@Euros(m.Personal)</b></div>
+                    <div class="c-sel"><span class="tag admin">Personal</span> <b class="g-importe">@Formato.Euros(m.Personal)</b></div>
                 </div>
             }
         }
@@ -283,7 +283,7 @@ else if (_resumen is not null && _liquidacion is not null)
     private Guid? _confirmandoEliminar;
     private List<MesCerradoDto> _cierres = [];
 
-    private MesCerradoDto? CierreDelMes => _cierres.FirstOrDefault(c => c.Mes == _mes.ToString("yyyy-MM", CultureInfo.InvariantCulture));
+    private MesCerradoDto? CierreDelMes => _cierres.FirstOrDefault(c => c.Mes == Formato.Mes(_mes));
 
     private string _filtroMiembro = "";
     private readonly Dictionary<(Guid, Guid), string> _importes = [];
@@ -322,7 +322,7 @@ else if (_resumen is not null && _liquidacion is not null)
 
     private async Task RecargarAsync()
     {
-        var mes = _mes.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+        var mes = Formato.Mes(_mes);
         _resumen = await Api.ObtenerResumenAsync(mes);
         _liquidacion = await Api.ObtenerLiquidacionAsync(mes);
         try
@@ -367,12 +367,8 @@ else if (_resumen is not null && _liquidacion is not null)
     private string NombreCategoria(ResumenCategoriaDto c) =>
         _categorias.Any(x => x.Id == c.CategoriaId) ? ArbolCategorias.Ruta(_categorias, c.CategoriaId) : c.Nombre;
 
-    private string NombreMiembro(Guid id) => _miembros.FirstOrDefault(m => m.Id == id)?.Nombre ?? "—";
-
-    private static string Euros(decimal importe) => importe.ToString("C2", Es);
-
     /// <summary>Saldo con signo explícito, para que no dependa solo del color.</summary>
-    private static string Saldo(decimal saldo) => (saldo > 0 ? "+" : "") + Euros(saldo);
+    private static string Saldo(decimal saldo) => (saldo > 0 ? "+" : "") + Formato.Euros(saldo);
 
     /// <summary>Sin filtro pasa todo; con filtro, solo lo que afecta al miembro elegido.</summary>
     private bool FiltraMiembro(Guid id) => _filtroMiembro == "" || id.ToString() == _filtroMiembro;

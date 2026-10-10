@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Text.RegularExpressions;
 using MiParte.Contracts;
 using MiParte.Core.Domain;
 using MiParte.Core.Domain.Entidades;
@@ -121,7 +120,7 @@ public sealed partial class ServidorDemo
     private static IReadOnlySet<string> Efectivos(MiembroDemo m, string? rol = null, List<string>? propios = null, bool usarPropios = false)
         => CatalogoPermisos.Efectivos(new Miembro
         {
-            Tipo = m.Tipo == "adulto" ? TipoMiembro.Adulto : TipoMiembro.ACargo,
+            Tipo = m.Tipo == TiposMiembro.Adulto ? TipoMiembro.Adulto : TipoMiembro.ACargo,
             UserId = m.Vinculado ? Guid.Empty : null,
             Rol = (rol ?? m.Rol) == "admin" ? RolMiembro.Admin : RolMiembro.Miembro,
             Permisos = usarPropios ? propios : m.Permisos,
@@ -136,9 +135,9 @@ public sealed partial class ServidorDemo
         var nombre = r.Nombre?.Trim();
         if (string.IsNullOrEmpty(nombre)) return Mal("El nombre es obligatorio.");
         if (nombre.Length > MaxNombre) return Mal($"El nombre admite como máximo {MaxNombre} caracteres.");
-        if (r.Tipo is not ("adulto" or "a_cargo")) return Mal("El tipo debe ser 'adulto' o 'a_cargo'.");
+        if (r.Tipo is not (TiposMiembro.Adulto or TiposMiembro.ACargo)) return Mal("El tipo debe ser 'adulto' o 'a_cargo'.");
 
-        if (r.Tipo == "a_cargo")
+        if (r.Tipo == TiposMiembro.ACargo)
         {
             if (r.ResponsableId is null) return Mal("Un miembro a cargo necesita un responsable adulto.");
             if (!EsAdultoActivo(r.ResponsableId.Value)) return Mal("El responsable debe ser un adulto activo del hogar.");
@@ -166,7 +165,7 @@ public sealed partial class ServidorDemo
         if (r.Rol is not null and not ("admin" or "miembro")) return Mal("El rol debe ser 'admin' o 'miembro'.");
         if (r.ResponsableId is { } responsable)
         {
-            if (m.Tipo != "a_cargo") return Mal("Solo un miembro a cargo tiene responsable.");
+            if (m.Tipo != TiposMiembro.ACargo) return Mal("Solo un miembro a cargo tiene responsable.");
             if (!EsAdultoActivo(responsable)) return Mal("El responsable debe ser un adulto activo del hogar.");
         }
 
@@ -174,7 +173,7 @@ public sealed partial class ServidorDemo
         if (r.Permisos is not null)
         {
             if (r.Permisos.FirstOrDefault(p => !CatalogoPermisos.Existe(p)) is { } desconocido) return Mal($"El permiso «{desconocido}» no existe.");
-            if (m.Tipo != "adulto" || !m.Vinculado) return Mal(HttpStatusCode.Conflict, "Solo un adulto con cuenta tiene permisos propios.");
+            if (m.Tipo != TiposMiembro.Adulto || !m.Vinculado) return Mal(HttpStatusCode.Conflict, "Solo un adulto con cuenta tiene permisos propios.");
             permisos = r.Permisos.ToList();
         }
 
@@ -216,10 +215,10 @@ public sealed partial class ServidorDemo
         return Respuesta(HttpStatusCode.Created, new InvitacionCreada(Guid.NewGuid(), $"demo-{Guid.NewGuid():N}", DateTimeOffset.UtcNow.AddDays(7)));
     }
 
-    private bool EsAdultoActivo(Guid id) => _miembros.Any(m => m.Id == id && m.Activo && m.Tipo == "adulto");
+    private bool EsAdultoActivo(Guid id) => _miembros.Any(m => m.Id == id && m.Activo && m.Tipo == TiposMiembro.Adulto);
 
     private List<MiembroDemo> AdultosActivos() =>
-        _miembros.Where(m => m.Activo && m.Tipo == "adulto").OrderBy(m => m.Nombre).ThenBy(m => m.Id).ToList();
+        _miembros.Where(m => m.Activo && m.Tipo == TiposMiembro.Adulto).OrderBy(m => m.Nombre).ThenBy(m => m.Id).ToList();
 
     // ───── Categorías ─────
 
@@ -739,21 +738,11 @@ public sealed partial class ServidorDemo
 
     // ───── Utilidades ─────
 
-    [GeneratedRegex(@"^\d{4}-(0[1-9]|1[0-2])$")]
-    private static partial Regex PatronMes();
+    private static bool TryMes(string? mes, out DateOnly inicio) => FormatosApi.TryMes(mes, out inicio);
 
-    private static bool TryFecha(string? texto, out DateOnly fecha) =>
-        DateOnly.TryParseExact(texto, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out fecha);
+    private static bool TryFecha(string? texto, out DateOnly fecha) => FormatosApi.TryFecha(texto, out fecha);
 
-    private static bool TryMes(string? mes, out DateOnly inicio)
-    {
-        inicio = default;
-        if (mes is null || !PatronMes().IsMatch(mes) || int.Parse(mes[..4]) < 1) return false;
-        inicio = new DateOnly(int.Parse(mes[..4]), int.Parse(mes[5..]), 1);
-        return true;
-    }
-
-    private static string FormatoMes(DateOnly inicio) => $"{inicio.Year:0000}-{inicio.Month:00}";
+    private static string FormatoMes(DateOnly inicio) => FormatosApi.FormatoMes(inicio);
 
     private static string? ValidarImporte(decimal importe)
     {
@@ -800,7 +789,7 @@ public sealed partial class ServidorDemo
     {
         public Guid Id { get; init; }
         public string Nombre { get; set; } = "";
-        public string Tipo { get; init; } = "adulto";
+        public string Tipo { get; init; } = TiposMiembro.Adulto;
         public Guid? ResponsableId { get; set; }
         public bool Activo { get; set; } = true;
         public string Rol { get; set; } = "miembro";

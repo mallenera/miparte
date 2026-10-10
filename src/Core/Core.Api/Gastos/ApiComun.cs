@@ -1,5 +1,5 @@
-using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using MiParte.Contracts;
 using MiParte.Core.Domain;
 using MiParte.Core.Domain.Entidades;
 using MiParte.Core.Infrastructure.Persistencia;
@@ -7,30 +7,18 @@ using MiParte.Core.Infrastructure.Persistencia;
 namespace MiParte.Core.Api.Gastos;
 
 /// <summary>Utilidades compartidas por los endpoints de gastos, recurrentes y liquidación.</summary>
-internal static partial class ApiComun
+internal static class ApiComun
 {
     /// <summary>Longitud máxima del concepto de un movimiento.</summary>
     public const int MaxConcepto = 200;
     /// <summary>Importe máximo admitido en un movimiento.</summary>
     private const decimal MaxImporte = 9_999_999_999.99m;
 
-    /// <summary>Patrón estricto del mes con formato YYYY-MM.</summary>
-    [GeneratedRegex(@"^\d{4}-(0[1-9]|1[0-2])$")]
-    private static partial Regex PatronMes();
-
     /// <summary>Parsea "YYYY-MM" estricto; devuelve el primer día del mes.</summary>
-    public static bool TryMes(string? mes, out DateOnly inicio)
-    {
-        inicio = default;
-        if (mes is null || !PatronMes().IsMatch(mes)) return false;
-        var anio = int.Parse(mes[..4]);
-        if (anio < 1) return false;
-        inicio = new DateOnly(anio, int.Parse(mes[5..]), 1);
-        return true;
-    }
+    public static bool TryMes(string? mes, out DateOnly inicio) => FormatosApi.TryMes(mes, out inicio);
 
     /// <summary>Formatea el primer día de un mes como "YYYY-MM".</summary>
-    public static string FormatoMes(DateOnly inicio) => $"{inicio.Year:0000}-{inicio.Month:00}";
+    public static string FormatoMes(DateOnly inicio) => FormatosApi.FormatoMes(inicio);
 
     /// <summary>Respuesta 400 con el mensaje de error indicado.</summary>
     public static IResult Invalido(string mensaje) => Results.BadRequest(new { error = mensaje });
@@ -39,8 +27,7 @@ internal static partial class ApiComun
     public static IResult MesInvalido() => Invalido("El mes debe tener el formato YYYY-MM.");
 
     /// <summary>Parsea una fecha con el formato exacto "YYYY-MM-DD".</summary>
-    public static bool TryFecha(string? texto, out DateOnly fecha) =>
-        DateOnly.TryParseExact(texto, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out fecha);
+    public static bool TryFecha(string? texto, out DateOnly fecha) => FormatosApi.TryFecha(texto, out fecha);
 
     /// <summary>Respuesta 400 por una fecha con formato distinto de YYYY-MM-DD; <paramref name="parametro"/> es el nombre del parámetro.</summary>
     public static IResult FechaInvalida(string parametro) => Invalido($"La fecha «{parametro}» debe tener el formato YYYY-MM-DD.");

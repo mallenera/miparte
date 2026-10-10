@@ -36,7 +36,7 @@ public static class CierresMesEndpoints
     }
 
     /// <summary>Convierte un cierre en su DTO, con el nombre de quien lo cerró.</summary>
-    private static MesCerradoDto A(MesCerrado c, IReadOnlyDictionary<Guid, string> autores)
+    private static MesCerradoDto ADto(MesCerrado c, IReadOnlyDictionary<Guid, string> autores)
         => new(ApiComun.FormatoMes(c.Mes), c.CerradoEn, c.CerradoPor is { } u ? autores.GetValueOrDefault(u) : null);
 
     /// <summary>GET /api/cierres-mes: meses cerrados del hogar, del más reciente al más antiguo. Cualquier miembro. 409 sin hogar.</summary>
@@ -46,7 +46,7 @@ public static class CierresMesEndpoints
         if (hogar.HogarId is null) return ApiComun.SinHogar();
         var cierres = await db.MesesCerrados.OrderByDescending(c => c.Mes).ToListAsync(ct);
         var autores = await db.Miembros.Where(m => m.UserId != null).ToDictionaryAsync(m => m.UserId!.Value, m => m.Nombre, ct);
-        return Results.Ok(cierres.Select(c => A(c, autores)).ToList());
+        return Results.Ok(cierres.Select(c => ADto(c, autores)).ToList());
     }
 
     /// <summary>POST /api/cierres-mes: cierra un mes. Exige el permiso <c>mes.cerrar</c> (403 si no). 400 si el mes es inválido o aún no ha terminado; 409 sin hogar o si ya está cerrado. 201 si se cierra.</summary>
@@ -74,7 +74,7 @@ public static class CierresMesEndpoints
             // Dos cierres simultáneos del mismo mes: gana el primero y el índice único rechaza al segundo.
             return Results.Conflict(new { error = "Ese mes ya está cerrado." });
         }
-        return Results.Created($"/api/cierres-mes/{ApiComun.FormatoMes(inicio)}", A(cierre, new Dictionary<Guid, string> { [yo.UserId!.Value] = yo.Nombre }));
+        return Results.Created($"/api/cierres-mes/{ApiComun.FormatoMes(inicio)}", ADto(cierre, new Dictionary<Guid, string> { [yo.UserId!.Value] = yo.Nombre }));
     }
 
     /// <summary>DELETE /api/cierres-mes/{mes}: reabre un mes cerrado. Exige el permiso <c>mes.reabrir</c> (403 si no). 400 si el mes es inválido; 404 si no estaba cerrado; 409 sin hogar. 204 si se reabre.</summary>

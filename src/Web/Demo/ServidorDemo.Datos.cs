@@ -33,7 +33,7 @@ public sealed partial class ServidorDemo
         [
             new MiembroDemo { Id = Ana, Nombre = "Ana", Rol = "admin", Vinculado = true, EsYo = true },
             new MiembroDemo { Id = Marcos, Nombre = "Marcos" },
-            new MiembroDemo { Id = Lucia, Nombre = "Lucía", Tipo = "a_cargo", ResponsableId = Ana },
+            new MiembroDemo { Id = Lucia, Nombre = "Lucía", Tipo = TiposMiembro.ACargo, ResponsableId = Ana },
         ]);
 
         _perfiles.AddRange(

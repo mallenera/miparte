@@ -18,6 +18,7 @@ erDiagram
     hogar ||--o{ retirada_ahorro : "retira del ahorro"
     hogar ||--o{ deposito_ahorro : "ingresa en el ahorro"
     hogar ||--o{ mes_cerrado : "cierra"
+    hogar ||--o{ auditoria : "registra cambios"
     miembro |o--o| miembro : "responsable_id (a_cargo)"
     perfil_reparto ||--o{ perfil_reparto_detalle : "valor por miembro"
     miembro ||--o{ perfil_reparto_detalle : ""

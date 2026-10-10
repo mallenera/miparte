@@ -135,6 +135,8 @@ Cada gasto tiene un perfil de reparto; quien paga (`pagado_por`) y quien asume e
 | Proporcional a ingresos | Usa un porcentaje fijo del hogar, escrito a mano o calculado con una calculadora de ingresos que no se guarda | A gana 2X, B gana X → 66,7 % / 33,3 % |
 | Individual | 100 % de una persona | Ocio personal |
 
+> **Estado actual:** el modo «Proporcional a ingresos» ya no existe como modo propio (los ingresos no se guardan). Esa necesidad se cubre con un perfil de *Porcentaje* o *Por partes* acordado por el hogar. Los modos vigentes son individual, porcentajes, partes y cuenta común; el detalle está en [README.md](README.md#estado-diseño-frente-a-código). Las referencias posteriores a «proporcional a ingresos» (el caso del hogar, el perfil por defecto de cada categoría y D3-D4) se leen con esa equivalencia.
+
 **Caso de vuestro hogar.** A (sin hijo) ingresa 2X y B (con hijo) ingresa X. En un gasto de 900 € pagado por A con reparto proporcional a ingresos, A asume 600 € y B asume 300 €, por lo que B debe 300 € a A.
 
 El % proporcional es fijo para todo el hogar: se escribe a mano o se calcula con una calculadora de ingresos que no guarda los importes. Si cambian los sueldos, se actualiza y solo afecta a los gastos nuevos. Cada gasto guarda su modo de reparto, los porcentajes aplicados y lo que asume cada persona, así que cambiar el porcentaje, las partes o los perfiles después no altera los gastos ya introducidos.
@@ -213,6 +215,8 @@ Una sola aplicación en Docker atiende a la web y al móvil, y delega el login y
 
 El navegador solo habla con la app; la app lee y escribe en Supabase y, desde el chatbot, consulta al modelo de lenguaje.
 
+> **Nota:** la tabla recoge el stack propuesto originalmente (Streamlit). El stack real es Blazor WASM (PWA) + minimal API .NET + Supabase, desplegado en Cloudflare Pages y Render (ver [despliegue.md](despliegue.md) y la decisión D5).
+
 | Pieza | Opción propuesta | Notas |
 |---|---|---|
 | Interfaz | Streamlit (Python) | Trae componentes de chat; se abre en el navegador del móvil y puede añadirse a la pantalla de inicio |
@@ -255,7 +259,7 @@ Siete decisiones condicionan el desarrollo; la D3 es la única que depende de un
 | D2 | Base de datos y login | Supabase (PostgreSQL + login con correo y Google); SQLite local con login propio | Supabase: incluye ambos logins y plan gratuito | Pendiente |
 | D3 | Cómo se reparten los gastos del hijo | 100 % B; proporcional a ingresos (A asume 2/3); perfil propio (por ejemplo 50/50 o 70/30) | Perfil propio configurable; el porcentaje lo acordáis vosotros | Pendiente |
 | D4 | Reparto de la alimentación | Proporcional a ingresos; por partes 2:1 contando al hijo | Por decidir según si el hijo cuenta como una parte | Pendiente |
-| D5 | Interfaz | Streamlit; FastAPI con frontend web instalable (PWA) | Streamlit para el MVP; migrar después reutilizando lógica y base de datos | Pendiente |
+| D5 | Interfaz | Streamlit; FastAPI con frontend web instalable (PWA) | Streamlit para el MVP; migrar después reutilizando lógica y base de datos | **Superada**: se optó por Blazor WASM (PWA) + minimal API .NET + Supabase |
 | D6 | Alcance de la IA | Solo chatbot; chatbot más categorización automática de gastos | Chatbot en el MVP; categorización como extra si da tiempo | Chatbot hecho; categorización pendiente |
 | D7 | Modelo de lenguaje del chatbot y dominio | Proveedor, modelo y coste por definir; registrador del dominio por elegir | Comprobar requisitos del máster y precios actuales antes de decidir | Proveedor Anthropic, `claude-sonnet-5-5` por defecto y configurable (`Asistente__Modelo`); coste y dominio pendientes |
 

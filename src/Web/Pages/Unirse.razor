@@ -28,8 +28,8 @@
             <div class="card-body">
                 <p>Para unirte necesitas una cuenta. Al entrar volverás aquí y podrás aceptar la invitación.</p>
                 <div class="actions">
-                    <a class="btn" href="login">Iniciar sesión</a>
-                    <a class="btn btn-ghost" href="registro">Crear cuenta</a>
+                    <a class="btn" href="@ConFragmento("login")">Iniciar sesión</a>
+                    <a class="btn btn-ghost" href="@ConFragmento("registro")">Crear cuenta</a>
                 </div>
             </div>
         </section>
@@ -66,7 +66,7 @@
 @code {
     private readonly Modelo _modelo = new();
     private string? _token, _error;
-    private bool _listo, _enviando, _aceptada;
+    private bool _listo, _enviando, _aceptada, _guardado;
 
     protected override async Task OnInitializedAsync()
     {
@@ -78,12 +78,16 @@
         {
             await InvitacionPendiente.GuardarAsync(Almacen, delEnlace);
             // Sin almacenamiento (modo privado, datos bloqueados) el fragmento es la única copia: solo se quita si el código quedó guardado.
-            if (await InvitacionPendiente.LeerAsync(Almacen) == delEnlace) Navegacion.NavigateTo(InvitacionPendiente.Ruta, replace: true);
+            _guardado = await InvitacionPendiente.LeerAsync(Almacen) == delEnlace;
+            if (_guardado) Navegacion.NavigateTo(InvitacionPendiente.Ruta, replace: true);
         }
 
         _token = delEnlace ?? await InvitacionPendiente.LeerAsync(Almacen);
         _listo = true;
     }
+
+    /// <summary>Sin almacenamiento el código solo vive en la URL, así que viaja en el fragmento por login y registro.</summary>
+    private string ConFragmento(string ruta) => InvitacionPendiente.ConFragmento(ruta, _guardado ? null : _token);
 
     private async Task UnirseAsync()
     {

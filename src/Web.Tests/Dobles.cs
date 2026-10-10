@@ -6,13 +6,13 @@ using MiParte.Web.Autenticacion;
 namespace MiParte.Web.Tests;
 
 /// <summary>Almacén en memoria que sustituye a <c>localStorage</c>.</summary>
-internal sealed class AlmacenMemoria : IAlmacenLocal
+internal class AlmacenMemoria : IAlmacenLocal
 {
     public Dictionary<string, string> Datos { get; } = new();
 
     public Task<string?> LeerAsync(string clave) => Task.FromResult(Datos.TryGetValue(clave, out var v) ? v : null);
 
-    public Task EscribirAsync(string clave, string valor)
+    public virtual Task EscribirAsync(string clave, string valor)
     {
         Datos[clave] = valor;
         return Task.CompletedTask;

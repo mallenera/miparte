@@ -38,7 +38,7 @@
                 <div class="aviso err" role="alert">@_error</div>
                 @if (_sinConfirmar)
                 {
-                    <p class="muted"><a href="@($"registro?email={Uri.EscapeDataString(_modelo.Email.Trim())}")">Introducir el código de confirmación</a></p>
+                    <p class="muted"><a href="@(InvitacionPendiente.ConFragmento($"registro?email={Uri.EscapeDataString(_modelo.Email.Trim())}", _tokenUrl))">Introducir el código de confirmación</a></p>
                 }
             }
             <button class="btn btn-block" type="submit" disabled="@(_enviando || !Opciones.EstaConfigurada)">
@@ -56,7 +56,7 @@
             La demo local no necesita cuenta ni conexión y no guarda nada.
         </p>
 
-        <p class="muted">¿No tienes cuenta? <a href="registro">Regístrate</a></p>
+        <p class="muted">¿No tienes cuenta? <a href="@InvitacionPendiente.ConFragmento("registro", _tokenUrl)">Regístrate</a></p>
     </div>
 </div>
 
@@ -66,8 +66,12 @@
     private bool _enviando;
     private bool _sinConfirmar;
 
+    /// <summary>Código de invitación en el fragmento: alternativa al almacén cuando el navegador no permite guardarlo.</summary>
+    private string? _tokenUrl;
+
     protected override async Task OnInitializedAsync()
     {
+        _tokenUrl = InvitacionPendiente.ExtraerToken(Navegacion.Uri);
         await Sesion.InicializarAsync();
         try
         {
@@ -75,7 +79,7 @@
             var uri = Navegacion.ToAbsoluteUri(Navegacion.Uri);
             if (await Sesion.CompletarGoogleAsync($"{uri.Query}&{uri.Fragment}"))
             {
-                Navegacion.NavigateTo(await InvitacionPendiente.DestinoTrasAccesoAsync(Almacen), replace: true);
+                Navegacion.NavigateTo(await InvitacionPendiente.DestinoTrasAccesoAsync(Almacen, _tokenUrl), replace: true);
                 return;
             }
         }
@@ -84,7 +88,7 @@
             _error = e.Message;
         }
 
-        if (Sesion.SesionActual is not null) Navegacion.NavigateTo(await InvitacionPendiente.DestinoTrasAccesoAsync(Almacen), replace: true);
+        if (Sesion.SesionActual is not null) Navegacion.NavigateTo(await InvitacionPendiente.DestinoTrasAccesoAsync(Almacen, _tokenUrl), replace: true);
     }
 
     private async Task EnviarAsync()
@@ -95,7 +99,7 @@
         try
         {
             await Sesion.IniciarSesionAsync(CuentaDemo.ACorreo(_modelo.Email), _modelo.Password);
-            Navegacion.NavigateTo(await InvitacionPendiente.DestinoTrasAccesoAsync(Almacen), replace: true);
+            Navegacion.NavigateTo(await InvitacionPendiente.DestinoTrasAccesoAsync(Almacen, _tokenUrl), replace: true);
         }
         catch (AuthException e)
         {

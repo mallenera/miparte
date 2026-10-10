@@ -7,6 +7,7 @@ using Microsoft.Extensions.Time.Testing;
 using MiParte.Contracts;
 using MiParte.Web.Api;
 using MiParte.Web.Autenticacion;
+using MiParte.Web.Configuracion;
 using MiParte.Web.Hogares;
 using MiParte.Web.Pages;
 
@@ -19,15 +20,22 @@ public class InvitacionEnlaceTests : BunitContext
 
     private AlmacenMemoria _almacen = null!;
 
-    private void Registrar(ApiFalsa api, bool conSesion)
+    /// <summary>Almacén que se comporta como el del navegador sin almacenamiento: las escrituras no se guardan.</summary>
+    private sealed class AlmacenBloqueado : AlmacenMemoria
+    {
+        public override Task EscribirAsync(string clave, string valor) => Task.CompletedTask;
+    }
+
+    private void Registrar(ApiFalsa api, bool conSesion, bool almacenamientoBloqueado = false)
     {
         var reloj = new FakeTimeProvider(Ahora);
-        _almacen = new AlmacenMemoria();
+        _almacen = almacenamientoBloqueado ? new AlmacenBloqueado() : new AlmacenMemoria();
         if (conSesion)
             _almacen.Datos["miparte.sesion"] = JsonSerializer.Serialize(new SesionSupabase("a", "r", Ahora.AddHours(1), "u1", "a@b.com"));
         var auth = new SupabaseAuthClient(
             new HttpClient(ManejadorFalso.Json(HttpStatusCode.OK, "{}")) { BaseAddress = new Uri("https://x.supabase.co/auth/v1/") }, reloj);
         Services.AddSingleton<IAlmacenLocal>(_almacen);
+        Services.AddSingleton(new OpcionesWeb());
         Services.AddSingleton(new ServicioSesion(auth, _almacen, reloj));
         Services.AddSingleton(new CoreApiClient(new HttpClient(api) { BaseAddress = new Uri("http://localhost:5001/") }));
         Services.AddSingleton(new EstadoHogar(new AlmacenMemoria()));
@@ -145,5 +153,51 @@ public class InvitacionEnlaceTests : BunitContext
         await InvitacionPendiente.GuardarAsync(almacen, "abc123");
 
         Assert.Equal("unirse", await InvitacionPendiente.DestinoTrasAccesoAsync(almacen));
+    }
+
+    [Fact]
+    public void Sin_almacenamiento_los_enlaces_de_acceso_conservan_el_codigo_en_el_fragmento()
+    {
+        Registrar(new ApiFalsa(), conSesion: false, almacenamientoBloqueado: true);
+        var nav = Services.GetRequiredService<NavigationManager>();
+        nav.NavigateTo("/unirse#token=abc123");
+
+        var c = Render<Unirse>();
+
+        c.WaitForAssertion(() => Assert.NotEmpty(c.FindAll("a[href='login#token=abc123']")));
+        Assert.NotEmpty(c.FindAll("a[href='registro#token=abc123']"));
+        Assert.Contains("#token=abc123", nav.Uri);
+    }
+
+    [Fact]
+    public void Login_sin_almacenamiento_reenvia_a_unirse_con_el_codigo_de_la_url()
+    {
+        Registrar(new ApiFalsa(), conSesion: true, almacenamientoBloqueado: true);
+        var nav = Services.GetRequiredService<NavigationManager>();
+        nav.NavigateTo("/login#token=abc123");
+
+        Render<Login>();
+
+        Assert.EndsWith("/unirse#token=abc123", nav.Uri);
+    }
+
+    [Fact]
+    public void Login_y_registro_sin_almacenamiento_se_enlazan_conservando_el_codigo()
+    {
+        Registrar(new ApiFalsa(), conSesion: false, almacenamientoBloqueado: true);
+        var nav = Services.GetRequiredService<NavigationManager>();
+        nav.NavigateTo("/login#token=abc123");
+        Assert.NotEmpty(Render<Login>().FindAll("a[href='registro#token=abc123']"));
+
+        nav.NavigateTo("/registro#token=abc123");
+        Assert.NotEmpty(Render<Registro>().FindAll("a[href='login#token=abc123']"));
+    }
+
+    [Fact]
+    public async Task El_codigo_de_la_url_tiene_prioridad_para_decidir_el_destino()
+    {
+        var almacen = new AlmacenMemoria();
+
+        Assert.Equal("unirse#token=a%2Bb", await InvitacionPendiente.DestinoTrasAccesoAsync(almacen, "a+b"));
     }
 }

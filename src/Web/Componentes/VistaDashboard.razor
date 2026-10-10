@@ -100,7 +100,7 @@ else if (_r is not null && _rCat is not null && _rMiembro is not null && _rSerie
             <span class="kpi-lab">Categoría principal</span>
             @if (_r.CategoriaPrincipal is { } cp)
             {
-                <b class="kpi-val" id="kpi-categoria">@cp.Nombre</b>
+                <b class="kpi-val kpi-texto" id="kpi-categoria">@cp.Nombre</b>
                 <span class="kpi-sub">@Euros(cp.Importe) · @Porcentaje(cp.Importe, _r.Total) del total</span>
             }
             else
@@ -146,6 +146,11 @@ else if (_r is not null && _rCat is not null && _rMiembro is not null && _rSerie
                 {
                     var p = _rSerie.Serie[i];
                     var elegido = _tramo?.Inicio == p.Inicio;
+                    @if (elegido)
+                    {
+                        @* Guía vertical del tramo elegido, para localizarlo de un vistazo. *@
+                        <line class="gr-sel" x1="@N(X(i))" x2="@N(X(i))" y1="@N(Y(p.Importe))" y2="@N(MargenSup + AltoUtil)" />
+                    }
                     <circle class="gr-punto @(elegido ? "sel" : _tramo is not null ? "apagado" : "")" cx="@N(X(i))" cy="@N(Y(p.Importe))" r="@(_rSerie.Serie.Count > 62 ? "2.5" : "3.5")" />
                     @* Zona de pulsación más grande que el punto, también para el teclado. *@
                     <circle class="gr-hit" cx="@N(X(i))" cy="@N(Y(p.Importe))" r="11" tabindex="0" role="button" aria-pressed="@(elegido ? "true" : "false")"
@@ -481,7 +486,7 @@ else if (_r is not null && _rCat is not null && _rMiembro is not null && _rSerie
     {
         Granularidad.Dia => p.Inicio.ToString("d MMM yyyy", Es),
         Granularidad.Semana => "Semana del " + p.Inicio.ToString("d MMM yyyy", Es),
-        _ => p.Inicio.ToString("MMMM yyyy", Es),
+        _ => Es.TextInfo.ToTitleCase(p.Inicio.ToString("MMMM yyyy", Es)),
     };
 
     private static string EtiquetaEje(PuntoSerie p) => p.Granularidad switch

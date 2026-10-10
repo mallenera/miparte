@@ -101,6 +101,26 @@ public class InvitacionEnlaceTests : BunitContext
     }
 
     [Fact]
+    public void Si_falla_la_carga_tras_aceptar_se_reintenta_sin_reenviar_el_codigo()
+    {
+        var api = new ApiFalsa()
+            .Responde("POST /api/invitaciones/aceptar", HttpStatusCode.OK, Casa)
+            .Error("GET /api/yo", HttpStatusCode.ServiceUnavailable, "Sin servicio.");
+        Registrar(api, conSesion: true);
+        _almacen.Datos["miparte.invitacion"] = "abc123";
+        Services.GetRequiredService<NavigationManager>().NavigateTo("/unirse");
+        var c = Render<Unirse>();
+        c.WaitForAssertion(() => Assert.NotEmpty(c.FindAll("form")));
+
+        c.Find("form").Submit();
+
+        c.WaitForAssertion(() => Assert.Contains("Ya te has unido", c.Find("[role=alert]").TextContent));
+        Assert.Empty(c.FindAll("form"));
+        Assert.False(_almacen.Datos.ContainsKey("miparte.invitacion"));
+        Assert.Contains(c.FindAll("button"), b => b.TextContent.Trim() == "Reintentar");
+    }
+
+    [Fact]
     public void Una_invitacion_usada_muestra_el_error_y_no_se_vuelve_a_ofrecer()
     {
         var api = new ApiFalsa().Error("POST /api/invitaciones/aceptar", HttpStatusCode.Conflict, "La invitación ya se ha usado.");

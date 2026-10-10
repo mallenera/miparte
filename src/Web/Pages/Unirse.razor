@@ -42,15 +42,22 @@
         }
         <section class="card">
             <div class="card-body">
-                <EditForm Model="_modelo" OnValidSubmit="UnirseAsync">
-                    <DataAnnotationsValidator />
-                    <div class="fieldrow">
-                        <label for="nombre">Tu nombre (si la invitación no lo trae)</label>
-                        <InputText id="nombre" @bind-Value="_modelo.Nombre" />
-                        <ValidationMessage For="() => _modelo.Nombre" />
-                    </div>
-                    <button class="btn" type="submit" disabled="@_enviando">Aceptar invitación</button>
-                </EditForm>
+                @if (_aceptada)
+                {
+                    <button class="btn" type="button" disabled="@_enviando" @onclick="ContinuarAsync">Reintentar</button>
+                }
+                else
+                {
+                    <EditForm Model="_modelo" OnValidSubmit="UnirseAsync">
+                        <DataAnnotationsValidator />
+                        <div class="fieldrow">
+                            <label for="nombre">Tu nombre (si la invitación no lo trae)</label>
+                            <InputText id="nombre" @bind-Value="_modelo.Nombre" />
+                            <ValidationMessage For="() => _modelo.Nombre" />
+                        </div>
+                        <button class="btn" type="submit" disabled="@_enviando">Aceptar invitación</button>
+                    </EditForm>
+                }
             </div>
         </section>
     }
@@ -59,7 +66,7 @@
 @code {
     private readonly Modelo _modelo = new();
     private string? _token, _error;
-    private bool _listo, _enviando;
+    private bool _listo, _enviando, _aceptada;
 
     protected override async Task OnInitializedAsync()
     {
@@ -70,10 +77,11 @@
         if (delEnlace is not null)
         {
             await InvitacionPendiente.GuardarAsync(Almacen, delEnlace);
-            Navegacion.NavigateTo(InvitacionPendiente.Ruta, replace: true);
+            // Sin almacenamiento (modo privado, datos bloqueados) el fragmento es la única copia: solo se quita si el código quedó guardado.
+            if (await InvitacionPendiente.LeerAsync(Almacen) == delEnlace) Navegacion.NavigateTo(InvitacionPendiente.Ruta, replace: true);
         }
 
-        _token = await InvitacionPendiente.LeerAsync(Almacen);
+        _token = delEnlace ?? await InvitacionPendiente.LeerAsync(Almacen);
         _listo = true;
     }
 
@@ -87,15 +95,36 @@
         {
             var nombre = string.IsNullOrWhiteSpace(_modelo.Nombre) ? null : _modelo.Nombre.Trim();
             await Api.AceptarInvitacionAsync(new AceptarInvitacionRequest(_token, nombre));
+            _aceptada = true; // el código ya está gastado: a partir de aquí solo se reintenta la carga, nunca la aceptación
             await InvitacionPendiente.DescartarAsync(Almacen);
-            var destino = await Arranque.CargarAsync();
-            Navegacion.NavigateTo(destino == DestinoArranque.ElegirHogar ? "elegir-hogar" : "", replace: true);
         }
         catch (ApiException e)
         {
             // Con 404/409 el código ya no sirve (usado, caducado o inválido): no se vuelve a ofrecer en cada acceso.
             if (e.Codigo is System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.Conflict) await InvitacionPendiente.DescartarAsync(Almacen);
             _error = e.Message;
+        }
+        finally
+        {
+            _enviando = false;
+        }
+        if (_aceptada) await ContinuarAsync();
+    }
+
+    /// <summary>Carga hogares y navega tras una aceptación correcta; si falla, queda reintentable sin reenviar el código.</summary>
+    private async Task ContinuarAsync()
+    {
+        if (_enviando) return;
+        _enviando = true;
+        _error = null;
+        try
+        {
+            var destino = await Arranque.CargarAsync();
+            Navegacion.NavigateTo(destino == DestinoArranque.ElegirHogar ? "elegir-hogar" : "", replace: true);
+        }
+        catch (ApiException e)
+        {
+            _error = $"Ya te has unido al hogar, pero no se han podido cargar tus datos: {e.Message}";
         }
         finally
         {

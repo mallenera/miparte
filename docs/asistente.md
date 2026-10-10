@@ -101,7 +101,7 @@ Asistente__CoreUrl=http://localhost:5001 dotnet run --project src/Assistant/Assi
 dotnet run --project src/Web                                                                 # Api:AssistantUrl ya apunta a :5002
 ```
 
-Sin clave se puede ver la pestaña y comprobar el 503; el modo demo del front responde con un texto fijo. Los tests (`dotnet test src/Assistant/Assistant.Tests`) usan un cliente de modelo falso y no llaman a la API de Anthropic.
+Sin clave se puede ver el asistente flotante y comprobar el 503; el modo demo del front responde con un texto fijo. Los tests (`dotnet test src/Assistant/Assistant.Tests`) usan un cliente de modelo falso y no llaman a la API de Anthropic.
 
 ## Pendiente
 

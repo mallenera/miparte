@@ -125,6 +125,15 @@ public sealed class CoreApiClient
         return ObtenerAsync<List<GastoResponse>>(filtros.Count == 0 ? "api/gastos" : "api/gastos?" + string.Join('&', filtros), ct);
     }
 
+    /// <summary>Gastos del hogar con fecha entre dos días, ambos incluidos (<c>GET /api/gastos?desde=&amp;hasta=</c>).</summary>
+    /// <param name="desde">Primer día del periodo.</param>
+    /// <param name="hasta">Último día del periodo.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<List<GastoResponse>> ListarGastosPorRangoAsync(DateOnly desde, DateOnly hasta, CancellationToken ct = default) =>
+        ObtenerAsync<List<GastoResponse>>(
+            $"api/gastos?desde={desde.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)}"
+            + $"&hasta={hasta.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)}", ct);
+
     /// <summary>Crea un gasto; el servidor calcula y guarda el reparto (<c>POST /api/gastos</c>).</summary>
     /// <param name="peticion">Datos del gasto.</param>
     /// <param name="ct">Token de cancelación.</param>

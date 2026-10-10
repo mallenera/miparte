@@ -1,0 +1,388 @@
+@* Pestaña Dashboard: indicadores y gráficos del gasto del hogar entre dos fechas, comparado con el periodo anterior de igual duración. *@
+@using System.Globalization
+@using MiParte.Web.Reparto
+@inject CoreApiClient Api
+@inject EstadoHogar Hogar
+@inject TimeProvider Reloj
+
+<h1 class="sr">Dashboard de gastos de @Hogar.HogarActual?.Nombre</h1>
+
+<section class="card" aria-labelledby="t-periodo">
+    <div class="card-head"><h2 id="t-periodo">Dashboard de gastos</h2></div>
+    <p class="muted">Elige el periodo que quieres controlar. Los gastos personales no cuentan en el total del hogar, igual que en el resumen mensual.</p>
+    <div class="filtros" role="group" aria-label="Periodo">
+        <label>Desde
+            <input type="date" @bind="_desde" @bind:after="AplicarFechasAsync" max="@_hasta.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" />
+        </label>
+        <label>Hasta
+            <input type="date" @bind="_hasta" @bind:after="AplicarFechasAsync" min="@_desde.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" />
+        </label>
+    </div>
+    <div class="u-fila-mt10" role="group" aria-label="Periodos rápidos">
+        <button class="chip chip-btn" type="button" @onclick="() => ElegirAsync(PeriodoRapido.EsteMes)">Este mes</button>
+        <button class="chip chip-btn" type="button" @onclick="() => ElegirAsync(PeriodoRapido.MesAnterior)">Mes anterior</button>
+        <button class="chip chip-btn" type="button" @onclick="() => ElegirAsync(PeriodoRapido.Ultimos30)">Últimos 30 días</button>
+        <button class="chip chip-btn" type="button" @onclick="() => ElegirAsync(PeriodoRapido.EsteAnio)">Este año</button>
+    </div>
+    @if (_desde > _hasta)
+    {
+        <div class="aviso err u-mt12" role="alert">La fecha «Desde» no puede ser posterior a «Hasta».</div>
+    }
+</section>
+
+@if (_cargando)
+{
+    <div class="spinbox" role="status"><div class="spin"></div><span>Cargando el dashboard…</span></div>
+}
+else if (_errorCarga is not null)
+{
+    <div class="aviso err" role="alert">
+        @_errorCarga
+        <button class="linkbtn" type="button" @onclick="CargarAsync">Reintentar</button>
+    </div>
+}
+else if (_r is not null)
+{
+    <section class="kpis" aria-label="Indicadores clave del periodo @Periodo">
+        <article class="kpi">
+            <span class="kpi-lab">Gasto total</span>
+            <b class="kpi-val" id="kpi-total">@Euros(_r.Total)</b>
+            <span class="kpi-sub">@_r.NumeroGastos @(_r.NumeroGastos == 1 ? "gasto" : "gastos") entre @Periodo</span>
+        </article>
+        <article class="kpi">
+            <span class="kpi-lab">Frente al periodo anterior</span>
+            @if (_r.Variacion is { } v)
+            {
+                <b class="kpi-val @(v > 0 ? "sube" : v < 0 ? "baja" : "")" id="kpi-variacion">@(v > 0 ? "▲ +" : v < 0 ? "▼ −" : "")@Math.Abs(v).ToString("P1", Es)</b>
+                <span class="kpi-sub">@(v > 0 ? "Gastáis más" : v < 0 ? "Gastáis menos" : "Igual") que los @AnteriorDias días previos (@Euros(_r.TotalAnterior))</span>
+            }
+            else
+            {
+                <b class="kpi-val" id="kpi-variacion">—</b>
+                <span class="kpi-sub">Sin gastos en el periodo anterior con los que comparar</span>
+            }
+        </article>
+        <article class="kpi">
+            <span class="kpi-lab">Media diaria</span>
+            <b class="kpi-val" id="kpi-media">@Euros(_r.MediaDiaria)</b>
+            <span class="kpi-sub">En @Dias @(Dias == 1 ? "día" : "días")</span>
+        </article>
+        <article class="kpi">
+            <span class="kpi-lab">Categoría principal</span>
+            @if (_r.CategoriaPrincipal is { } cp)
+            {
+                <b class="kpi-val" id="kpi-categoria">@cp.Nombre</b>
+                <span class="kpi-sub">@Euros(cp.Importe) · @Porcentaje(cp.Importe, _r.Total) del total</span>
+            }
+            else
+            {
+                <b class="kpi-val" id="kpi-categoria">—</b>
+                <span class="kpi-sub">Sin gastos en el periodo</span>
+            }
+        </article>
+        <article class="kpi">
+            <span class="kpi-lab">Mayor gasto</span>
+            @if (_r.MayorGasto is { } mg)
+            {
+                <b class="kpi-val" id="kpi-mayor">@Euros(mg.Importe)</b>
+                <span class="kpi-sub">@NombreGasto(mg) · @mg.Fecha.ToString("dd/MM/yyyy", Es)</span>
+            }
+            else
+            {
+                <b class="kpi-val" id="kpi-mayor">—</b>
+                <span class="kpi-sub">Sin gastos en el periodo</span>
+            }
+        </article>
+    </section>
+
+    @if (_r.NumeroGastos == 0)
+    {
+        <section class="card">
+            <div class="empty">No hay gastos del hogar entre estas fechas.@(_r.Personales > 0 ? $" Hay {Euros(_r.Personales)} en gastos personales." : "")</div>
+        </section>
+    }
+    else
+    {
+        <section class="card" aria-labelledby="t-evolucion">
+            <div class="card-head"><h2 id="t-evolucion">Evolución del gasto</h2><span class="tag">@TextoGranularidad</span></div>
+            <svg class="dash-svg" viewBox="0 0 520 220" role="img" aria-labelledby="t-evolucion">
+                @foreach (var g in Guias)
+                {
+                    <line class="gr-eje" x1="@N(MargenIzq)" x2="@N(Ancho - MargenDer)" y1="@g.Y" y2="@g.Y" />
+                    @Etiqueta(N(MargenIzq - 6), g.YTexto, "end", g.Texto)
+                }
+                <path class="gr-area" d="@Area" />
+                <path class="gr-linea" d="@Linea" />
+                @for (var i = 0; i < _r.Serie.Count; i++)
+                {
+                    var p = _r.Serie[i];
+                    <circle class="gr-punto" cx="@N(X(i))" cy="@N(Y(p.Importe))" r="@(_r.Serie.Count > 62 ? "2.5" : "3.5")">
+                        <title>@EtiquetaTramo(p): @Euros(p.Importe)</title>
+                    </circle>
+                    @if (RotulaEje(i))
+                    {
+                        @Etiqueta(N(X(i)), N(Alto - 8), AnclaEje(i), EtiquetaEje(p))
+                    }
+                }
+            </svg>
+        </section>
+
+        <div class="dash-dos">
+            <section class="card" aria-labelledby="t-categorias">
+                <div class="card-head"><h2 id="t-categorias">Gasto por categoría</h2></div>
+                @foreach (var c in CategoriasMostradas)
+                {
+                    <div class="dash-fila">
+                        <div class="dash-fila-top">
+                            <span class="dash-nombre">@c.Nombre</span>
+                            <span class="g-importe">@Euros(c.Importe)</span>
+                        </div>
+                        <progress class="barra" max="100" value="@Math.Round(Porcentaje(c.Importe, _r.Total, 100m), 1).ToString(CultureInfo.InvariantCulture)" aria-label="@c.Nombre: @Porcentaje(c.Importe, _r.Total) del total"></progress>
+                        <span class="muted dash-pie">@Porcentaje(c.Importe, _r.Total) · @c.Gastos @(c.Gastos == 1 ? "gasto" : "gastos")</span>
+                    </div>
+                }
+            </section>
+
+            <section class="card" aria-labelledby="t-quien">
+                <div class="card-head"><h2 id="t-quien">Quién paga</h2></div>
+                <p class="muted">Dinero adelantado por cada persona y parte que le corresponde según el reparto.</p>
+                <svg class="dash-rosco" viewBox="0 0 42 42" role="img" aria-label="Reparto del dinero adelantado entre las personas del hogar">
+                    <circle class="dn-fondo" cx="21" cy="21" r="15.915" fill="none" stroke-width="6" />
+                    @foreach (var s in Rodajas)
+                    {
+                        <circle class="@s.Clase" cx="21" cy="21" r="15.915" fill="none" stroke-width="6" stroke-dasharray="@s.Trazo" stroke-dashoffset="@s.Desfase" />
+                    }
+                </svg>
+                @foreach (var m in _r.PorMiembro)
+                {
+                    <div class="dash-fila-top dash-miembro">
+                        <span class="dash-nombre">
+                            @if (m.MiembroId is { } id)
+                            {
+                                <Avatar Nombre="@NombreMiembro(id)" Color="@ColorMiembro.De(id, _miembros)" Tamano="sm" />
+                                @NombreMiembro(id)
+                            }
+                            else
+                            {
+                                <span class="dn-punto" aria-hidden="true"></span>
+                                @:Cuenta común o ahorro
+                            }
+                        </span>
+                        <span class="muted">paga <b class="g-importe">@Euros(m.Pagado)</b> · le toca <b class="g-importe">@Euros(m.Asumido)</b></span>
+                    </div>
+                }
+            </section>
+        </div>
+
+        <section class="card" aria-labelledby="t-mayores">
+            <div class="card-head"><h2 id="t-mayores">Mayores gastos</h2></div>
+            @foreach (var g in _r.Mayores)
+            {
+                <div class="gastorow">
+                    <div class="g-main">
+                        <div class="g-concepto">@NombreGasto(g)</div>
+                        <div class="muted g-meta">@g.Fecha.ToString("dd/MM/yyyy", Es) · @ArbolCategorias.Ruta(_categorias, g.CategoriaId)</div>
+                    </div>
+                    <div class="g-importe">@Euros(g.Importe)</div>
+                </div>
+            }
+        </section>
+    }
+
+    @if (_r.Personales > 0 && _r.NumeroGastos > 0)
+    {
+        <p class="muted">Además hay @Euros(_r.Personales) en gastos personales, fuera del total del hogar.</p>
+    }
+}
+
+@code {
+    private static readonly CultureInfo Es = new("es-ES");
+
+    private enum PeriodoRapido { EsteMes, MesAnterior, Ultimos30, EsteAnio }
+
+    private List<GastoResponse> _gastos = [];
+    private List<CategoriaDto> _categorias = [];
+    private List<MiembroDto> _miembros = [];
+    private ResultadoAnalisis? _r;
+    private bool _cargando = true;
+    private string? _errorCarga;
+    private DateOnly _desde, _hasta;
+
+    /// <summary>Versión de la última petición: una respuesta tardía de otro periodo no pisa la actual.</summary>
+    private int _version;
+
+    private DateOnly Hoy => DateOnly.FromDateTime(Reloj.GetLocalNow().DateTime);
+
+    private int Dias => AnalisisGastos.Dias(_r?.Desde ?? _desde, _r?.Hasta ?? _hasta);
+
+    private int AnteriorDias => Dias;
+
+    private string Periodo => _r is null ? "" : $"{_r.Desde.ToString("d MMM yyyy", Es)} y {_r.Hasta.ToString("d MMM yyyy", Es)}";
+
+    private string TextoGranularidad => AnalisisGastos.GranularidadPara(Dias) switch
+    {
+        Granularidad.Dia => "Por día",
+        Granularidad.Semana => "Por semana",
+        _ => "Por mes",
+    };
+
+    /// <summary>Hasta 7 categorías y el resto agrupado, para que el gráfico se lea en una pantalla pequeña.</summary>
+    private IReadOnlyList<GastoPorCategoria> CategoriasMostradas
+    {
+        get
+        {
+            const int max = 7;
+            var todas = _r!.PorCategoria;
+            if (todas.Count <= max) return todas;
+            var resto = todas.Skip(max - 1).ToList();
+            return todas.Take(max - 1)
+                .Append(new GastoPorCategoria(Guid.Empty, "Otras categorías", resto.Sum(c => c.Importe), resto.Sum(c => c.Gastos)))
+                .ToList();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var hoy = Hoy;
+        _desde = new DateOnly(hoy.Year, hoy.Month, 1);
+        _hasta = hoy;
+        await CargarAsync();
+    }
+
+    private Task ElegirAsync(PeriodoRapido p)
+    {
+        var hoy = Hoy;
+        (_desde, _hasta) = p switch
+        {
+            PeriodoRapido.EsteMes => (new DateOnly(hoy.Year, hoy.Month, 1), hoy),
+            PeriodoRapido.MesAnterior => (new DateOnly(hoy.Year, hoy.Month, 1).AddMonths(-1), new DateOnly(hoy.Year, hoy.Month, 1).AddDays(-1)),
+            PeriodoRapido.Ultimos30 => (hoy.AddDays(-29), hoy),
+            _ => (new DateOnly(hoy.Year, 1, 1), hoy),
+        };
+        return CargarAsync();
+    }
+
+    private Task AplicarFechasAsync() => _desde > _hasta ? Task.CompletedTask : CargarAsync();
+
+    private async Task CargarAsync()
+    {
+        var version = ++_version;
+        _cargando = true;
+        _errorCarga = null;
+        var desde = _desde;
+        var hasta = _hasta;
+        try
+        {
+            // Una sola petición cubre el periodo y el anterior de igual duración, para calcular la variación.
+            var gastos = Api.ListarGastosPorRangoAsync(AnalisisGastos.InicioAnterior(desde, hasta), hasta);
+            var categorias = Api.ListarCategoriasAsync();
+            var miembros = Api.ListarMiembrosAsync();
+            await Task.WhenAll(gastos, categorias, miembros);
+            if (version != _version) return;
+            _gastos = gastos.Result;
+            _categorias = categorias.Result;
+            _miembros = miembros.Result;
+            _r = AnalisisGastos.Calcular(_gastos, _categorias, desde, hasta);
+        }
+        catch (ApiException e) when (version == _version)
+        {
+            _errorCarga = e.Message;
+            _r = null;
+        }
+        catch (ApiException)
+        {
+            return; // fallo de una petición ya superada
+        }
+
+        _cargando = false;
+    }
+
+    private string NombreMiembro(Guid id) => _miembros.FirstOrDefault(m => m.Id == id)?.Nombre ?? "—";
+
+    private string NombreGasto(GastoResponse g) =>
+        string.IsNullOrWhiteSpace(g.Concepto) ? ArbolCategorias.Ruta(_categorias, g.CategoriaId) : g.Concepto;
+
+    private static string Euros(decimal importe) => importe.ToString("C2", Es);
+
+    private static string Porcentaje(decimal parte, decimal total) => (total > 0 ? parte / total : 0m).ToString("P1", Es);
+
+    private static decimal Porcentaje(decimal parte, decimal total, decimal escala) => total > 0 ? parte / total * escala : 0m;
+
+    // ───── Gráfico de líneas (SVG con atributos y clases: la CSP no admite estilos en línea) ─────
+
+    private const double Ancho = 520, Alto = 220, MargenIzq = 58, MargenDer = 14, MargenSup = 14, MargenInf = 30;
+    private const double AnchoUtil = Ancho - MargenIzq - MargenDer, AltoUtil = Alto - MargenSup - MargenInf;
+
+    /// <summary>Etiqueta de texto del SVG; se construye a mano porque en Razor <c>&lt;text&gt;</c> es una etiqueta reservada.</summary>
+    private static RenderFragment Etiqueta(string x, string y, string ancla, string texto) => builder =>
+    {
+        builder.OpenElement(0, "text");
+        builder.AddAttribute(1, "class", "gr-txt");
+        builder.AddAttribute(2, "x", x);
+        builder.AddAttribute(3, "y", y);
+        builder.AddAttribute(4, "text-anchor", ancla);
+        builder.AddContent(5, texto);
+        builder.CloseElement();
+    };
+
+    private static string N(double d) => d.ToString("0.##", CultureInfo.InvariantCulture);
+
+    /// <summary>Importe máximo de la serie (el eje Y llega hasta él).</summary>
+    private double MaxSerie => Math.Max(1.0, (double)_r!.Serie.Max(p => p.Importe));
+
+    private double X(int i) =>
+        _r!.Serie.Count == 1 ? MargenIzq + AnchoUtil / 2 : MargenIzq + AnchoUtil * i / (_r.Serie.Count - 1);
+
+    private double Y(decimal v) => MargenSup + AltoUtil * (1 - (double)v / MaxSerie);
+
+    private string Linea => string.Join(' ', _r!.Serie.Select((p, i) => $"{(i == 0 ? "M" : "L")}{N(X(i))} {N(Y(p.Importe))}"));
+
+    private string Area => $"{Linea} L{N(X(_r!.Serie.Count - 1))} {N(MargenSup + AltoUtil)} L{N(X(0))} {N(MargenSup + AltoUtil)} Z";
+
+    /// <summary>Líneas guía horizontales: cero, mitad y máximo, con su importe.</summary>
+    private IEnumerable<(string Y, string YTexto, string Texto)> Guias =>
+        new[] { 0.0, 0.5, 1.0 }.Select(f =>
+        {
+            var y = MargenSup + AltoUtil * (1 - f);
+            return (N(y), N(y + 4), ((decimal)(MaxSerie * f)).ToString("N0", Es) + " €");
+        });
+
+    /// <summary>Se rotula como mucho cada cuarto de la serie, para que las etiquetas no se pisen en pantallas estrechas.</summary>
+    private int PasoEtiquetas => Math.Max(1, (int)Math.Ceiling((_r!.Serie.Count - 1) / 4.0));
+
+    private bool RotulaEje(int i) => i % PasoEtiquetas == 0 || i == _r!.Serie.Count - 1;
+
+    private string AnclaEje(int i) => i == 0 ? "start" : i == _r!.Serie.Count - 1 ? "end" : "middle";
+
+    private static string EtiquetaTramo(PuntoSerie p) => p.Granularidad switch
+    {
+        Granularidad.Dia => p.Inicio.ToString("d MMM yyyy", Es),
+        Granularidad.Semana => "Semana del " + p.Inicio.ToString("d MMM yyyy", Es),
+        _ => p.Inicio.ToString("MMMM yyyy", Es),
+    };
+
+    private static string EtiquetaEje(PuntoSerie p) => p.Granularidad switch
+    {
+        Granularidad.Mes => p.Inicio.ToString("MMM yy", Es),
+        _ => p.Inicio.ToString("d MMM", Es),
+    };
+
+    // ───── Rosco de quién paga ─────
+
+    /// <summary>Un arco por persona (o por la cuenta común): circunferencia de 100 unidades, así el trazo es el porcentaje.</summary>
+    private IEnumerable<(string Clase, string Trazo, string Desfase)> Rodajas
+    {
+        get
+        {
+            var total = _r!.PorMiembro.Sum(m => m.Pagado);
+            var acumulado = 0.0;
+            foreach (var m in _r.PorMiembro.Where(m => m.Pagado > 0))
+            {
+                var parte = (double)(m.Pagado / total) * 100;
+                var clase = m.MiembroId is { } id ? $"dn-m{ColorMiembro.De(id, _miembros)}" : "dn-comun";
+                yield return (clase, $"{N(parte)} {N(100 - parte)}", N(25 - acumulado));
+                acumulado += parte;
+            }
+        }
+    }
+}

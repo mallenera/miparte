@@ -193,6 +193,34 @@ public class ApiPostgresTests
     }
 
     [SkippableFact]
+    public async Task Gastos_FiltraPorRangoDeFechasInclusivoYValidaLosParametros()
+    {
+        Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
+        await using var e = new Entorno();
+        var user = await e.CrearUsuarioAsync();
+        var hogar = await CrearHogar(e.Cliente(user), "Casa rango", "Ana");
+        var c = e.Cliente(user, hogar.Id);
+
+        var ana = (await Leer<List<MiembroDto>>(await c.GetAsync("/api/miembros"))).Single();
+        var perfil = (await Leer<List<PerfilRepartoDto>>(await c.GetAsync("/api/perfiles"))).Single(p => p.Modo == "partes");
+        var categoria = (await Leer<List<CategoriaDto>>(await c.GetAsync("/api/categorias"))).First();
+        foreach (var dia in new[] { 30, 1, 15 }) // 30 de septiembre y 1 y 15 de octubre
+        {
+            var fecha = dia == 30 ? new DateOnly(2026, 9, 30) : new DateOnly(2026, 10, dia);
+            await Leer<GastoResponse>(await c.PostAsJsonAsync("/api/gastos",
+                new GastoRequest(fecha, 10m, categoria.Id, ana.Id, perfil.Id, null)), HttpStatusCode.Created);
+        }
+
+        var rango = await Leer<List<GastoResponse>>(await c.GetAsync("/api/gastos?desde=2026-09-30&hasta=2026-10-01"));
+        Assert.Equal([new DateOnly(2026, 10, 1), new DateOnly(2026, 9, 30)], rango.Select(g => g.Fecha));
+        Assert.Single(await Leer<List<GastoResponse>>(await c.GetAsync("/api/gastos?desde=2026-10-15")));
+        Assert.Equal(2, (await Leer<List<GastoResponse>>(await c.GetAsync("/api/gastos?hasta=2026-10-01"))).Count);
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.GetAsync("/api/gastos?desde=2026-10")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.GetAsync("/api/gastos?desde=2026-10-02&hasta=2026-10-01")).StatusCode);
+    }
+
+    [SkippableFact]
     public async Task Gasto_Resumen_Liquidacion_EnPostgres()
     {
         Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");

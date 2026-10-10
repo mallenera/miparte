@@ -38,6 +38,13 @@ internal static partial class ApiComun
     /// <summary>Respuesta 400 por mes con formato distinto de YYYY-MM.</summary>
     public static IResult MesInvalido() => Invalido("El mes debe tener el formato YYYY-MM.");
 
+    /// <summary>Parsea una fecha con el formato exacto "YYYY-MM-DD".</summary>
+    public static bool TryFecha(string? texto, out DateOnly fecha) =>
+        DateOnly.TryParseExact(texto, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out fecha);
+
+    /// <summary>Respuesta 400 por una fecha con formato distinto de YYYY-MM-DD; <paramref name="parametro"/> es el nombre del parámetro.</summary>
+    public static IResult FechaInvalida(string parametro) => Invalido($"La fecha «{parametro}» debe tener el formato YYYY-MM-DD.");
+
     /// <summary>Respuesta 409 cuando la petición no tiene hogar seleccionado.</summary>
     public static IResult SinHogar() => Results.Conflict(new { error = "No hay hogar seleccionado." });
 

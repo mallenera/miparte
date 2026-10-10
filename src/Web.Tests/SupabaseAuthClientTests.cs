@@ -56,7 +56,7 @@ public class SupabaseAuthClientTests
             return ManejadorFalso.RespuestaJson(HttpStatusCode.OK, TokenJson);
         });
 
-        var sesion = await Crear(manejador).VerificarCodigoAsync("a@b.com", "123456");
+        var sesion = await Crear(manejador).VerificarCodigoAsync("a@b.com", "12345678");
 
         Assert.Equal("acc", sesion.AccessToken);
         var peticion = manejador.Peticiones[0];
@@ -65,7 +65,7 @@ public class SupabaseAuthClientTests
         using var json = System.Text.Json.JsonDocument.Parse(cuerpo!);
         Assert.Equal("signup", json.RootElement.GetProperty("type").GetString());
         Assert.Equal("a@b.com", json.RootElement.GetProperty("email").GetString());
-        Assert.Equal("123456", json.RootElement.GetProperty("token").GetString());
+        Assert.Equal("12345678", json.RootElement.GetProperty("token").GetString());
     }
 
     [Fact]
@@ -73,7 +73,7 @@ public class SupabaseAuthClientTests
     {
         var manejador = ManejadorFalso.Json(HttpStatusCode.Forbidden, """{"error_code":"otp_expired","msg":"Token has expired or is invalid"}""");
 
-        var e = await Assert.ThrowsAsync<AuthException>(() => Crear(manejador).VerificarCodigoAsync("a@b.com", "000000"));
+        var e = await Assert.ThrowsAsync<AuthException>(() => Crear(manejador).VerificarCodigoAsync("a@b.com", "00000000"));
 
         Assert.Contains("caducado", e.Message);
     }

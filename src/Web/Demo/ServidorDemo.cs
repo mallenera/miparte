@@ -76,7 +76,7 @@ public sealed partial class ServidorDemo
             ("perfiles", 3, "PUT") when id is { } i => GuardarPerfil(i, (await Cuerpo<GuardarPerfilRequest>())!),
             ("perfiles", 3, "DELETE") when id is { } i => EliminarPerfil(i),
 
-            ("gastos", 2, "GET") => ListarGastos(mes, Consulta(uri, "categoriaId"), Consulta(uri, "miembroId"), Consulta(uri, "buscar")),
+            ("gastos", 2, "GET") => ListarGastos(mes, Consulta(uri, "desde"), Consulta(uri, "hasta"), Consulta(uri, "categoriaId"), Consulta(uri, "miembroId"), Consulta(uri, "buscar")),
             ("gastos", 2, "POST") => GuardarGasto(null, (await Cuerpo<GastoRequest>())!),
             ("gastos", 3, "PUT") when id is { } i => GuardarGasto(i, (await Cuerpo<GastoRequest>())!),
             ("gastos", 3, "DELETE") when id is { } i => BorrarGasto(i),
@@ -352,7 +352,7 @@ public sealed partial class ServidorDemo
         g.Id, g.Fecha, g.Importe, g.CategoriaId, g.PagadoPor, g.PerfilRepartoId, g.Concepto, g.GastoRecurrenteId,
         g.Repartos.OrderBy(r => r.MiembroId).ToList(), g.ACargoCuentaComun, false, g.EsPersonal);
 
-    private HttpResponseMessage ListarGastos(string? mes, string? categoriaId, string? miembroId, string? buscar)
+    private HttpResponseMessage ListarGastos(string? mes, string? desde, string? hasta, string? categoriaId, string? miembroId, string? buscar)
     {
         var lista = _gastos.AsEnumerable();
         if (Guid.TryParse(categoriaId, out var cat)) lista = lista.Where(g => g.CategoriaId == cat);
@@ -365,6 +365,21 @@ public sealed partial class ServidorDemo
             var fin = inicio.AddMonths(1);
             lista = lista.Where(g => g.Fecha >= inicio && g.Fecha < fin);
         }
+
+        DateOnly? primero = null, ultimo = null;
+        if (!string.IsNullOrEmpty(desde))
+        {
+            if (!TryFecha(desde, out var f)) return Mal("La fecha «desde» debe tener el formato YYYY-MM-DD.");
+            primero = f;
+        }
+        if (!string.IsNullOrEmpty(hasta))
+        {
+            if (!TryFecha(hasta, out var f)) return Mal("La fecha «hasta» debe tener el formato YYYY-MM-DD.");
+            ultimo = f;
+        }
+        if (primero > ultimo) return Mal("La fecha «desde» no puede ser posterior a «hasta».");
+        if (primero is { } p) lista = lista.Where(g => g.Fecha >= p);
+        if (ultimo is { } u) lista = lista.Where(g => g.Fecha <= u);
 
         return Ok(lista.OrderByDescending(g => g.Fecha).ThenBy(g => g.Id).Select(GastoDto).ToList());
     }
@@ -726,6 +741,9 @@ public sealed partial class ServidorDemo
 
     [GeneratedRegex(@"^\d{4}-(0[1-9]|1[0-2])$")]
     private static partial Regex PatronMes();
+
+    private static bool TryFecha(string? texto, out DateOnly fecha) =>
+        DateOnly.TryParseExact(texto, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out fecha);
 
     private static bool TryMes(string? mes, out DateOnly inicio)
     {

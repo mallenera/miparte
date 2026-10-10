@@ -772,3 +772,57 @@ section.card + section.card { margin-top: 24px; }
 .permisos .plantillas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 4px; }
 .card.peligro { border-color: var(--err); }
 .btn.btn-danger { background: var(--err-soft); color: var(--err); border: 1px solid var(--err); }
+
+/* Dashboard: indicadores, gráfico de líneas y rosco en SVG con clases (sin estilos en línea por la CSP). */
+.chip-btn { cursor: pointer; background: var(--surface); color: var(--ink); padding: 8px 14px; min-height: 36px; font-weight: 600; }
+.chip-btn:hover { border-color: var(--wine); color: var(--wine-text); }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); gap: 12px; margin: 24px 0; }
+.kpi { display: grid; gap: 4px; align-content: start; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); min-width: 0; }
+.kpi-lab { font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+.kpi-val { font: 600 1.45rem/1.2 var(--font-body); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.kpi-val.sube { color: var(--err); }
+.kpi-val.baja { color: var(--ok); }
+.kpi-sub { font-size: .82rem; color: var(--ink-2); overflow-wrap: anywhere; }
+.dash-dos { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 24px; margin: 24px 0; align-items: start; }
+.dash-svg { display: block; width: 100%; height: auto; margin-top: 8px; }
+.gr-eje { stroke: var(--line-2); stroke-width: 1; }
+.gr-txt { fill: var(--ink-2); font: 600 11px var(--font-body); }
+.gr-area { fill: var(--wine-soft); }
+.gr-linea { fill: none; stroke: var(--wine); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.gr-punto { fill: var(--surface); stroke: var(--wine); stroke-width: 2; }
+.dash-fila { display: grid; gap: 4px; padding: 8px 0; border-top: 1px solid var(--line); }
+.dash-fila:first-of-type { border-top: 0; }
+.dash-fila-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.dash-nombre { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; overflow-wrap: anywhere; }
+.dash-pie { font-size: .82rem; }
+.dash-miembro { padding: 6px 0; flex-wrap: wrap; }
+.dash-rosco { display: block; width: 9rem; max-width: 60%; margin: 12px auto; transform: rotate(0deg); }
+.dn-fondo { stroke: var(--line); }
+.dn-comun { stroke: var(--ink-2); }
+.dn-punto { width: 14px; height: 14px; border-radius: 50%; background: var(--ink-2); display: inline-block; }
+.dn-m0 { stroke: var(--m0); } .dn-m1 { stroke: var(--m1); } .dn-m2 { stroke: var(--m2); } .dn-m3 { stroke: var(--m3); }
+.dn-m4 { stroke: var(--m4); } .dn-m5 { stroke: var(--m5); } .dn-m6 { stroke: var(--m6); } .dn-m7 { stroke: var(--m7); }
+
+/* Dashboard interactivo: elementos pulsables que filtran el resto; el elegido se resalta y los demás se atenúan. */
+.dash-click { appearance: none; width: 100%; font: inherit; color: inherit; text-align: left; background: transparent; border: 0; border-top: 1px solid var(--line); border-radius: 8px; padding: 8px 6px; cursor: pointer; }
+.dash-click:disabled { cursor: default; }
+.dash-click:hover:not(:disabled) { background: var(--surface-2); }
+.dash-click.sel { background: var(--wine-soft); box-shadow: inset 3px 0 0 var(--wine); }
+.dash-click.apagada, .dn-click.apagada { opacity: .45; }
+.dash-miembro.dash-click { display: flex; }
+.dash-filtros { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 16px 0 0; }
+.chip-btn.sel { background: var(--wine-soft); border-color: var(--wine); color: var(--wine-text); }
+.chip-btn .ico { vertical-align: -2px; }
+.gr-hit { fill: transparent; stroke: transparent; stroke-width: 1.5; cursor: pointer; }
+.gr-hit:hover, .gr-hit:focus-visible { stroke: var(--wine); outline: 0; }
+.gr-punto.sel { fill: var(--wine); r: 5; }
+.gr-punto.apagado { opacity: .45; }
+.dn-click { cursor: pointer; }
+.dn-click.sel { stroke-width: 7.5; }
+.gr-sel { stroke: var(--wine); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.kpi-val.kpi-texto { font-size: 1.15rem; overflow-wrap: break-word; }
+
+/* Gastos: con un gasto en edición el formulario sube sobre la lista y el selector de periodo se presenta como pestañas. */
+.gastos-cuerpo { display: flex; flex-direction: column; }
+.gastos-cuerpo > .editando { order: -1; margin-bottom: 14px; }
+.modo { display: flex; gap: 6px; flex-wrap: wrap; }

@@ -30,9 +30,10 @@ public static class GastosEndpoints
         g.Repartos.OrderBy(r => r.MiembroId).Select(r => new RepartoGastoDto(r.MiembroId, r.ImporteAsumido)).ToList(),
         g.ACargoCuentaComun, g.PagadoDesdeAhorro, g.EsPersonal);
 
-    /// <summary>GET /api/gastos: lista los gastos, filtrables por mes (YYYY-MM), categoría, miembro (quien paga o asume una parte mayor que 0) y texto del concepto, de más reciente a más antiguo. 409 sin hogar; 400 si el mes es inválido.</summary>
+    /// <summary>GET /api/gastos: lista los gastos, filtrables por mes (YYYY-MM), rango de fechas (<c>desde</c> y <c>hasta</c>, YYYY-MM-DD, ambos incluidos), categoría, miembro (quien paga o asume una parte mayor que 0) y texto del concepto, de más reciente a más antiguo. 409 sin hogar; 400 si el mes o una fecha es inválida o <c>desde</c> es posterior a <c>hasta</c>.</summary>
     private static async Task<IResult> ListarAsync(
-        [FromQuery] string? mes, [FromQuery] Guid? categoriaId, [FromQuery] Guid? miembroId, [FromQuery] string? buscar,
+        [FromQuery] string? mes, [FromQuery] string? desde, [FromQuery] string? hasta,
+        [FromQuery] Guid? categoriaId, [FromQuery] Guid? miembroId, [FromQuery] string? buscar,
         [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
@@ -43,6 +44,20 @@ public static class GastosEndpoints
             var fin = inicio.AddMonths(1);
             q = q.Where(g => g.Fecha >= inicio && g.Fecha < fin);
         }
+        DateOnly? primero = null, ultimo = null;
+        if (!string.IsNullOrEmpty(desde))
+        {
+            if (!ApiComun.TryFecha(desde, out var f)) return ApiComun.FechaInvalida("desde");
+            primero = f;
+        }
+        if (!string.IsNullOrEmpty(hasta))
+        {
+            if (!ApiComun.TryFecha(hasta, out var f)) return ApiComun.FechaInvalida("hasta");
+            ultimo = f;
+        }
+        if (primero is { } p && ultimo is { } u && p > u) return ApiComun.Invalido("La fecha «desde» no puede ser posterior a «hasta».");
+        if (primero is { } desdeFecha) q = q.Where(g => g.Fecha >= desdeFecha);
+        if (ultimo is { } hastaFecha) q = q.Where(g => g.Fecha <= hastaFecha);
         if (categoriaId is { } c) q = q.Where(g => g.CategoriaId == c);
         if (miembroId is { } m) q = q.Where(g => g.PagadoPor == m || g.Repartos.Any(r => r.MiembroId == m && r.ImporteAsumido > 0m));
         var texto = buscar?.Trim();

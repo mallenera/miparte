@@ -125,6 +125,28 @@ public sealed class CoreApiClient
         return ObtenerAsync<List<GastoResponse>>(filtros.Count == 0 ? "api/gastos" : "api/gastos?" + string.Join('&', filtros), ct);
     }
 
+    /// <summary>Gastos del hogar con fecha entre dos días, ambos incluidos (<c>GET /api/gastos?desde=&amp;hasta=</c>).</summary>
+    /// <param name="desde">Primer día del periodo.</param>
+    /// <param name="hasta">Último día del periodo.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<List<GastoResponse>> ListarGastosPorRangoAsync(DateOnly desde, DateOnly hasta, CancellationToken ct = default) =>
+        ListarGastosPorRangoAsync(desde, hasta, null, null, ct);
+
+    /// <summary>Gastos entre dos días, ambos incluidos, con filtros opcionales de quién paga o asume y de texto.</summary>
+    /// <param name="desde">Primer día del periodo.</param>
+    /// <param name="hasta">Último día del periodo.</param>
+    /// <param name="miembroId">Solo gastos que paga o en cuyo reparto asume algo este miembro.</param>
+    /// <param name="buscar">Texto que debe contener el concepto.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<List<GastoResponse>> ListarGastosPorRangoAsync(DateOnly desde, DateOnly hasta, Guid? miembroId, string? buscar, CancellationToken ct = default)
+    {
+        var url = $"api/gastos?desde={desde.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)}"
+            + $"&hasta={hasta.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)}";
+        if (miembroId is { } m) url += $"&miembroId={m}";
+        if (!string.IsNullOrWhiteSpace(buscar)) url += $"&buscar={Uri.EscapeDataString(buscar.Trim())}";
+        return ObtenerAsync<List<GastoResponse>>(url, ct);
+    }
+
     /// <summary>Crea un gasto; el servidor calcula y guarda el reparto (<c>POST /api/gastos</c>).</summary>
     /// <param name="peticion">Datos del gasto.</param>
     /// <param name="ct">Token de cancelación.</param>

@@ -1,5 +1,6 @@
 @* Pestaña Gastos: gastos del mes con su reparto, alta y edición. El servidor calcula el reparto según el perfil. *@
 @using System.Globalization
+@using Microsoft.JSInterop
 @inject CoreApiClient Api
 @inject EstadoHogar Hogar
 @inject ServicioAvisos Avisos
@@ -23,12 +24,34 @@ else
     <section class="card" aria-labelledby="t-gastos">
         <div class="card-head">
             <h2 id="t-gastos">Gastos</h2>
+            <div class="modo" role="group" aria-label="Tipo de periodo">
+                <button class="chip chip-btn @(_modoRango ? "" : "sel")" type="button" aria-pressed="@(_modoRango ? "false" : "true")" @onclick="() => CambiarModoAsync(false)">Por mes</button>
+                <button class="chip chip-btn @(_modoRango ? "sel" : "")" type="button" aria-pressed="@(_modoRango ? "true" : "false")" @onclick="() => CambiarModoAsync(true)">Entre fechas</button>
+            </div>
+        </div>
+        @if (_modoRango)
+        {
+            <div class="filtros" role="group" aria-label="Periodo">
+                <label>Desde
+                    <input type="date" @bind="_desdeR" @bind:after="AplicarRangoAsync" max="@_hastaR.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" />
+                </label>
+                <label>Hasta
+                    <input type="date" @bind="_hastaR" @bind:after="AplicarRangoAsync" min="@_desdeR.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" />
+                </label>
+            </div>
+            @if (_desdeR > _hastaR)
+            {
+                <div class="aviso err u-mt12" role="alert">La fecha «Desde» no puede ser posterior a «Hasta».</div>
+            }
+        }
+        else
+        {
             <div class="mesnav">
                 <button class="linkbtn" type="button" aria-label="Mes anterior" @onclick="() => CambiarMesAsync(-1)"><Icono Nombre="chevron-left" /></button>
                 <span class="tag cur" aria-live="polite">@NombreMes</span>
                 <button class="linkbtn" type="button" aria-label="Mes siguiente" @onclick="() => CambiarMesAsync(1)"><Icono Nombre="chevron-right" /></button>
             </div>
-        </div>
+        }
         <div class="filtros" role="search" aria-label="Filtrar gastos">
             <label>Persona
                 <select @bind="_filtroMiembro" @bind:after="AplicarFiltrosAsync">
@@ -56,17 +79,27 @@ else
                 <button class="linkbtn" type="button" @onclick="LimpiarFiltrosAsync">Quitar filtros</button>
             }
         </div>
-        <p class="muted">@(HayFiltros ? "Total filtrado" : "Total del mes"): <b>@Euros(_gastos.Where(g => !g.Personal).Sum(g => g.Importe))</b> en @_gastos.Count(g => !g.Personal) @(_gastos.Count(g => !g.Personal) == 1 ? "gasto" : "gastos").
+        @if (_soloPaga is not null || _soloCuenta)
+        {
+            <p class="muted u-mt10" role="status">Solo lo que paga <b>@(_soloPaga is { } p ? NombreMiembro(p) : "la cuenta común o el ahorro")</b>, no lo que solo asume.</p>
+        }
+        <p class="muted">@(HayFiltros ? "Total filtrado" : _modoRango ? "Total del periodo" : "Total del mes"): <b>@Euros(_gastos.Where(g => !g.Personal).Sum(g => g.Importe))</b> en @_gastos.Count(g => !g.Personal) @(_gastos.Count(g => !g.Personal) == 1 ? "gasto" : "gastos").
             @if (_gastos.Any(g => g.Personal))
             {
                 <span>Personales (fuera de la liquidación): <b>@Euros(_gastos.Where(g => g.Personal).Sum(g => g.Importe))</b>.</span>
             }
         </p>
 
-        @if (MesCerrado)
+        @if (!_modoRango && MesCerrado)
         {
             <div class="aviso warn u-mt12" role="status">
                 Este mes está cerrado: sus gastos no se pueden añadir, editar ni borrar. Un administrador puede reabrirlo desde Resumen.
+            </div>
+        }
+        else if (_modoRango && _gastos.Any(CerradoGasto))
+        {
+            <div class="aviso warn u-mt12" role="status">
+                Los gastos de meses cerrados no se pueden editar ni borrar. Un administrador puede reabrir el mes desde Resumen.
             </div>
         }
 
@@ -75,6 +108,8 @@ else
             <div class="aviso err u-mt12" role="alert">@_error</div>
         }
 
+        @* Con un gasto en edición el formulario sube sobre la lista (order en CSS): en un periodo largo no hay que bajar hasta el final. *@
+        <div class="gastos-cuerpo">
         <div class="u-mt10">
             @foreach (var g in _gastos)
             {
@@ -112,7 +147,7 @@ else
                             <button class="linkbtn danger" type="button" @onclick="() => EliminarAsync(g)">Sí</button>
                             <button class="linkbtn" type="button" @onclick="() => _confirmandoEliminar = null">No</button>
                         }
-                        else if (!MesCerrado)
+                        else if (!CerradoGasto(g))
                         {
                             @if (Permisos.Tiene(Claves.GastosEditar))
                             {
@@ -129,7 +164,7 @@ else
 
             @if (_gastos.Count == 0)
             {
-                <div class="empty">@(HayFiltros ? "Ningún gasto de este mes coincide con los filtros." : "No hay gastos en este mes. Añade el primero abajo.")</div>
+                <div class="empty">@(HayFiltros ? $"Ningún gasto de {(_modoRango ? "este periodo" : "este mes")} coincide con los filtros." : _modoRango ? "No hay gastos entre estas fechas." : "No hay gastos en este mes. Añade el primero abajo.")</div>
             }
         </div>
 
@@ -143,10 +178,10 @@ else
         }
         else
         {
-            <form class="addcat" @onsubmit="GuardarAsync">
+            <form class="addcat @(_editando is not null ? "editando" : "")" @onsubmit="GuardarAsync">
                 <h3 class="u-titulo-form">@(_editando is null ? "Nuevo gasto" : "Editar gasto")</h3>
                 <label>Fecha
-                    <input type="date" required @bind="_fecha" />
+                    <input type="date" required @bind="_fecha" @ref="_campoFecha" />
                 </label>
                 <label>Importe (€)
                     <input inputmode="decimal" required placeholder="0,00" @bind="_importe" @bind:event="oninput" />
@@ -206,6 +241,7 @@ else
                 }
             </form>
         }
+        </div>
     </section>
 }
 
@@ -228,6 +264,31 @@ else
     private Guid _categoria, _perfil;
     private Guid? _pagador;
     private bool _cuentaActiva, _ahorroActivo, _desdeAhorro, _personal;
+
+    /// <summary>Si se listan los gastos entre dos fechas en vez de por mes (para ver una categoría a lo largo de varios meses).</summary>
+    private bool _modoRango;
+    private DateOnly _desdeR, _hastaR;
+
+    /// <summary>Categoría con la que se abre la lista (enlace desde el Dashboard).</summary>
+    [Parameter] public Guid? CategoriaInicial { get; set; }
+
+    /// <summary>Persona con la que se abre la lista (enlace desde el Dashboard).</summary>
+    [Parameter] public Guid? MiembroInicial { get; set; }
+
+    /// <summary>Solo los gastos que paga esta persona (enlace del Dashboard): a diferencia de <see cref="MiembroInicial"/>, no incluye los que solo asume en parte.</summary>
+    [Parameter] public Guid? PagadorInicial { get; set; }
+
+    /// <summary>Solo los gastos pagados por la cuenta común o el ahorro, sin persona (enlace del Dashboard).</summary>
+    [Parameter] public bool CuentaComunInicial { get; set; }
+
+    private Guid? _soloPaga;
+    private bool _soloCuenta;
+
+    /// <summary>Primer día del periodo con el que se abre la lista; con <see cref="HastaInicial"/> activa el modo «entre fechas».</summary>
+    [Parameter] public DateOnly? DesdeInicial { get; set; }
+
+    /// <summary>Último día del periodo con el que se abre la lista.</summary>
+    [Parameter] public DateOnly? HastaInicial { get; set; }
 
     /// <summary>Quién paga en el selector: un adulto (su id), la cuenta común ("") o el ahorro ("ahorro").</summary>
     private string OrigenPago
@@ -275,7 +336,22 @@ else
 
     private bool ImporteValido => TryImporte(out _);
 
-    protected override Task OnInitializedAsync() => CargarAsync();
+    protected override Task OnInitializedAsync()
+    {
+        if (CategoriaInicial is { } c) _filtroCategoria = c.ToString();
+        if (MiembroInicial is { } m) _filtroMiembro = m.ToString();
+        _soloPaga = PagadorInicial;
+        _soloCuenta = CuentaComunInicial && PagadorInicial is null;
+        if (DesdeInicial is { } d && HastaInicial is { } h && d <= h)
+        {
+            _modoRango = true;
+            _desdeR = d;
+            _hastaR = h;
+            _mes = new DateOnly(d.Year, d.Month, 1);
+        }
+
+        return CargarAsync();
+    }
 
     private async Task CargarAsync()
     {
@@ -328,7 +404,7 @@ else
         if (_pagador is null && PerfilCuentaComun is { } p) _perfil = p.Id;
     }
 
-    private bool HayFiltros => _filtroMiembro != "" || _filtroCategoria != "" || !string.IsNullOrWhiteSpace(_filtroTexto);
+    private bool HayFiltros => _filtroMiembro != "" || _filtroCategoria != "" || !string.IsNullOrWhiteSpace(_filtroTexto) || _soloPaga is not null || _soloCuenta;
 
     /// <summary>Versión de la última petición de gastos: una respuesta tardía de otra selección no pisa la actual.</summary>
     private int _versionCarga;
@@ -338,12 +414,22 @@ else
         var version = ++_versionCarga;
         try
         {
-            var gastos = await Api.ListarGastosAsync(
-                    _mes.ToString("yyyy-MM", CultureInfo.InvariantCulture),
-                    Guid.TryParse(_filtroCategoria, out var categoria) ? categoria : null,
-                    Guid.TryParse(_filtroMiembro, out var miembro) ? miembro : null,
-                    _filtroTexto);
-            if (version == _versionCarga) _gastos = gastos.OrderByDescending(g => g.Fecha).ToList();
+            Guid? miembro = Guid.TryParse(_filtroMiembro, out var m) ? m : null;
+            var gastos = _modoRango
+                ? await Api.ListarGastosPorRangoAsync(_desdeR, _hastaR, miembro, _filtroTexto)
+                : await Api.ListarGastosAsync(_mes.ToString("yyyy-MM", CultureInfo.InvariantCulture), null, miembro, _filtroTexto);
+            // La categoría se filtra aquí y no en la API para que incluya sus subcategorías.
+            if (Guid.TryParse(_filtroCategoria, out var categoria))
+            {
+                var ids = ArbolCategorias.ConDescendientes(_categorias, categoria);
+                gastos = gastos.Where(g => ids.Contains(g.CategoriaId)).ToList();
+            }
+
+            // Quién paga (no quién asume): lo que reproduce el filtro de persona del Dashboard.
+            if (_soloPaga is { } paga) gastos = gastos.Where(g => g.PagadoPor == paga).ToList();
+            else if (_soloCuenta) gastos = gastos.Where(g => g.PagadoPor is null).ToList();
+
+            if (version == _versionCarga) _gastos = gastos.OrderByDescending(g => g.Fecha).ThenBy(g => g.Id).ToList();
         }
         catch (ApiException) when (version != _versionCarga)
         {
@@ -378,8 +464,37 @@ else
     private Task LimpiarFiltrosAsync()
     {
         _filtroMiembro = _filtroCategoria = _filtroTexto = "";
+        _soloPaga = null;
+        _soloCuenta = false;
         return AplicarFiltrosAsync();
     }
+
+    /// <summary>Cambia entre la vista por mes y la de entre fechas, conservando el periodo que se estaba viendo.</summary>
+    private async Task CambiarModoAsync(bool rango)
+    {
+        if (rango == _modoRango) return;
+        if (rango)
+        {
+            _desdeR = _mes;
+            _hastaR = _mes.AddMonths(1).AddDays(-1);
+        }
+        else
+        {
+            _mes = new DateOnly(_desdeR.Year, _desdeR.Month, 1);
+        }
+
+        _modoRango = rango;
+        _error = null;
+        _confirmandoEliminar = null;
+        if (_editando is not null) ReiniciarFormulario();
+        await AplicarFiltrosAsync();
+    }
+
+    private Task AplicarRangoAsync() => _desdeR > _hastaR ? Task.CompletedTask : AplicarFiltrosAsync();
+
+    /// <summary>El gasto cae en un mes cerrado: el servidor rechazaría editarlo o borrarlo.</summary>
+    private bool CerradoGasto(GastoResponse g) =>
+        _cierres.Any(c => c.Mes == g.Fecha.ToString("yyyy-MM", CultureInfo.InvariantCulture));
 
     private async Task CambiarMesAsync(int delta)
     {
@@ -446,8 +561,27 @@ else
         _perfil = g.PerfilRepartoId;
         _concepto = g.Concepto ?? "";
         _error = null;
+        _enfocarFormulario = true;
     }
 
+
+    private ElementReference _campoFecha;
+    private bool _enfocarFormulario;
+
+    /// <summary>Al empezar a editar lleva el foco (y con él la vista) al formulario, aunque se pulsara «Editar» al final de una lista larga.</summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_enfocarFormulario) return;
+        _enfocarFormulario = false;
+        try
+        {
+            await _campoFecha.FocusAsync();
+        }
+        catch (Exception e) when (e is JSException or InvalidOperationException)
+        {
+            // El foco es una comodidad: sin JavaScript disponible la edición sigue funcionando.
+        }
+    }
     private void CancelarEdicion() => ReiniciarFormulario();
 
     private Task GuardarAsync() =>

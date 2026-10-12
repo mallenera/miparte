@@ -204,7 +204,12 @@ public sealed class Migrador
             }
             catch (PostgresException ex)
             {
-                throw new InvalidOperationException($"Fallo en «{nombre}»: {ex.MessageText}", ex);
+                // 23502: una columna NOT NULL nueva sobre una tabla con filas. No se anticipa al transformar porque
+                // sobre una tabla vacía es válido; aquí solo se explica cómo resolverlo.
+                var pista = ex.SqlState == PostgresErrorCodes.NotNullViolation
+                    ? " Una columna NOT NULL nueva en una tabla con datos necesita DEFAULT o un script en Scripts/Antes que la añada y la rellene."
+                    : "";
+                throw new InvalidOperationException($"Fallo en «{nombre}»: {ex.MessageText}.{pista}", ex);
             }
         }
         tx.Commit();

@@ -32,7 +32,7 @@ public static class ExportadorEstructura
             UseShellExecute = false,
         };
         // Solo el esquema de la aplicación: sin el journal ni el auth simulado, sin propietarios (varían por entorno).
-        foreach (var a in new[] { "--schema-only", "--no-owner", "--schema=public", "--encoding=UTF8", "-h", cs.Host ?? "localhost",
+        foreach (var a in new[] { "--schema-only", "--no-password", "--no-owner", "--schema=public", "--encoding=UTF8", "-h", cs.Host ?? "localhost",
                                   "-p", cs.Port.ToString(), "-U", cs.Username ?? "postgres", "-d", cs.Database ?? "postgres" })
             psi.ArgumentList.Add(a);
         if (!string.IsNullOrEmpty(cs.Password))

@@ -49,7 +49,7 @@ MIPARTE_TEST_DB="Host=localhost;Database=miparte;Username=postgres;Password=..."
 
 #### Montar un PostgreSQL local en Windows (una vez)
 
-Sin Docker ni instalador con administrador, con scoop (instala la 18 en `~\scoop\apps\postgresql`; CI usa la 16, el SQL es estándar). Su post-instalación ya crea un clúster con superusuario `postgres` sin contraseña y autenticación `trust` solo local. En una terminal nueva (para que vea el PATH):
+Sin Docker ni instalador con administrador, con scoop (instala la última, hoy la 18, en `~\scoop\apps\postgresql`; `scoop install postgresql@17` falla porque su autoupdate no encuentra el zip de EnterpriseDB (403); CI y Supabase usan la 17, pero para desarrollo basta la 18: los ficheros de `Estructura/` se aplican en 15+ y el exportador quita lo propio de la 17+). Su post-instalación ya crea un clúster con superusuario `postgres` sin contraseña y autenticación `trust` solo local. En una terminal nueva (para que vea el PATH):
 
 ```bash
 scoop install postgresql

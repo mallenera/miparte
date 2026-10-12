@@ -6,7 +6,9 @@ RUN dotnet publish src/Assistant/Assistant.Api -c Release -o /app
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 COPY --from=build /app .
-ENV ASPNETCORE_URLS=http://+:8080
+# HTTP_PORTS y no URLS: la imagen aspnet ya define HTTP_PORTS=8080 y ambas juntas provocan el aviso
+# «Overriding HTTP_PORTS» (Hosting.Diagnostics[15]) en cada arranque.
+ENV ASPNETCORE_HTTP_PORTS=8080
 # Sin privilegios: APP_UID viene definido en las imágenes aspnet (usuario "app").
 USER $APP_UID
 EXPOSE 8080

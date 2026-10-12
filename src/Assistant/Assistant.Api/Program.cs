@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Options;
 using MiParte.Assistant.Api;
 using MiParte.Assistant.Api.Chat;
@@ -11,6 +12,9 @@ var builder = WebApplication.CreateBuilder(args);
 var opciones = builder.Configuration.GetSection(OpcionesAsistente.Seccion).Get<OpcionesAsistente>() ?? new();
 builder.Services.Configure<OpcionesAsistente>(builder.Configuration.GetSection(OpcionesAsistente.Seccion));
 builder.Services.AddSupabaseAuth(builder.Configuration);
+// La API no usa cookies ni nada que deba cifrarse entre reinicios (solo valida JWT): claves efímeras en memoria
+// evitan los avisos de DataProtection por guardar claves sin cifrar en un contenedor sin disco persistente.
+builder.Services.AddDataProtection().UseEphemeralDataProtectionProvider();
 builder.AddSeguridadAsistente(opciones);
 
 // Datos del hogar: siempre vía Core.Api con el JWT de la persona (no hay acceso directo a la base de datos).

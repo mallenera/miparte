@@ -1,23 +1,23 @@
-# Scripts nuevos del esquema
+# Scripts versionados
 
-Aquí van los cambios de esquema **nuevos**, posteriores a la línea base (`supabase/migrations`, congelada).
-Se incrustan en el ensamblado y `migrar` aplica cada uno una sola vez, por orden de nombre.
+La estructura del esquema vive en `../Estructura/` y `migrar` la converge sola. Aquí van **solo los pasos que no se
+pueden inferir de ella**: borrar o renombrar, cambiar tipos, rellenar o corregir datos, retirar objetos que ya no
+existen. Cada script corre **una vez** (journal en `miparte_migraciones.scripts_aplicados`), por orden de nombre.
 
+- `Antes/`: corren antes de aplicar la estructura (p. ej. renombrar una columna para que la estructura no cree otra
+  vacía; borrar un objeto que estorba).
+- raíz (`*.sql`): corren después (p. ej. rellenar con datos una columna nueva y borrar la antigua).
 - Nombre: `AAAAMMDDHHMMSS_descripcion_en_snake_case.sql`, posterior al último.
-- **Idempotentes**: cada script debe poder ejecutarse dos veces sin error ni efecto doble (así también vale
-  pegarlo a mano o recuperarse de una ejecución a medias). Patrones:
-  - tablas, índices y esquemas: `create table if not exists`, `create index if not exists`;
-  - columnas: `alter table ... add column if not exists`, `drop column if exists`;
-  - funciones y vistas: `create or replace`;
-  - restricciones, políticas y tipos (no admiten `if not exists`): `drop policy if exists` + `create policy`,
-    o `do $$ begin if not exists (select 1 from pg_constraint where conname = '...') then ... end if; end $$;`;
-  - datos: `insert ... on conflict do nothing` o `update` con `where` acotado.
+- **Idempotentes**: sobre una base vacía o ya migrada deben poder ejecutarse sin error ni efecto doble. Patrones:
+  - borrar: `drop column if exists`, `drop function if exists`, `drop table if exists`;
+  - renombrar: `do $$ begin if exists (select 1 from information_schema.columns where table_name = '...' and column_name = 'vieja') then alter table ... rename column vieja to nueva; end if; end $$;`;
+  - datos: `update ... where <condición que ya no se cumple tras aplicar>` o `insert ... on conflict do nothing`.
 - Funciones `SECURITY DEFINER`: `set search_path = ''` y nombres cualificados.
 - No uses `$miparte_script$` como etiqueta de dólar (la usa el comando `script`).
 - Nunca edites un script ya aplicado en algún entorno; crea otro.
 
 ## Generados
 
-`Scripts/Generados/` recibe la salida del comando `script` (un SQL idempotente con todo). Está ignorado por git y
-no se incrusta (solo se incrustan los `.sql` de esta carpeta, no los de subcarpetas), así que no se reaplica como migración.
-La estructura real vigente se versiona aparte, en `../Estructura/` (comando `estructura`, un fichero por tabla y función).
+`Scripts/Generados/` recibe la salida del comando `script` (un SQL idempotente con estructura y scripts). Está
+ignorado por git y no se incrusta (solo se incrustan los `.sql` de `Antes/` y de esta carpeta), así que no se
+reaplica como migración.

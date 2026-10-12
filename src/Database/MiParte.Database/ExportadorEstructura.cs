@@ -1,25 +1,26 @@
 using System.Diagnostics;
 using System.Text;
+using System.Text.RegularExpressions;
 using Npgsql;
 
 namespace MiParte.Database;
 
 /// <summary>
-/// Vuelca la estructura actual del esquema <c>public</c> (tablas, funciones, RLS, privilegios) a un único SQL
-/// versionable. Es una instantánea de lectura: el origen de verdad siguen siendo los scripts, y el diff de este
-/// fichero en cada PR muestra qué cambia realmente en la base.
+/// Vuelca la estructura actual del esquema <c>public</c> (tablas, funciones, RLS, privilegios) a ficheros SQL
+/// versionables, uno por objeto. Es una instantánea de lectura: el origen de verdad siguen siendo los scripts, y el diff de
+/// estos ficheros en cada PR muestra qué cambia realmente en la base.
 /// </summary>
 public static class ExportadorEstructura
 {
     /// <summary>Ruta por defecto de la instantánea, relativa a la raíz del repositorio.</summary>
-    public const string RutaPorDefecto = "src/Database/MiParte.Database/Estructura/esquema.sql";
+    public const string RutaPorDefecto = "src/Database/MiParte.Database/Estructura";
 
     /// <summary>
     /// Ejecuta <c>pg_dump --schema-only</c> contra la base y escribe el resultado normalizado.
     /// Requiere <c>pg_dump</c> en el PATH.
     /// </summary>
     /// <param name="conexion">Cadena de conexión Npgsql de una base ya migrada.</param>
-    /// <param name="destino">Fichero de salida.</param>
+    /// <param name="destino">Carpeta de salida (se regenera entera).</param>
     public static void Exportar(string conexion, string destino)
     {
         var cs = new NpgsqlConnectionStringBuilder(conexion);
@@ -45,8 +46,92 @@ public static class ExportadorEstructura
         if (proceso.ExitCode != 0)
             throw new InvalidOperationException($"pg_dump falló: {error.Result.Trim()}");
 
-        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(destino))!);
-        File.WriteAllText(destino, Normalizar(salida.Result), new UTF8Encoding(false));
+        // Se regenera por completo: un objeto eliminado no debe dejar su fichero atrás.
+        if (Directory.Exists(destino))
+            Directory.Delete(destino, recursive: true);
+        foreach (var (relativa, contenido) in Dividir(salida.Result))
+        {
+            var fichero = Path.Combine(destino, relativa);
+            Directory.CreateDirectory(Path.GetDirectoryName(fichero)!);
+            File.WriteAllText(fichero, contenido, new UTF8Encoding(false));
+        }
+    }
+
+    /// <summary>
+    /// Reparte el volcado en un fichero por objeto, agrupando con cada tabla o función lo que depende de ella.
+    /// El prefijo numérico de las carpetas es también el orden en que se pueden aplicar sobre una base vacía.
+    /// </summary>
+    /// <returns>Ruta relativa del fichero → contenido.</returns>
+    internal static IReadOnlyDictionary<string, string> Dividir(string sql)
+    {
+        var lineas = Normalizar(sql).Split('\n');
+        var ficheros = new SortedDictionary<string, StringBuilder>(StringComparer.Ordinal);
+        var ruta = "00_Esquema.sql";
+
+        for (var i = 0; i < lineas.Length; i++)
+        {
+            if (EsCabecera(lineas, i))
+            {
+                var cabecera = lineas[i + 1];
+                // Cuerpo del bloque hasta la siguiente cabecera, para localizar el objeto al que pertenece.
+                var fin = i + 3;
+                while (fin < lineas.Length && !EsCabecera(lineas, fin))
+                    fin++;
+                var cuerpo = string.Join('\n', lineas[(i + 3)..fin]);
+                ruta = Clasificar(cabecera, cuerpo);
+
+                // pg_dump expresa los privilegios de tabla relativos a los de por defecto vigentes al crearla; al
+                // revocar antes a anon y authenticated, los GRANT que siguen valen sobre cualquier base de partida.
+                if (cabecera.Contains("Type: DEFAULT ACL;", StringComparison.Ordinal))
+                {
+                    // Igual que con las tablas: sin esto, los permisos por defecto previos de la base se sumarían.
+                    if (!ficheros.TryGetValue(ruta, out var d))
+                        ficheros[ruta] = d = new StringBuilder();
+                    d.Append("--\n").Append(cabecera).Append("\n--\n\n")
+                        .Append("ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated;\n");
+                    i += 2;
+                    continue;
+                }
+                var tabla = Regex.Match(cuerpo, @"\bON TABLE public\.""?(\w+)""?");
+                if (cabecera.Contains("Type: ACL;", StringComparison.Ordinal) && tabla.Success)
+                {
+                    if (!ficheros.TryGetValue(ruta, out var destino))
+                        ficheros[ruta] = destino = new StringBuilder();
+                    destino.Append("--\n").Append(cabecera).Append("\n--\n\n")
+                        .Append($"REVOKE ALL ON TABLE public.{tabla.Groups[1].Value} FROM anon, authenticated;\n");
+                    i += 2;
+                    continue;
+                }
+            }
+            if (lineas[i].StartsWith("-- PostgreSQL database dump complete", StringComparison.Ordinal))
+                break;
+            if (!ficheros.TryGetValue(ruta, out var sb))
+                ficheros[ruta] = sb = new StringBuilder();
+            sb.Append(lineas[i]).Append('\n');
+        }
+        return ficheros.ToDictionary(p => p.Key, p => p.Value.ToString().Trim() + "\n");
+    }
+
+    private static bool EsCabecera(string[] l, int i) =>
+        i + 2 < l.Length && l[i] == "--" && l[i + 1].StartsWith("-- Name: ", StringComparison.Ordinal) && l[i + 2] == "--";
+
+    private static string Clasificar(string cabecera, string cuerpo)
+    {
+        var tipo = Regex.Match(cabecera, @"Type: ([^;]+);").Groups[1].Value;
+        var objeto = Regex.Match(cuerpo, @"(?:\bON(?: TABLE| FUNCTION)?|\bONLY|\bTABLE|\bFUNCTION)\s+public\.""?(\w+)""?")
+            .Groups[1].Value;
+        if (objeto.Length == 0)
+            return "00_Esquema.sql";
+        return tipo switch
+        {
+            "TABLE" or "CONSTRAINT" or "CHECK CONSTRAINT" or "INDEX" => $"01_Tablas/{objeto}.sql",
+            "FUNCTION" => $"02_Funciones/{objeto}.sql",
+            "ACL" when cuerpo.Contains(" ON FUNCTION ", StringComparison.Ordinal) => $"02_Funciones/{objeto}.sql",
+            "TRIGGER" => $"03_Disparadores/{objeto}.sql",
+            "FK CONSTRAINT" => $"04_ClavesForaneas/{objeto}.sql",
+            "POLICY" or "ROW SECURITY" or "ACL" => $"05_Seguridad/{objeto}.sql",
+            _ => "00_Esquema.sql",
+        };
     }
 
     /// <summary>

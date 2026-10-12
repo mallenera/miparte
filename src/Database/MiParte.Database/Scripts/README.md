@@ -20,4 +20,4 @@ Se incrustan en el ensamblado y `migrar` aplica cada uno una sola vez, por orden
 
 `Scripts/Generados/` recibe la salida del comando `script` (un SQL idempotente con todo). Está ignorado por git y
 no se incrusta (solo se incrustan los `.sql` de esta carpeta, no los de subcarpetas), así que no se reaplica como migración.
-La estructura real vigente se versiona aparte, en `../Estructura/esquema.sql` (comando `estructura`).
+La estructura real vigente se versiona aparte, en `../Estructura/` (comando `estructura`, un fichero por tabla y función).

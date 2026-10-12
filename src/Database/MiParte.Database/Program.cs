@@ -10,7 +10,7 @@ const string Ayuda = """
       migrar             Aplica los scripts pendientes. Repetirlo es seguro.
       pendientes         Lista aplicados y pendientes sin tocar el esquema (sale con 1 si hay pendientes).
       script [fichero]   Genera un SQL idempotente con todos los scripts (por defecto Scripts/Generados; «-» = pantalla).
-      estructura [fich]  Vuelca la estructura actual (pg_dump) a Estructura/esquema.sql; requiere pg_dump en el PATH.
+      estructura [dir]   Vuelca la estructura actual (pg_dump) a Estructura/, un fichero por objeto; requiere pg_dump.
       marcar-aplicadas   Registra todos los scripts como aplicados sin ejecutarlos (adoptar una base ya migrada).
       semilla-demo       Ejecuta la semilla de la cuenta demo (la restablece).
 

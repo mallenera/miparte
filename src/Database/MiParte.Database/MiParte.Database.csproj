@@ -21,4 +21,8 @@
     <EmbeddedResource Include="..\..\..\supabase\seed\demo.sql" LogicalName="semillas/demo.sql" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="MiParte.Database.Tests" />
+  </ItemGroup>
+
 </Project>

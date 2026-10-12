@@ -38,5 +38,4 @@ CREATE POLICY invitacion_hogar_update ON public.invitacion_hogar FOR UPDATE TO a
 
 REVOKE ALL ON TABLE public.invitacion_hogar FROM anon, authenticated;
 
-GRANT MAINTAIN ON TABLE public.invitacion_hogar TO anon;
-GRANT SELECT,MAINTAIN ON TABLE public.invitacion_hogar TO authenticated;
+GRANT SELECT ON TABLE public.invitacion_hogar TO authenticated;

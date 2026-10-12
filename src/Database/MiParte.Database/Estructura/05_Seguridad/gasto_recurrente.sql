@@ -17,5 +17,4 @@ CREATE POLICY gasto_recurrente_hogar ON public.gasto_recurrente TO authenticated
 
 REVOKE ALL ON TABLE public.gasto_recurrente FROM anon, authenticated;
 
-GRANT MAINTAIN ON TABLE public.gasto_recurrente TO anon;
-GRANT SELECT,MAINTAIN ON TABLE public.gasto_recurrente TO authenticated;
+GRANT SELECT ON TABLE public.gasto_recurrente TO authenticated;

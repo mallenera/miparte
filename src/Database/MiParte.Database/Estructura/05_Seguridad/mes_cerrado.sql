@@ -17,5 +17,4 @@ CREATE POLICY mes_cerrado_select ON public.mes_cerrado FOR SELECT TO authenticat
 
 REVOKE ALL ON TABLE public.mes_cerrado FROM anon, authenticated;
 
-GRANT MAINTAIN ON TABLE public.mes_cerrado TO anon;
-GRANT SELECT,MAINTAIN ON TABLE public.mes_cerrado TO authenticated;
+GRANT SELECT ON TABLE public.mes_cerrado TO authenticated;

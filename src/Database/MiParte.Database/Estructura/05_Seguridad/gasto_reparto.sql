@@ -17,5 +17,4 @@ CREATE POLICY gasto_reparto_hogar ON public.gasto_reparto TO authenticated USING
 
 REVOKE ALL ON TABLE public.gasto_reparto FROM anon, authenticated;
 
-GRANT MAINTAIN ON TABLE public.gasto_reparto TO anon;
-GRANT SELECT,MAINTAIN ON TABLE public.gasto_reparto TO authenticated;
+GRANT SELECT ON TABLE public.gasto_reparto TO authenticated;

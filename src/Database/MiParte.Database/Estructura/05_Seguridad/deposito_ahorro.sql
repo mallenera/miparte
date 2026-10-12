@@ -17,5 +17,4 @@ CREATE POLICY deposito_ahorro_select ON public.deposito_ahorro FOR SELECT TO aut
 
 REVOKE ALL ON TABLE public.deposito_ahorro FROM anon, authenticated;
 
-GRANT MAINTAIN ON TABLE public.deposito_ahorro TO anon;
-GRANT SELECT,MAINTAIN ON TABLE public.deposito_ahorro TO authenticated;
+GRANT SELECT ON TABLE public.deposito_ahorro TO authenticated;

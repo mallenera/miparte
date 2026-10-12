@@ -17,5 +17,4 @@ CREATE POLICY aportacion_cuenta_hogar ON public.aportacion_cuenta TO authenticat
 
 REVOKE ALL ON TABLE public.aportacion_cuenta FROM anon, authenticated;
 
-GRANT MAINTAIN ON TABLE public.aportacion_cuenta TO anon;
-GRANT SELECT,MAINTAIN ON TABLE public.aportacion_cuenta TO authenticated;
+GRANT SELECT ON TABLE public.aportacion_cuenta TO authenticated;

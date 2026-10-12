@@ -20,7 +20,7 @@ public class MigradorTests
         public BaseTemporal()
         {
             _servidor = new NpgsqlConnectionStringBuilder(Cadena!) { Pooling = false };
-            Ejecutar($"create database {_nombre}");
+            Ejecutar($"create database {_nombre}", _servidor.ConnectionString);
             Conexion = new NpgsqlConnectionStringBuilder(Cadena!) { Database = _nombre, Pooling = false }.ConnectionString;
         }
 
@@ -28,7 +28,7 @@ public class MigradorTests
 
         public void Ejecutar(string sql, string? conexion = null)
         {
-            using var c = new NpgsqlConnection(conexion ?? _servidor.ConnectionString);
+            using var c = new NpgsqlConnection(conexion ?? Conexion);
             c.Open();
             using var cmd = new NpgsqlCommand(sql, c);
             cmd.ExecuteNonQuery();
@@ -42,70 +42,71 @@ public class MigradorTests
             return Convert.ToInt64(cmd.ExecuteScalar());
         }
 
-        public void Dispose() => Ejecutar($"drop database if exists {_nombre} with (force)");
+        public void Dispose() => Ejecutar($"drop database if exists {_nombre} with (force)", _servidor.ConnectionString);
     }
 
     private static string Auth() => Migrador.Leer("previos/auth_stub.sql");
 
     [SkippableFact]
-    public void Migrar_AplicaTodoYRepetirEsInocuo()
+    public void Migrar_CreaLaEstructuraYRepetirEsInocuo()
     {
         Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
         using var bd = new BaseTemporal();
         var migrador = new Migrador(bd.Conexion, TextWriter.Null);
 
-        var primera = migrador.Migrar(conAuthStub: true);
-        var segunda = migrador.Migrar(conAuthStub: true);
+        migrador.Migrar(conAuthStub: true);
+        migrador.Migrar(conAuthStub: true);
 
-        Assert.Equal(Migrador.NombresDeScripts().Count, primera);
-        Assert.Equal(0, segunda);
-        var (aplicados, pendientes) = migrador.Estado();
-        Assert.Equal(Migrador.NombresDeScripts().Count, aplicados.Count);
-        Assert.Empty(pendientes);
+        Assert.Equal(1, bd.Contar("select count(*) from pg_class where oid = 'public.gasto'::regclass"));
+        Assert.True(bd.Contar("select count(*) from pg_proc where proname = 'crear_hogar'") >= 1);
+        Assert.Empty(migrador.Estado().Pendientes);
     }
 
     [SkippableFact]
-    public void ScriptGenerado_EsIdempotenteYDejaElJournal()
+    public void Migrar_ConvergeUnaBaseQueSeHaQuedadoAtras()
     {
         Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
         using var bd = new BaseTemporal();
-        bd.Ejecutar(Auth(), bd.Conexion);
+        var migrador = new Migrador(bd.Conexion, TextWriter.Null);
+        migrador.Migrar(conAuthStub: true);
+
+        // Estado antiguo: falta una columna y una restricción con nombre.
+        bd.Ejecutar("alter table public.categoria drop column a_cargo_cuenta_comun");
+        bd.Ejecutar("alter table public.categoria drop constraint categoria_nombre_longitud");
+        migrador.Migrar(conAuthStub: true);
+
+        Assert.Equal(1, bd.Contar("select count(*) from information_schema.columns " +
+                                  "where table_name = 'categoria' and column_name = 'a_cargo_cuenta_comun'"));
+        Assert.Equal(1, bd.Contar("select count(*) from pg_constraint where conname = 'categoria_nombre_longitud'"));
+    }
+
+    [SkippableFact]
+    public void ScriptGenerado_EsIdempotenteYEquivaleAMigrar()
+    {
+        Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
+        using var bd = new BaseTemporal();
+        bd.Ejecutar(Auth());
         var sql = Migrador.GenerarScriptCompleto();
 
-        bd.Ejecutar(sql, bd.Conexion);
-        bd.Ejecutar(sql, bd.Conexion);
+        bd.Ejecutar(sql);
+        bd.Ejecutar(sql);
 
-        Assert.Equal(Migrador.NombresDeScripts().Count,
-            bd.Contar($"select count(*) from {Migrador.EsquemaJournal}.{Migrador.TablaJournal}"));
-        // El journal que deja el script lo entiende el migrador: no queda nada pendiente.
-        var (_, pendientes) = new Migrador(bd.Conexion, TextWriter.Null).Estado();
-        Assert.Empty(pendientes);
-    }
-
-    [SkippableFact]
-    public void MarcarAplicadas_AdoptaUnaBaseYaMigradaSinReejecutar()
-    {
-        Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
-        using var bd = new BaseTemporal();
-        bd.Ejecutar(Auth(), bd.Conexion);
-        foreach (var nombre in Migrador.NombresDeScripts())
-            bd.Ejecutar(Migrador.Leer(nombre), bd.Conexion); // migrada «a mano», sin journal
-
+        Assert.Equal(1, bd.Contar("select count(*) from pg_class where oid = 'public.gasto'::regclass"));
+        // Lo que dejó el script lo reconoce el migrador: no queda nada pendiente y migrar no falla.
         var migrador = new Migrador(bd.Conexion, TextWriter.Null);
-        migrador.MarcarAplicadas();
-
-        Assert.Equal(0, migrador.Migrar(conAuthStub: false));
+        Assert.Empty(migrador.Estado().Pendientes);
+        migrador.Migrar(conAuthStub: false);
     }
 
     [SkippableFact]
-    public void ScriptsNuevos_SePuedenEjecutarDosVeces()
+    public void ScriptsVersionados_SePuedenEjecutarDosVeces()
     {
         Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
         using var bd = new BaseTemporal();
         new Migrador(bd.Conexion, TextWriter.Null).Migrar(conAuthStub: true);
 
-        // Contrato de la carpeta Scripts/: reejecutar un script ya aplicado no debe fallar ni duplicar nada.
-        foreach (var nombre in Migrador.NombresDeScripts().Where(n => n.StartsWith("scripts/", StringComparison.Ordinal)))
-            bd.Ejecutar(Migrador.Leer(nombre), bd.Conexion);
+        // Contrato de Scripts/ y Scripts/Antes: reejecutar un script ya aplicado no debe fallar ni duplicar nada.
+        foreach (var nombre in Migrador.NombresDeScripts())
+            bd.Ejecutar(Migrador.Leer(nombre));
     }
 }

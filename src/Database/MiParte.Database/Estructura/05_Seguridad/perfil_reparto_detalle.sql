@@ -17,5 +17,4 @@ CREATE POLICY perfil_reparto_detalle_hogar ON public.perfil_reparto_detalle TO a
 
 REVOKE ALL ON TABLE public.perfil_reparto_detalle FROM anon, authenticated;
 
-GRANT MAINTAIN ON TABLE public.perfil_reparto_detalle TO anon;
-GRANT SELECT,MAINTAIN ON TABLE public.perfil_reparto_detalle TO authenticated;
+GRANT SELECT ON TABLE public.perfil_reparto_detalle TO authenticated;

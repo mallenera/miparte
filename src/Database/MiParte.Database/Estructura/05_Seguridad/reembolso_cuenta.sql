@@ -17,5 +17,4 @@ CREATE POLICY reembolso_cuenta_hogar ON public.reembolso_cuenta TO authenticated
 
 REVOKE ALL ON TABLE public.reembolso_cuenta FROM anon, authenticated;
 
-GRANT MAINTAIN ON TABLE public.reembolso_cuenta TO anon;
-GRANT SELECT,MAINTAIN ON TABLE public.reembolso_cuenta TO authenticated;
+GRANT SELECT ON TABLE public.reembolso_cuenta TO authenticated;

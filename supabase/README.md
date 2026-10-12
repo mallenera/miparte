@@ -1,6 +1,7 @@
 # Supabase: migraciones con la CLI
 
-> **Los cambios nuevos de esquema ya no van aquí.** `migrations/*.sql` es la línea base (congelada) y se migra con el proyecto `src/Database/MiParte.Database` (`migrar`, `pendientes`, `script`, `marcar-aplicadas`), cuyos scripts nuevos e idempotentes viven en `src/Database/MiParte.Database/Scripts/`. Una base que ya se migró con `supabase db push` se adopta una vez con `marcar-aplicadas`; después, no mezcles ambas herramientas en la misma base. Lo que sigue describe la CLI solo para esa línea base y para el entorno local.
+> **El esquema ya no se migra con la CLI de Supabase.** La fuente de verdad es `src/Database/MiParte.Database/Estructura/` y se aplica con el proyecto `MiParte.Database` (`migrar`, `pendientes`, `script`), que converge cualquier base con esa estructura; `migrations/*.sql` es la historia anterior y no se amplía ni se aplica. Para Supabase real: `migrar --conexion "<session pooler, puerto 5432>"` o pegar en el editor SQL el fichero que genera `script`. No mezcles `supabase db push` con esta herramienta en la misma base. Lo que sigue describe la CLI solo para el entorno local y la historia.
+
 
 Esquema y RLS en `migrations/*.sql` (orden por nombre). `tests/auth_stub.sql` solo lo usa el CI con Postgres puro; con `supabase start` el esquema `auth` es el real.
 
@@ -30,7 +31,7 @@ supabase migration list                         # local vs remoto
 
 ## Nuevos cambios de esquema
 
-Crea `src/Database/MiParte.Database/Scripts/<AAAAMMDDHHMMSS>_nombre_del_cambio.sql` (idempotente, ver su README), ajusta el mapeo en `MiParteDbContext` y aplica con:
+Edita `src/Database/MiParte.Database/Estructura/` (la tabla, función o política afectada; ver su README), ajusta el mapeo en `MiParteDbContext` y aplica con:
 
 ```bash
 dotnet run --project src/Database/MiParte.Database -- pendientes --conexion "<session pooler, puerto 5432>"
@@ -38,7 +39,8 @@ dotnet run --project src/Database/MiParte.Database -- migrar --conexion "<sessio
 dotnet run --project src/Database/MiParte.Database -- script supabase-completo.sql   # alternativa: pegar en el editor SQL
 ```
 
-Los scripts aplicados no se editan: se crea otro.
+Si el cambio no se puede inferir de la estructura (borrar o renombrar, cambiar tipo, rellenar datos) añade además un script versionado idempotente en `Scripts/Antes` o `Scripts` (ver su README).
+
 
 ## Entorno local (opcional, requiere Docker)
 

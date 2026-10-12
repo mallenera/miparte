@@ -135,8 +135,10 @@ public static class ExportadorEstructura
     }
 
     /// <summary>
-    /// Quita lo que cambia en cada volcado sin que cambie el esquema: la versión de pg_dump, la fecha y los
-    /// tokens aleatorios <c>\restrict</c> de PostgreSQL recientes.
+    /// Quita lo que cambia en cada volcado sin que cambie el esquema (versión de pg_dump, fecha, tokens
+    /// <c>\restrict</c>) y lo que solo existe en PostgreSQL recientes y rompería en versiones anteriores:
+    /// <c>SET transaction_timeout</c> (17+) y el privilegio <c>MAINTAIN</c> (17+, que además aparece solo por
+    /// los permisos por defecto de la base de origen).
     /// </summary>
     internal static string Normalizar(string sql)
     {
@@ -144,7 +146,10 @@ public static class ExportadorEstructura
             .Where(l => !l.StartsWith("\\restrict ", StringComparison.Ordinal)
                         && !l.StartsWith("\\unrestrict ", StringComparison.Ordinal)
                         && !l.StartsWith("-- Dumped from database version", StringComparison.Ordinal)
-                        && !l.StartsWith("-- Dumped by pg_dump version", StringComparison.Ordinal));
+                        && !l.StartsWith("-- Dumped by pg_dump version", StringComparison.Ordinal)
+                        && !l.StartsWith("SET transaction_timeout", StringComparison.Ordinal)
+                        && !l.StartsWith("GRANT MAINTAIN ON ", StringComparison.Ordinal))
+            .Select(l => l.Replace(",MAINTAIN", "", StringComparison.Ordinal));
         return string.Join('\n', lineas);
     }
 }

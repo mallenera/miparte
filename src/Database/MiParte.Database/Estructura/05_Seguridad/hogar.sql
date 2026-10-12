@@ -24,5 +24,4 @@ CREATE POLICY hogar_update ON public.hogar FOR UPDATE TO authenticated USING ((i
 
 REVOKE ALL ON TABLE public.hogar FROM anon, authenticated;
 
-GRANT MAINTAIN ON TABLE public.hogar TO anon;
-GRANT SELECT,MAINTAIN ON TABLE public.hogar TO authenticated;
+GRANT SELECT ON TABLE public.hogar TO authenticated;

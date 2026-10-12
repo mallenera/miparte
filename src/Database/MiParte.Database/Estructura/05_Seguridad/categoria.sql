@@ -17,5 +17,4 @@ CREATE POLICY categoria_hogar ON public.categoria TO authenticated USING ((hogar
 
 REVOKE ALL ON TABLE public.categoria FROM anon, authenticated;
 
-GRANT MAINTAIN ON TABLE public.categoria TO anon;
-GRANT SELECT,MAINTAIN ON TABLE public.categoria TO authenticated;
+GRANT SELECT ON TABLE public.categoria TO authenticated;

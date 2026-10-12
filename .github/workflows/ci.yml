@@ -26,7 +26,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-      - name: Aplicar migraciones (proyecto de base de datos, con esquema auth simulado)
+      - name: Aplicar la estructura (proyecto de base de datos, con esquema auth simulado)
         run: dotnet run --project src/Database/MiParte.Database --configuration Release -- migrar --con-auth-stub --conexion "$MIPARTE_TEST_DB"
       - run: dotnet build --configuration Release
       - run: dotnet test --configuration Release --no-build

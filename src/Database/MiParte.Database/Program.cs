@@ -7,11 +7,11 @@ const string Ayuda = """
     Uso: dotnet run --project src/Database/MiParte.Database -- <comando> [opciones]
 
     Comandos
-      migrar             Aplica los scripts pendientes. Repetirlo es seguro.
-      pendientes         Lista aplicados y pendientes sin tocar el esquema (sale con 1 si hay pendientes).
-      script [fichero]   Genera un SQL idempotente con todos los scripts (por defecto Scripts/Generados; «-» = pantalla).
+      migrar             Converge la base con Estructura/ y aplica los scripts pendientes. Repetirlo es seguro.
+      pendientes         Lista scripts aplicados y pendientes sin tocar el esquema (sale con 1 si hay pendientes).
+      script [fichero]   Genera un SQL idempotente: estructura y scripts (por defecto Scripts/Generados; «-» = pantalla).
       estructura [dir]   Vuelca la estructura actual (pg_dump) a Estructura/, un fichero por objeto; requiere pg_dump.
-      marcar-aplicadas   Registra todos los scripts como aplicados sin ejecutarlos (adoptar una base ya migrada).
+      marcar-aplicadas   Registra los scripts versionados como aplicados sin ejecutarlos.
       semilla-demo       Ejecuta la semilla de la cuenta demo (la restablece).
 
     Opciones
@@ -44,7 +44,7 @@ string? Posicional()
 }
 
 // «script» no necesita base de datos: el SQL sale solo de los recursos incrustados. Sin fichero va a
-// Scripts/Generados (subcarpeta no incrustada, así que no se reaplica como migración); «-» imprime por pantalla.
+// Scripts/Generados (subcarpeta no incrustada, así que no se reaplica); «-» imprime por pantalla.
 if (comando == "script")
 {
     var sql = Migrador.GenerarScriptCompleto();

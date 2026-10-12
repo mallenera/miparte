@@ -38,5 +38,4 @@ CREATE POLICY miembro_update ON public.miembro FOR UPDATE TO authenticated USING
 
 REVOKE ALL ON TABLE public.miembro FROM anon, authenticated;
 
-GRANT MAINTAIN ON TABLE public.miembro TO anon;
-GRANT SELECT,MAINTAIN ON TABLE public.miembro TO authenticated;
+GRANT SELECT ON TABLE public.miembro TO authenticated;

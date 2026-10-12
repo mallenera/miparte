@@ -31,7 +31,8 @@ docker compose up --build                       # web :8080, core :5001, assista
 ```
 
 ## Base de datos
-El esquema es SQL: `supabase/migrations` (línea base) y `src/Database/MiParte.Database/Scripts` (cambios nuevos, idempotentes), aplicados con el proyecto `MiParte.Database`; EF Core solo lo mapea, no genera migraciones.
+El esquema es SQL y su fuente de verdad es `src/Database/MiParte.Database/Estructura/` (un fichero por tabla y función); el proyecto `MiParte.Database` lo converge sobre cualquier base al migrar, con scripts versionados (`Scripts/Antes`, `Scripts`) solo para lo que no se puede inferir. EF Core solo lo mapea, no genera migraciones. `supabase/migrations` es historia anterior y ya no se aplica.
+
 `Core.Api` lee la cadena de conexión de la variable de entorno `ConnectionStrings__Default`.
 
 Migrar (idempotente: repetirlo no hace nada; `pendientes` lista sin tocar y `script` genera un único SQL idempotente):

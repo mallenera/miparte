@@ -17,5 +17,4 @@ CREATE POLICY pago_liquidacion_hogar ON public.pago_liquidacion TO authenticated
 
 REVOKE ALL ON TABLE public.pago_liquidacion FROM anon, authenticated;
 
-GRANT MAINTAIN ON TABLE public.pago_liquidacion TO anon;
-GRANT SELECT,MAINTAIN ON TABLE public.pago_liquidacion TO authenticated;
+GRANT SELECT ON TABLE public.pago_liquidacion TO authenticated;

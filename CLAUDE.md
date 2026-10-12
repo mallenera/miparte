@@ -30,6 +30,7 @@ dotnet run --project src/Core/Core.Api                          # GET /health, G
 ./scripts/probar-api.ps1 -SupabaseUrl https://xxxx.supabase.co -Email ...   # prueba de humo contra Supabase real
 dotnet run --project src/Assistant/Assistant.Api                 # chatbot; necesita ANTHROPIC_API_KEY en el entorno
 dotnet run --project src/Web
+dotnet run --project src/Database/MiParte.Database -- migrar --conexion "<cadena>"   # migrar; también: pendientes, script, marcar-aplicadas
 docker compose up --build                                       # web :8080 (nginx sin privilegios), core :5001, assistant :5002
 ```
 
@@ -37,21 +38,18 @@ No hay linter configurado. CodeRabbit revisa los PR (`.coderabbit.yaml`; exige d
 
 ### Tests contra PostgreSQL real
 
-`EsquemaPostgresTests` (y otros que usen BD) usan `[SkippableFact]` y se saltan si no existe la variable `MIPARTE_TEST_DB`. En CI siempre se ejecutan (servicio postgres:16). En local:
+`EsquemaPostgresTests` (y otros que usen BD) usan `[SkippableFact]` y se saltan si no existe la variable `MIPARTE_TEST_DB`. En CI siempre se ejecutan (servicio postgres:17, la misma versión mayor que Supabase en `supabase/config.toml`). En local:
 
 ```bash
-psql -d miparte -v ON_ERROR_STOP=1 -f supabase/tests/auth_stub.sql || exit 1
-for f in supabase/migrations/*.sql; do
-  psql -d miparte -v ON_ERROR_STOP=1 -f "$f" || exit 1
-done
+dotnet run --project src/Database/MiParte.Database -- migrar --con-auth-stub --conexion "Host=localhost;Database=miparte;Username=postgres;Password=..."
 MIPARTE_TEST_DB="Host=localhost;Database=miparte;Username=postgres;Password=..." dotnet test
 ```
 
-`supabase/tests/auth_stub.sql` simula el esquema `auth` de Supabase (y sus privilegios por defecto para `anon`/`authenticated`, necesarios para que los tests de permisos tengan algo que comprobar); hay que aplicarlo antes de las migraciones.
+`supabase/tests/auth_stub.sql` simula el esquema `auth` de Supabase (y sus privilegios por defecto para `anon`/`authenticated`, necesarios para que los tests de permisos tengan algo que comprobar); lo aplica `migrar --con-auth-stub` antes de las migraciones (en Supabase real no se usa). El proyecto `MiParte.Database.Tests` crea y borra bases temporales a partir del servidor de `MIPARTE_TEST_DB`.
 
 #### Montar un PostgreSQL local en Windows (una vez)
 
-Sin Docker ni instalador con administrador, con scoop (instala la 18 en `~\scoop\apps\postgresql`; CI usa la 16, el SQL es estándar). Su post-instalación ya crea un clúster con superusuario `postgres` sin contraseña y autenticación `trust` solo local. En una terminal nueva (para que vea el PATH):
+Sin Docker ni instalador con administrador, con scoop (instala la última, hoy la 18, en `~\scoop\apps\postgresql`; `scoop install postgresql@17` falla porque su autoupdate no encuentra el zip de EnterpriseDB (403); CI y Supabase usan la 17, pero para desarrollo basta la 18: los ficheros de `Estructura/` se aplican en 15+ y el exportador quita lo propio de la 17+). Su post-instalación ya crea un clúster con superusuario `postgres` sin contraseña y autenticación `trust` solo local. En una terminal nueva (para que vea el PATH):
 
 ```bash
 scoop install postgresql
@@ -59,15 +57,12 @@ pg_ctl -D ~/scoop/apps/postgresql/current/data -l ~/pg.log start     # no arranc
 createdb -U postgres -h localhost miparte
 ```
 
-Cada vez que haya migraciones nuevas (o al empezar de cero), recrea la base y aplica stub y migraciones en orden (los comandos de arriba, con `PGUSER=postgres PGHOST=localhost`); no edites migraciones ya aplicadas, crea otra. Para parar el servidor: `pg_ctl -D ~/scoop/apps/postgresql/current/data stop`. Si `pg_ctl` se cuelga en una tubería (`| tail`), no redirijas su salida: el servidor queda arrancado igualmente (comprueba el log).
+Cada vez que haya migraciones nuevas (o al empezar de cero), basta `migrar` (aplica solo lo pendiente); para empezar de cero, recrea la base y vuelve a migrar. No edites scripts ya aplicados, crea otro. Para parar el servidor: `pg_ctl -D ~/scoop/apps/postgresql/current/data stop`. Si `pg_ctl` se cuelga en una tubería (`| tail`), no redirijas su salida: el servidor queda arrancado igualmente (comprueba el log).
 
 ```bash
 export PGUSER=postgres PGHOST=localhost
 psql -c "drop database if exists miparte" -c "create database miparte"
-psql -d miparte -v ON_ERROR_STOP=1 -f supabase/tests/auth_stub.sql || exit 1
-for f in supabase/migrations/*.sql; do
-  psql -d miparte -v ON_ERROR_STOP=1 -f "$f" || exit 1
-done
+dotnet run --project src/Database/MiParte.Database -- migrar --con-auth-stub --conexion "Host=localhost;Database=miparte;Username=postgres"
 MIPARTE_TEST_DB="Host=localhost;Database=miparte;Username=postgres" dotnet test
 ```
 
@@ -99,7 +94,8 @@ Endpoints por carpeta en `src/Core/Core.Api`: `Hogares`, `Miembros`, `Reparto` (
 
 ### Base de datos: el esquema es SQL, no EF
 
-El esquema y las políticas RLS viven en `supabase/migrations/*.sql` (esquema inicial, multihogar con invitaciones y pagos, recurrentes únicos, perfiles de cuenta común sin ingresos). EF Core **solo mapea** (no se generan migraciones EF; `MiParteDbContext` fija tablas con `ToTable`, `UseSnakeCaseNamingConvention`, y conversiones explícitas de enums a texto). Cambios de esquema = nueva migración SQL + ajustar el mapeo en `MiParteDbContext`; CI aplica todas las migraciones en orden.
+El esquema y las políticas RLS viven en SQL y la **fuente de verdad es `src/Database/MiParte.Database/Estructura/`**: un fichero por tabla y por función en `01_Tablas`, `02_Funciones`, `03_Disparadores`, `04_ClavesForaneas` y `05_Seguridad` (formato `pg_dump`, ver su README). El proyecto `MiParte.Database` (DbUp) **converge** cualquier base con esa estructura al migrar: crea lo que falta, reemplaza funciones y políticas y añade columnas y restricciones ausentes, siempre de forma idempotente. Lo que no se puede inferir (borrar, renombrar, cambiar tipo, rellenar datos) va en scripts versionados que corren una vez, con journal en el esquema `miparte_migraciones`: `Scripts/Antes/` (antes de la estructura) y `Scripts/` (después), siempre idempotentes. Comandos: `migrar`, `pendientes`, `script` (un único SQL idempotente completo para pegar en Supabase o psql; sale a `Scripts/Generados/`, ignorado por git), `estructura` (vuelca una base real a `Estructura/` con `pg_dump`, para regenerar o canonicalizar tras tocar la base a mano) y `marcar-aplicadas`. `supabase/migrations/*.sql` es la historia anterior: ya no se aplica ni se amplía.
+ EF Core **solo mapea** (no se generan migraciones EF; `MiParteDbContext` fija tablas con `ToTable`, `UseSnakeCaseNamingConvention`, y conversiones explícitas de enums a texto). Cambios de esquema = nuevo script en `Scripts/` + ajustar el mapeo en `MiParteDbContext`; 
 
 ### Multitenencia por hogar (dos capas)
 

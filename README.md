@@ -31,15 +31,16 @@ docker compose up --build                       # web :8080, core :5001, assista
 ```
 
 ## Base de datos
-El esquema vive en `supabase/migrations` (SQL); EF Core solo lo mapea, no genera migraciones.
+El esquema es SQL: `supabase/migrations` (línea base) y `src/Database/MiParte.Database/Scripts` (cambios nuevos, idempotentes), aplicados con el proyecto `MiParte.Database`; EF Core solo lo mapea, no genera migraciones.
 `Core.Api` lee la cadena de conexión de la variable de entorno `ConnectionStrings__Default`.
+
+Migrar (idempotente: repetirlo no hace nada; `pendientes` lista sin tocar y `script` genera un único SQL idempotente):
+```
+dotnet run --project src/Database/MiParte.Database -- migrar --con-auth-stub --conexion "Host=localhost;Database=miparte;Username=postgres"
+```
 
 Tests contra PostgreSQL real (opcionales en local, siempre activos en CI):
 ```
-psql -d miparte -v ON_ERROR_STOP=1 -f supabase/tests/auth_stub.sql || exit 1
-for f in supabase/migrations/*.sql; do   # todas, en orden; se detiene en el primer error
-  psql -d miparte -v ON_ERROR_STOP=1 -f "$f" || exit 1
-done
 MIPARTE_TEST_DB="Host=localhost;Database=miparte;Username=postgres;Password=..." dotnet test
 ```
 

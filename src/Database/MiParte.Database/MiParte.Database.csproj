@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>MiParte.Database</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="dbup-postgresql" Version="6.0.*" />
+  </ItemGroup>
+
+  <!-- migraciones/: línea base histórica, congelada en supabase/migrations y vinculada sin copiarla.
+       scripts/: cambios nuevos e idempotentes, en Scripts/. El nombre lógico es el que queda en el journal. -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\..\supabase\migrations\*.sql" LogicalName="migraciones/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Scripts\*.sql" LogicalName="scripts/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\supabase\tests\auth_stub.sql" LogicalName="previos/auth_stub.sql" />
+    <EmbeddedResource Include="..\..\..\supabase\seed\demo.sql" LogicalName="semillas/demo.sql" />
+  </ItemGroup>
+
+</Project>

@@ -1,5 +1,7 @@
 # Supabase: migraciones con la CLI
 
+> **Los cambios nuevos de esquema ya no van aquí.** `migrations/*.sql` es la línea base (congelada) y se migra con el proyecto `src/Database/MiParte.Database` (`migrar`, `pendientes`, `script`, `marcar-aplicadas`), cuyos scripts nuevos e idempotentes viven en `src/Database/MiParte.Database/Scripts/`. Una base que ya se migró con `supabase db push` se adopta una vez con `marcar-aplicadas`; después, no mezcles ambas herramientas en la misma base. Lo que sigue describe la CLI solo para esa línea base y para el entorno local.
+
 Esquema y RLS en `migrations/*.sql` (orden por nombre). `tests/auth_stub.sql` solo lo usa el CI con Postgres puro; con `supabase start` el esquema `auth` es el real.
 
 ## Instalar la CLI (Windows)
@@ -26,13 +28,17 @@ supabase migration list                         # local vs remoto
 
 `<project-ref>` es el identificador de la URL del proyecto (`https://<project-ref>.supabase.co`). No guardes la contraseña ni el token en el repo.
 
-## Nuevas migraciones
+## Nuevos cambios de esquema
+
+Crea `src/Database/MiParte.Database/Scripts/<AAAAMMDDHHMMSS>_nombre_del_cambio.sql` (idempotente, ver su README), ajusta el mapeo en `MiParteDbContext` y aplica con:
 
 ```bash
-supabase migration new nombre_del_cambio        # crea supabase/migrations/<timestamp>_nombre_del_cambio.sql
+dotnet run --project src/Database/MiParte.Database -- pendientes --conexion "<session pooler, puerto 5432>"
+dotnet run --project src/Database/MiParte.Database -- migrar --conexion "<session pooler, puerto 5432>"
+dotnet run --project src/Database/MiParte.Database -- script supabase-completo.sql   # alternativa: pegar en el editor SQL
 ```
 
-Escribe el SQL, ajusta el mapeo en `MiParteDbContext` y ejecuta `supabase db push`. Las migraciones aplicadas no se editan: se crea otra.
+Los scripts aplicados no se editan: se crea otro.
 
 ## Entorno local (opcional, requiere Docker)
 

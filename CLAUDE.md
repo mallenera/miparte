@@ -38,7 +38,7 @@ No hay linter configurado. CodeRabbit revisa los PR (`.coderabbit.yaml`; exige d
 
 ### Tests contra PostgreSQL real
 
-`EsquemaPostgresTests` (y otros que usen BD) usan `[SkippableFact]` y se saltan si no existe la variable `MIPARTE_TEST_DB`. En CI siempre se ejecutan (servicio postgres:16). En local:
+`EsquemaPostgresTests` (y otros que usen BD) usan `[SkippableFact]` y se saltan si no existe la variable `MIPARTE_TEST_DB`. En CI siempre se ejecutan (servicio postgres:17, la misma versión mayor que Supabase en `supabase/config.toml`). En local:
 
 ```bash
 dotnet run --project src/Database/MiParte.Database -- migrar --con-auth-stub --conexion "Host=localhost;Database=miparte;Username=postgres;Password=..."

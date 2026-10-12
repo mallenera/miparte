@@ -9,7 +9,8 @@ const string Ayuda = """
     Comandos
       migrar             Aplica los scripts pendientes. Repetirlo es seguro.
       pendientes         Lista aplicados y pendientes sin tocar el esquema (sale con 1 si hay pendientes).
-      script [fichero]   Genera un SQL idempotente con todos los scripts (a stdout o a un fichero).
+      script [fichero]   Genera un SQL idempotente con todos los scripts (por defecto Scripts/Generados; «-» = pantalla).
+      estructura [fich]  Vuelca la estructura actual (pg_dump) a Estructura/esquema.sql; requiere pg_dump en el PATH.
       marcar-aplicadas   Registra todos los scripts como aplicados sin ejecutarlos (adoptar una base ya migrada).
       semilla-demo       Ejecuta la semilla de la cuenta demo (la restablece).
 
@@ -31,21 +32,34 @@ string? Opcion(string nombre)
     return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
 }
 
-// «script» no necesita base de datos: el SQL sale solo de los recursos incrustados.
+// Primer argumento posicional tras el comando (ignora opciones y el valor de --conexion).
+string? Posicional()
+{
+    for (var i = 1; i < args.Length; i++)
+    {
+        if (args[i] == "--conexion") { i++; continue; }
+        if (args[i] == "-" || !args[i].StartsWith("--", StringComparison.Ordinal)) return args[i];
+    }
+    return null;
+}
+
+// «script» no necesita base de datos: el SQL sale solo de los recursos incrustados. Sin fichero va a
+// Scripts/Generados (subcarpeta no incrustada, así que no se reaplica como migración); «-» imprime por pantalla.
 if (comando == "script")
 {
     var sql = Migrador.GenerarScriptCompleto();
-    var destino = args.Skip(1).FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal));
-    if (destino is null)
+    var destino = Posicional()
+                  ?? "src/Database/MiParte.Database/Scripts/Generados/migracion_completa.sql";
+    if (destino == "-")
         Console.Write(sql);
     else
     {
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(destino))!);
         File.WriteAllText(destino, sql, new UTF8Encoding(false));
         Console.WriteLine($"Escrito {destino} ({Migrador.NombresDeScripts().Count} scripts)");
     }
     return 0;
 }
-
 var conexion = Opcion("--conexion") ?? Environment.GetEnvironmentVariable("ConnectionStrings__Default");
 if (string.IsNullOrWhiteSpace(conexion))
 {
@@ -72,6 +86,11 @@ try
         case "marcar-aplicadas":
             migrador.MarcarAplicadas();
             Console.WriteLine($"Marcados como aplicados {Migrador.NombresDeScripts().Count} scripts.");
+            return 0;
+        case "estructura":
+            var salida = Posicional() ?? ExportadorEstructura.RutaPorDefecto;
+            ExportadorEstructura.Exportar(conexion, salida);
+            Console.WriteLine($"Estructura escrita en {salida}");
             return 0;
         case "semilla-demo":
             migrador.SembrarDemo();

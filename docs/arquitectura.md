@@ -82,7 +82,7 @@ Una regla nueva se prueba primero en su capa (dominio o servicio); los tests HTT
 |---|---|
 | Liquidación, gastos, cuenta común y ahorro, miembros, recurrentes, categorías, perfiles, cierres | **Migradas** a servicio + puerto. |
 | Hogares (crear con semilla, eliminar, `/api/yo`) y auditoría (lectura) | **Pendiente**: aún usan `DbContext` en el endpoint. |
-| Front (`src/Web`) | **En curso**: lógica de presentación extraída, `ModeloGastos` como patrón de modelo de pantalla y modo demo sobre los casos de uso reales (ver sección Front). Pendiente: aplicar el patrón al resto de vistas. |
+| Front (`src/Web`) | **Hecho en las pestañas principales**: lógica de presentación extraída, un modelo de pantalla por pestaña (Gastos, Recurrentes, Cuenta común, Resumen, Dashboard y Configuración del hogar) y modo demo sobre los casos de uso reales (ver sección Front). Pendiente: Categorías, paneles de perfiles, permisos e historial y las pantallas de acceso. |
 
 ## Front
 
@@ -92,10 +92,11 @@ componentes.
 
 | Pieza | Dónde | Qué resuelve |
 |---|---|---|
-| Modelo de pantalla | `src/Web/Modelos/ModeloGastos` | Estado de la pestaña, carga de datos de referencia, periodo y filtros, formulario, y las operaciones contra la API (guardar, eliminar, recargar con control de respuestas tardías). La vista lo crea con `CoreApiClient` y enlaza sus propiedades. |
+| Modelos de pantalla | `src/Web/Modelos` | Un modelo por pestaña: `ModeloGastos`, `ModeloRecurrentes`, `ModeloCuentaComun`, `ModeloResumen`, `ModeloDashboard` y `ModeloConfiguracionHogar`. Guardan el estado de la pantalla, cargan los datos de referencia y ejecutan las operaciones contra la API (guardar, eliminar, recargar con control de respuestas tardías) devolviendo el aviso a mostrar o dejando el error. La vista lo crea con `CoreApiClient` y enlaza sus propiedades; la parte que depende del navegador (foco, portapapeles, «Compartir», navegación) se queda en la vista. |
 | `EntradaImporte` | `src/Web/Reparto` | Interpretación del importe escrito en un formulario (coma o punto, máx. 2 decimales, cero opcional). Una sola copia para Gastos, Recurrentes y Cuenta común. |
 | `ListaGastos` | `src/Web/Reparto` | Filtros del cliente (categoría con subcategorías, quién paga), orden, totales y perfiles ofrecidos. |
 | `GraficoGastos` | `src/Web/Reparto` | Agrupación en «Otras categorías» y porcentajes del Dashboard. |
+| `GraficoLinea` | `src/Web/Reparto` | Geometría del SVG del Dashboard: coordenadas, guías, etiquetas del eje y arcos del rosco. |
 | `AnalisisGastos`, `ArbolCategorias`, `EdicionPerfil` | `src/Web/Reparto` | Cálculo del Dashboard, árbol de categorías y edición de perfiles. |
 
 Regla: si un `@code` necesita un `Sum`, un `Where` por una regla de negocio, un parseo o varias llamadas encadenadas a la API, va a
@@ -119,6 +120,6 @@ un front que solo dependa de `Contracts`, la demo tendría que volver a ser un s
 
 ### Pendiente en el front
 
-- Aplicar el patrón de modelo de pantalla al resto de vistas: `VistaRecurrentes`, `VistaCuentaComun`, `VistaResumen`,
-  `VistaDashboard` y `VistaConfiguracionHogar`.
+- Aplicar el patrón a las vistas que quedan: `VistaCategorias`, `PanelPerfiles`, `PanelPermisos`, `PanelHistorial` y las de
+  acceso (login, registro, unirse).
 - `CatalogoPermisos` sigue en `Core.Domain` y el front lo usa directamente (claves de permiso y etiquetas).

@@ -5,6 +5,7 @@ using MiParte.Core.Api.Seguridad;
 using MiParte.Core.Application;
 using MiParte.Core.Application.Miembros;
 using MiParte.Core.Domain;
+using MiParte.Core.Mapeo;
 using MiParte.Core.Domain.Entidades;
 using MiParte.Core.Infrastructure.Persistencia;
 
@@ -45,13 +46,6 @@ public static class MiembrosEndpoints
     /// <summary>SHA-256 en hexadecimal minúscula del token en UTF-8 (igual que aceptar_invitacion en SQL).</summary>
     public static string HashToken(string token) => TokenInvitacion.Hash(token);
 
-    /// <summary>Convierte un miembro en su DTO: tipo "adulto"/"a_cargo", rol "admin"/"miembro", si está vinculado a un usuario y si es el usuario autenticado (<paramref name="usuarioActual"/>).</summary>
-    private static MiembroDto ADto(Miembro m, Guid? usuarioActual = null) => new(
-        m.Id, m.Nombre, m.Tipo == TipoMiembro.Adulto ? TiposMiembro.Adulto : TiposMiembro.ACargo, m.ResponsableId, m.Activo,
-        m.Rol == RolMiembro.Admin ? "admin" : "miembro", m.UserId is not null,
-        usuarioActual is not null && m.UserId == usuarioActual,
-        CatalogoPermisos.Todos.Select(p => p.Clave).Where(CatalogoPermisos.Efectivos(m).Contains).ToList());
-
     /// <summary>Obtiene el id del usuario autenticado del claim "sub"; false si falta o no es un GUID.</summary>
     private static bool TryUsuario(HttpContext ctx, out Guid userId)
         => Guid.TryParse(ctx.User.FindFirst("sub")?.Value, out userId);
@@ -76,7 +70,7 @@ public static class MiembrosEndpoints
     {
         var miembros = await servicio.ListarAsync(incluirInactivos, ct);
         var usuario = TryUsuario(ctx, out var userId) ? userId : (Guid?)null;
-        return Results.Ok(miembros.Select(m => ADto(m, usuario)).ToList());
+        return Results.Ok(miembros.Select(m => m.ADto(usuario)).ToList());
     }
 
     /// <summary>
@@ -91,7 +85,7 @@ public static class MiembrosEndpoints
         if (!TryUsuario(ctx, out var userId)) return Results.Unauthorized();
         var r = await servicio.CrearAsync(userId, hogar.HogarId!.Value, new NuevoMiembro(req.Nombre, req.Tipo, req.ResponsableId), ct);
         if (r.Error is { } error) return Error(error);
-        return Results.Created($"/api/miembros/{r.Valor!.Id}", ADto(r.Valor));
+        return Results.Created($"/api/miembros/{r.Valor!.Id}", r.Valor.ADto());
     }
 
     /// <summary>
@@ -106,7 +100,7 @@ public static class MiembrosEndpoints
         if (!TryUsuario(ctx, out var userId)) return Results.Unauthorized();
         var r = await servicio.ActualizarAsync(
             userId, id, new CambiosMiembro(req.Nombre, req.Activo, req.ResponsableId, req.Rol, req.Permisos), ct);
-        return r.Error is { } error ? Error(error) : Results.Ok(ADto(r.Valor!, userId));
+        return r.Error is { } error ? Error(error) : Results.Ok(r.Valor!.ADto(userId));
     }
 
     /// <summary>DELETE /api/miembros/{id}: borrado lógico, equivale a PUT con activo=false (mismas reglas y códigos).</summary>
@@ -115,7 +109,7 @@ public static class MiembrosEndpoints
     {
         if (!TryUsuario(ctx, out var userId)) return Results.Unauthorized();
         var r = await servicio.DesactivarAsync(userId, id, ct);
-        return r.Error is { } error ? Error(error) : Results.Ok(ADto(r.Valor!, userId));
+        return r.Error is { } error ? Error(error) : Results.Ok(r.Valor!.ADto(userId));
     }
 
     /// <summary>

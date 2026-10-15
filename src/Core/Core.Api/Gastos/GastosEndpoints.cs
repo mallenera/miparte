@@ -3,6 +3,7 @@ using MiParte.Contracts;
 using MiParte.Core.Api.Seguridad;
 using MiParte.Core.Application.Gastos;
 using MiParte.Core.Domain;
+using MiParte.Core.Mapeo;
 using MiParte.Core.Domain.Entidades;
 using MiParte.Core.Infrastructure.Persistencia;
 
@@ -25,12 +26,6 @@ public static class GastosEndpoints
         g.MapDelete("{id:guid}", BorrarAsync).RequierePermiso(CatalogoPermisos.GastosBorrar);
         return app;
     }
-
-    /// <summary>Convierte un gasto con su reparto en el DTO de respuesta.</summary>
-    private static GastoResponse A(Gasto g) => new(
-        g.Id, g.Fecha, g.Importe, g.CategoriaId, g.PagadoPor, g.PerfilRepartoId, g.Concepto, g.GastoRecurrenteId,
-        g.Repartos.OrderBy(r => r.MiembroId).Select(r => new RepartoGastoDto(r.MiembroId, r.ImporteAsumido)).ToList(),
-        g.ACargoCuentaComun, g.PagadoDesdeAhorro, g.EsPersonal);
 
     /// <summary>Convierte el cuerpo de la petición en los datos del caso de uso.</summary>
     private static DatosGasto Datos(GastoRequest r)
@@ -72,7 +67,7 @@ public static class GastosEndpoints
 
         var filtro = new FiltroGastos(
             Mayor(primero, rangoDesde), Menor(ultimo, rangoHasta), categoriaId, miembroId, texto);
-        return Results.Ok((await servicio.ListarAsync(filtro, ct)).Select(A));
+        return Results.Ok((await servicio.ListarAsync(filtro, ct)).Select(g => g.ADto()));
     }
 
     /// <summary>La fecha más tardía de las dadas (la que más restringe un límite inferior); null si no hay ninguna.</summary>
@@ -87,7 +82,7 @@ public static class GastosEndpoints
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
         var g = await servicio.ObtenerAsync(id, ct);
-        return g is null ? Results.NotFound() : Results.Ok(A(g));
+        return g is null ? Results.NotFound() : Results.Ok(g.ADto());
     }
 
     /// <summary>POST /api/gastos: crea el gasto y guarda su reparto en la misma transacción. 201 si se crea; 409 sin hogar; 400 si falla la validación o el reparto; 409 si el mes está cerrado, si se paga desde el ahorro y no alcanza o si va a cargo de la cuenta común y el hogar no la ha activado.</summary>
@@ -97,7 +92,7 @@ public static class GastosEndpoints
         if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
         var r = await servicio.CrearAsync(hogarId, Datos(req), ct);
         if (r.Error is { } error) return ApiComun.Respuesta(error);
-        return Results.Created($"/api/gastos/{r.Valor!.Id}", A(r.Valor));
+        return Results.Created($"/api/gastos/{r.Valor!.Id}", r.Valor.ADto());
     }
 
     /// <summary>PUT /api/gastos/{id}: actualiza el gasto y recalcula solo su reparto, sin tocar el resto del histórico. 409 sin hogar; 404 si no existe; 400 si no es válido.</summary>
@@ -106,7 +101,7 @@ public static class GastosEndpoints
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
         var r = await servicio.EditarAsync(id, Datos(req), ct);
-        return r.Error is { } error ? ApiComun.Respuesta(error) : Results.Ok(A(r.Valor!));
+        return r.Error is { } error ? ApiComun.Respuesta(error) : Results.Ok(r.Valor!.ADto());
     }
 
     /// <summary>DELETE /api/gastos/{id}: borra el gasto y su reparto. 409 sin hogar o si el mes está cerrado; 404 si no existe; 204 si se borra.</summary>

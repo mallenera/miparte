@@ -3,6 +3,7 @@ using MiParte.Contracts;
 using MiParte.Core.Api.Seguridad;
 using MiParte.Core.Application.Recurrentes;
 using MiParte.Core.Domain;
+using MiParte.Core.Mapeo;
 using MiParte.Core.Domain.Entidades;
 using MiParte.Core.Infrastructure.Persistencia;
 
@@ -28,10 +29,6 @@ public static class RecurrentesEndpoints
         return app;
     }
 
-    /// <summary>Convierte una plantilla de gasto recurrente en su DTO de respuesta.</summary>
-    private static GastoRecurrenteResponse A(GastoRecurrente r)
-        => new(r.Id, r.Importe, r.CategoriaId, r.PagadoPor, r.PerfilRepartoId, r.DiaMes, r.Concepto, r.Activo);
-
     /// <summary>Convierte el cuerpo de la petición en los datos del caso de uso.</summary>
     private static DatosRecurrente Datos(GastoRecurrenteRequest r)
         => new(r.Importe, r.CategoriaId, r.PagadoPor, r.PerfilRepartoId, r.DiaMes, r.Concepto, r.Activo);
@@ -41,7 +38,7 @@ public static class RecurrentesEndpoints
         [FromServices] ServicioRecurrentes servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
-        return Results.Ok((await servicio.ListarAsync(ct)).Select(A));
+        return Results.Ok((await servicio.ListarAsync(ct)).Select(r => r.ADto()));
     }
 
     /// <summary>GET /api/gastos-recurrentes/{id}: devuelve una plantilla. 409 sin hogar; 404 si no existe.</summary>
@@ -50,7 +47,7 @@ public static class RecurrentesEndpoints
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
         var r = await servicio.ObtenerAsync(id, ct);
-        return r is null ? Results.NotFound() : Results.Ok(A(r));
+        return r is null ? Results.NotFound() : Results.Ok(r.ADto());
     }
 
     /// <summary>POST /api/gastos-recurrentes: crea una plantilla. 201 si se crea; 409 sin hogar; 400 si no es válida.</summary>
@@ -60,7 +57,7 @@ public static class RecurrentesEndpoints
         if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
         var r = await servicio.CrearAsync(hogarId, Datos(req), ct);
         if (r.Error is { } error) return ApiComun.Respuesta(error);
-        return Results.Created($"/api/gastos-recurrentes/{r.Valor!.Id}", A(r.Valor));
+        return Results.Created($"/api/gastos-recurrentes/{r.Valor!.Id}", r.Valor.ADto());
     }
 
     /// <summary>PUT /api/gastos-recurrentes/{id}: actualiza la plantilla sin modificar los gastos ya generados. 409 sin hogar; 404 si no existe; 400 si no es válida.</summary>
@@ -69,7 +66,7 @@ public static class RecurrentesEndpoints
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
         var r = await servicio.EditarAsync(id, Datos(req), ct);
-        return r.Error is { } error ? ApiComun.Respuesta(error) : Results.Ok(A(r.Valor!));
+        return r.Error is { } error ? ApiComun.Respuesta(error) : Results.Ok(r.Valor!.ADto());
     }
 
     /// <summary>DELETE /api/gastos-recurrentes/{id}: borra la plantilla. 409 sin hogar o si ya tiene gastos generados (hay que desactivarla); 404 si no existe; 204 si se borra.</summary>

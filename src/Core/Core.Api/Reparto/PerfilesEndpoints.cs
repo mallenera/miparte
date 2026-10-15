@@ -4,6 +4,7 @@ using MiParte.Core.Api.Gastos;
 using MiParte.Core.Api.Seguridad;
 using MiParte.Core.Application.Perfiles;
 using MiParte.Core.Domain;
+using MiParte.Core.Mapeo;
 using MiParte.Core.Domain.Entidades;
 using MiParte.Core.Infrastructure.Persistencia;
 
@@ -26,27 +27,19 @@ public static class PerfilesEndpoints
         return app;
     }
 
-    /// <summary>Convierte el modo de reparto al texto usado en la API (porcentaje, partes, cuenta_comun o individual).</summary>
-    internal static string ModoATexto(ModoReparto m) => TextoModoReparto.ATexto(m);
-
-    /// <summary>Convierte un perfil en su DTO de respuesta, con el detalle ordenado por miembro.</summary>
-    private static PerfilRepartoDto Dto(PerfilReparto p) => new(
-        p.Id, p.Nombre, ModoATexto(p.Modo),
-        p.Detalles.OrderBy(d => d.MiembroId).Select(d => new PerfilDetalleDto(d.MiembroId, d.Valor)).ToList());
-
     /// <summary>Convierte el detalle del cuerpo en los valores que usa el caso de uso.</summary>
     private static List<ValorMiembro>? Valores(GuardarPerfilRequest r)
         => r.Detalle?.Select(d => new ValorMiembro(d.MiembroId, d.Valor)).ToList();
 
     /// <summary>GET /api/perfiles: devuelve los perfiles del hogar con su detalle, ordenados por nombre.</summary>
     private static async Task<IResult> ListarAsync([FromServices] ServicioPerfiles servicio, CancellationToken ct)
-        => Results.Ok((await servicio.ListarAsync(ct)).Select(Dto).ToList());
+        => Results.Ok((await servicio.ListarAsync(ct)).Select(p => p.ADto()).ToList());
 
     /// <summary>GET /api/perfiles/{id}: devuelve un perfil con su detalle; 404 si no existe.</summary>
     private static async Task<IResult> ObtenerAsync(Guid id, [FromServices] ServicioPerfiles servicio, CancellationToken ct)
     {
         var p = await servicio.ObtenerAsync(id, ct);
-        return p is null ? Results.NotFound() : Results.Ok(Dto(p));
+        return p is null ? Results.NotFound() : Results.Ok(p.ADto());
     }
 
     /// <summary>POST /api/perfiles: crea un perfil con su detalle. 201 si se crea; 400 si no supera la validación; 409 si el nombre ya existe.</summary>
@@ -55,7 +48,7 @@ public static class PerfilesEndpoints
     {
         var r = await servicio.CrearAsync(hogar.HogarId!.Value, req.Nombre, req.Modo, Valores(req), ct);
         if (r.Error is { } error) return ApiComun.Respuesta(error);
-        return Results.Created($"/api/perfiles/{r.Valor!.Id}", Dto(r.Valor));
+        return Results.Created($"/api/perfiles/{r.Valor!.Id}", r.Valor.ADto());
     }
 
     /// <summary>PUT /api/perfiles/{id}: sustituye nombre, modo y detalle del perfil. 404 si no existe; 400 si no es válido; 409 si el nombre ya existe.</summary>
@@ -63,7 +56,7 @@ public static class PerfilesEndpoints
         Guid id, GuardarPerfilRequest req, [FromServices] ServicioPerfiles servicio, CancellationToken ct)
     {
         var r = await servicio.ActualizarAsync(id, req.Nombre, req.Modo, Valores(req), ct);
-        return r.Error is { } error ? ApiComun.Respuesta(error) : Results.Ok(Dto(r.Valor!));
+        return r.Error is { } error ? ApiComun.Respuesta(error) : Results.Ok(r.Valor!.ADto());
     }
 
     /// <summary>DELETE /api/perfiles/{id}: elimina el perfil y su detalle. 404 si no existe; 409 si lo usan categorías, gastos o gastos recurrentes; 204 si se elimina.</summary>

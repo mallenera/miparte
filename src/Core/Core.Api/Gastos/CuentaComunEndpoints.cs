@@ -3,6 +3,7 @@ using MiParte.Contracts;
 using MiParte.Core.Api.Seguridad;
 using MiParte.Core.Application.CuentaComun;
 using MiParte.Core.Domain;
+using MiParte.Core.Mapeo;
 using MiParte.Core.Domain.Entidades;
 using MiParte.Core.Infrastructure.Persistencia;
 
@@ -30,40 +31,6 @@ public static class CuentaComunEndpoints
         return app;
     }
 
-    /// <summary>Convierte una aportación en su DTO de respuesta.</summary>
-    private static AportacionCuentaDto ADto(AportacionCuenta a) => new(a.Id, a.MiembroId, a.Desde, a.Importe, a.Ahorro);
-
-    /// <summary>Convierte un reembolso en su DTO de respuesta.</summary>
-    private static ReembolsoCuentaDto ADto(ReembolsoCuenta r) => new(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto);
-
-    /// <summary>Convierte un depósito de ahorro en su DTO de respuesta.</summary>
-    private static DepositoAhorroDto ADto(DepositoAhorro d) => new(d.Id, d.MiembroId, d.Fecha, d.Importe, d.Concepto);
-
-    /// <summary>Convierte una retirada de ahorro en su DTO de respuesta.</summary>
-    private static RetiradaAhorroDto ADto(RetiradaAhorro r) => new(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto);
-
-    /// <summary>Convierte el estado de la cuenta en la respuesta de la API.</summary>
-    private static CuentaComunResponse ADto(EstadoCuentaDelMes s)
-    {
-        var e = s.Estado;
-        var d = s.Detalle;
-        var nombres = d.Nombres;
-        return new CuentaComunResponse(
-            ApiComun.FormatoMes(s.Mes), e.AportadoMes, e.Aportado, e.Gastado, e.Saldo,
-            e.Pendientes.Select(p => new PendienteCuentaDto(p.MiembroId, nombres.GetValueOrDefault(p.MiembroId, ""), p.Importe)).ToList(),
-            e.Efectivo, d.Aportaciones.Select(a => new AportacionCuentaDto(a.Id, a.MiembroId, a.Desde, a.Importe, a.Ahorro)).ToList(),
-            d.ReembolsosDelMes.Select(r => new ReembolsoCuentaDto(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto)).ToList(),
-            e.AhorroMes, e.AhorroAcumulado, e.AhorroRetirado, e.AhorroDisponible,
-            d.RetiradasDelMes.Select(r => new RetiradaAhorroDto(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto)).ToList(),
-            e.AhorroDepositado,
-            d.DepositosDelMes.Select(x => new DepositoAhorroDto(x.Id, x.MiembroId, x.Fecha, x.Importe, x.Concepto)).ToList(),
-            e.AhorroGastado, d.Historico.CuentaActiva,
-            s.Partes.Select(p => new PartePersonaDto(
-                p.MiembroId, nombres.GetValueOrDefault(p.MiembroId, ""), p.Aportado, p.Ahorrado, p.PorcentajeGastos, p.PorcentajeAhorro,
-                p.ParteSaldo, p.ParteAhorro, p.Pendiente)).ToList(),
-            d.AhorroActivo);
-    }
-
     /// <summary>GET /api/cuenta-comun?mes=YYYY-MM: saldo acumulado, ahorro, reembolsos pendientes, aportaciones, y reembolsos y retiradas de ahorro del mes. 409 sin hogar; 400 si el mes es inválido.</summary>
     private static async Task<IResult> EstadoAsync(
         [FromQuery] string? mes, [FromServices] ServicioCuentaComun servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
@@ -71,7 +38,7 @@ public static class CuentaComunEndpoints
         if (hogar.HogarId is null) return ApiComun.SinHogar();
         if (!ApiComun.TryMes(mes, out var inicio)) return ApiComun.MesInvalido();
 
-        return Results.Ok(ADto(await servicio.EstadoAsync(inicio, ct)));
+        return Results.Ok((await servicio.EstadoAsync(inicio, ct)).ADto());
     }
 
     /// <summary>
@@ -103,7 +70,7 @@ public static class CuentaComunEndpoints
     {
         if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
         var r = await servicio.FijarAportacionAsync(new FijarAportacion(hogarId, req.MiembroId, req.Desde, req.Importe, req.Ahorro), ct);
-        return r.Error is { } error ? ApiComun.Respuesta(error) : Results.Ok(ADto(r.Valor!));
+        return r.Error is { } error ? ApiComun.Respuesta(error) : Results.Ok(r.Valor!.ADto());
     }
 
     /// <summary>POST /api/cuenta-comun/reembolsos: registra un pago de la cuenta a quien adelantó gastos. 400 si el importe es inválido o el miembro no es del hogar; 409 sin hogar o si supera lo pendiente de reembolsar al miembro. 201 si se crea.</summary>
@@ -113,7 +80,7 @@ public static class CuentaComunEndpoints
         if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
         var r = await servicio.CrearReembolsoAsync(new RegistrarMovimiento(hogarId, req.MiembroId, req.Importe, req.Fecha, req.Concepto), ct);
         if (r.Error is { } error) return ApiComun.Respuesta(error);
-        return Results.Created($"/api/cuenta-comun/reembolsos/{r.Valor!.Id}", ADto(r.Valor));
+        return Results.Created($"/api/cuenta-comun/reembolsos/{r.Valor!.Id}", r.Valor.ADto());
     }
 
     /// <summary>DELETE /api/cuenta-comun/reembolsos/{id}: borra un reembolso. 409 sin hogar; 404 si no existe; 204 si se borra.</summary>
@@ -132,7 +99,7 @@ public static class CuentaComunEndpoints
         if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
         var r = await servicio.CrearDepositoAsync(new RegistrarMovimiento(hogarId, req.MiembroId, req.Importe, req.Fecha, req.Concepto), ct);
         if (r.Error is { } error) return ApiComun.Respuesta(error);
-        return Results.Created($"/api/cuenta-comun/depositos-ahorro/{r.Valor!.Id}", ADto(r.Valor));
+        return Results.Created($"/api/cuenta-comun/depositos-ahorro/{r.Valor!.Id}", r.Valor.ADto());
     }
 
     /// <summary>DELETE /api/cuenta-comun/depositos-ahorro/{id}: borra un depósito de ahorro. 409 sin hogar o si dejaría sin respaldo lo ya retirado o gastado desde el ahorro (<c>{ error, falta }</c>); 404 si no existe; 204 si se borra.</summary>
@@ -151,7 +118,7 @@ public static class CuentaComunEndpoints
         if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
         var r = await servicio.CrearRetiradaAsync(new RegistrarMovimiento(hogarId, req.MiembroId, req.Importe, req.Fecha, req.Concepto), ct);
         if (r.Error is { } error) return ApiComun.Respuesta(error);
-        return Results.Created($"/api/cuenta-comun/retiradas-ahorro/{r.Valor!.Id}", ADto(r.Valor));
+        return Results.Created($"/api/cuenta-comun/retiradas-ahorro/{r.Valor!.Id}", r.Valor.ADto());
     }
 
     /// <summary>DELETE /api/cuenta-comun/retiradas-ahorro/{id}: borra una retirada de ahorro. 409 sin hogar; 404 si no existe; 204 si se borra.</summary>

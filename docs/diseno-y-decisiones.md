@@ -224,6 +224,8 @@ El navegador solo habla con la app; la app lee y escribe en Supabase y, desde el
 | Base de datos y login | Supabase (PostgreSQL y Auth) | Correo con contraseña y Google; el login con Google requiere credenciales OAuth gratuitas en Google Cloud Console |
 | Dominio | Cualquier registrador (.com o .es) | Coste anual bajo |
 
+> **Organización interna del código:** `Core.Domain` (reglas) → `Core.Application` (casos de uso) → `Core.Infrastructure` (datos) y `Core.Api` (HTTP); ver [arquitectura.md](arquitectura.md).
+
 Los planes cambian: antes de decidir hay que comprobar las condiciones vigentes. Los planes gratuitos suelen dormir la app o pausar la base de datos tras un tiempo sin uso, algo tolerable en uso familiar.
 
 ## Modelo de datos

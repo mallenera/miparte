@@ -26,59 +26,75 @@ public sealed partial class ServidorDemo
 
     private static Guid Id(int n) => new(n, 0, 0, new byte[8]);
 
-    /// <summary>Hogar de ejemplo: dos adultos, una hija a cargo, los cuatro perfiles de siempre y dos meses de gastos.</summary>
-    private void Sembrar()
+    /// <summary>
+    /// Hogar de ejemplo: dos adultos (Ana, que es quien usa la demo y administra, y Marcos), una hija a cargo, los cuatro perfiles de
+    /// siempre y dos meses de gastos. Las entidades son las del dominio, no una copia para la demo.
+    /// </summary>
+    private static AlmacenDemo Sembrar(DateOnly hoy)
     {
-        _miembros.AddRange(
+        var a = new AlmacenDemo(new Hogar
+        {
+            Id = IdHogar, Nombre = "Casa de Ana y Marcos", CuentaComunActiva = true, AhorroActivo = true,
+        });
+
+        a.Miembros.AddRange(
         [
-            new MiembroDemo { Id = Ana, Nombre = "Ana", Rol = "admin", Vinculado = true, EsYo = true },
-            new MiembroDemo { Id = Marcos, Nombre = "Marcos" },
-            new MiembroDemo { Id = Lucia, Nombre = "Lucía", Tipo = TiposMiembro.ACargo, ResponsableId = Ana },
+            new Miembro { Id = Ana, HogarId = IdHogar, Nombre = "Ana", Rol = RolMiembro.Admin, UserId = IdUsuario },
+            new Miembro { Id = Marcos, HogarId = IdHogar, Nombre = "Marcos" },
+            new Miembro { Id = Lucia, HogarId = IdHogar, Nombre = "Lucía", Tipo = TipoMiembro.ACargo, ResponsableId = Ana },
         ]);
 
-        _perfiles.AddRange(
+        PerfilReparto Perfil(Guid id, string nombre, ModoReparto modo, params (Guid Miembro, decimal Valor)[] detalle)
+        {
+            var p = new PerfilReparto { Id = id, HogarId = IdHogar, Nombre = nombre, Modo = modo };
+            p.Detalles.AddRange(detalle.Select(d => new PerfilRepartoDetalle
+            {
+                Id = Guid.NewGuid(), HogarId = IdHogar, PerfilId = id, MiembroId = d.Miembro, Valor = d.Valor,
+            }));
+            return p;
+        }
+
+        a.Perfiles.AddRange(
         [
-            new PerfilDemo { Id = PerfilCuentaComun, Nombre = "Cuenta común", Modo = ModoReparto.CuentaComun },
-            new PerfilDemo
-            {
-                Id = PerfilPartes, Nombre = "Por partes", Modo = ModoReparto.Partes,
-                Detalle = [new PerfilDetalleDto(Ana, 3), new PerfilDetalleDto(Marcos, 2)],
-            },
-            new PerfilDemo
-            {
-                Id = PerfilPorcentaje, Nombre = "Porcentaje fijo", Modo = ModoReparto.Porcentaje,
-                Detalle = [new PerfilDetalleDto(Ana, 50), new PerfilDetalleDto(Marcos, 50)],
-            },
-            new PerfilDemo { Id = PerfilIndividual, Nombre = "Individual", Modo = ModoReparto.Individual },
+            Perfil(PerfilCuentaComun, "Cuenta común", ModoReparto.CuentaComun),
+            Perfil(PerfilPartes, "Por partes", ModoReparto.Partes, (Ana, 3), (Marcos, 2)),
+            Perfil(PerfilPorcentaje, "Porcentaje fijo", ModoReparto.Porcentaje, (Ana, 50), (Marcos, 50)),
+            Perfil(PerfilIndividual, "Individual", ModoReparto.Individual),
         ]);
 
-        _categorias.AddRange(
+        Categoria Cat(Guid id, string nombre, Guid? padre, Guid perfil)
+            => new() { Id = id, HogarId = IdHogar, Nombre = nombre, CategoriaPadreId = padre, PerfilRepartoId = perfil };
+
+        a.Categorias.AddRange(
         [
-            new CategoriaDto(CatHipoteca, "Hipoteca/Alquiler", null, PerfilPartes),
-            new CategoriaDto(CatAlimentacion, "Alimentación", null, PerfilPartes),
-            new CategoriaDto(CatSuministros, "Suministros", null, PerfilPartes),
-            new CategoriaDto(CatVarios, "Gastos varios de casa", null, PerfilPartes),
-            new CategoriaDto(CatHijo, "Hijo", null, PerfilPartes),
-            new CategoriaDto(CatOcio, "Ocio personal", null, PerfilIndividual),
-            new CategoriaDto(CatSupermercado, "Supermercado", CatAlimentacion, PerfilPartes),
+            Cat(CatHipoteca, "Hipoteca/Alquiler", null, PerfilPartes),
+            Cat(CatAlimentacion, "Alimentación", null, PerfilPartes),
+            Cat(CatSuministros, "Suministros", null, PerfilPartes),
+            Cat(CatVarios, "Gastos varios de casa", null, PerfilPartes),
+            Cat(CatHijo, "Hijo", null, PerfilPartes),
+            Cat(CatOcio, "Ocio personal", null, PerfilIndividual),
+            Cat(CatSupermercado, "Supermercado", CatAlimentacion, PerfilPartes),
         ]);
 
-        _recurrentes.AddRange(
+        a.Recurrentes.AddRange(
         [
-            new RecurrenteDemo
+            new GastoRecurrente
             {
-                Id = RecHipoteca, Importe = 780m, CategoriaId = CatHipoteca, PagadoPor = Ana, PerfilRepartoId = PerfilPartes,
-                DiaMes = 1, Concepto = "Hipoteca", Activo = true,
+                Id = RecHipoteca, HogarId = IdHogar, Importe = 780m, CategoriaId = CatHipoteca, PagadoPor = Ana,
+                PerfilRepartoId = PerfilPartes, DiaMes = 1, Concepto = "Hipoteca", Activo = true,
             },
-            new RecurrenteDemo
+            new GastoRecurrente
             {
-                Id = RecInternet, Importe = 39.90m, CategoriaId = CatSuministros, PagadoPor = Marcos, PerfilRepartoId = PerfilPartes,
-                DiaMes = 8, Concepto = "Internet y móvil", Activo = true,
+                Id = RecInternet, HogarId = IdHogar, Importe = 39.90m, CategoriaId = CatSuministros, PagadoPor = Marcos,
+                PerfilRepartoId = PerfilPartes, DiaMes = 8, Concepto = "Internet y móvil", Activo = true,
             },
         ]);
 
-        var actual = new DateOnly(_hoy.Year, _hoy.Month, 1);
+        var actual = new DateOnly(hoy.Year, hoy.Month, 1);
         var anterior = actual.AddMonths(-1);
+
+        void Gasto(DateOnly mes, int dia, decimal importe, Guid categoria, Guid? pagador, Guid perfil, string concepto, Guid? recurrente = null)
+            => a.SembrarGasto(IdHogar, hoy, mes, dia, importe, categoria, pagador, perfil, concepto, recurrente);
 
         // Mes anterior completo y mes actual hasta hoy.
         foreach (var (mes, v) in new[] { (anterior, 0), (actual, 1) })
@@ -97,21 +113,8 @@ public sealed partial class ServidorDemo
         // Cuenta común: un gasto que paga la propia cuenta y otro que adelantó Marcos y aún no le han reembolsado.
         Gasto(anterior, 15, 210m, CatVarios, null, PerfilCuentaComun, "Seguro del hogar");
         Gasto(anterior, 20, 95m, CatVarios, Marcos, PerfilCuentaComun, "Reparación de la lavadora");
-        _aportaciones.Add(new AportacionCuentaDto(Guid.NewGuid(), Ana, anterior, 250m));
-        _aportaciones.Add(new AportacionCuentaDto(Guid.NewGuid(), Marcos, anterior, 250m));
-    }
-
-    /// <summary>Añade un gasto de ejemplo con su reparto; se omite si cae en el futuro.</summary>
-    private void Gasto(DateOnly mes, int dia, decimal importe, Guid categoria, Guid? pagador, Guid perfil, string concepto, Guid? recurrente = null)
-    {
-        var fecha = new DateOnly(mes.Year, mes.Month, dia);
-        if (fecha > _hoy) return;
-        var p = _perfiles.First(x => x.Id == perfil);
-        Repartir(p, importe, pagador ?? Guid.Empty, out var repartos);
-        _gastos.Add(new GastoDemo
-        {
-            Id = Guid.NewGuid(), Fecha = fecha, Importe = importe, CategoriaId = categoria, PagadoPor = pagador, PerfilRepartoId = perfil,
-            Concepto = concepto, GastoRecurrenteId = recurrente, Repartos = repartos, ACargoCuentaComun = p.Modo == ModoReparto.CuentaComun,
-        });
+        a.Aportaciones.Add(new AportacionCuenta { Id = Guid.NewGuid(), HogarId = IdHogar, MiembroId = Ana, Desde = anterior, Importe = 250m });
+        a.Aportaciones.Add(new AportacionCuenta { Id = Guid.NewGuid(), HogarId = IdHogar, MiembroId = Marcos, Desde = anterior, Importe = 250m });
+        return a;
     }
 }

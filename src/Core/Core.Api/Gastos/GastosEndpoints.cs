@@ -38,43 +38,11 @@ public static class GastosEndpoints
         [FromServices] ServicioGastos servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
-        // Sin ningún límite de fechas se devolvería todo el histórico del hogar, con sus repartos: se exige al menos uno.
-        if (mes is null && string.IsNullOrEmpty(desde) && string.IsNullOrEmpty(hasta))
-            return ApiComun.Invalido("Indica el mes («mes») o al menos una fecha («desde» o «hasta»).");
+        if (ConsultasApi.FiltroGastos(mes, desde, hasta, categoriaId, miembroId, buscar, out var filtro) is { } error)
+            return ApiComun.Invalido(error);
 
-        // El mes y el rango se combinan con «y»: el filtro final es la intersección de ambos.
-        DateOnly? primero = null, ultimo = null;
-        if (mes is not null)
-        {
-            if (!ApiComun.TryMes(mes, out var inicio)) return ApiComun.MesInvalido();
-            primero = inicio;
-            ultimo = inicio.AddMonths(1).AddDays(-1);
-        }
-        DateOnly? rangoDesde = null, rangoHasta = null;
-        if (!string.IsNullOrEmpty(desde))
-        {
-            if (!ApiComun.TryFecha(desde, out var f)) return ApiComun.FechaInvalida("desde");
-            rangoDesde = f;
-        }
-        if (!string.IsNullOrEmpty(hasta))
-        {
-            if (!ApiComun.TryFecha(hasta, out var f)) return ApiComun.FechaInvalida("hasta");
-            rangoHasta = f;
-        }
-        if (rangoDesde is { } p && rangoHasta is { } u && p > u) return ApiComun.Invalido("La fecha «desde» no puede ser posterior a «hasta».");
-        var texto = buscar?.Trim();
-        if (texto is { Length: > 200 }) return ApiComun.Invalido("El texto de búsqueda no puede pasar de 200 caracteres.");
-
-        var filtro = new FiltroGastos(
-            Mayor(primero, rangoDesde), Menor(ultimo, rangoHasta), categoriaId, miembroId, texto);
         return Results.Ok((await servicio.ListarAsync(filtro, ct)).Select(g => g.ADto()));
     }
-
-    /// <summary>La fecha más tardía de las dadas (la que más restringe un límite inferior); null si no hay ninguna.</summary>
-    private static DateOnly? Mayor(DateOnly? a, DateOnly? b) => a is null ? b : b is null ? a : a > b ? a : b;
-
-    /// <summary>La fecha más temprana de las dadas (la que más restringe un límite superior); null si no hay ninguna.</summary>
-    private static DateOnly? Menor(DateOnly? a, DateOnly? b) => a is null ? b : b is null ? a : a < b ? a : b;
 
     /// <summary>GET /api/gastos/{id}: devuelve un gasto con su reparto. 409 sin hogar; 404 si no existe.</summary>
     private static async Task<IResult> ObtenerAsync(

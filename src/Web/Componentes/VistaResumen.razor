@@ -261,8 +261,8 @@ else if (_resumen is not null && _liquidacion is not null)
         return ArbolCategorias.ResumenEnArbol(_categorias, _resumen!.Categorias).SelectMany(n => Recorrer(n, 0));
     }
 
-    private string Porcentaje(decimal total) =>
-        (_resumen!.GastosTotales > 0 ? Math.Round(total / _resumen.GastosTotales * 100m, 0) : 0m).ToString("0", CultureInfo.InvariantCulture);
+    private string Porcentaje(decimal total)
+        => Math.Round(GraficoGastos.PorCiento(total, _resumen!.GastosTotales), 0).ToString("0", CultureInfo.InvariantCulture);
 
     private readonly HashSet<Guid> _abiertas = [];
 

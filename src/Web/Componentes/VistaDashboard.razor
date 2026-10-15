@@ -316,22 +316,7 @@ else if (_r is not null && _rCat is not null && _rMiembro is not null && _rSerie
     };
 
     /// <summary>Hasta 7 categorías y el resto agrupado, para que el gráfico se lea en una pantalla pequeña; la elegida siempre se ve.</summary>
-    private IReadOnlyList<GastoPorCategoria> CategoriasMostradas
-    {
-        get
-        {
-            const int max = 7;
-            var todas = _rCat!.PorCategoria;
-            if (todas.Count <= max) return todas;
-            var visibles = todas.Take(max - 1).ToList();
-            if (_filtro.Categoria is { } elegida && todas.FirstOrDefault(c => c.CategoriaId == elegida) is { } c && !visibles.Contains(c))
-                visibles[^1] = c;
-            var resto = todas.Where(c => !visibles.Contains(c)).ToList();
-            return visibles
-                .Append(new GastoPorCategoria(Guid.Empty, "Otras categorías", resto.Sum(c => c.Importe), resto.Sum(c => c.Gastos)))
-                .ToList();
-        }
-    }
+    private IReadOnlyList<GastoPorCategoria> CategoriasMostradas => GraficoGastos.AgruparResto(_rCat!.PorCategoria, 7, _filtro.Categoria);
 
     protected override async Task OnInitializedAsync()
     {
@@ -456,7 +441,7 @@ else if (_r is not null && _rCat is not null && _rMiembro is not null && _rSerie
 
     private static string Porcentaje(decimal parte, decimal total) => (total > 0 ? parte / total : 0m).ToString("P1", Es);
 
-    private static decimal ProporcionPorCien(decimal parte, decimal total) => total > 0 ? parte / total * 100m : 0m;
+    private static decimal ProporcionPorCien(decimal parte, decimal total) => GraficoGastos.PorCiento(parte, total);
 
     // ───── Gráfico de líneas (SVG con atributos y clases: la CSP no admite estilos en línea) ─────
 

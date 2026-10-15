@@ -83,10 +83,11 @@ else
         {
             <p class="muted u-mt10" role="status">Solo lo que paga <b>@(_soloPaga is { } p ? Formato.NombreMiembro(p, _miembros) : "la cuenta común o el ahorro")</b>, no lo que solo asume.</p>
         }
-        <p class="muted">@(HayFiltros ? "Total filtrado" : _modoRango ? "Total del periodo" : "Total del mes"): <b>@Formato.Euros(_gastos.Where(g => !g.Personal).Sum(g => g.Importe))</b> en @_gastos.Count(g => !g.Personal) @(_gastos.Count(g => !g.Personal) == 1 ? "gasto" : "gastos").
-            @if (_gastos.Any(g => g.Personal))
+        @{ var totales = ListaGastos.Totales(_gastos); }
+        <p class="muted">@(HayFiltros ? "Total filtrado" : _modoRango ? "Total del periodo" : "Total del mes"): <b>@Formato.Euros(totales.TotalHogar)</b> en @totales.CuantosHogar @(totales.CuantosHogar == 1 ? "gasto" : "gastos").
+            @if (totales.HayPersonales)
             {
-                <span>Personales (fuera de la liquidación): <b>@Formato.Euros(_gastos.Where(g => g.Personal).Sum(g => g.Importe))</b>.</span>
+                <span>Personales (fuera de la liquidación): <b>@Formato.Euros(totales.TotalPersonales)</b>.</span>
             }
         </p>
 
@@ -318,16 +319,7 @@ else
 
     /// <summary>Perfiles que se ofrecen: el de cuenta común solo con la cuenta activada (si no, la API rechazaría el gasto).</summary>
     private IEnumerable<PerfilRepartoDto> PerfilesOfrecidos
-    {
-        get
-        {
-            var ofrecidos = _cuentaActiva ? _perfiles : _perfiles.Where(p => p.Modo != ModosReparto.CuentaComun).ToList();
-            // Al editar un gasto cuyo perfil ya no se ofrece se mantiene como opción, para que el formulario muestre lo que envía.
-            return _editando is not null && _perfiles.FirstOrDefault(p => p.Id == _perfil) is { } actual && !ofrecidos.Contains(actual)
-                ? ofrecidos.Append(actual)
-                : ofrecidos;
-        }
-    }
+        => ListaGastos.PerfilesOfrecidos(_perfiles, _cuentaActiva, _editando is not null ? _perfil : null);
 
     /// <summary>La categoría elegida está marcada «a cargo de la cuenta común» y la cuenta está activada.</summary>
     private bool CategoriaACargoDeLaCuenta => _cuentaActiva && _categorias.FirstOrDefault(c => c.Id == _categoria)?.ACargoCuentaComun == true;
@@ -415,17 +407,11 @@ else
                 ? await Api.ListarGastosPorRangoAsync(_desdeR, _hastaR, miembro, _filtroTexto)
                 : await Api.ListarGastosAsync(Formato.Mes(_mes), null, miembro, _filtroTexto);
             // La categoría se filtra aquí y no en la API para que incluya sus subcategorías.
-            if (Guid.TryParse(_filtroCategoria, out var categoria))
-            {
-                var ids = ArbolCategorias.ConDescendientes(_categorias, categoria);
-                gastos = gastos.Where(g => ids.Contains(g.CategoriaId)).ToList();
-            }
+            var categorias = Guid.TryParse(_filtroCategoria, out var categoria)
+                ? ArbolCategorias.ConDescendientes(_categorias, categoria)
+                : null;
 
-            // Quién paga (no quién asume): lo que reproduce el filtro de persona del Dashboard.
-            if (_soloPaga is { } paga) gastos = gastos.Where(g => g.PagadoPor == paga).ToList();
-            else if (_soloCuenta) gastos = gastos.Where(g => g.PagadoPor is null).ToList();
-
-            if (version == _versionCarga) _gastos = gastos.OrderByDescending(g => g.Fecha).ThenBy(g => g.Id).ToList();
+            if (version == _versionCarga) _gastos = ListaGastos.Filtrar(gastos, new FiltroLista(categorias, _soloPaga, _soloCuenta));
         }
         catch (ApiException) when (version != _versionCarga)
         {
@@ -512,9 +498,7 @@ else
 
     private string NombreCategoria(Guid id) => ArbolCategorias.Ruta(_categorias, id);
 
-    private bool TryImporte(out decimal valor) =>
-        decimal.TryParse(_importe.Trim().Replace(',', '.'), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out valor)
-        && valor > 0 && decimal.Round(valor, 2) == valor;
+    private bool TryImporte(out decimal valor) => EntradaImporte.TryParse(_importe, out valor);
 
     private void ReiniciarFormulario()
     {
@@ -579,7 +563,7 @@ else
     private Task GuardarAsync() =>
         EjecutarAsync(async () =>
         {
-            if (!TryImporte(out var importe)) throw new ApiException(System.Net.HttpStatusCode.BadRequest, "Introduce un importe mayor que 0 con máximo 2 decimales.");
+            if (!TryImporte(out var importe)) throw new ApiException(System.Net.HttpStatusCode.BadRequest, EntradaImporte.MensajeInvalido);
             var peticion = new GastoRequest(_fecha, importe, _categoria, _pagador, _perfil,
                 string.IsNullOrWhiteSpace(_concepto) ? null : _concepto.Trim(), _desdeAhorro, _personal && _pagador is not null);
             if (_editando is { } id)

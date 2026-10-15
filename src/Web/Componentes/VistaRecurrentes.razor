@@ -225,9 +225,7 @@ else
 
     private string NombrePlantilla(GastoRecurrenteResponse p) => string.IsNullOrWhiteSpace(p.Concepto) ? NombreCategoria(p.CategoriaId) : p.Concepto;
 
-    private bool TryImporte(out decimal valor) =>
-        decimal.TryParse(_importe.Trim().Replace(',', '.'), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out valor)
-        && valor > 0 && decimal.Round(valor, 2) == valor;
+    private bool TryImporte(out decimal valor) => EntradaImporte.TryParse(_importe, out valor);
 
     private void ReiniciarFormulario()
     {
@@ -268,7 +266,7 @@ else
     private Task GuardarSinAvisoAsync() =>
         EjecutarAsync(async () =>
         {
-            if (!TryImporte(out var importe)) throw new ApiException(System.Net.HttpStatusCode.BadRequest, "Introduce un importe mayor que 0 con máximo 2 decimales.");
+            if (!TryImporte(out var importe)) throw new ApiException(System.Net.HttpStatusCode.BadRequest, EntradaImporte.MensajeInvalido);
             // Al editar se conserva si la plantilla estaba pausada: el formulario no toca ese estado.
             var activo = _editando is { } actual ? _plantillas.FirstOrDefault(p => p.Id == actual)?.Activo ?? true : true;
             var peticion = new GastoRecurrenteRequest(importe, _categoria, _pagador, _perfil, (short)_dia,

@@ -418,9 +418,7 @@ else if (_estado is not null)
         _ahorroAportacion = AhorroVigenteDe(_aportante).ToString(CultureInfo.InvariantCulture);
     }
 
-    private static bool TryImporte(string texto, bool permitirCero, out decimal valor) =>
-        decimal.TryParse(texto.Trim().Replace(',', '.'), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out valor)
-        && (valor > 0 || (permitirCero && valor == 0)) && decimal.Round(valor, 2) == valor;
+    private static bool TryImporte(string texto, bool permitirCero, out decimal valor) => EntradaImporte.TryParse(texto, permitirCero, out valor);
 
     private Task FijarAportacionAsync() =>
         EjecutarAsync(async () =>

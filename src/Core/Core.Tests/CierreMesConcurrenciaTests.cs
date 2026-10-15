@@ -225,6 +225,29 @@ public class CierreMesConcurrenciaTests
         await EjecutarAsync("update public.gasto set importe = 20 where id = @g", ("g", g.Id));
     }
 
+    /// <summary>Reasignar solo la categoría o el perfil de un gasto (al borrar una categoría o perfil en uso) vale en un mes cerrado: no cambia importes ni liquidación.</summary>
+    [SkippableFact]
+    public async Task Triggers_PermitenReasignarCategoriaYPerfilEnMesCerrado_EnPostgres()
+    {
+        Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
+        await using var e = new Entorno();
+        var s = await Montar(e);
+        var g = await CrearGasto(s, new DateOnly(2020, 3, 10));
+        await EjecutarAsync("insert into public.mes_cerrado (hogar_id, mes) values (@h, @m)", ("h", s.Hogar), ("m", Marzo));
+
+        await EjecutarAsync(
+            "update public.gasto set categoria_id = (select id from public.categoria where hogar_id = @h and id <> @c limit 1) where id = @g",
+            ("h", s.Hogar), ("c", s.Categoria), ("g", g.Id));
+        await EjecutarAsync(
+            "update public.gasto set perfil_reparto_id = (select id from public.perfil_reparto where hogar_id = @h and id <> @p limit 1) where id = @g",
+            ("h", s.Hogar), ("p", s.Perfil), ("g", g.Id));
+
+        // Cambiar además cualquier otro dato sigue prohibido.
+        var ex = await Assert.ThrowsAsync<PostgresException>(() => EjecutarAsync(
+            "update public.gasto set importe = 20, categoria_id = @c where id = @g", ("c", s.Categoria), ("g", g.Id)));
+        Assert.Equal("MP409", ex.SqlState);
+    }
+
     /// <summary>Borrar un hogar con gastos en meses cerrados no queda bloqueado por los triggers (borrado en cascada).</summary>
     [SkippableFact]
     public async Task BorrarHogar_ConMesesCerradosYGastos_NoLoBloqueaElCierre_EnPostgres()

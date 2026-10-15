@@ -58,6 +58,23 @@ else
                             <button class="linkbtn danger" type="button" aria-label="Eliminar @c.Nombre" @onclick="() => _confirmandoEliminar = c.Id">Eliminar</button>
                         }
                     </div>
+                    @if (_moviendo == c.Id)
+                    {
+                        <form class="editcat" id="mover-categoria" @onsubmit="() => MoverYEliminarAsync(c)">
+                            <p class="muted">«@c.Nombre» tiene gastos o plantillas recurrentes. ¿A qué categoría los movemos antes de eliminarla?</p>
+                            <label>Mover a
+                                <select @bind="_destino">
+                                    <option value="">Elige una categoría</option>
+                                    @foreach (var otra in _arbol.Where(n => n.Categoria.Id != c.Id))
+                                    {
+                                        <option value="@otra.Categoria.Id">@(new string(' ', otra.Nivel * 3))@otra.Categoria.Nombre</option>
+                                    }
+                                </select>
+                            </label>
+                            <button class="btn btn-sm" type="submit" disabled="@string.IsNullOrEmpty(_destino)">Mover y eliminar</button>
+                            <button class="linkbtn" type="button" @onclick="() => _moviendo = null">Cancelar</button>
+                        </form>
+                    }
                     @if (_editando == c.Id)
                     {
                         <form class="editcat" @onsubmit="() => GuardarEdicionAsync(c)">
@@ -144,8 +161,8 @@ else
     private bool _cargando = true;
     private string? _errorCarga, _error;
 
-    private Guid? _editando, _confirmandoEliminar;
-    private string _nombre = "", _padre = "", _perfil = "";
+    private Guid? _editando, _confirmandoEliminar, _moviendo;
+    private string _nombre = "", _padre = "", _perfil = "", _destino = "";
     private string _nuevoNombre = "", _nuevoPadre = "", _nuevoPerfil = "";
     private bool _aCargo, _nuevoACargo;
 
@@ -209,12 +226,36 @@ else
             return "Categoría guardada";
         });
 
-    private Task EliminarAsync(CategoriaDto c) =>
-        EjecutarAsync(async () =>
+    /// <summary>Elimina la categoría; si tiene gastos la API lo rechaza como «en uso» y se pregunta a qué categoría moverlos.</summary>
+    private async Task EliminarAsync(CategoriaDto c)
+    {
+        _error = null;
+        try
         {
             await Api.EliminarCategoriaAsync(c.Id);
             _confirmandoEliminar = null;
-            return "Categoría eliminada";
+            await RecargarAsync();
+            Avisos.Mostrar("Categoría eliminada");
+        }
+        catch (ApiException e) when (e.EnUso)
+        {
+            _confirmandoEliminar = null;
+            _destino = "";
+            _moviendo = c.Id;
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+            _confirmandoEliminar = null;
+        }
+    }
+
+    private Task MoverYEliminarAsync(CategoriaDto c) =>
+        EjecutarAsync(async () =>
+        {
+            await Api.EliminarCategoriaAsync(c.Id, ComoGuid(_destino));
+            _moviendo = null;
+            return "Gastos movidos y categoría eliminada";
         });
 
     private Task AnadirAsync() =>

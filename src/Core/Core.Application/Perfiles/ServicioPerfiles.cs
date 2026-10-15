@@ -42,16 +42,38 @@ public sealed class ServicioPerfiles(IRepositorioPerfiles repositorio)
         return await repositorio.GuardarAsync(ct) ? Resultado<PerfilReparto>.Ok(perfil) : Resultado<PerfilReparto>.Conflicto(NombreRepetido);
     }
 
-    /// <summary>Borra el perfil y su detalle; conflicto si lo usan categorías, gastos o gastos recurrentes.</summary>
-    public async Task<Resultado<bool>> EliminarAsync(Guid id, CancellationToken ct)
+    /// <summary>
+    /// Borra el perfil y su detalle. Si lo usan categorías, gastos o gastos recurrentes hace falta <paramref name="moverAId"/>: sin
+    /// él es conflicto (con <c>enUso</c> entre los datos extra, para que el cliente pregunte a qué perfil moverlos); con él, todo
+    /// pasa al perfil de destino en el mismo guardado. El destino debe ser otro perfil y, como las categorías a cargo de la cuenta
+    /// común exigen su perfil, o ambos son de cuenta común o ninguno lo es.
+    /// </summary>
+    public async Task<Resultado<bool>> EliminarAsync(Guid id, Guid? moverAId, CancellationToken ct)
     {
         var perfil = await repositorio.ObtenerParaEditarAsync(id, ct);
         if (perfil is null) return Resultado<bool>.NoEncontrado();
+
+        var movidos = false;
         if (await repositorio.EnUsoAsync(id, ct))
-            return Resultado<bool>.Conflicto("El perfil está en uso por categorías, gastos o gastos recurrentes.");
+        {
+            if (moverAId is not { } destinoId)
+                return Resultado<bool>.Conflicto(
+                    "El perfil está en uso por categorías, gastos o gastos recurrentes.", new Dictionary<string, object> { ["enUso"] = true });
+            if (destinoId == id) return Resultado<bool>.Invalido("El perfil de destino debe ser otro.");
+            var destino = await repositorio.ObtenerAsync(destinoId, ct);
+            if (destino is null) return Resultado<bool>.Invalido("El perfil de destino no existe en este hogar.");
+            if ((destino.Modo == ModoReparto.CuentaComun) != (perfil.Modo == ModoReparto.CuentaComun))
+                return Resultado<bool>.Invalido("El perfil de destino debe ser de cuenta común si el que se borra lo es, y no serlo si no.");
+
+            await repositorio.ReasignarUsoAsync(id, destinoId, ct);
+            movidos = true;
+        }
 
         repositorio.Eliminar(perfil);
-        return await repositorio.GuardarAsync(ct) ? Resultado<bool>.Ok(true) : Resultado<bool>.Conflicto("El perfil está en uso.");
+        if (await repositorio.GuardarAsync(ct)) return Resultado<bool>.Ok(true);
+        return Resultado<bool>.Conflicto(movidos
+            ? "No se ha podido mover el uso del perfil al perfil de destino."
+            : "El perfil está en uso.");
     }
 
     private static PerfilRepartoDetalle Nuevo(Guid hogarId, Guid perfilId, ValorMiembro d) => new()

@@ -49,16 +49,35 @@ public sealed class ServicioCategorias(IRepositorioCategorias repositorio, IRepo
         return await repositorio.GuardarAsync(ct) ? Resultado<Categoria>.Ok(categoria) : Resultado<Categoria>.Conflicto(NombreRepetido);
     }
 
-    /// <summary>Borra la categoría; conflicto si tiene subcategorías, gastos o gastos recurrentes.</summary>
-    public async Task<Resultado<bool>> EliminarAsync(Guid id, CancellationToken ct)
+    /// <summary>
+    /// Borra la categoría. Conflicto si tiene subcategorías, o si tiene gastos o gastos recurrentes y no se indica
+    /// <paramref name="moverAId"/> (con <c>enUso</c> entre los datos extra, para que el cliente pregunte a qué categoría moverlos);
+    /// con destino, los gastos y plantillas pasan a ella en el mismo guardado.
+    /// </summary>
+    public async Task<Resultado<bool>> EliminarAsync(Guid id, Guid? moverAId, CancellationToken ct)
     {
         var categoria = await repositorio.ObtenerParaEditarAsync(id, ct);
         if (categoria is null) return Resultado<bool>.NoEncontrado();
         if (await repositorio.TieneSubcategoriasAsync(id, ct)) return Resultado<bool>.Conflicto("La categoría tiene subcategorías.");
-        if (await repositorio.TieneGastosAsync(id, ct)) return Resultado<bool>.Conflicto("La categoría tiene gastos asociados.");
+
+        var movidos = false;
+        if (await repositorio.TieneGastosAsync(id, ct))
+        {
+            if (moverAId is not { } destinoId)
+                return Resultado<bool>.Conflicto("La categoría tiene gastos asociados.", new Dictionary<string, object> { ["enUso"] = true });
+            if (destinoId == id) return Resultado<bool>.Invalido("La categoría de destino debe ser otra.");
+            if (await repositorio.ObtenerParaEditarAsync(destinoId, ct) is null)
+                return Resultado<bool>.Invalido("La categoría de destino no existe en este hogar.");
+
+            await repositorio.ReasignarGastosAsync(id, destinoId, ct);
+            movidos = true;
+        }
 
         repositorio.Eliminar(categoria);
-        return await repositorio.GuardarAsync(ct) ? Resultado<bool>.Ok(true) : Resultado<bool>.Conflicto("La categoría está en uso.");
+        if (await repositorio.GuardarAsync(ct)) return Resultado<bool>.Ok(true);
+        return Resultado<bool>.Conflicto(movidos
+            ? "No se han podido mover los gastos a la categoría de destino."
+            : "La categoría está en uso.");
     }
 
     private sealed record Validada(string Nombre, Guid? PerfilId, bool ACargo, Resultado<Categoria>? Error);

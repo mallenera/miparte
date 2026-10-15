@@ -90,13 +90,13 @@ public sealed partial class ServidorDemo
             ("categorias", 2, "GET") => Ok((await _categorias.ListarAsync(ct)).Select(c => c.ADto()).ToList()),
             ("categorias", 2, "POST") => await GuardarCategoria(null, (await Cuerpo<GuardarCategoriaRequest>())!, ct),
             ("categorias", 3, "PUT") when id is { } i => await GuardarCategoria(i, (await Cuerpo<GuardarCategoriaRequest>())!, ct),
-            ("categorias", 3, "DELETE") when id is { } i => Sin(await _categorias.EliminarAsync(i, ct)),
+            ("categorias", 3, "DELETE") when id is { } i => Sin(await _categorias.EliminarAsync(i, DestinoDeMovimiento(uri), ct)),
 
             ("perfiles", 2, "GET") => Ok((await _perfiles.ListarAsync(ct)).Select(p => p.ADto()).ToList()),
             ("perfiles", 3, "GET") when id is { } i => await ObtenerPerfil(i, ct),
             ("perfiles", 2, "POST") => await GuardarPerfil(null, (await Cuerpo<GuardarPerfilRequest>())!, ct),
             ("perfiles", 3, "PUT") when id is { } i => await GuardarPerfil(i, (await Cuerpo<GuardarPerfilRequest>())!, ct),
-            ("perfiles", 3, "DELETE") when id is { } i => Sin(await _perfiles.EliminarAsync(i, ct)),
+            ("perfiles", 3, "DELETE") when id is { } i => Sin(await _perfiles.EliminarAsync(i, DestinoDeMovimiento(uri), ct)),
 
             ("gastos", 2, "GET") => await ListarGastos(uri, ct),
             ("gastos", 3, "GET") when id is { } i => await ObtenerGasto(i, ct),
@@ -174,6 +174,9 @@ public sealed partial class ServidorDemo
     }
 
     // ───── Categorías y perfiles ─────
+
+    /// <summary>Destino indicado en <c>?moverA=</c> al borrar una categoría o un perfil en uso; null si no viene o no es un Guid.</summary>
+    private static Guid? DestinoDeMovimiento(Uri uri) => Guid.TryParse(Consulta(uri, "moverA"), out var g) ? g : null;
 
     private async Task<HttpResponseMessage> GuardarCategoria(Guid? id, GuardarCategoriaRequest r, CancellationToken ct)
     {

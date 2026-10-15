@@ -83,10 +83,48 @@ public class ServicioPerfilesTests
         var p = (await Crear("Casa", "individual")).Valor!;
         _repo.EnUso.Add(p.Id);
 
-        var r = await Servicio.EliminarAsync(p.Id, default);
+        var r = await Servicio.EliminarAsync(p.Id, null, default);
 
         Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
+        Assert.Equal(true, r.Error.Extra!["enUso"]);
         Assert.Single(_repo.Perfiles);
+    }
+
+    [Fact]
+    public async Task Eliminar_EnUsoConDestino_MueveElUsoYBorra()
+    {
+        var p = (await Crear("Casa", "individual")).Valor!;
+        var destino = (await Crear("Otro", "individual")).Valor!;
+        _repo.EnUso.Add(p.Id);
+
+        var r = await Servicio.EliminarAsync(p.Id, destino.Id, default);
+
+        Assert.Null(r.Error);
+        Assert.Equal((p.Id, destino.Id), Assert.Single(_repo.Movidos));
+        Assert.DoesNotContain(_repo.Perfiles, x => x.Id == p.Id);
+    }
+
+    [Fact]
+    public async Task Eliminar_EnUsoConDestinoDeOtraNaturaleza_EsInvalido()
+    {
+        var p = (await Crear("Casa", "individual")).Valor!;
+        var cuenta = (await Crear("Cuenta", "cuenta_comun")).Valor!;
+        _repo.EnUso.Add(p.Id);
+
+        var r = await Servicio.EliminarAsync(p.Id, cuenta.Id, default);
+
+        Assert.Equal(TipoError.Invalido, r.Error!.Tipo);
+        Assert.Empty(_repo.Movidos);
+    }
+
+    [Fact]
+    public async Task Eliminar_EnUsoConDestinoInexistenteOElMismo_EsInvalido()
+    {
+        var p = (await Crear("Casa", "individual")).Valor!;
+        _repo.EnUso.Add(p.Id);
+
+        Assert.Equal(TipoError.Invalido, (await Servicio.EliminarAsync(p.Id, Guid.NewGuid(), default)).Error!.Tipo);
+        Assert.Equal(TipoError.Invalido, (await Servicio.EliminarAsync(p.Id, p.Id, default)).Error!.Tipo);
     }
 
     [Fact]
@@ -123,6 +161,14 @@ public class ServicioPerfilesTests
             => Task.FromResult(Perfiles.Any(p => p.Nombre == nombre && p.Id != excluirId));
 
         public Task<bool> EnUsoAsync(Guid id, CancellationToken ct) => Task.FromResult(EnUso.Contains(id));
+
+        public List<(Guid Origen, Guid Destino)> Movidos { get; } = [];
+
+        public Task ReasignarUsoAsync(Guid origen, Guid destino, CancellationToken ct)
+        {
+            Movidos.Add((origen, destino));
+            return Task.CompletedTask;
+        }
 
         public void Anadir(PerfilReparto perfil) => _nuevos.Add(perfil);
 
@@ -257,7 +303,7 @@ public class ServicioCategoriasTests
         var casa = (await Crear("Casa")).Valor!;
         await Crear("Cocina", casa.Id);
 
-        var r = await Servicio.EliminarAsync(casa.Id, default);
+        var r = await Servicio.EliminarAsync(casa.Id, null, default);
 
         Assert.Equal("La categoría tiene subcategorías.", r.Error!.Mensaje);
     }
@@ -268,9 +314,36 @@ public class ServicioCategoriasTests
         var casa = (await Crear("Casa")).Valor!;
         _repo.ConGastos.Add(casa.Id);
 
-        var r = await Servicio.EliminarAsync(casa.Id, default);
+        var r = await Servicio.EliminarAsync(casa.Id, null, default);
 
         Assert.Equal("La categoría tiene gastos asociados.", r.Error!.Mensaje);
+        Assert.Equal(true, r.Error.Extra!["enUso"]);
+    }
+
+    [Fact]
+    public async Task Eliminar_ConGastosYDestino_LosMueveYBorra()
+    {
+        var casa = (await Crear("Casa")).Valor!;
+        var ocio = (await Crear("Ocio")).Valor!;
+        _repo.ConGastos.Add(casa.Id);
+
+        var r = await Servicio.EliminarAsync(casa.Id, ocio.Id, default);
+
+        Assert.Null(r.Error);
+        Assert.Equal((casa.Id, ocio.Id), Assert.Single(_repo.Movidos));
+        Assert.DoesNotContain(_repo.Categorias, c => c.Id == casa.Id);
+    }
+
+    [Fact]
+    public async Task Eliminar_ConGastosYDestinoInexistente_EsInvalidoYNoMueve()
+    {
+        var casa = (await Crear("Casa")).Valor!;
+        _repo.ConGastos.Add(casa.Id);
+
+        var r = await Servicio.EliminarAsync(casa.Id, Guid.NewGuid(), default);
+
+        Assert.Equal(TipoError.Invalido, r.Error!.Tipo);
+        Assert.Empty(_repo.Movidos);
     }
 
     private sealed class RepositorioFalso : IRepositorioCategorias
@@ -305,6 +378,14 @@ public class ServicioCategoriasTests
             => Task.FromResult(Categorias.Any(c => c.CategoriaPadreId == id));
 
         public Task<bool> TieneGastosAsync(Guid id, CancellationToken ct) => Task.FromResult(ConGastos.Contains(id));
+
+        public List<(Guid Origen, Guid Destino)> Movidos { get; } = [];
+
+        public Task ReasignarGastosAsync(Guid origen, Guid destino, CancellationToken ct)
+        {
+            Movidos.Add((origen, destino));
+            return Task.CompletedTask;
+        }
 
         public void Anadir(Categoria categoria) => _nuevas.Add(categoria);
 

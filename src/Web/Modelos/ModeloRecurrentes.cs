@@ -67,6 +67,9 @@ public sealed class ModeloRecurrentes(CoreApiClient api, Func<DateTime> hoy)
     /// <summary>Nombre del mes mostrado.</summary>
     public string NombreMes => Mes.ToString("MMMM yyyy", Es);
 
+    /// <summary>Día del mes de hoy.</summary>
+    public int DiaHoy => hoy().Day;
+
     /// <summary>Nombre del mes en curso.</summary>
     public string NombreMesActual => hoy().ToString("MMMM yyyy", Es);
 
@@ -207,7 +210,8 @@ public sealed class ModeloRecurrentes(CoreApiClient api, Func<DateTime> hoy)
             }
 
             await api.CrearRecurrenteAsync(peticion);
-            if (activo && Dia < hoy().Day)
+            // El día de hoy también cuenta: la plantilla solo genera su gasto al pedirlo, así que hay que ofrecerlo igual que si hubiera pasado.
+            if (activo && Dia <= hoy().Day)
                 DiaPasado = (string.IsNullOrWhiteSpace(Concepto) ? NombreCategoria(Categoria) : Concepto.Trim(), Dia);
             Importe = "";
             Concepto = "";

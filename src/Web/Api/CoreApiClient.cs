@@ -82,11 +82,15 @@ public sealed class CoreApiClient
     public Task<CategoriaDto> GuardarCategoriaAsync(Guid id, GuardarCategoriaRequest peticion, CancellationToken ct = default) =>
         EnviarAsync<CategoriaDto>(HttpMethod.Put, $"api/categorias/{id}", peticion, ct);
 
-    /// <summary>Elimina una categoría sin subcategorías ni gastos (<c>DELETE /api/categorias/{id}</c>).</summary>
+    /// <summary>
+    /// Elimina una categoría sin subcategorías (<c>DELETE /api/categorias/{id}</c>). Si tiene gastos hay que indicar a qué categoría
+    /// pasan; sin destino la API responde 409 y la excepción lleva <see cref="ApiException.EnUso"/>.
+    /// </summary>
     /// <param name="id">Categoría a eliminar.</param>
+    /// <param name="moverA">Categoría que recibe sus gastos y plantillas, o null si no tiene.</param>
     /// <param name="ct">Token de cancelación.</param>
-    public Task EliminarCategoriaAsync(Guid id, CancellationToken ct = default) =>
-        EnviarSinRespuestaAsync(HttpMethod.Delete, $"api/categorias/{id}", ct);
+    public Task EliminarCategoriaAsync(Guid id, Guid? moverA = null, CancellationToken ct = default) =>
+        EnviarSinRespuestaAsync(HttpMethod.Delete, moverA is { } d ? $"api/categorias/{id}?moverA={d}" : $"api/categorias/{id}", ct);
 
     /// <summary>Perfiles de reparto con su detalle (<c>GET /api/perfiles</c>).</summary>
     /// <param name="ct">Token de cancelación.</param>
@@ -106,11 +110,15 @@ public sealed class CoreApiClient
     public Task<PerfilRepartoDto> GuardarPerfilAsync(Guid id, GuardarPerfilRequest peticion, CancellationToken ct = default) =>
         EnviarAsync<PerfilRepartoDto>(HttpMethod.Put, $"api/perfiles/{id}", peticion, ct);
 
-    /// <summary>Elimina un perfil que no esté en uso (<c>DELETE /api/perfiles/{id}</c>).</summary>
+    /// <summary>
+    /// Elimina un perfil (<c>DELETE /api/perfiles/{id}</c>). Si está en uso hay que indicar a qué perfil pasa; sin destino la API
+    /// responde 409 y la excepción lleva <see cref="ApiException.EnUso"/>.
+    /// </summary>
     /// <param name="id">Perfil a eliminar.</param>
+    /// <param name="moverA">Perfil que recibe sus categorías, gastos y plantillas, o null si no está en uso.</param>
     /// <param name="ct">Token de cancelación.</param>
-    public Task EliminarPerfilAsync(Guid id, CancellationToken ct = default) =>
-        EnviarSinRespuestaAsync(HttpMethod.Delete, $"api/perfiles/{id}", ct);
+    public Task EliminarPerfilAsync(Guid id, Guid? moverA = null, CancellationToken ct = default) =>
+        EnviarSinRespuestaAsync(HttpMethod.Delete, moverA is { } d ? $"api/perfiles/{id}?moverA={d}" : $"api/perfiles/{id}", ct);
 
     /// <summary>Gastos de un mes del hogar con su reparto (<c>GET /api/gastos</c>); la API exige acotar por mes o por fechas.</summary>
     /// <param name="mes">Mes en formato <c>YYYY-MM</c>.</param>
@@ -383,7 +391,11 @@ public sealed class CoreApiClient
 
         using (respuesta)
         {
-            if (!respuesta.IsSuccessStatusCode) throw new ApiException(respuesta.StatusCode, await LeerErrorAsync(respuesta, ct));
+            if (!respuesta.IsSuccessStatusCode)
+            {
+                var (mensaje, enUso) = await LeerErrorAsync(respuesta, ct);
+                throw new ApiException(respuesta.StatusCode, mensaje) { EnUso = enUso };
+            }
         }
     }
 
@@ -408,7 +420,12 @@ public sealed class CoreApiClient
 
         using (respuesta)
         {
-            if (!respuesta.IsSuccessStatusCode) throw new ApiException(respuesta.StatusCode, await LeerErrorAsync(respuesta, ct));
+            if (!respuesta.IsSuccessStatusCode)
+            {
+                var (mensaje, enUso) = await LeerErrorAsync(respuesta, ct);
+                throw new ApiException(respuesta.StatusCode, mensaje) { EnUso = enUso };
+            }
+
             try
             {
                 return await respuesta.Content.ReadFromJsonAsync<T>(ct)
@@ -423,20 +440,25 @@ public sealed class CoreApiClient
         }
     }
 
-    private static async Task<string> LeerErrorAsync(HttpResponseMessage respuesta, CancellationToken ct)
+    /// <summary>Mensaje del cuerpo <c>{ "error": ... }</c> (o uno por código) y si trae <c>enUso: true</c>, en una sola lectura del cuerpo.</summary>
+    private static async Task<(string Mensaje, bool EnUso)> LeerErrorAsync(HttpResponseMessage respuesta, CancellationToken ct)
     {
         try
         {
             var cuerpo = await respuesta.Content.ReadFromJsonAsync<JsonElement>(ct);
             if (cuerpo.ValueKind == JsonValueKind.Object && cuerpo.TryGetProperty("error", out var e) && e.GetString() is { Length: > 0 } texto)
-                return texto;
+                return (texto, cuerpo.TryGetProperty("enUso", out var u) && u.ValueKind == JsonValueKind.True);
         }
         catch (Exception ex) when (ex is JsonException or NotSupportedException)
         {
             // Sin cuerpo JSON: se usa el mensaje por código.
         }
 
-        return respuesta.StatusCode switch
+        return (MensajePorCodigo(respuesta.StatusCode), false);
+    }
+
+    private static string MensajePorCodigo(HttpStatusCode codigo) =>
+        codigo switch
         {
             HttpStatusCode.Unauthorized => "Tu sesión ha caducado. Vuelve a iniciar sesión.",
             HttpStatusCode.Forbidden => "No tienes permiso para hacer esto.",
@@ -444,5 +466,4 @@ public sealed class CoreApiClient
             HttpStatusCode.Conflict => "La operación no se puede realizar en el estado actual.",
             _ => "Ha ocurrido un error en el servidor.",
         };
-    }
 }

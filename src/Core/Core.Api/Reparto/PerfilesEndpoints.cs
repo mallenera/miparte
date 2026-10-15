@@ -59,10 +59,15 @@ public static class PerfilesEndpoints
         return r.Error is { } error ? ApiComun.Respuesta(error) : Results.Ok(r.Valor!.ADto());
     }
 
-    /// <summary>DELETE /api/perfiles/{id}: elimina el perfil y su detalle. 404 si no existe; 409 si lo usan categorías, gastos o gastos recurrentes; 204 si se elimina.</summary>
-    private static async Task<IResult> EliminarAsync(Guid id, [FromServices] ServicioPerfiles servicio, CancellationToken ct)
+    /// <summary>
+    /// DELETE /api/perfiles/{id}?moverA={id}: elimina el perfil y su detalle, pasando antes categorías, gastos y gastos recurrentes
+    /// a <c>moverA</c>. 404 si no existe; 409 si está en uso y no se indica <c>moverA</c> (con <c>enUso: true</c>); 400 si el
+    /// destino no es válido; 204 si se elimina.
+    /// </summary>
+    private static async Task<IResult> EliminarAsync(
+        Guid id, [FromQuery] Guid? moverA, [FromServices] ServicioPerfiles servicio, CancellationToken ct)
     {
-        var r = await servicio.EliminarAsync(id, ct);
+        var r = await servicio.EliminarAsync(id, moverA, ct);
         return r.Error is { } error ? ApiComun.Respuesta(error) : Results.NoContent();
     }
 }

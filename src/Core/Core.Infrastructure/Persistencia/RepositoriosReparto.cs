@@ -38,6 +38,14 @@ public sealed class RepositorioPerfiles(MiParteDbContext db) : IRepositorioPerfi
             || await db.GastosRecurrentes.AnyAsync(g => g.PerfilRepartoId == id, ct);
 
     /// <inheritdoc />
+    public async Task ReasignarUsoAsync(Guid origen, Guid destino, CancellationToken ct)
+    {
+        foreach (var c in await db.Categorias.Where(c => c.PerfilRepartoId == origen).ToListAsync(ct)) c.PerfilRepartoId = destino;
+        foreach (var g in await db.Gastos.Where(g => g.PerfilRepartoId == origen).ToListAsync(ct)) g.PerfilRepartoId = destino;
+        foreach (var r in await db.GastosRecurrentes.Where(r => r.PerfilRepartoId == origen).ToListAsync(ct)) r.PerfilRepartoId = destino;
+    }
+
+    /// <inheritdoc />
     public void Anadir(PerfilReparto perfil) => db.PerfilesReparto.Add(perfil);
 
     /// <inheritdoc />
@@ -114,6 +122,13 @@ public sealed class RepositorioCategorias(MiParteDbContext db) : IRepositorioCat
     /// <inheritdoc />
     public async Task<bool> TieneGastosAsync(Guid id, CancellationToken ct)
         => await db.Gastos.AnyAsync(g => g.CategoriaId == id, ct) || await db.GastosRecurrentes.AnyAsync(g => g.CategoriaId == id, ct);
+
+    /// <inheritdoc />
+    public async Task ReasignarGastosAsync(Guid origen, Guid destino, CancellationToken ct)
+    {
+        foreach (var g in await db.Gastos.Where(g => g.CategoriaId == origen).ToListAsync(ct)) g.CategoriaId = destino;
+        foreach (var r in await db.GastosRecurrentes.Where(r => r.CategoriaId == origen).ToListAsync(ct)) r.CategoriaId = destino;
+    }
 
     /// <inheritdoc />
     public void Anadir(Categoria categoria) => db.Categorias.Add(categoria);

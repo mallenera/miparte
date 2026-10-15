@@ -855,13 +855,26 @@ public class ComponentesTests : BunitContext
     }
 
     [Fact]
-    public void Recurrentes_crear_con_dia_futuro_o_de_hoy_no_avisa()
+    public void Recurrentes_crear_con_dia_de_hoy_ofrece_crear_el_gasto_del_mes()
     {
         Registrar(ApiRecurrentes().Responde("POST /api/gastos-recurrentes", HttpStatusCode.Created, Alquiler()));
         var c = Render<VistaRecurrentes>();
 
         c.FindAll("#form-recurrente input")[1].Input("850");
         c.FindAll("#form-recurrente input")[2].Input("7"); // hoy es 7
+        c.Find("#form-recurrente").Submit();
+
+        Assert.Contains("es hoy", c.Find("#aviso-dia-pasado").TextContent);
+    }
+
+    [Fact]
+    public void Recurrentes_crear_con_dia_futuro_no_avisa()
+    {
+        Registrar(ApiRecurrentes().Responde("POST /api/gastos-recurrentes", HttpStatusCode.Created, Alquiler()));
+        var c = Render<VistaRecurrentes>();
+
+        c.FindAll("#form-recurrente input")[1].Input("850");
+        c.FindAll("#form-recurrente input")[2].Input("8"); // hoy es 7
         c.Find("#form-recurrente").Submit();
 
         Assert.Empty(c.FindAll("#aviso-dia-pasado"));

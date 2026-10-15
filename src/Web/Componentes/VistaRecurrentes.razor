@@ -52,7 +52,7 @@ else
         @if (_m.DiaPasado is { } dp)
         {
             <div class="aviso warn u-mt12" role="status" id="aviso-dia-pasado">
-                El día @dp.Dia de este mes ya ha pasado, así que «@dp.Nombre» no se ha creado como gasto de @_m.NombreMesActual.
+                El día @dp.Dia de este mes @(dp.Dia == _m.DiaHoy ? "es hoy" : "ya ha pasado"), así que «@dp.Nombre» no se ha creado como gasto de @_m.NombreMesActual.
                 ¿Quieres crearlo ahora?
                 <button class="linkbtn" type="button" id="crear-gasto-pasado" disabled="@_m.Generando" @onclick="GenerarMesActualAsync">Crear gasto de @_m.NombreMesActual</button>
                 <button class="linkbtn" type="button" @onclick="() => _m.DiaPasado = null">Ahora no</button>

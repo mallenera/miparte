@@ -32,6 +32,9 @@ public interface IRepositorioCategorias
     /// <summary>Si la categoría tiene gastos o gastos recurrentes.</summary>
     Task<bool> TieneGastosAsync(Guid id, CancellationToken ct);
 
+    /// <summary>Marca los gastos y gastos recurrentes de <paramref name="origen"/> para pasarlos a <paramref name="destino"/> con <see cref="GuardarAsync"/>.</summary>
+    Task ReasignarGastosAsync(Guid origen, Guid destino, CancellationToken ct);
+
     /// <summary>Marca una categoría nueva para guardarla con <see cref="GuardarAsync"/>.</summary>
     void Anadir(Categoria categoria);
 

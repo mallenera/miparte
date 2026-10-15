@@ -61,6 +61,19 @@
         {
             <button class="linkbtn" type="button" @onclick="() => OnCancelar.InvokeAsync()">Cancelar</button>
         }
+        else if (_moviendo)
+        {
+            <span class="muted">Está en uso. ¿A qué perfil movemos sus categorías y gastos?</span>
+            <select aria-label="Perfil de destino" @bind="_destino">
+                <option value="">Elige un perfil</option>
+                @foreach (var d in Destinos)
+                {
+                    <option value="@d.Id">@d.Nombre</option>
+                }
+            </select>
+            <button class="linkbtn danger" type="button" id="mover-perfil" disabled="@string.IsNullOrEmpty(_destino)" @onclick="MoverYEliminarAsync">Mover y eliminar</button>
+            <button class="linkbtn" type="button" @onclick="() => _moviendo = false">Cancelar</button>
+        }
         else if (_confirmando)
         {
             <span class="muted">¿Eliminar el perfil?</span>
@@ -81,6 +94,9 @@
     /// <summary>Miembros activos del hogar; solo los adultos reciben valor.</summary>
     [Parameter] public List<MiembroDto> Miembros { get; set; } = [];
 
+    /// <summary>Perfiles del hogar; de ellos salen los destinos al borrar un perfil que está en uso.</summary>
+    [Parameter] public List<PerfilRepartoDto> Todos { get; set; } = [];
+
     /// <summary>Se invoca con el mensaje de confirmación tras guardar.</summary>
     [Parameter] public EventCallback<string> OnGuardado { get; set; }
 
@@ -93,7 +109,12 @@
     private EdicionPerfil _edicion = new([]);
     private List<MiembroDto> _adultos = [];
     private string? _error;
-    private bool _enviando, _confirmando;
+    private bool _enviando, _confirmando, _moviendo;
+    private string _destino = "";
+
+    /// <summary>Otros perfiles que pueden recibir lo del que se borra: la cuenta común solo puede pasar a otra cuenta común, y al revés.</summary>
+    private IEnumerable<PerfilRepartoDto> Destinos => Todos.Where(p =>
+        p.Id != Perfil?.Id && (p.Modo == ModosReparto.CuentaComun) == (Perfil?.Modo == ModosReparto.CuentaComun));
 
     protected override void OnInitialized()
     {
@@ -147,10 +168,31 @@
             await Api.EliminarPerfilAsync(Perfil.Id);
             await OnEliminado.InvokeAsync("Perfil eliminado");
         }
+        catch (ApiException e) when (e.EnUso)
+        {
+            _confirmando = false;
+            _destino = "";
+            _moviendo = true;
+        }
         catch (ApiException e)
         {
             _error = e.Message;
             _confirmando = false;
+        }
+    }
+
+    private async Task MoverYEliminarAsync()
+    {
+        if (Perfil is null || !Guid.TryParse(_destino, out var destino)) return;
+        _error = null;
+        try
+        {
+            await Api.EliminarPerfilAsync(Perfil.Id, destino);
+            await OnEliminado.InvokeAsync("Perfil eliminado; su uso se ha movido al perfil elegido");
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
         }
     }
 }

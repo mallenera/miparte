@@ -23,6 +23,9 @@ public interface IRepositorioPerfiles
     /// <summary>Si alguna categoría, gasto o gasto recurrente usa el perfil.</summary>
     Task<bool> EnUsoAsync(Guid id, CancellationToken ct);
 
+    /// <summary>Marca las categorías, gastos y gastos recurrentes de <paramref name="origen"/> para pasarlos a <paramref name="destino"/> con <see cref="GuardarAsync"/>.</summary>
+    Task ReasignarUsoAsync(Guid origen, Guid destino, CancellationToken ct);
+
     /// <summary>Marca un perfil nuevo para guardarlo con <see cref="GuardarAsync"/>.</summary>
     void Anadir(PerfilReparto perfil);
 

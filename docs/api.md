@@ -97,7 +97,7 @@ Permisos: "miembro" = cualquier miembro activo del hogar (incluye admin). "admin
 | `GET /api/categorias` | Lista (por nombre) | - | `CategoriaDto[]` 200 | - | miembro |
 | `POST /api/categorias` | Crea (subcategorías vía `categoriaPadreId`). `aCargoCuentaComun` (opcional, false) marca que sus gastos van por defecto a cargo de la cuenta común: exige que el perfil sea el de cuenta común (si no se envía perfil, se asigna el de cuenta común del hogar). Un perfil por defecto de cuenta común implica el indicador (elegir solo ese perfil guarda la marca sin exigir la cuenta activada; pedir `aCargoCuentaComun` explícitamente sí la exige) | `GuardarCategoriaRequest` | `CategoriaDto` 201 | 400 nombre vacío/> 100, perfil o padre inexistente, `aCargoCuentaComun` con otro perfil o sin perfil de cuenta común en el hogar; 409 nombre duplicado en ese nivel o `aCargoCuentaComun` con la cuenta común sin activar | permiso `categorias.gestionar` |
 | `PUT /api/categorias/{id}` | Reemplaza todos los campos (también `aCargoCuentaComun`: omitirlo lo deja en false, salvo que el perfil sea de cuenta común) | `GuardarCategoriaRequest` | `CategoriaDto` 200 | 400 (igual, más padre = ella misma o ciclo), 404, 409 duplicada o cuenta común sin activar al marcar una categoría que no lo estaba | permiso `categorias.gestionar` |
-| `DELETE /api/categorias/{id}` | Elimina | - | 204 | 404; 409 con subcategorías o con gastos/recurrentes asociados | permiso `categorias.gestionar` |
+| `DELETE /api/categorias/{id}?moverA={id}` | Elimina. Si tiene gastos o recurrentes hay que indicar `moverA`: pasan a esa categoría en el mismo guardado | - | 204 | 400 destino inexistente o ella misma; 404; 409 con subcategorías, o con gastos sin `moverA` (el cuerpo lleva `enUso: true`) | permiso `categorias.gestionar` |
 
 ### 3.4 Perfiles de reparto
 
@@ -107,7 +107,7 @@ Permisos: "miembro" = cualquier miembro activo del hogar (incluye admin). "admin
 | `GET /api/perfiles/{id}` | Uno | - | `PerfilRepartoDto` 200 | 404 | miembro |
 | `POST /api/perfiles` | Crea | `GuardarPerfilRequest` | `PerfilRepartoDto` 201 | 400 (ver reglas), 409 nombre duplicado | permiso `perfiles.gestionar` |
 | `PUT /api/perfiles/{id}` | Reemplaza nombre, modo y detalle | `GuardarPerfilRequest` | `PerfilRepartoDto` 200 | 400, 404, 409 | permiso `perfiles.gestionar` |
-| `DELETE /api/perfiles/{id}` | Elimina | - | 204 | 404; 409 en uso por categorías, gastos o recurrentes | permiso `perfiles.gestionar` |
+| `DELETE /api/perfiles/{id}?moverA={id}` | Elimina. Si está en uso hay que indicar `moverA`: sus categorías, gastos y recurrentes pasan a ese perfil (debe ser de cuenta común si el borrado lo es, y no serlo si no) | - | 204 | 400 destino inexistente, el mismo o de otra naturaleza; 404; 409 en uso sin `moverA` (el cuerpo lleva `enUso: true`) | permiso `perfiles.gestionar` |
 
 Validación de perfiles (400): nombre obligatorio (≤ 100); `modo` en `porcentaje|partes|cuenta_comun|individual`; `cuenta_comun` e `individual` no llevan detalle; `porcentaje` y `partes` exigen detalle sin miembros repetidos, solo adultos activos (los miembros a cargo no reparten), valores ≥ 0; `porcentaje` debe sumar 100 (tolerancia 0,0001); `partes` necesita alguna parte > 0.
 

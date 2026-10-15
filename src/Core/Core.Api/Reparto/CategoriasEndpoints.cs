@@ -51,10 +51,15 @@ public static class CategoriasEndpoints
         return r.Error is { } error ? ApiComun.Respuesta(error) : Results.Ok(r.Valor!.ADto());
     }
 
-    /// <summary>DELETE /api/categorias/{id}: elimina la categoría. 404 si no existe; 409 si tiene subcategorías, gastos o gastos recurrentes asociados; 204 si se elimina.</summary>
-    private static async Task<IResult> EliminarAsync(Guid id, [FromServices] ServicioCategorias servicio, CancellationToken ct)
+    /// <summary>
+    /// DELETE /api/categorias/{id}?moverA={id}: elimina la categoría, pasando antes sus gastos y gastos recurrentes a <c>moverA</c>.
+    /// 404 si no existe; 409 si tiene subcategorías, o gastos y no se indica <c>moverA</c> (con <c>enUso: true</c>); 400 si el
+    /// destino no es válido; 204 si se elimina.
+    /// </summary>
+    private static async Task<IResult> EliminarAsync(
+        Guid id, [FromQuery] Guid? moverA, [FromServices] ServicioCategorias servicio, CancellationToken ct)
     {
-        var r = await servicio.EliminarAsync(id, ct);
+        var r = await servicio.EliminarAsync(id, moverA, ct);
         return r.Error is { } error ? ApiComun.Respuesta(error) : Results.NoContent();
     }
 }

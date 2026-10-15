@@ -131,6 +131,21 @@ public class ServidorDemoTests
         await Assert.ThrowsAsync<ApiException>(() => api.ActualizarMiembroAsync(yo.Id, new ActualizarMiembroRequest(Rol: "miembro")));
     }
 
+    [Fact]
+    public async Task Un_perfil_en_uso_se_borra_moviendo_su_uso_a_otro_perfil()
+    {
+        var api = Cliente();
+        var perfiles = await api.ListarPerfilesAsync();
+        var origen = perfiles.First(p => p.Modo == "partes");
+        var destino = perfiles.First(p => p.Modo != "cuenta_comun" && p.Id != origen.Id);
+
+        var enUso = await Assert.ThrowsAsync<ApiException>(() => api.EliminarPerfilAsync(origen.Id));
+        Assert.True(enUso.EnUso);
+
+        await api.EliminarPerfilAsync(origen.Id, destino.Id);
+        Assert.DoesNotContain(await api.ListarPerfilesAsync(), p => p.Id == origen.Id);
+    }
+
     [Theory]
     [InlineData("demo", "demo@miparte.example")]
     [InlineData(" DEMO ", "demo@miparte.example")]

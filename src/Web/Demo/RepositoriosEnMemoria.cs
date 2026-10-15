@@ -361,6 +361,14 @@ internal sealed class RepositorioPerfilesEnMemoria(AlmacenDemo a) : IRepositorio
         => Task.FromResult(a.Categorias.Any(c => c.PerfilRepartoId == id) || a.Gastos.Any(g => g.PerfilRepartoId == id)
             || a.Recurrentes.Any(r => r.PerfilRepartoId == id));
 
+    public Task ReasignarUsoAsync(Guid origen, Guid destino, CancellationToken ct)
+    {
+        foreach (var c in a.Categorias.Where(c => c.PerfilRepartoId == origen)) c.PerfilRepartoId = destino;
+        foreach (var g in a.Gastos.Where(g => g.PerfilRepartoId == origen)) g.PerfilRepartoId = destino;
+        foreach (var r in a.Recurrentes.Where(r => r.PerfilRepartoId == origen)) r.PerfilRepartoId = destino;
+        return Task.CompletedTask;
+    }
+
     public void Anadir(PerfilReparto perfil) => _porAnadir.Add(perfil);
 
     public void ReemplazarDetalle(PerfilReparto perfil, IReadOnlyList<PerfilRepartoDetalle> nuevo)
@@ -410,6 +418,13 @@ internal sealed class RepositorioCategoriasEnMemoria(AlmacenDemo a) : IRepositor
 
     public Task<bool> TieneGastosAsync(Guid id, CancellationToken ct)
         => Task.FromResult(a.Gastos.Any(g => g.CategoriaId == id) || a.Recurrentes.Any(r => r.CategoriaId == id));
+
+    public Task ReasignarGastosAsync(Guid origen, Guid destino, CancellationToken ct)
+    {
+        foreach (var g in a.Gastos.Where(g => g.CategoriaId == origen)) g.CategoriaId = destino;
+        foreach (var r in a.Recurrentes.Where(r => r.CategoriaId == origen)) r.CategoriaId = destino;
+        return Task.CompletedTask;
+    }
 
     public void Anadir(Categoria categoria) => _porAnadir.Add(categoria);
 

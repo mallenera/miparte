@@ -84,7 +84,7 @@ Una regla nueva se prueba primero en su capa (dominio o servicio); los tests HTT
 |---|---|
 | Liquidación, gastos, cuenta común y ahorro, miembros, recurrentes, categorías, perfiles, cierres | **Migradas** a servicio + puerto. |
 | Hogares (crear con semilla, eliminar, `/api/yo`) y auditoría (lectura) | **Migradas**: ningún endpoint de `Core.Api` usa `DbContext`. |
-| Front (`src/Web`) | **Hecho en las pestañas principales**: lógica de presentación extraída, un modelo de pantalla por pestaña (Gastos, Recurrentes, Cuenta común, Resumen, Dashboard y Configuración del hogar) y modo demo sobre los casos de uso reales (ver sección Front). Pendiente: el editor de perfiles y las pantallas de acceso. |
+| Front (`src/Web`) | **Hecho en las pestañas principales**: lógica de presentación extraída, un modelo de pantalla por pestaña (Gastos, Recurrentes, Cuenta común, Resumen, Dashboard y Configuración del hogar) y modo demo sobre los casos de uso reales (ver sección Front). Sin modelo propio por decisión: `EditorPerfil` ya delega su lógica en `EdicionPerfil` y las pantallas de acceso en `ServicioSesion`. |
 
 ## Front
 
@@ -122,6 +122,4 @@ un front que solo dependa de `Contracts`, la demo tendría que volver a ser un s
 
 ### Pendiente en el front
 
-- Aplicar el patrón a lo que queda: `PanelPerfiles`/`EditorPerfil` y las pantallas de
-  acceso (login, registro, unirse).
 - `CatalogoPermisos` sigue en `Core.Domain` y el front lo usa directamente (claves de permiso y etiquetas).

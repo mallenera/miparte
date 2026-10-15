@@ -78,6 +78,11 @@ public record LiquidacionResponse(
     string Mes, IReadOnlyList<SaldoMiembroDto> Saldos, IReadOnlyList<TransferenciaDto> Transferencias,
     IReadOnlyList<PagoLiquidacionDto> Pagos);
 
+/// <summary>GET /api/resumen-liquidacion?mes=YYYY-MM: el resumen y la liquidación del mes juntos (lo que pinta la pestaña Resumen).</summary>
+/// <param name="Resumen">Lo mismo que devuelve <c>GET /api/resumen</c>.</param>
+/// <param name="Liquidacion">Lo mismo que devuelve <c>GET /api/liquidacion</c>.</param>
+public record ResumenYLiquidacionResponse(ResumenMensualResponse Resumen, LiquidacionResponse Liquidacion);
+
 /// <summary>Mes debe ser el día 1. Fecha por defecto: hoy (UTC).</summary>
 /// <param name="Mes">Mes que se salda, como fecha del día 1.</param>
 /// <param name="DeMiembroId">Miembro que paga.</param>

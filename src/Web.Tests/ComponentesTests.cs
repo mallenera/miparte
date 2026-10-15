@@ -15,10 +15,12 @@ public class ComponentesTests : BunitContext
 
     private ServicioPermisos _permisos = null!;
 
-    private void Registrar(ApiFalsa api)
+    private void Registrar(ApiFalsa api, HogarResumen? hogarActual = null)
     {
         var cliente = new CoreApiClient(new HttpClient(api) { BaseAddress = new Uri("http://localhost:5001/") });
         var hogar = new EstadoHogar(new AlmacenMemoria());
+        // La pestaña Gastos sabe si la cuenta común está activa por el hogar ya cargado, no por /api/cuenta-comun.
+        if (hogarActual is not null) hogar.AplicarAsync(new YoResponse(null, [hogarActual], hogarActual)).GetAwaiter().GetResult();
         Services.AddSingleton(cliente);
         Services.AddSingleton(hogar);
         _permisos = PermisosDePrueba.Registrar(Services, cliente, hogar);
@@ -300,7 +302,7 @@ public class ComponentesTests : BunitContext
             .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, Cuenta(0m))
             .Responde("POST /api/gastos", HttpStatusCode.Created,
                 new GastoResponse(Guid.NewGuid(), DateOnly.FromDateTime(DateTime.Today), 12.5m, cat.Id, ana.Id, perfil.Id, null, null, []));
-        Registrar(api);
+        Registrar(api, new HogarResumen(Casa.Id, "Casa", true, false));
         var c = Render<VistaGastos>();
 
         c.Find("form.addcat input[inputmode=decimal]").Input("12,50");
@@ -492,7 +494,7 @@ public class ComponentesTests : BunitContext
                 new CuentaComunResponse("2026-10", 0m, 0m, 0m, 0m, [], 0m, [], [], 0m, 300m, 0m, 300m, [], 300m, []))
             .Responde("POST /api/gastos", HttpStatusCode.Created,
                 new GastoResponse(Guid.NewGuid(), DateOnly.FromDateTime(DateTime.Today), 80m, cat.Id, null, perfil.Id, null, null, [], true, true));
-        Registrar(api);
+        Registrar(api, new HogarResumen(Casa.Id, "Casa", true, true));
         var c = Render<VistaGastos>();
 
         // Solo hay ahorro (sin aportaciones): aun así se ofrece pagar desde él.
@@ -560,8 +562,7 @@ public class ComponentesTests : BunitContext
         new ApiFalsa()
             .Responde("GET /api/miembros", HttpStatusCode.OK,
                 new[] { ApiFalsa.Miembro("Ana", esYo: true, id: AnaId), ApiFalsa.Miembro("Luis", id: LuisId) })
-            .Responde("GET /api/resumen", HttpStatusCode.OK, resumen)
-            .Responde("GET /api/liquidacion", HttpStatusCode.OK, liquidacion);
+            .Responde("GET /api/resumen-liquidacion", HttpStatusCode.OK, new ResumenYLiquidacionResponse(resumen, liquidacion));
 
     private static LiquidacionResponse Liquidacion(decimal deuda, params PagoLiquidacionDto[] pagos) =>
         new("2026-10",
@@ -946,7 +947,7 @@ public class ComponentesTests : BunitContext
             .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, Cuenta(0m))
             .Responde("POST /api/gastos", HttpStatusCode.Created,
                 new GastoResponse(Guid.NewGuid(), DateOnly.FromDateTime(DateTime.Today), 40m, comunidad.Id, ana.Id, cuenta.Id, null, null, [], true));
-        Registrar(api);
+        Registrar(api, new HogarResumen(Casa.Id, "Casa", true, false));
         var c = Render<VistaGastos>();
         Assert.DoesNotContain("va por defecto a cargo de la cuenta común", c.Markup); // la primera categoría (Comida) no lo está
 

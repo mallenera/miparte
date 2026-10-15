@@ -147,38 +147,28 @@ public static class CuentaComunEndpoints
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
         if (!ApiComun.TryMes(mes, out var inicio)) return ApiComun.MesInvalido();
-        var fin = inicio.AddMonths(1);
 
-        var aportaciones = await db.AportacionesCuenta.OrderBy(a => a.MiembroId).ThenBy(a => a.Desde).ToListAsync(ct);
-        var reembolsos = await db.ReembolsosCuenta.OrderBy(r => r.Fecha).ThenBy(r => r.Id).ToListAsync(ct);
-        var retiradas = await db.RetiradasAhorro.OrderBy(r => r.Fecha).ThenBy(r => r.Id).ToListAsync(ct);
-        var depositos = await db.DepositosAhorro.OrderBy(d => d.Fecha).ThenBy(d => d.Id).ToListAsync(ct);
-        var nombres = await db.Miembros.ToDictionaryAsync(m => m.Id, m => m.Nombre, ct);
-        var activa = await db.Hogares.AnyAsync(h => h.CuentaComunActiva, ct);
-        var ahorroActivo = await db.Hogares.AnyAsync(h => h.AhorroActivo, ct);
+        // Todo lo que necesita el cálculo en una sola consulta y ya agrupado: el histórico no se trae fila a fila.
+        var h = await HistoricoCuentaComun.LeerAsync(db, inicio, detalleDelMes: true, ct);
+        var nombres = h.Nombres;
+        var vigentes = h.Vigentes;
 
-        var depositosAhorro = depositos.Select(d => new DepositoDeAhorro(d.Fecha, d.Importe, d.MiembroId)).ToList();
-        var vigentes = Vigentes(aportaciones);
-
-        var e = CuentaComun.Calcular(
-            inicio, vigentes,
-            await GastosDeCuenta(db, ct), reembolsos.Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe)),
-            retiradas.Select(r => new RetiradaDeAhorro(r.Fecha, r.Importe)), depositosAhorro);
-        var partes = CuentaComun.PartesPorPersona(inicio, vigentes, e, depositosAhorro);
+        var e = CuentaComun.Calcular(inicio, vigentes, h.Gastos, h.Reembolsos, h.Retiradas, h.Depositos);
+        var partes = CuentaComun.PartesPorPersona(inicio, vigentes, e, h.Depositos);
 
         return Results.Ok(new CuentaComunResponse(
             ApiComun.FormatoMes(inicio), e.AportadoMes, e.Aportado, e.Gastado, e.Saldo,
             e.Pendientes.Select(p => new PendienteCuentaDto(p.MiembroId, nombres.GetValueOrDefault(p.MiembroId, ""), p.Importe)).ToList(),
-            e.Efectivo, aportaciones.Select(ADto).ToList(),
-            reembolsos.Where(r => r.Fecha >= inicio && r.Fecha < fin).Select(ADto).ToList(),
+            e.Efectivo, h.Aportaciones.Select(a => new AportacionCuentaDto(a.Id, a.MiembroId, a.Fecha, a.Importe, a.Ahorro)).ToList(),
+            h.ReembolsosDelMes,
             e.AhorroMes, e.AhorroAcumulado, e.AhorroRetirado, e.AhorroDisponible,
-            retiradas.Where(r => r.Fecha >= inicio && r.Fecha < fin).Select(ADto).ToList(),
-            e.AhorroDepositado, depositos.Where(d => d.Fecha >= inicio && d.Fecha < fin).Select(ADto).ToList(),
-            e.AhorroGastado, activa,
+            h.RetiradasDelMes,
+            e.AhorroDepositado, h.DepositosDelMes,
+            e.AhorroGastado, h.CuentaActiva,
             partes.Select(p => new PartePersonaDto(
                 p.MiembroId, nombres.GetValueOrDefault(p.MiembroId, ""), p.Aportado, p.Ahorrado, p.PorcentajeGastos, p.PorcentajeAhorro,
                 p.ParteSaldo, p.ParteAhorro, p.Pendiente)).ToList(),
-            ahorroActivo));
+            h.AhorroActivo));
     }
 
     /// <summary>PUT /api/cuenta-comun/aportaciones: fija la aportación de un adulto desde un mes, con la parte que va a ahorro (si ya había una de ese mes, la sustituye). 400 si el mes no es día 1, el importe o el ahorro son inválidos (el ahorro no puede superar el importe) o el miembro no es adulto activo; 409 sin hogar o si la rebaja del ahorro dejaría sin respaldo lo ya retirado o gastado desde el ahorro (<c>{ error, falta }</c>).</summary>

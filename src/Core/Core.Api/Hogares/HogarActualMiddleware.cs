@@ -14,6 +14,9 @@ public class HogarActualMiddleware(RequestDelegate next)
     /// <summary>Nombre de la cabecera HTTP con la que el cliente elige hogar cuando pertenece a varios.</summary>
     public const string Cabecera = "X-Hogar-Id";
 
+    /// <summary>Clave de <c>HttpContext.Items</c> con el miembro (<c>Miembro</c>, solo lectura) del usuario en el hogar de la petición, o null si no hay.</summary>
+    public const string ClaveMiembro = "miparte.miembro-actual";
+
     /// <summary>
     /// Fija <see cref="HogarActual"/> para la petición autenticada y continúa el pipeline. Responde 400 si la
     /// cabecera no es un GUID, 403 si el hogar no es del usuario y 409 si tiene varios hogares y no la envía.
@@ -37,12 +40,14 @@ public class HogarActualMiddleware(RequestDelegate next)
             var hogarActual = ctx.RequestServices.GetRequiredService<HogarActual>();
             var db = ctx.RequestServices.GetRequiredService<MiParteDbContext>();
 
-            var hogares = await db.Miembros
-                .IgnoreQueryFilters() // aquí aún no hay hogar: es justo lo que se resuelve
-                .Where(m => m.UserId == userId && m.Activo)
-                .Select(m => m.HogarId)
-                .Distinct()
-                .ToListAsync(ctx.RequestAborted);
+            // Un miembro por hogar (hay un único índice user_id + hogar_id). Con la caché no hace falta consultar en cada petición,
+            // y las escrituras con permisos reutilizan la fila (ClaveMiembro) en vez de volver a leerla.
+            var cache = ctx.RequestServices.GetService<CacheAcceso>();
+            var miembros = cache is not null
+                ? await cache.MiembrosActivosAsync(userId, db, ctx.RequestAborted)
+                : await db.Miembros.IgnoreQueryFilters().AsNoTracking()
+                    .Where(m => m.UserId == userId && m.Activo).ToListAsync(ctx.RequestAborted);
+            var hogares = miembros.Select(m => m.HogarId).Distinct().ToList();
 
             if (ctx.Request.Headers.TryGetValue(Cabecera, out var valor))
             {
@@ -67,9 +72,37 @@ public class HogarActualMiddleware(RequestDelegate next)
                 await Responder(ctx, StatusCodes.Status409Conflict, $"Perteneces a varios hogares: indica {Cabecera}.");
                 return;
             }
+
+            if (hogarActual.HogarId is { } hogarElegido)
+                ctx.Items[ClaveMiembro] = miembros.FirstOrDefault(m => m.HogarId == hogarElegido);
         }
 
-        await next(ctx);
+        try
+        {
+            await next(ctx);
+        }
+        finally
+        {
+            InvalidarSiCambiaAcceso(ctx);
+        }
+    }
+
+    /// <summary>
+    /// Tras una escritura sobre miembros, invitaciones u hogares se olvida lo cacheado, aunque la petición haya fallado a medias:
+    /// así un permiso retirado, una desactivación o un hogar nuevo se ven en la petición siguiente.
+    /// </summary>
+    private static void InvalidarSiCambiaAcceso(HttpContext ctx)
+    {
+        if (HttpMethods.IsGet(ctx.Request.Method) || HttpMethods.IsHead(ctx.Request.Method) || HttpMethods.IsOptions(ctx.Request.Method)) return;
+        var ruta = ctx.Request.Path;
+        if (!ruta.StartsWithSegments("/api/miembros") && !ruta.StartsWithSegments("/api/invitaciones") && !ruta.StartsWithSegments("/api/hogares")
+            && !ruta.StartsWithSegments("/api/hogar"))
+            return;
+
+        var cache = ctx.RequestServices.GetService<CacheAcceso>();
+        if (cache is null) return;
+        if (Guid.TryParse(ctx.User.FindFirst("sub")?.Value, out var usuario)) cache.InvalidarUsuario(usuario);
+        if (ctx.RequestServices.GetService<HogarActual>()?.HogarId is { } hogar) cache.InvalidarHogar(hogar);
     }
 
     /// <summary>Escribe una respuesta JSON de error { error } con el código HTTP indicado.</summary>

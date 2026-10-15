@@ -8,11 +8,20 @@ namespace MiParte.Web.Api;
 /// <summary>Cliente tipado de Core.Api. Cubre usuario, hogares, miembros, invitaciones, categorías, perfiles, gastos, gastos recurrentes, cuenta común, resumen, liquidación y auditoría; el resto se añadirá con cada pantalla.</summary>
 public sealed class CoreApiClient
 {
+    /// <summary>Rutas cuyas lecturas se guardan en <see cref="CacheLecturas"/>.</summary>
+    private static readonly string[] RutasEnCache = ["api/miembros", "api/categorias", "api/perfiles", "api/cierres-mes"];
+
     private readonly HttpClient _http;
+    private readonly CacheLecturas? _cache;
 
     /// <summary>Crea el cliente.</summary>
     /// <param name="http">Cliente HTTP con la URL base de Core.Api y el <see cref="ManejadorCoreApi"/>.</param>
-    public CoreApiClient(HttpClient http) => _http = http;
+    /// <param name="cache">Caché de lecturas compartida por toda la aplicación; sin ella cada lectura va a la API.</param>
+    public CoreApiClient(HttpClient http, CacheLecturas? cache = null)
+    {
+        _http = http;
+        _cache = cache;
+    }
 
     /// <summary>Usuario autenticado, sus hogares y el hogar actual (<c>GET /api/yo</c>).</summary>
     /// <param name="ct">Token de cancelación.</param>
@@ -34,7 +43,7 @@ public sealed class CoreApiClient
     /// <param name="incluirInactivos">Incluye también a los desactivados (<c>?incluirInactivos=true</c>), para poner nombre a quien aparece en el historial.</param>
     /// <param name="ct">Token de cancelación.</param>
     public Task<List<MiembroDto>> ListarMiembrosAsync(bool incluirInactivos = false, CancellationToken ct = default) =>
-        ObtenerAsync<List<MiembroDto>>(incluirInactivos ? "api/miembros?incluirInactivos=true" : "api/miembros", ct);
+        ObtenerListaAsync<MiembroDto>(incluirInactivos ? "api/miembros?incluirInactivos=true" : "api/miembros", ct);
 
     /// <summary>Añade una persona sin cuenta (<c>POST /api/miembros</c>, solo admin).</summary>
     /// <param name="peticion">Nombre, tipo y responsable (si es a cargo).</param>
@@ -58,7 +67,7 @@ public sealed class CoreApiClient
     /// <summary>Categorías del hogar actual (<c>GET /api/categorias</c>).</summary>
     /// <param name="ct">Token de cancelación.</param>
     public Task<List<CategoriaDto>> ListarCategoriasAsync(CancellationToken ct = default) =>
-        ObtenerAsync<List<CategoriaDto>>("api/categorias", ct);
+        ObtenerListaAsync<CategoriaDto>("api/categorias", ct);
 
     /// <summary>Crea una categoría (<c>POST /api/categorias</c>).</summary>
     /// <param name="peticion">Nombre, categoría padre y perfil por defecto.</param>
@@ -82,7 +91,7 @@ public sealed class CoreApiClient
     /// <summary>Perfiles de reparto con su detalle (<c>GET /api/perfiles</c>).</summary>
     /// <param name="ct">Token de cancelación.</param>
     public Task<List<PerfilRepartoDto>> ListarPerfilesAsync(CancellationToken ct = default) =>
-        ObtenerAsync<List<PerfilRepartoDto>>("api/perfiles", ct);
+        ObtenerListaAsync<PerfilRepartoDto>("api/perfiles", ct);
 
     /// <summary>Crea un perfil de reparto (<c>POST /api/perfiles</c>).</summary>
     /// <param name="peticion">Nombre, modo y detalle.</param>
@@ -103,26 +112,25 @@ public sealed class CoreApiClient
     public Task EliminarPerfilAsync(Guid id, CancellationToken ct = default) =>
         EnviarSinRespuestaAsync(HttpMethod.Delete, $"api/perfiles/{id}", ct);
 
-    /// <summary>Gastos del hogar con su reparto (<c>GET /api/gastos</c>).</summary>
-    /// <param name="mes">Mes en formato <c>YYYY-MM</c>, o null para todos.</param>
+    /// <summary>Gastos de un mes del hogar con su reparto (<c>GET /api/gastos</c>); la API exige acotar por mes o por fechas.</summary>
+    /// <param name="mes">Mes en formato <c>YYYY-MM</c>.</param>
     /// <param name="ct">Token de cancelación.</param>
-    public Task<List<GastoResponse>> ListarGastosAsync(string? mes = null, CancellationToken ct = default) =>
+    public Task<List<GastoResponse>> ListarGastosAsync(string mes, CancellationToken ct = default) =>
         ListarGastosAsync(mes, null, null, null, ct);
 
-    /// <summary>Gastos del hogar filtrados (<c>GET /api/gastos</c>); los filtros nulos o vacíos no se envían.</summary>
-    /// <param name="mes">Mes en formato <c>YYYY-MM</c>, o null para todos.</param>
+    /// <summary>Gastos de un mes filtrados (<c>GET /api/gastos</c>); los filtros nulos o vacíos no se envían.</summary>
+    /// <param name="mes">Mes en formato <c>YYYY-MM</c>.</param>
     /// <param name="categoriaId">Solo gastos de esta categoría.</param>
     /// <param name="miembroId">Solo gastos que paga o en cuyo reparto asume algo este miembro.</param>
     /// <param name="buscar">Texto que debe contener el concepto.</param>
     /// <param name="ct">Token de cancelación.</param>
-    public Task<List<GastoResponse>> ListarGastosAsync(string? mes, Guid? categoriaId, Guid? miembroId, string? buscar, CancellationToken ct = default)
+    public Task<List<GastoResponse>> ListarGastosAsync(string mes, Guid? categoriaId, Guid? miembroId, string? buscar, CancellationToken ct = default)
     {
-        var filtros = new List<string>();
-        if (mes is not null) filtros.Add($"mes={Uri.EscapeDataString(mes)}");
+        var filtros = new List<string> { $"mes={Uri.EscapeDataString(mes)}" };
         if (categoriaId is { } c) filtros.Add($"categoriaId={c}");
         if (miembroId is { } m) filtros.Add($"miembroId={m}");
         if (!string.IsNullOrWhiteSpace(buscar)) filtros.Add($"buscar={Uri.EscapeDataString(buscar.Trim())}");
-        return ObtenerAsync<List<GastoResponse>>(filtros.Count == 0 ? "api/gastos" : "api/gastos?" + string.Join('&', filtros), ct);
+        return ObtenerAsync<List<GastoResponse>>("api/gastos?" + string.Join('&', filtros), ct);
     }
 
     /// <summary>Gastos del hogar con fecha entre dos días, ambos incluidos (<c>GET /api/gastos?desde=&amp;hasta=</c>).</summary>
@@ -292,6 +300,15 @@ public sealed class CoreApiClient
     public Task<LiquidacionResponse> ObtenerLiquidacionAsync(string mes, CancellationToken ct = default) =>
         ObtenerAsync<LiquidacionResponse>($"api/liquidacion?mes={Uri.EscapeDataString(mes)}", ct);
 
+    /// <summary>
+    /// Resumen y liquidación del mes en una sola petición (<c>GET /api/resumen-liquidacion</c>): lo que pinta la pestaña Resumen, sin
+    /// leer dos veces los gastos y los miembros del mes.
+    /// </summary>
+    /// <param name="mes">Mes en formato YYYY-MM.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<ResumenYLiquidacionResponse> ObtenerResumenYLiquidacionAsync(string mes, CancellationToken ct = default) =>
+        ObtenerAsync<ResumenYLiquidacionResponse>($"api/resumen-liquidacion?mes={Uri.EscapeDataString(mes)}", ct);
+
     /// <summary>Registra un pago entre dos miembros para saldar un mes (<c>POST /api/pagos-liquidacion</c>).</summary>
     /// <param name="peticion">Mes (día 1), pagador, receptor, importe, fecha y concepto.</param>
     /// <param name="ct">Token de cancelación.</param>
@@ -307,7 +324,7 @@ public sealed class CoreApiClient
     /// <summary>Meses cerrados del hogar (<c>GET /api/cierres-mes</c>).</summary>
     /// <param name="ct">Token de cancelación.</param>
     public Task<List<MesCerradoDto>> ListarCierresMesAsync(CancellationToken ct = default) =>
-        ObtenerAsync<List<MesCerradoDto>>("api/cierres-mes", ct);
+        ObtenerListaAsync<MesCerradoDto>("api/cierres-mes", ct);
 
     /// <summary>Cierra un mes; puede cualquier miembro activo (<c>POST /api/cierres-mes</c>).</summary>
     /// <param name="mes">Mes en formato YYYY-MM.</param>
@@ -323,6 +340,30 @@ public sealed class CoreApiClient
 
     private Task<T> ObtenerAsync<T>(string ruta, CancellationToken ct) => EnviarAsync<T>(HttpMethod.Get, ruta, null, ct);
 
+    /// <summary>Lectura de una lista que casi no cambia: pasa por la caché, que la reutiliza entre pantallas durante <see cref="CacheLecturas.Vigencia"/>.</summary>
+    private Task<List<T>> ObtenerListaAsync<T>(string ruta, CancellationToken ct) =>
+        _cache is null
+            ? ObtenerAsync<List<T>>(ruta, ct)
+            : _cache.ListaAsync(ruta, () => ObtenerAsync<List<T>>(ruta, CancellationToken.None), ct);
+
+    /// <summary>
+    /// Tras cualquier escritura (también si falla: un 409 o un 404 suelen indicar que lo cacheado ya no es cierto) se olvidan las
+    /// listas guardadas que ese cambio puede afectar; sin esto la pantalla siguiente enseñaría la categoría borrada o el miembro nuevo sin él.
+    /// </summary>
+    private void InvalidarTrasEscritura(HttpMethod metodo, string ruta)
+    {
+        if (_cache is null || metodo == HttpMethod.Get) return;
+        // Aceptar una invitación vincula a un miembro; crear o borrar un hogar cambia de contexto por completo.
+        if (ruta.StartsWith("api/invitaciones", StringComparison.Ordinal) || ruta.StartsWith("api/hogar", StringComparison.Ordinal))
+        {
+            _cache.Limpiar();
+            return;
+        }
+
+        var afectadas = RutasEnCache.Where(r => ruta.StartsWith(r, StringComparison.Ordinal)).ToArray();
+        if (afectadas.Length > 0) _cache.Invalidar(afectadas);
+    }
+
     private async Task EnviarSinRespuestaAsync(HttpMethod metodo, string ruta, CancellationToken ct)
     {
         using var peticion = new HttpRequestMessage(metodo, ruta);
@@ -334,6 +375,10 @@ public sealed class CoreApiClient
         catch (HttpRequestException)
         {
             throw new ApiException(HttpStatusCode.ServiceUnavailable, "No se pudo conectar con el servidor. Comprueba tu conexión.");
+        }
+        finally
+        {
+            InvalidarTrasEscritura(metodo, ruta);
         }
 
         using (respuesta)
@@ -355,6 +400,10 @@ public sealed class CoreApiClient
         catch (HttpRequestException)
         {
             throw new ApiException(HttpStatusCode.ServiceUnavailable, "No se pudo conectar con el servidor. Comprueba tu conexión.");
+        }
+        finally
+        {
+            InvalidarTrasEscritura(metodo, ruta);
         }
 
         using (respuesta)

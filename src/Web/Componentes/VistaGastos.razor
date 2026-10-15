@@ -369,7 +369,7 @@ else
             _categorias = categorias.Result;
             _perfiles = perfiles.Result;
             _arbol = ArbolCategorias.Aplanar(_categorias);
-            _cuentaActiva = await CuentaActivaAsync();
+            _cuentaActiva = CuentaActiva();
             await RecargarGastosAsync();
             ReiniciarFormulario();
         }
@@ -381,20 +381,16 @@ else
         _cargando = false;
     }
 
-    /// <summary>La cuenta común se ofrece si el hogar la tiene activada; si la consulta falla se trata como desactivada.</summary>
-    private async Task<bool> CuentaActivaAsync()
+    /// <summary>
+    /// La cuenta común se ofrece si el hogar la tiene activada. Se lee del hogar ya cargado (<c>/api/yo</c>, que se actualiza al
+    /// cambiar las funciones) en lugar de pedir el estado completo de la cuenta, que son ~9 consultas solo para dos booleanos.
+    /// Si otro administrador la activa desde otro dispositivo, la API sigue rechazando lo que no corresponda.
+    /// </summary>
+    private bool CuentaActiva()
     {
-        try
-        {
-            var cuenta = await Api.ObtenerCuentaComunAsync(Formato.Mes(_mes));
-            _ahorroActivo = cuenta.Activa && cuenta.AhorroActivo;
-            return cuenta.Activa;
-        }
-        catch (ApiException)
-        {
-            _ahorroActivo = false;
-            return false;
-        }
+        var hogar = Hogar.HogarActual;
+        _ahorroActivo = hogar is { CuentaComunActiva: true, AhorroActivo: true };
+        return hogar is { CuentaComunActiva: true };
     }
 
     /// <summary>La cuenta común solo paga gastos con su perfil: al elegirla como pagador se selecciona ese perfil.</summary>

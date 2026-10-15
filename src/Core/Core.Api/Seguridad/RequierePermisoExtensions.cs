@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using MiParte.Core.Api.Hogares;
 using MiParte.Core.Domain;
+using MiParte.Core.Domain.Entidades;
 using MiParte.Core.Infrastructure.Persistencia;
 
 namespace MiParte.Core.Api.Seguridad;
@@ -22,8 +24,11 @@ public static class RequierePermisoExtensions
             var hogar = http.RequestServices.GetRequiredService<IHogarActual>();
             if (hogar.HogarId is null || hogar.UsuarioId is not { } usuario) return await siguiente(contexto);
 
-            var db = http.RequestServices.GetRequiredService<MiParteDbContext>();
-            var yo = await db.Miembros.FirstOrDefaultAsync(m => m.UserId == usuario && m.Activo, http.RequestAborted);
+            // HogarActualMiddleware ya resolvió el miembro del usuario en este hogar: no hace falta volver a consultarlo.
+            var yo = http.Items.TryGetValue(HogarActualMiddleware.ClaveMiembro, out var resuelto)
+                ? resuelto as Miembro
+                : await http.RequestServices.GetRequiredService<MiParteDbContext>()
+                    .Miembros.AsNoTracking().FirstOrDefaultAsync(m => m.UserId == usuario && m.Activo, http.RequestAborted);
             if (yo is not null && CatalogoPermisos.Efectivos(yo).Contains(clave)) return await siguiente(contexto);
 
             return Results.Json(

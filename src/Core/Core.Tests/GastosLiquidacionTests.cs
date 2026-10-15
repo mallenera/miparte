@@ -189,6 +189,22 @@ public class GastosLiquidacionTests
     }
 
     [Fact]
+    public async Task Gastos_ExigeMesOAlMenosUnaFecha_ParaNoDevolverTodoElHistorico()
+    {
+        var e = await Montar();
+        foreach (var sinLimite in new[] { "/api/gastos", "/api/gastos?categoriaId=" + e.Categoria, "/api/gastos?buscar=luz", "/api/gastos?desde=&hasta=" })
+        {
+            var r = await e.Cliente.GetAsync(sinLimite);
+            Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
+            Assert.Contains("mes", await r.Content.ReadAsStringAsync());
+        }
+
+        // Basta uno de los tres: el mes, solo «desde» o solo «hasta».
+        foreach (var conLimite in new[] { "/api/gastos?mes=2026-09", "/api/gastos?desde=2026-01-01", "/api/gastos?hasta=2026-12-31" })
+            Assert.Equal(HttpStatusCode.OK, (await e.Cliente.GetAsync(conLimite)).StatusCode);
+    }
+
+    [Fact]
     public async Task Gastos_FiltrosPorMesYCategoria_YBorrado()
     {
         var e = await Montar();
@@ -197,8 +213,8 @@ public class GastosLiquidacionTests
 
         var deSep = await Leer<List<GastoResponse>>(await e.Cliente.GetAsync("/api/gastos?mes=2026-09"));
         Assert.Equal(sep.Id, Assert.Single(deSep).Id);
-        Assert.Empty(await Leer<List<GastoResponse>>(await e.Cliente.GetAsync($"/api/gastos?categoriaId={Guid.NewGuid()}")));
-        Assert.Equal(2, (await Leer<List<GastoResponse>>(await e.Cliente.GetAsync($"/api/gastos?categoriaId={e.Categoria}"))).Count);
+        Assert.Empty(await Leer<List<GastoResponse>>(await e.Cliente.GetAsync($"/api/gastos?desde=2026-01-01&categoriaId={Guid.NewGuid()}")));
+        Assert.Equal(2, (await Leer<List<GastoResponse>>(await e.Cliente.GetAsync($"/api/gastos?desde=2026-01-01&categoriaId={e.Categoria}"))).Count);
 
         Assert.Equal(HttpStatusCode.NoContent, (await e.Cliente.DeleteAsync($"/api/gastos/{sep.Id}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await e.Cliente.GetAsync($"/api/gastos/{sep.Id}")).StatusCode);
@@ -215,12 +231,12 @@ public class GastosLiquidacionTests
         var soloAna = await CrearGasto(e, Gasto(e, 20m, e.PerfilIndividual)); // Ana paga y asume todo
         var pagaBeto = await CrearGasto(e, Gasto(e, 30m, e.Perfil5050, pagador: beto));
 
-        var deBeto = await Leer<List<GastoResponse>>(await e.Cliente.GetAsync($"/api/gastos?miembroId={beto}"));
+        var deBeto = await Leer<List<GastoResponse>>(await e.Cliente.GetAsync($"/api/gastos?desde=2026-01-01&miembroId={beto}"));
         Assert.Equal(new[] { compartido.Id, pagaBeto.Id }.Order(), deBeto.Select(g => g.Id).Order());
-        var deAna = await Leer<List<GastoResponse>>(await e.Cliente.GetAsync($"/api/gastos?miembroId={e.Ana}"));
+        var deAna = await Leer<List<GastoResponse>>(await e.Cliente.GetAsync($"/api/gastos?desde=2026-01-01&miembroId={e.Ana}"));
         Assert.Equal(3, deAna.Count);
         Assert.Contains(deAna, g => g.Id == soloAna.Id);
-        Assert.Empty(await Leer<List<GastoResponse>>(await e.Cliente.GetAsync($"/api/gastos?miembroId={Guid.NewGuid()}")));
+        Assert.Empty(await Leer<List<GastoResponse>>(await e.Cliente.GetAsync($"/api/gastos?desde=2026-01-01&miembroId={Guid.NewGuid()}")));
     }
 
     [Fact]
@@ -231,11 +247,11 @@ public class GastosLiquidacionTests
         await CrearGasto(e, Gasto(e, 20m, e.Perfil5050, "2026-10-02") with { Concepto = "Luz octubre" });
         await CrearGasto(e, Gasto(e, 30m, e.Perfil5050) with { Concepto = "Supermercado" });
 
-        Assert.Equal(2, (await Leer<List<GastoResponse>>(await e.Cliente.GetAsync("/api/gastos?buscar=luz"))).Count);
+        Assert.Equal(2, (await Leer<List<GastoResponse>>(await e.Cliente.GetAsync("/api/gastos?desde=2026-01-01&buscar=luz"))).Count);
         var soloSep = await Leer<List<GastoResponse>>(await e.Cliente.GetAsync("/api/gastos?buscar=luz&mes=2026-09"));
         Assert.Equal(10m, Assert.Single(soloSep).Importe);
-        Assert.Equal(3, (await Leer<List<GastoResponse>>(await e.Cliente.GetAsync("/api/gastos?buscar=%20"))).Count);
-        Assert.Equal(HttpStatusCode.BadRequest, (await e.Cliente.GetAsync("/api/gastos?buscar=" + new string('a', 201))).StatusCode);
+        Assert.Equal(3, (await Leer<List<GastoResponse>>(await e.Cliente.GetAsync("/api/gastos?desde=2026-01-01&buscar=%20"))).Count);
+        Assert.Equal(HttpStatusCode.BadRequest, (await e.Cliente.GetAsync("/api/gastos?desde=2026-01-01&buscar=" + new string('a', 201))).StatusCode);
     }
 
     [Fact]
@@ -261,6 +277,31 @@ public class GastosLiquidacionTests
         Assert.Equal(HttpStatusCode.Created, (await c.PostAsJsonAsync("/api/pagos-liquidacion", new CrearPagoLiquidacionRequest(mes, beto, e.Ana, 17.65m, null, null))).StatusCode);
         Assert.Equal(0m, await Pendiente());
         Assert.Equal(3, (await Leer<LiquidacionResponse>(await c.GetAsync("/api/liquidacion?mes=2026-09"))).Pagos.Count);
+    }
+
+    [Fact]
+    public async Task ResumenLiquidacion_DaLoMismoQueResumenYLiquidacionPorSeparado()
+    {
+        var e = await Montar();
+        var c = e.Cliente;
+        var mes = new DateOnly(2026, 9, 1);
+        await CrearGasto(e, Gasto(e, 100m, e.Perfil5050));
+        await CrearGasto(e, Gasto(e, 33.33m, e.Perfil6040, pagador: e.Beto));
+        await CrearGasto(e, Gasto(e, 80m, e.PerfilCuentaComun)); // a cargo de la cuenta común, adelantado por Ana
+        await CrearGasto(e, Gasto(e, 15m, e.Perfil5050, "2026-08-31")); // otro mes: no entra
+        Assert.Equal(HttpStatusCode.Created, (await c.PostAsJsonAsync("/api/pagos-liquidacion",
+            new CrearPagoLiquidacionRequest(mes, e.Beto!.Value, e.Ana, 12.34m, null, "Parcial"))).StatusCode);
+
+        var resumen = await (await c.GetAsync("/api/resumen?mes=2026-09")).Content.ReadAsStringAsync();
+        var liquidacion = await (await c.GetAsync("/api/liquidacion?mes=2026-09")).Content.ReadAsStringAsync();
+        var juntas = await c.GetAsync("/api/resumen-liquidacion?mes=2026-09");
+
+        Assert.Equal(HttpStatusCode.OK, juntas.StatusCode);
+        using var doc = System.Text.Json.JsonDocument.Parse(await juntas.Content.ReadAsStringAsync());
+        Assert.Equal(resumen, doc.RootElement.GetProperty("resumen").GetRawText());
+        Assert.Equal(liquidacion, doc.RootElement.GetProperty("liquidacion").GetRawText());
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.GetAsync("/api/resumen-liquidacion?mes=2026-9")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await Cliente(e.F, null).GetAsync("/api/resumen-liquidacion?mes=2026-09")).StatusCode);
     }
 
     [Fact]

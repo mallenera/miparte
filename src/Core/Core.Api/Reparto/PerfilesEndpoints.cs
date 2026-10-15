@@ -57,7 +57,7 @@ public static class PerfilesEndpoints
     /// <summary>GET /api/perfiles: devuelve los perfiles del hogar con su detalle, ordenados por nombre.</summary>
     private static async Task<IResult> ListarAsync([FromServices] MiParteDbContext db, CancellationToken ct)
     {
-        var perfiles = await db.PerfilesReparto.Include(p => p.Detalles).OrderBy(p => p.Nombre).ToListAsync(ct);
+        var perfiles = await db.PerfilesReparto.AsNoTracking().Include(p => p.Detalles).OrderBy(p => p.Nombre).ToListAsync(ct);
         return Results.Ok(perfiles.Select(Dto).ToList());
     }
 

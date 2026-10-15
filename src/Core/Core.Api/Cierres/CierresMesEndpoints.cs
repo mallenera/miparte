@@ -29,7 +29,10 @@ public static class CierresMesEndpoints
     private static async Task<(Miembro? Yo, IResult? Error)> ExigirMiembroAsync(HttpContext ctx, MiParteDbContext db, CancellationToken ct)
     {
         if (!Guid.TryParse(ctx.User.FindFirst("sub")?.Value, out var userId)) return (null, Results.Unauthorized());
-        var yo = await db.Miembros.FirstOrDefaultAsync(m => m.UserId == userId && m.Activo, ct);
+        // Solo se lee (id de usuario y nombre): vale el miembro que ya resolvió el middleware.
+        var yo = ctx.Items.TryGetValue(Hogares.HogarActualMiddleware.ClaveMiembro, out var resuelto)
+            ? resuelto as Miembro
+            : await db.Miembros.AsNoTracking().FirstOrDefaultAsync(m => m.UserId == userId && m.Activo, ct);
         return yo is null
             ? (null, Results.Json(new { error = "Solo un miembro activo del hogar puede cerrar un mes." }, statusCode: StatusCodes.Status403Forbidden))
             : (yo, null);
@@ -44,7 +47,7 @@ public static class CierresMesEndpoints
         [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
-        var cierres = await db.MesesCerrados.OrderByDescending(c => c.Mes).ToListAsync(ct);
+        var cierres = await db.MesesCerrados.AsNoTracking().OrderByDescending(c => c.Mes).ToListAsync(ct);
         var autores = await db.Miembros.Where(m => m.UserId != null).ToDictionaryAsync(m => m.UserId!.Value, m => m.Nombre, ct);
         return Results.Ok(cierres.Select(c => ADto(c, autores)).ToList());
     }

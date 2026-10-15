@@ -16,6 +16,7 @@ public static class LiquidacionEndpoints
     {
         app.MapGet("/api/resumen", ResumenAsync).RequireAuthorization();
         app.MapGet("/api/liquidacion", LiquidacionAsync).RequireAuthorization();
+        app.MapGet("/api/resumen-liquidacion", ResumenYLiquidacionAsync).RequireAuthorization();
         app.MapPost("/api/pagos-liquidacion", CrearPagoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.PagosRegistrar);
         app.MapDelete("/api/pagos-liquidacion/{id:guid}", BorrarPagoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.PagosRegistrar);
         return app;
@@ -25,7 +26,7 @@ public static class LiquidacionEndpoints
     private static async Task<List<Gasto>> GastosDelMes(MiParteDbContext db, DateOnly inicio, CancellationToken ct)
     {
         var fin = inicio.AddMonths(1);
-        return await db.Gastos.Include(g => g.Repartos).Where(g => g.Fecha >= inicio && g.Fecha < fin).ToListAsync(ct);
+        return await db.Gastos.AsNoTracking().Include(g => g.Repartos).Where(g => g.Fecha >= inicio && g.Fecha < fin).ToListAsync(ct);
     }
 
     /// <summary>Gastos cargados a la cuenta común, para saber cuánto debe a quien los adelantó.</summary>
@@ -39,20 +40,29 @@ public static class LiquidacionEndpoints
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
         if (!ApiComun.TryMes(mes, out var inicio)) return ApiComun.MesInvalido();
-        var fin = inicio.AddMonths(1);
 
         var delMes = await GastosDelMes(db, inicio, ct);
+        var miembros = await db.Miembros.AsNoTracking().ToListAsync(ct);
+        var categorias = await db.Categorias.ToDictionaryAsync(c => c.Id, c => c.Nombre, ct);
+        // Una sola consulta con el histórico de la cuenta ya agrupado (en vez de cinco tablas completas).
+        var historico = await HistoricoCuentaComun.LeerAsync(db, inicio, detalleDelMes: false, ct);
+
+        return Results.Ok(ConstruirResumen(inicio, delMes, miembros, categorias, historico));
+    }
+
+    /// <summary>
+    /// Arma el resumen del mes con lo ya leído: gastos del mes (con reparto), miembros, nombres de categoría e histórico de la cuenta común.
+    /// No consulta la base de datos, así que <c>/api/resumen</c> y <c>/api/resumen-liquidacion</c> dan exactamente los mismos importes.
+    /// </summary>
+    private static ResumenMensualResponse ConstruirResumen(
+        DateOnly inicio, List<Gasto> delMes, List<Miembro> miembros, Dictionary<Guid, string> categorias, HistoricoCuentaComun historico)
+    {
         var gastos = delMes.Where(g => !g.EsPersonal).ToList(); // los personales van aparte: no entran en pagado, asumido ni totales
         var personales = delMes.Where(g => g.EsPersonal).ToList();
-        var miembros = await db.Miembros.ToListAsync(ct);
-        var categorias = await db.Categorias.ToDictionaryAsync(c => c.Id, c => c.Nombre, ct);
-
         var gastosTotales = gastos.Sum(g => g.Importe);
 
         // Lo que adelantó un miembro para la cuenta común cuenta como pagado, y la cuenta le debe lo aún no reembolsado.
-        var reembolsos = await db.ReembolsosCuenta.ToListAsync(ct);
-        var cuenta = CuentaComun.Calcular(
-            inicio, [], await GastosDeCuenta(db, ct), reembolsos.Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe)));
+        var cuenta = CuentaComun.Calcular(inicio, [], historico.Gastos, historico.Reembolsos);
         // Los acreedores con pendiente de meses anteriores aparecen aunque no participen en los gastos de este mes (p. ej. un miembro ya inactivo).
         var implicados = miembros.Where(m => m.Activo && m.Tipo == TipoMiembro.Adulto).Select(m => m.Id)
             .Concat(gastos.Where(g => g.PagadoPor is not null).Select(g => g.PagadoPor!.Value))
@@ -79,23 +89,18 @@ public static class LiquidacionEndpoints
 
         // Saldos de la cuenta al final del mes, solo si el hogar la ha activado.
         ResumenCuentaComunDto? resumenCuenta = null;
-        if (await db.Hogares.AnyAsync(h => h.CuentaComunActiva, ct))
+        if (historico.CuentaActiva)
         {
-            var aportaciones = await db.AportacionesCuenta.ToListAsync(ct);
-            var retiradas = await db.RetiradasAhorro.Select(r => new RetiradaDeAhorro(r.Fecha, r.Importe)).ToListAsync(ct);
-            var depositos = await db.DepositosAhorro.Select(d => new DepositoDeAhorro(d.Fecha, d.Importe, d.MiembroId)).ToListAsync(ct);
-            var gastosCuenta = await GastosDeCuenta(db, ct);
             var estado = CuentaComun.Calcular(
-                inicio, aportaciones.Select(a => new AportacionVigente(a.MiembroId, a.Desde, a.Importe, a.Ahorro)).ToList(),
-                gastosCuenta, reembolsos.Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe)), retiradas, depositos);
+                inicio, historico.Vigentes, historico.Gastos, historico.Reembolsos, historico.Retiradas, historico.Depositos);
             resumenCuenta = new ResumenCuentaComunDto(
-                estado.AportadoMes, gastosCuenta.Where(g => g.Fecha >= inicio && g.Fecha < fin).Sum(g => g.Importe), estado.Saldo,
+                estado.AportadoMes, historico.GastadoMes, estado.Saldo,
                 estado.Efectivo, estado.Pendientes.Where(p => p.Importe > 0m).Sum(p => p.Importe),
                 estado.AhorroMes, estado.AhorroDisponible);
         }
 
-        return Results.Ok(new ResumenMensualResponse(
-            ApiComun.FormatoMes(inicio), gastosTotales, porMiembro, porCategoria, resumenCuenta, personales.Sum(g => g.Importe)));
+        return new ResumenMensualResponse(
+            ApiComun.FormatoMes(inicio), gastosTotales, porMiembro, porCategoria, resumenCuenta, personales.Sum(g => g.Importe));
     }
 
     /// <summary>Resultado del cálculo de liquidación de un mes: saldos, transferencias propuestas, pagos registrados, nombres de miembros y si el mes tiene gastos.</summary>
@@ -103,14 +108,25 @@ public static class LiquidacionEndpoints
         IReadOnlyList<SaldoMiembro> Saldos, IReadOnlyList<Transferencia> Transferencias,
         List<PagoLiquidacionRegistro> Pagos, Dictionary<Guid, string> Nombres, bool HayGastos);
 
-    /// <summary>Calcula los saldos del mes a partir de gastos y pagos de liquidación registrados, y las transferencias que los saldan.</summary>
+    /// <summary>Lee gastos, pagos y miembros del mes y calcula la liquidación (la usan GET /api/liquidacion y el alta de pagos).</summary>
     private static async Task<Calculo> Calcular(MiParteDbContext db, DateOnly inicio, CancellationToken ct)
+    {
+        var delMes = await GastosDelMes(db, inicio, ct);
+        var pagos = await PagosDelMes(db, inicio, ct);
+        var miembros = await db.Miembros.AsNoTracking().ToListAsync(ct);
+        return Calcular(delMes, pagos, miembros);
+    }
+
+    /// <summary>Pagos de liquidación registrados para el mes que empieza en <paramref name="inicio"/>, por fecha.</summary>
+    private static Task<List<PagoLiquidacionRegistro>> PagosDelMes(MiParteDbContext db, DateOnly inicio, CancellationToken ct)
+        => db.PagosLiquidacion.AsNoTracking().Where(p => p.Mes == inicio).OrderBy(p => p.Fecha).ThenBy(p => p.Id).ToListAsync(ct);
+
+    /// <summary>Calcula los saldos del mes a partir de gastos y pagos de liquidación ya leídos, y las transferencias que los saldan.</summary>
+    private static Calculo Calcular(List<Gasto> delMes, List<PagoLiquidacionRegistro> pagos, List<Miembro> miembros)
     {
         // Lo que asume la cuenta común no entra en la deuda entre personas (y es lo único que puede pagar la cuenta: PagadoPor nulo).
         // Los gastos personales tampoco: los asume íntegros quien los paga.
-        var gastos = (await GastosDelMes(db, inicio, ct)).Where(g => !g.ACargoCuentaComun && !g.EsPersonal).ToList();
-        var pagos = await db.PagosLiquidacion.Where(p => p.Mes == inicio).OrderBy(p => p.Fecha).ThenBy(p => p.Id).ToListAsync(ct);
-        var miembros = await db.Miembros.ToListAsync(ct);
+        var gastos = delMes.Where(g => !g.ACargoCuentaComun && !g.EsPersonal).ToList();
 
         var ids = miembros.Where(m => m.Activo && m.Tipo == TipoMiembro.Adulto).Select(m => m.Id)
             .Concat(gastos.Select(g => g.PagadoPor!.Value)).Concat(gastos.SelectMany(g => g.Repartos).Select(r => r.MiembroId))
@@ -125,6 +141,13 @@ public static class LiquidacionEndpoints
         return new Calculo(saldos, transferencias, pagos, miembros.ToDictionary(m => m.Id, m => m.Nombre), gastos.Count > 0);
     }
 
+    /// <summary>Convierte el cálculo de liquidación en la respuesta de la API.</summary>
+    private static LiquidacionResponse ConstruirLiquidacion(DateOnly inicio, Calculo c) => new(
+        ApiComun.FormatoMes(inicio),
+        c.Saldos.Select(s => new SaldoMiembroDto(s.MiembroId, c.Nombres.GetValueOrDefault(s.MiembroId, ""), s.Importe)).ToList(),
+        c.Transferencias.Select(t => new TransferenciaDto(t.De, t.A, t.Importe)).ToList(),
+        c.Pagos.Select(A).ToList());
+
     /// <summary>GET /api/liquidacion?mes=YYYY-MM: saldos por miembro, transferencias pendientes y pagos registrados del mes. 409 sin hogar; 400 si el mes es inválido.</summary>
     private static async Task<IResult> LiquidacionAsync(
         [FromQuery] string? mes, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
@@ -132,12 +155,29 @@ public static class LiquidacionEndpoints
         if (hogar.HogarId is null) return ApiComun.SinHogar();
         if (!ApiComun.TryMes(mes, out var inicio)) return ApiComun.MesInvalido();
 
-        var c = await Calcular(db, inicio, ct);
-        return Results.Ok(new LiquidacionResponse(
-            ApiComun.FormatoMes(inicio),
-            c.Saldos.Select(s => new SaldoMiembroDto(s.MiembroId, c.Nombres.GetValueOrDefault(s.MiembroId, ""), s.Importe)).ToList(),
-            c.Transferencias.Select(t => new TransferenciaDto(t.De, t.A, t.Importe)).ToList(),
-            c.Pagos.Select(A).ToList()));
+        return Results.Ok(ConstruirLiquidacion(inicio, await Calcular(db, inicio, ct)));
+    }
+
+    /// <summary>
+    /// GET /api/resumen-liquidacion?mes=YYYY-MM: el resumen y la liquidación del mes en una sola respuesta. Es lo que pinta la pestaña
+    /// Resumen: ambas necesitan los gastos del mes y los miembros, que así se leen una vez (cinco consultas en lugar de siete) y en
+    /// una sola petición. Los importes son los mismos que devuelven <c>/api/resumen</c> y <c>/api/liquidacion</c>. 409 sin hogar; 400 si el mes es inválido.
+    /// </summary>
+    private static async Task<IResult> ResumenYLiquidacionAsync(
+        [FromQuery] string? mes, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
+    {
+        if (hogar.HogarId is null) return ApiComun.SinHogar();
+        if (!ApiComun.TryMes(mes, out var inicio)) return ApiComun.MesInvalido();
+
+        var delMes = await GastosDelMes(db, inicio, ct);
+        var miembros = await db.Miembros.AsNoTracking().ToListAsync(ct);
+        var categorias = await db.Categorias.ToDictionaryAsync(c => c.Id, c => c.Nombre, ct);
+        var historico = await HistoricoCuentaComun.LeerAsync(db, inicio, detalleDelMes: false, ct);
+        var pagos = await PagosDelMes(db, inicio, ct);
+
+        return Results.Ok(new ResumenYLiquidacionResponse(
+            ConstruirResumen(inicio, delMes, miembros, categorias, historico),
+            ConstruirLiquidacion(inicio, Calcular(delMes, pagos, miembros))));
     }
 
     /// <summary>Convierte un pago de liquidación en su DTO de respuesta.</summary>

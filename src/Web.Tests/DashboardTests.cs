@@ -372,7 +372,7 @@ public class DashboardTests : BunitContext
     {
         var reloj = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 10, 20, 12, 0, 0, TimeSpan.Zero));
         var api = new CoreApiClient(new HttpClient(new Puente(new ServidorDemo(reloj))) { BaseAddress = new Uri("http://localhost:5001/") });
-        var todos = await api.ListarGastosAsync();
+        var todos = await api.ListarGastosPorRangoAsync(new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31));
         var algunDia = todos.OrderBy(g => g.Fecha).Skip(todos.Count / 2).First().Fecha;
 
         var rango = await api.ListarGastosPorRangoAsync(algunDia, algunDia);

@@ -353,6 +353,9 @@ public sealed partial class ServidorDemo
 
     private HttpResponseMessage ListarGastos(string? mes, string? desde, string? hasta, string? categoriaId, string? miembroId, string? buscar)
     {
+        // Igual que Core.Api: sin mes ni fechas se devolvería todo el histórico.
+        if (mes is null && string.IsNullOrEmpty(desde) && string.IsNullOrEmpty(hasta))
+            return Mal("Indica el mes («mes») o al menos una fecha («desde» o «hasta»).");
         var lista = _gastos.AsEnumerable();
         if (Guid.TryParse(categoriaId, out var cat)) lista = lista.Where(g => g.CategoriaId == cat);
         if (Guid.TryParse(miembroId, out var mie)) lista = lista.Where(g => g.PagadoPor == mie || g.Repartos.Any(r => r.MiembroId == mie && r.ImporteAsumido > 0m));

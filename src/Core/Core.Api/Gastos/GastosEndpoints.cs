@@ -30,13 +30,16 @@ public static class GastosEndpoints
         g.Repartos.OrderBy(r => r.MiembroId).Select(r => new RepartoGastoDto(r.MiembroId, r.ImporteAsumido)).ToList(),
         g.ACargoCuentaComun, g.PagadoDesdeAhorro, g.EsPersonal);
 
-    /// <summary>GET /api/gastos: lista los gastos, filtrables por mes (YYYY-MM), rango de fechas (<c>desde</c> y <c>hasta</c>, YYYY-MM-DD, ambos incluidos), categoría, miembro (quien paga o asume una parte mayor que 0) y texto del concepto, de más reciente a más antiguo. 409 sin hogar; 400 si el mes o una fecha es inválida o <c>desde</c> es posterior a <c>hasta</c>.</summary>
+    /// <summary>GET /api/gastos: lista los gastos, filtrables por mes (YYYY-MM), rango de fechas (<c>desde</c> y <c>hasta</c>, YYYY-MM-DD, ambos incluidos), categoría, miembro (quien paga o asume una parte mayor que 0) y texto del concepto, de más reciente a más antiguo. 409 sin hogar; 400 si no se indica ninguno de <c>mes</c>, <c>desde</c> y <c>hasta</c> (hace falta al menos uno, para no devolver todo el histórico), si el mes o una fecha es inválida o <c>desde</c> es posterior a <c>hasta</c>.</summary>
     private static async Task<IResult> ListarAsync(
         [FromQuery] string? mes, [FromQuery] string? desde, [FromQuery] string? hasta,
         [FromQuery] Guid? categoriaId, [FromQuery] Guid? miembroId, [FromQuery] string? buscar,
         [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
+        // Sin ningún límite de fechas se devolvería todo el histórico del hogar, con sus repartos: se exige al menos uno.
+        if (mes is null && string.IsNullOrEmpty(desde) && string.IsNullOrEmpty(hasta))
+            return ApiComun.Invalido("Indica el mes («mes») o al menos una fecha («desde» o «hasta»).");
         var q = db.Gastos.AsNoTracking().Include(g => g.Repartos).AsQueryable();
         if (mes is not null)
         {

@@ -379,8 +379,12 @@ public sealed class CoreApiClient
             return;
         }
 
-        var afectadas = RutasEnCache.Where(r => ruta.StartsWith(r, StringComparison.Ordinal)).ToArray();
-        if (afectadas.Length > 0) _cache.Invalidar(afectadas);
+        var afectadas = RutasEnCache.Where(r => ruta.StartsWith(r, StringComparison.Ordinal)).ToList();
+        // Borrar un perfil en uso pasa sus categorías a otro perfil (?moverA=): la lista de categorías guardada apuntaría a un perfil
+        // que ya no existe y el formulario de gastos lo propondría como reparto por defecto.
+        if (metodo == HttpMethod.Delete && ruta.StartsWith("api/perfiles", StringComparison.Ordinal) && !afectadas.Contains("api/categorias"))
+            afectadas.Add("api/categorias");
+        if (afectadas.Count > 0) _cache.Invalidar(afectadas.ToArray());
     }
 
     private async Task EnviarSinRespuestaAsync(HttpMethod metodo, string ruta, CancellationToken ct)

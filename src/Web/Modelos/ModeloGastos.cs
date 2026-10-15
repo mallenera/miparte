@@ -49,6 +49,9 @@ public sealed class ModeloGastos(CoreApiClient api, DateOnly hoy)
     /// <summary>Si se están cargando los datos de referencia.</summary>
     public bool Cargando { get; set; } = true;
 
+    /// <summary>Si hay un guardado o un borrado en curso (se ignoran los demás: un doble clic crearía el gasto dos veces).</summary>
+    public bool Guardando { get; private set; }
+
     /// <summary>Error de la carga inicial; null si fue bien.</summary>
     public string? ErrorCarga { get; private set; }
 
@@ -417,6 +420,8 @@ public sealed class ModeloGastos(CoreApiClient api, DateOnly hoy)
     /// <summary>Ejecuta una operación y recarga la lista; los errores de la API quedan en <see cref="Error"/>.</summary>
     private async Task<string?> EjecutarAsync(Func<Task<string>> accion)
     {
+        if (Guardando) return null; // evita duplicar el gasto con doble clic o doble Intro
+        Guardando = true;
         Error = null;
         try
         {
@@ -429,6 +434,10 @@ public sealed class ModeloGastos(CoreApiClient api, DateOnly hoy)
             Error = e.Message;
             ConfirmandoEliminar = null;
             return null;
+        }
+        finally
+        {
+            Guardando = false;
         }
     }
 }

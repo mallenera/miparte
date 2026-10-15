@@ -22,7 +22,12 @@ public static class EntradaImporte
     {
         valor = 0m;
         if (string.IsNullOrWhiteSpace(texto)) return false;
-        if (!decimal.TryParse(texto.Trim().Replace(',', '.'), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out valor))
+        var normalizado = texto.Trim().Replace(',', '.');
+        // Los decimales se cuentan en el texto: «1,230» vale lo mismo que «1,23» pero tiene tres decimales, y en un teclado español
+        // «1.230» suele significar mil doscientos treinta; aceptarlos guardaría 1,23 € sin avisar.
+        var punto = normalizado.IndexOf('.');
+        if (punto >= 0 && normalizado.Length - punto - 1 > 2) return false;
+        if (!decimal.TryParse(normalizado, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out valor))
             return false;
         return (valor > 0 || (permitirCero && valor == 0)) && decimal.Round(valor, 2) == valor;
     }

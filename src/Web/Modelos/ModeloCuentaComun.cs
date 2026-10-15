@@ -15,6 +15,7 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
 {
     private static readonly CultureInfo Es = new("es-ES");
     private DateOnly _mes = new(hoy.Year, hoy.Month, 1);
+    private int _version;
 
     // ───── Datos ─────
 
@@ -157,7 +158,20 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
 
     private async Task RecargarAsync()
     {
-        Estado = await api.ObtenerCuentaComunAsync(Formato.Mes(_mes));
+        // Una respuesta tardía de otro mes no pisa la actual (ni los campos del formulario que se rellenan desde ella).
+        var version = ++_version;
+        CuentaComunResponse estado;
+        try
+        {
+            estado = await api.ObtenerCuentaComunAsync(Formato.Mes(_mes));
+        }
+        catch (ApiException) when (version != _version)
+        {
+            return; // fallo de una petición ya superada
+        }
+
+        if (version != _version) return;
+        Estado = estado;
         if (Estado.Pendientes.All(p => p.MiembroId != Reembolsado))
             Reembolsado = Estado.Pendientes.FirstOrDefault()?.MiembroId ?? Guid.Empty;
         AlCambiarAportante();

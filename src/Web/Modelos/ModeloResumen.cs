@@ -21,6 +21,7 @@ public sealed class ModeloResumen(CoreApiClient api, DateOnly hoy)
 {
     private static readonly CultureInfo Es = new("es-ES");
     private DateOnly _mes = new(hoy.Year, hoy.Month, 1);
+    private int _version;
     private readonly HashSet<Guid> _abiertas = [];
     private readonly Dictionary<(Guid, Guid), string> _importes = [];
 
@@ -115,11 +116,8 @@ public sealed class ModeloResumen(CoreApiClient api, DateOnly hoy)
     /// <summary>Importe del pago: mayor que 0, con máximo 2 decimales y sin pasar de lo pendiente.</summary>
     public bool TryImporte(TransferenciaDto t, out decimal valor)
     {
-        var texto = ImporteEscrito(t).Trim().Replace(',', '.');
-        // Se mira el texto y no solo el valor: «1,230» vale lo mismo que «1,23» pero tiene tres decimales.
-        var decimales = texto.Contains('.') ? texto.Length - texto.IndexOf('.') - 1 : 0;
-        return decimal.TryParse(texto, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out valor)
-            && valor > 0 && valor <= t.Importe && decimales <= 2;
+        // La regla del importe es una sola (EntradaImporte); aquí solo se añade que no pase de lo pendiente.
+        return EntradaImporte.TryParse(ImporteEscrito(t), out valor) && valor <= t.Importe;
     }
 
     /// <summary>El importe escrito para la transferencia es válido.</summary>
@@ -159,9 +157,20 @@ public sealed class ModeloResumen(CoreApiClient api, DateOnly hoy)
     private async Task RecargarAsync()
     {
         // Resumen y liquidación llegan juntos: la API lee una sola vez los gastos y los miembros del mes.
+        // Una respuesta tardía de otro mes no pisa la actual: si no, un pago se registraría en el mes mostrado con datos de otro.
+        var version = ++_version;
         var datos = api.ObtenerResumenYLiquidacionAsync(Formato.Mes(_mes));
         var cierres = OVacia(api.ListarCierresMesAsync()); // el cierre es informativo aquí: sin él se sigue viendo el resumen
-        await Task.WhenAll(datos, cierres);
+        try
+        {
+            await Task.WhenAll(datos, cierres);
+        }
+        catch (ApiException) when (version != _version)
+        {
+            return; // fallo de una petición ya superada
+        }
+
+        if (version != _version) return;
         Resumen = datos.Result.Resumen;
         Liquidacion = datos.Result.Liquidacion;
         Cierres = cierres.Result;

@@ -196,4 +196,22 @@ public class CacheLecturasTests
 
         Assert.Equal(1, Peticiones("GET /api/miembros"));
     }
+
+    [Fact]
+    public async Task Borrar_un_perfil_tambien_olvida_las_categorias_guardadas()
+    {
+        var perfil = Guid.NewGuid();
+        _api.Responde($"DELETE /api/perfiles/{perfil}", HttpStatusCode.NoContent);
+        var api = await ClienteAsync();
+        await api.ListarCategoriasAsync();
+        await api.ListarPerfilesAsync();
+
+        // Sus categorías pasan al perfil de destino: la lista guardada apuntaría a un perfil que ya no existe.
+        await api.EliminarPerfilAsync(perfil, Guid.NewGuid());
+        await api.ListarCategoriasAsync();
+        await api.ListarPerfilesAsync();
+
+        Assert.Equal(2, Peticiones("GET /api/categorias"));
+        Assert.Equal(2, Peticiones("GET /api/perfiles"));
+    }
 }

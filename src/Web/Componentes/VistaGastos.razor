@@ -235,7 +235,7 @@ else
                 <label>Concepto
                     <input maxlength="200" placeholder="Opcional" @bind="_m.Concepto" @bind:event="oninput" />
                 </label>
-                <button class="btn" type="submit" disabled="@(!_m.ImporteValido)">@(_m.Editando is null ? "Añadir" : "Guardar")</button>
+                <button class="btn" type="submit" disabled="@(!_m.ImporteValido || _m.Guardando)">@(_m.Editando is null ? "Añadir" : "Guardar")</button>
                 @if (_m.Editando is not null)
                 {
                     <button class="linkbtn" type="button" @onclick="_m.CancelarEdicion">Cancelar</button>

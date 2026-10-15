@@ -75,8 +75,10 @@ public sealed class RepositorioPerfiles(MiParteDbContext db) : IRepositorioPerfi
             await db.SaveChangesAsync(ct);
             return true;
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException { SqlState: "23505" or "23503" })
         {
+            // Nombre repetido (23505) o referencia a algo que otra petición acaba de borrar (23503): lo esperable. Cualquier otro
+            // error de la base de datos llega al manejador de 500 en lugar de disfrazarse de «nombre repetido».
             return false;
         }
     }
@@ -144,8 +146,10 @@ public sealed class RepositorioCategorias(MiParteDbContext db) : IRepositorioCat
             await db.SaveChangesAsync(ct);
             return true;
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException { SqlState: "23505" or "23503" })
         {
+            // Nombre repetido (23505) o referencia a algo que otra petición acaba de borrar (23503): lo esperable. Cualquier otro
+            // error de la base de datos llega al manejador de 500 en lugar de disfrazarse de «nombre repetido».
             return false;
         }
     }

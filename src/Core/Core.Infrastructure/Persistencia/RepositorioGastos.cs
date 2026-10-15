@@ -61,15 +61,7 @@ public sealed class RepositorioGastos(MiParteDbContext db) : IRepositorioGastos
     public Task<bool> AhorroActivoAsync(CancellationToken ct) => db.Hogares.AnyAsync(h => h.AhorroActivo, ct);
 
     /// <inheritdoc />
-    public async Task<DatosAhorro> DatosAhorroAsync(Guid? excluirGasto, CancellationToken ct)
-    {
-        var aportaciones = await db.AportacionesCuenta
-            .Select(a => new AportacionVigente(a.MiembroId, a.Desde, a.Importe, a.Ahorro)).ToListAsync(ct);
-        var depositos = await db.DepositosAhorro.Select(d => new DepositoDeAhorro(d.Fecha, d.Importe)).ToListAsync(ct);
-        var retirado = await db.RetiradasAhorro.SumAsync(r => r.Importe, ct);
-        var gastado = await db.Gastos.Where(g => g.PagadoDesdeAhorro && g.Id != excluirGasto).SumAsync(g => g.Importe, ct);
-        return new DatosAhorro(aportaciones, depositos, retirado, gastado);
-    }
+    public Task<DatosAhorro> DatosAhorroAsync(Guid? excluirGasto, CancellationToken ct) => ConsultasAhorro.LeerAsync(db, excluirGasto, ct);
 
     /// <inheritdoc />
     public Task<bool> MesCerradoAsync(DateOnly fecha, CancellationToken ct)

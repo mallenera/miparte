@@ -70,4 +70,8 @@ internal static class ApiComun
 
     /// <summary>Aplica el reparto al gasto (<see cref="RepartoGasto.Aplicar"/>).</summary>
     public static void AplicarReparto(Gasto gasto, IReadOnlyList<ParteAsumida> partes) => RepartoGasto.Aplicar(gasto, partes);
+
+    /// <summary>Devuelve el 409 si el hogar actual no tiene la cuenta común activada, o null si puede seguir.</summary>
+    public static async Task<IResult?> ExigirCuentaActivaAsync(MiParteDbContext db, CancellationToken ct)
+        => await db.Hogares.AnyAsync(h => h.CuentaComunActiva, ct) ? null : Results.Conflict(new { error = Mensajes.CuentaInactiva });
 }

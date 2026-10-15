@@ -141,7 +141,7 @@ public static class RecurrentesEndpoints
 
                 // Una plantilla a cargo de la cuenta común no genera gastos mientras el hogar no la tenga activada.
                 if (pendientes.Any(p => perfiles[p.PerfilRepartoId].Modo == ModoReparto.CuentaComun)
-                    && await CuentaComunEndpoints.ExigirActivaAsync(db, ct) is { } inactiva)
+                    && await ApiComun.ExigirCuentaActivaAsync(db, ct) is { } inactiva)
                     return inactiva;
 
                 foreach (var p in pendientes)

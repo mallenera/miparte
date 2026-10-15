@@ -137,7 +137,7 @@ public static class CategoriasEndpoints
 
             // Pedir el indicador en una categoría que no lo tenía exige la cuenta activada; editar una ya marcada, o elegir su perfil de cuenta común a secas, no.
             var yaMarcada = idActual is { } actual && await db.Categorias.AnyAsync(c => c.Id == actual && c.ACargoCuentaComun, ct);
-            if (req.ACargoCuentaComun && !yaMarcada && await CuentaComunEndpoints.ExigirActivaAsync(db, ct) is { } inactiva) return (inactiva, null, null, false);
+            if (req.ACargoCuentaComun && !yaMarcada && await ApiComun.ExigirCuentaActivaAsync(db, ct) is { } inactiva) return (inactiva, null, null, false);
         }
 
         if (req.CategoriaPadreId is { } padreId)

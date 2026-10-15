@@ -1,3 +1,4 @@
+using MiParte.Web.Autenticacion;
 using MiParte.Web.Hogares;
 
 namespace MiParte.Web.Api;
@@ -15,22 +16,28 @@ public sealed class CacheLecturas
     public static readonly TimeSpan Vigencia = TimeSpan.FromSeconds(60);
 
     private readonly EstadoHogar _hogar;
+    private readonly ServicioSesion _sesion;
     private readonly TimeProvider _reloj;
     private readonly Dictionary<string, Entrada> _entradas = [];
     private Guid? _hogarVigente;
+    private string? _usuarioVigente;
 
     /// <summary>Lectura guardada: la tarea (en curso o resuelta) y cuándo se pidió.</summary>
     private sealed record Entrada(object Tarea, DateTimeOffset Pedida);
 
-    /// <summary>Crea la caché y la engancha al cambio de hogar.</summary>
+    /// <summary>Crea la caché y la engancha al cambio de hogar y de usuario.</summary>
     /// <param name="hogar">Estado del hogar seleccionado.</param>
+    /// <param name="sesion">Sesión: al cambiar de usuario se olvida todo (p. ej. <c>EsYo</c> y los permisos de los miembros dependen de quien pregunta).</param>
     /// <param name="reloj">Reloj para la vigencia.</param>
-    public CacheLecturas(EstadoHogar hogar, TimeProvider reloj)
+    public CacheLecturas(EstadoHogar hogar, ServicioSesion sesion, TimeProvider reloj)
     {
         _hogar = hogar;
+        _sesion = sesion;
         _reloj = reloj;
         _hogarVigente = hogar.HogarActual?.Id;
+        _usuarioVigente = sesion.SesionActual?.UserId;
         hogar.Cambiado += AlCambiarHogar;
+        sesion.SesionCambiada += AlCambiarSesion;
     }
 
     /// <summary>
@@ -89,6 +96,16 @@ public sealed class CacheLecturas
     public void Limpiar()
     {
         lock (_entradas) _entradas.Clear();
+    }
+
+    private void AlCambiarSesion()
+    {
+        // También se dispara al renovar el token: con el mismo usuario no hay nada que olvidar. Al cerrar sesión (o descartarla
+        // tras un 401) el usuario pasa a ser nadie, y la caché del anterior no debe servirse a quien entre después.
+        var actual = _sesion.SesionActual?.UserId;
+        if (actual == _usuarioVigente) return;
+        _usuarioVigente = actual;
+        Limpiar();
     }
 
     private void AlCambiarHogar()

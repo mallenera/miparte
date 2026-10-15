@@ -61,6 +61,34 @@ public class AvisosSistemaTests : BunitContext
         Assert.False(conexion.PorLimite);
     }
 
+    /// <summary>Una fecha de `Retry-After` ya vencida no vale «espera cero»: se usa la espera por defecto, y un delta de cero sí es cero.</summary>
+    [Fact]
+    public async Task Un_retry_after_con_fecha_vencida_usa_la_espera_por_defecto()
+    {
+        var reloj = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 10, 7, 10, 0, 0, TimeSpan.Zero));
+        var llamadas = 0;
+        var servidor = new ManejadorFalso(_ =>
+        {
+            var r = new HttpResponseMessage(++llamadas == 1 ? HttpStatusCode.TooManyRequests : HttpStatusCode.OK);
+            if (llamadas == 1) r.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(reloj.GetUtcNow().AddMinutes(-5));
+            return r;
+        });
+        var manejador = new ManejadorReintentos(new ServicioConexion(), reloj)
+            { Esperas = SinEspera, EsperaMaximaPorLimite = TimeSpan.FromSeconds(30), InnerHandler = servidor };
+        var http = new HttpClient(manejador) { BaseAddress = new Uri("http://localhost/") };
+
+        var tarea = http.GetAsync("api/miembros");
+        await Task.Delay(50);
+        Assert.False(tarea.IsCompleted); // espera (la de por defecto), no reintenta de inmediato
+        reloj.Advance(TimeSpan.FromSeconds(4));
+        await Task.Delay(50);
+        Assert.False(tarea.IsCompleted);
+        reloj.Advance(TimeSpan.FromSeconds(2));
+
+        Assert.Equal(HttpStatusCode.OK, (await tarea).StatusCode);
+        Assert.Equal(2, llamadas);
+    }
+
     /// <summary>Si sigue limitando tras los reintentos permitidos se devuelve el 429 para que se muestre el mensaje de la API.</summary>
     [Fact]
     public async Task Tras_los_reintentos_por_limite_devuelve_el_429()

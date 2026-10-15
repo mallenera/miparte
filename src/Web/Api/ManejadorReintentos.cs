@@ -108,10 +108,12 @@ public sealed class ManejadorReintentos : DelegatingHandler
     /// <summary>Lo que hay que esperar según <c>Retry-After</c> (segundos o fecha), con <see cref="EsperaMaximaPorLimite"/> como tope.</summary>
     private TimeSpan EsperaPorLimite(HttpResponseMessage respuesta)
     {
+        var ahora = _tiempo.GetUtcNow();
         var pedida = respuesta.Headers.RetryAfter switch
         {
             { Delta: { } delta } => delta,
-            { Date: { } fecha } => fecha - _tiempo.GetUtcNow(),
+            // Una fecha ya vencida no es «espera cero»: es una indicación incoherente y se usa la espera por defecto.
+            { Date: { } fecha } => fecha > ahora ? fecha - ahora : EsperaPorLimiteSinIndicacion,
             _ => EsperaPorLimiteSinIndicacion,
         };
         if (pedida < TimeSpan.Zero) pedida = TimeSpan.Zero;

@@ -143,4 +143,19 @@ public class ModeloRecurrentesTests
         Assert.Contains("/api/gastos-recurrentes/generar?mes=2026-10", api.Consultas);
         Assert.Contains("ya tenía su gasto", m.Resultado);
     }
+
+    [Fact]
+    public async Task Crear_con_el_dia_de_hoy_tambien_ofrece_crear_el_gasto_del_mes()
+    {
+        var (m, api) = Crear();
+        api.Responde("POST /api/gastos-recurrentes", HttpStatusCode.Created, Plantilla("Gas", 20));
+        await m.CargarAsync();
+        m.Importe = "10";
+        m.Dia = 20; // hoy es día 20
+
+        await m.GuardarAsync();
+
+        Assert.Equal(20, m.DiaPasado!.Value.Dia);
+        Assert.Equal(20, m.DiaHoy);
+    }
 }

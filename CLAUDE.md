@@ -103,7 +103,7 @@ El esquema y las políticas RLS viven en SQL y la **fuente de verdad es `src/Dat
 1. RLS en Postgres (Supabase).
 2. En el servicio, el rol de conexión puede saltarse la RLS, así que `MiParteDbContext` aplica un **global query filter por `hogar_id`** a todas las entidades (con `IHogarActual`). Toda entidad nueva con `HogarId` necesita su `HasQueryFilter`.
 
-`HogarActualMiddleware` resuelve el hogar de cada petición autenticada: `sub` del JWT → `miembro.user_id` (activos). Un solo hogar se usa directamente; si hay varios exige la cabecera `X-Hogar-Id` (409 si falta, 403 si no pertenece, 400 si es inválida). Usa `IgnoreQueryFilters()` porque aún no hay hogar. `HogarActual` es scoped y se resuelve dentro del middleware para que `/health` funcione sin BD.
+`HogarActualMiddleware` resuelve el hogar de cada petición autenticada: `sub` del JWT → `miembro.user_id` (activos). Esa lectura pasa por `CacheAcceso` (singleton, 30 s) y deja el miembro del hogar en `HttpContext.Items[ClaveMiembro]`, que `RequierePermiso` reutiliza sin consultar; el middleware invalida la caché tras cualquier escritura en `/api/miembros`, `/api/invitaciones` y `/api/hogar(es)`, así que un endpoint nuevo que cambie miembros desde otra ruta debe invalidarla también. Con varias instancias de la API, un permiso retirado tarda como mucho 30 s en surtir efecto en las demás. Un solo hogar se usa directamente; si hay varios exige la cabecera `X-Hogar-Id` (409 si falta, 403 si no pertenece, 400 si es inválida). Usa `IgnoreQueryFilters()` porque aún no hay hogar. `HogarActual` es scoped y se resuelve dentro del middleware para que `/health` funcione sin BD.
 
 ### Autenticación
 

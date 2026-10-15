@@ -31,7 +31,7 @@ public static class CategoriasEndpoints
     /// <summary>GET /api/categorias: devuelve las categorías del hogar ordenadas por nombre.</summary>
     private static async Task<IResult> ListarAsync([FromServices] MiParteDbContext db, CancellationToken ct)
     {
-        var lista = await db.Categorias.OrderBy(c => c.Nombre).ToListAsync(ct);
+        var lista = await db.Categorias.AsNoTracking().OrderBy(c => c.Nombre).ToListAsync(ct);
         return Results.Ok(lista.Select(Dto).ToList());
     }
 

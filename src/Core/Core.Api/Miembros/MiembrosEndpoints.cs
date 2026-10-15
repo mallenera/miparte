@@ -76,7 +76,7 @@ public static class MiembrosEndpoints
     private static async Task<IResult> ListarAsync(
         HttpContext ctx, [FromServices] MiParteDbContext db, CancellationToken ct, bool incluirInactivos = false)
     {
-        var miembros = await db.Miembros.Where(m => incluirInactivos || m.Activo).OrderBy(m => m.Nombre).ToListAsync(ct);
+        var miembros = await db.Miembros.AsNoTracking().Where(m => incluirInactivos || m.Activo).OrderBy(m => m.Nombre).ToListAsync(ct);
         var usuario = TryUsuario(ctx, out var userId) ? userId : (Guid?)null;
         return Results.Ok(miembros.Select(m => ADto(m, usuario)).ToList());
     }

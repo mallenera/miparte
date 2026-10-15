@@ -37,7 +37,7 @@ public static class GastosEndpoints
         [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
-        var q = db.Gastos.Include(g => g.Repartos).AsQueryable();
+        var q = db.Gastos.AsNoTracking().Include(g => g.Repartos).AsQueryable();
         if (mes is not null)
         {
             if (!ApiComun.TryMes(mes, out var inicio)) return ApiComun.MesInvalido();

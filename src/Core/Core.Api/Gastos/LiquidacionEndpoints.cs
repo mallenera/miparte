@@ -25,7 +25,7 @@ public static class LiquidacionEndpoints
     private static async Task<List<Gasto>> GastosDelMes(MiParteDbContext db, DateOnly inicio, CancellationToken ct)
     {
         var fin = inicio.AddMonths(1);
-        return await db.Gastos.Include(g => g.Repartos).Where(g => g.Fecha >= inicio && g.Fecha < fin).ToListAsync(ct);
+        return await db.Gastos.AsNoTracking().Include(g => g.Repartos).Where(g => g.Fecha >= inicio && g.Fecha < fin).ToListAsync(ct);
     }
 
     /// <summary>Gastos cargados a la cuenta común, para saber cuánto debe a quien los adelantó.</summary>
@@ -44,15 +44,16 @@ public static class LiquidacionEndpoints
         var delMes = await GastosDelMes(db, inicio, ct);
         var gastos = delMes.Where(g => !g.EsPersonal).ToList(); // los personales van aparte: no entran en pagado, asumido ni totales
         var personales = delMes.Where(g => g.EsPersonal).ToList();
-        var miembros = await db.Miembros.ToListAsync(ct);
+        var miembros = await db.Miembros.AsNoTracking().ToListAsync(ct);
         var categorias = await db.Categorias.ToDictionaryAsync(c => c.Id, c => c.Nombre, ct);
 
         var gastosTotales = gastos.Sum(g => g.Importe);
 
         // Lo que adelantó un miembro para la cuenta común cuenta como pagado, y la cuenta le debe lo aún no reembolsado.
-        var reembolsos = await db.ReembolsosCuenta.ToListAsync(ct);
+        var reembolsos = await db.ReembolsosCuenta.AsNoTracking().ToListAsync(ct);
+        var gastosCuenta = await GastosDeCuenta(db, ct);
         var cuenta = CuentaComun.Calcular(
-            inicio, [], await GastosDeCuenta(db, ct), reembolsos.Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe)));
+            inicio, [], gastosCuenta, reembolsos.Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe)));
         // Los acreedores con pendiente de meses anteriores aparecen aunque no participen en los gastos de este mes (p. ej. un miembro ya inactivo).
         var implicados = miembros.Where(m => m.Activo && m.Tipo == TipoMiembro.Adulto).Select(m => m.Id)
             .Concat(gastos.Where(g => g.PagadoPor is not null).Select(g => g.PagadoPor!.Value))
@@ -81,10 +82,9 @@ public static class LiquidacionEndpoints
         ResumenCuentaComunDto? resumenCuenta = null;
         if (await db.Hogares.AnyAsync(h => h.CuentaComunActiva, ct))
         {
-            var aportaciones = await db.AportacionesCuenta.ToListAsync(ct);
+            var aportaciones = await db.AportacionesCuenta.AsNoTracking().ToListAsync(ct);
             var retiradas = await db.RetiradasAhorro.Select(r => new RetiradaDeAhorro(r.Fecha, r.Importe)).ToListAsync(ct);
             var depositos = await db.DepositosAhorro.Select(d => new DepositoDeAhorro(d.Fecha, d.Importe, d.MiembroId)).ToListAsync(ct);
-            var gastosCuenta = await GastosDeCuenta(db, ct);
             var estado = CuentaComun.Calcular(
                 inicio, aportaciones.Select(a => new AportacionVigente(a.MiembroId, a.Desde, a.Importe, a.Ahorro)).ToList(),
                 gastosCuenta, reembolsos.Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe)), retiradas, depositos);
@@ -109,8 +109,8 @@ public static class LiquidacionEndpoints
         // Lo que asume la cuenta común no entra en la deuda entre personas (y es lo único que puede pagar la cuenta: PagadoPor nulo).
         // Los gastos personales tampoco: los asume íntegros quien los paga.
         var gastos = (await GastosDelMes(db, inicio, ct)).Where(g => !g.ACargoCuentaComun && !g.EsPersonal).ToList();
-        var pagos = await db.PagosLiquidacion.Where(p => p.Mes == inicio).OrderBy(p => p.Fecha).ThenBy(p => p.Id).ToListAsync(ct);
-        var miembros = await db.Miembros.ToListAsync(ct);
+        var pagos = await db.PagosLiquidacion.AsNoTracking().Where(p => p.Mes == inicio).OrderBy(p => p.Fecha).ThenBy(p => p.Id).ToListAsync(ct);
+        var miembros = await db.Miembros.AsNoTracking().ToListAsync(ct);
 
         var ids = miembros.Where(m => m.Activo && m.Tipo == TipoMiembro.Adulto).Select(m => m.Id)
             .Concat(gastos.Select(g => g.PagadoPor!.Value)).Concat(gastos.SelectMany(g => g.Repartos).Select(r => r.MiembroId))

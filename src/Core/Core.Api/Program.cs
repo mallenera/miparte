@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using MiParte.Auth;
 using MiParte.Core.Api.Auditoria;
@@ -18,6 +19,8 @@ builder.Services.AddSupabaseAuth(builder.Configuration);
 // La API no usa cookies ni nada que deba cifrarse entre reinicios (solo valida JWT): claves efímeras en memoria
 // evitan los avisos de DataProtection por guardar claves sin cifrar en un contenedor sin disco persistente.
 builder.Services.AddDataProtection().UseEphemeralDataProtectionProvider();
+builder.Services.TryAddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<CacheAcceso>(); // miembros activos por usuario: evita una consulta por petición
 builder.AddLimitacionPeticiones();
 builder.AddCabecerasSeguridad();
 

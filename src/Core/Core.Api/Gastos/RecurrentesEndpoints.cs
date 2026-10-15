@@ -35,7 +35,7 @@ public static class RecurrentesEndpoints
         [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
-        var lista = await db.GastosRecurrentes.OrderBy(r => r.DiaMes).ThenBy(r => r.Id).ToListAsync(ct);
+        var lista = await db.GastosRecurrentes.AsNoTracking().OrderBy(r => r.DiaMes).ThenBy(r => r.Id).ToListAsync(ct);
         return Results.Ok(lista.Select(A));
     }
 

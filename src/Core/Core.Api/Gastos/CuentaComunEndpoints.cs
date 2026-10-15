@@ -149,13 +149,15 @@ public static class CuentaComunEndpoints
         if (!ApiComun.TryMes(mes, out var inicio)) return ApiComun.MesInvalido();
         var fin = inicio.AddMonths(1);
 
-        var aportaciones = await db.AportacionesCuenta.OrderBy(a => a.MiembroId).ThenBy(a => a.Desde).ToListAsync(ct);
-        var reembolsos = await db.ReembolsosCuenta.OrderBy(r => r.Fecha).ThenBy(r => r.Id).ToListAsync(ct);
-        var retiradas = await db.RetiradasAhorro.OrderBy(r => r.Fecha).ThenBy(r => r.Id).ToListAsync(ct);
-        var depositos = await db.DepositosAhorro.OrderBy(d => d.Fecha).ThenBy(d => d.Id).ToListAsync(ct);
+        var aportaciones = await db.AportacionesCuenta.AsNoTracking().OrderBy(a => a.MiembroId).ThenBy(a => a.Desde).ToListAsync(ct);
+        var reembolsos = await db.ReembolsosCuenta.AsNoTracking().OrderBy(r => r.Fecha).ThenBy(r => r.Id).ToListAsync(ct);
+        var retiradas = await db.RetiradasAhorro.AsNoTracking().OrderBy(r => r.Fecha).ThenBy(r => r.Id).ToListAsync(ct);
+        var depositos = await db.DepositosAhorro.AsNoTracking().OrderBy(d => d.Fecha).ThenBy(d => d.Id).ToListAsync(ct);
         var nombres = await db.Miembros.ToDictionaryAsync(m => m.Id, m => m.Nombre, ct);
-        var activa = await db.Hogares.AnyAsync(h => h.CuentaComunActiva, ct);
-        var ahorroActivo = await db.Hogares.AnyAsync(h => h.AhorroActivo, ct);
+        // Una sola consulta para las dos funciones del hogar (antes eran dos).
+        var funciones = await db.Hogares.Select(h => new { h.CuentaComunActiva, h.AhorroActivo }).FirstOrDefaultAsync(ct);
+        var activa = funciones?.CuentaComunActiva ?? false;
+        var ahorroActivo = funciones?.AhorroActivo ?? false;
 
         var depositosAhorro = depositos.Select(d => new DepositoDeAhorro(d.Fecha, d.Importe, d.MiembroId)).ToList();
         var vigentes = Vigentes(aportaciones);

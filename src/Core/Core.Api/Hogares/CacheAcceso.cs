@@ -20,6 +20,11 @@ public sealed class CacheAcceso(TimeProvider reloj)
 
     private readonly ConcurrentDictionary<Guid, Entrada> _usuarios = new();
 
+    // Protege _generacion y la publicación en _usuarios frente a las invalidaciones: comprobar la generación y guardar la
+    // entrada tiene que ser atómico respecto de «incrementar la generación y quitar entradas». Sin esto, una invalidación
+    // podía colarse entre la comprobación y la escritura y la entrada anterior al cambio volvía a quedar guardada.
+    private readonly object _sincronizacion = new();
+
     // Se incrementa en cada invalidación. Una lectura que empezó antes de una invalidación puede haber visto los datos
     // anteriores al cambio: su resultado se usa para esa petición pero no se publica en la caché.
     private long _generacion;
@@ -58,13 +63,38 @@ public sealed class CacheAcceso(TimeProvider reloj)
         if (_usuarios.TryGetValue(userId, out var e) && reloj.GetUtcNow() - e.Leida < Vigencia) return e.Miembros;
 
         var momento = reloj.GetUtcNow();
-        var generacion = Interlocked.Read(ref _generacion);
+        var generacion = Generacion;
         var miembros = await leer();
 
-        // Si mientras se leía hubo una invalidación, el resultado pudo ser anterior al cambio (un permiso ya retirado): no se guarda.
-        if (Interlocked.Read(ref _generacion) == generacion) _usuarios[userId] = new Entrada(momento, miembros);
+        Publicar(userId, momento, miembros, generacion);
         PurgarCaducadas(momento);
         return miembros;
+    }
+
+    /// <summary>Generación actual: cuenta las invalidaciones; una lectura la anota antes de empezar y se publica solo si no ha cambiado.</summary>
+    internal long Generacion
+    {
+        get
+        {
+            lock (_sincronizacion) return _generacion;
+        }
+    }
+
+    /// <summary>
+    /// Guarda la lectura solo si no hubo ninguna invalidación desde que empezó (<paramref name="generacion"/>). La comprobación y la
+    /// escritura van bajo el mismo cerrojo que las invalidaciones: si no, el resultado de antes de un cambio (un permiso ya retirado)
+    /// podía publicarse justo después de invalidar y valer hasta <see cref="Vigencia"/>.
+    /// </summary>
+    /// <param name="userId">Usuario al que pertenece la lectura.</param>
+    /// <param name="momento">Cuándo empezó la lectura (la vigencia cuenta desde aquí).</param>
+    /// <param name="miembros">Miembros activos leídos.</param>
+    /// <param name="generacion">Valor de <see cref="Generacion"/> anotado antes de leer.</param>
+    internal void Publicar(Guid userId, DateTimeOffset momento, IReadOnlyList<Miembro> miembros, long generacion)
+    {
+        lock (_sincronizacion)
+        {
+            if (_generacion == generacion) _usuarios[userId] = new Entrada(momento, miembros);
+        }
     }
 
     /// <summary>
@@ -83,16 +113,22 @@ public sealed class CacheAcceso(TimeProvider reloj)
     /// <param name="userId">Usuario cuyos hogares pueden haber cambiado.</param>
     public void InvalidarUsuario(Guid userId)
     {
-        Interlocked.Increment(ref _generacion);
-        _usuarios.TryRemove(userId, out _);
+        lock (_sincronizacion)
+        {
+            _generacion++;
+            _usuarios.TryRemove(userId, out _);
+        }
     }
 
     /// <summary>Olvida lo guardado de todos los usuarios con algún miembro en el hogar: cambió un permiso, un rol o un estado.</summary>
     /// <param name="hogarId">Hogar cuyos miembros pueden haber cambiado.</param>
     public void InvalidarHogar(Guid hogarId)
     {
-        Interlocked.Increment(ref _generacion);
-        foreach (var (usuario, entrada) in _usuarios)
-            if (entrada.Miembros.Any(m => m.HogarId == hogarId)) _usuarios.TryRemove(usuario, out _);
+        lock (_sincronizacion)
+        {
+            _generacion++;
+            foreach (var (usuario, entrada) in _usuarios)
+                if (entrada.Miembros.Any(m => m.HogarId == hogarId)) _usuarios.TryRemove(usuario, out _);
+        }
     }
 }

@@ -76,4 +76,29 @@ public class CacheAccesoTests
         await cache.MiembrosActivosAsync(usuario, () => { lecturas++; return Task.FromResult(new List<Miembro>()); });
         Assert.Equal(1, lecturas);
     }
+
+    /// <summary>
+    /// La comprobación de la generación y la escritura son atómicas respecto de la invalidación: si la lectura anotó la
+    /// generación antes de invalidar, tras publicar e invalidar a la vez la caché queda siempre vacía (o se publicó antes y la
+    /// invalidación la quitó, o se rechazó). Con una invalidación colándose entre la comprobación y la escritura, a veces quedaba la entrada.
+    /// </summary>
+    [Fact]
+    public async Task Publicar_e_invalidar_a_la_vez_nunca_deja_una_entrada_anterior_al_cambio()
+    {
+        var hogar = Guid.NewGuid();
+        for (var i = 0; i < 2000; i++)
+        {
+            var cache = new CacheAcceso(_reloj);
+            var usuario = Guid.NewGuid();
+            var generacion = cache.Generacion; // la lectura empezó antes de la invalidación
+            var inicio = new ManualResetEventSlim(false);
+
+            var publica = Task.Run(() => { inicio.Wait(); cache.Publicar(usuario, _reloj.GetUtcNow(), [Miembro(hogar, usuario)], generacion); });
+            var invalida = Task.Run(() => { inicio.Wait(); cache.InvalidarHogar(hogar); cache.InvalidarUsuario(usuario); });
+            inicio.Set();
+            await Task.WhenAll(publica, invalida);
+
+            Assert.Equal(0, cache.Entradas);
+        }
+    }
 }

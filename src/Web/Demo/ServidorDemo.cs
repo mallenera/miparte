@@ -107,6 +107,7 @@ public sealed partial class ServidorDemo
 
             ("resumen", 2, "GET") => Resumen(mes),
             ("liquidacion", 2, "GET") => Liquidacion(mes),
+            ("resumen-liquidacion", 2, "GET") => ResumenYLiquidacion(mes),
             ("pagos-liquidacion", 2, "POST") => CrearPago((await Cuerpo<CrearPagoLiquidacionRequest>())!),
             ("pagos-liquidacion", 3, "DELETE") when id is { } i => _pagos.RemoveAll(x => x.Id == i) > 0 ? Sin() : NoEncontrado(),
 
@@ -646,8 +647,10 @@ public sealed partial class ServidorDemo
     private string Nombre(Guid id) => _miembros.FirstOrDefault(m => m.Id == id)?.Nombre ?? "";
 
     private HttpResponseMessage Resumen(string? mes)
+        => TryMes(mes, out var inicio) ? Ok(ResumenDelMes(inicio)) : MesInvalido();
+
+    private ResumenMensualResponse ResumenDelMes(DateOnly inicio)
     {
-        if (!TryMes(mes, out var inicio)) return MesInvalido();
         var delMes = GastosDelMes(inicio);
         var gastos = delMes.Where(g => !g.EsPersonal).ToList();
         var personales = delMes.Where(g => g.EsPersonal).ToList();
@@ -687,7 +690,7 @@ public sealed partial class ServidorDemo
                 estado.Pendientes.Where(p => p.Importe > 0m).Sum(p => p.Importe), estado.AhorroMes, estado.AhorroDisponible);
         }
 
-        return Ok(new ResumenMensualResponse(FormatoMes(inicio), gastos.Sum(g => g.Importe), porMiembro, porCategoria, resumenCuenta, personales.Sum(g => g.Importe)));
+        return new ResumenMensualResponse(FormatoMes(inicio), gastos.Sum(g => g.Importe), porMiembro, porCategoria, resumenCuenta, personales.Sum(g => g.Importe));
     }
 
     private (IReadOnlyList<SaldoMiembro> Saldos, IReadOnlyList<Transferencia> Transferencias, List<PagoLiquidacionDto> Pagos, bool HayGastos)
@@ -708,13 +711,20 @@ public sealed partial class ServidorDemo
     }
 
     private HttpResponseMessage Liquidacion(string? mes)
+        => TryMes(mes, out var inicio) ? Ok(LiquidacionDelMes(inicio)) : MesInvalido();
+
+    private LiquidacionResponse LiquidacionDelMes(DateOnly inicio)
     {
-        if (!TryMes(mes, out var inicio)) return MesInvalido();
         var c = CalcularLiquidacion(inicio);
-        return Ok(new LiquidacionResponse(
+        return new LiquidacionResponse(
             FormatoMes(inicio), c.Saldos.Select(s => new SaldoMiembroDto(s.MiembroId, Nombre(s.MiembroId), s.Importe)).ToList(),
-            c.Transferencias.Select(t => new TransferenciaDto(t.De, t.A, t.Importe)).ToList(), c.Pagos));
+            c.Transferencias.Select(t => new TransferenciaDto(t.De, t.A, t.Importe)).ToList(), c.Pagos);
     }
+
+    private HttpResponseMessage ResumenYLiquidacion(string? mes)
+        => TryMes(mes, out var inicio)
+            ? Ok(new ResumenYLiquidacionResponse(ResumenDelMes(inicio), LiquidacionDelMes(inicio)))
+            : MesInvalido();
 
     private HttpResponseMessage CrearPago(CrearPagoLiquidacionRequest r)
     {

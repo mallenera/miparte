@@ -300,6 +300,15 @@ public sealed class CoreApiClient
     public Task<LiquidacionResponse> ObtenerLiquidacionAsync(string mes, CancellationToken ct = default) =>
         ObtenerAsync<LiquidacionResponse>($"api/liquidacion?mes={Uri.EscapeDataString(mes)}", ct);
 
+    /// <summary>
+    /// Resumen y liquidación del mes en una sola petición (<c>GET /api/resumen-liquidacion</c>): lo que pinta la pestaña Resumen, sin
+    /// leer dos veces los gastos y los miembros del mes.
+    /// </summary>
+    /// <param name="mes">Mes en formato YYYY-MM.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<ResumenYLiquidacionResponse> ObtenerResumenYLiquidacionAsync(string mes, CancellationToken ct = default) =>
+        ObtenerAsync<ResumenYLiquidacionResponse>($"api/resumen-liquidacion?mes={Uri.EscapeDataString(mes)}", ct);
+
     /// <summary>Registra un pago entre dos miembros para saldar un mes (<c>POST /api/pagos-liquidacion</c>).</summary>
     /// <param name="peticion">Mes (día 1), pagador, receptor, importe, fecha y concepto.</param>
     /// <param name="ct">Token de cancelación.</param>

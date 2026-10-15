@@ -280,6 +280,31 @@ public class GastosLiquidacionTests
     }
 
     [Fact]
+    public async Task ResumenLiquidacion_DaLoMismoQueResumenYLiquidacionPorSeparado()
+    {
+        var e = await Montar();
+        var c = e.Cliente;
+        var mes = new DateOnly(2026, 9, 1);
+        await CrearGasto(e, Gasto(e, 100m, e.Perfil5050));
+        await CrearGasto(e, Gasto(e, 33.33m, e.Perfil6040, pagador: e.Beto));
+        await CrearGasto(e, Gasto(e, 80m, e.PerfilCuentaComun)); // a cargo de la cuenta común, adelantado por Ana
+        await CrearGasto(e, Gasto(e, 15m, e.Perfil5050, "2026-08-31")); // otro mes: no entra
+        Assert.Equal(HttpStatusCode.Created, (await c.PostAsJsonAsync("/api/pagos-liquidacion",
+            new CrearPagoLiquidacionRequest(mes, e.Beto!.Value, e.Ana, 12.34m, null, "Parcial"))).StatusCode);
+
+        var resumen = await (await c.GetAsync("/api/resumen?mes=2026-09")).Content.ReadAsStringAsync();
+        var liquidacion = await (await c.GetAsync("/api/liquidacion?mes=2026-09")).Content.ReadAsStringAsync();
+        var juntas = await c.GetAsync("/api/resumen-liquidacion?mes=2026-09");
+
+        Assert.Equal(HttpStatusCode.OK, juntas.StatusCode);
+        using var doc = System.Text.Json.JsonDocument.Parse(await juntas.Content.ReadAsStringAsync());
+        Assert.Equal(resumen, doc.RootElement.GetProperty("resumen").GetRawText());
+        Assert.Equal(liquidacion, doc.RootElement.GetProperty("liquidacion").GetRawText());
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.GetAsync("/api/resumen-liquidacion?mes=2026-9")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await Cliente(e.F, null).GetAsync("/api/resumen-liquidacion?mes=2026-09")).StatusCode);
+    }
+
+    [Fact]
     public async Task Recurrentes_Generar_EsIdempotente_YNoDuplica()
     {
         var e = await Montar();

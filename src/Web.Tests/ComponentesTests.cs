@@ -562,8 +562,7 @@ public class ComponentesTests : BunitContext
         new ApiFalsa()
             .Responde("GET /api/miembros", HttpStatusCode.OK,
                 new[] { ApiFalsa.Miembro("Ana", esYo: true, id: AnaId), ApiFalsa.Miembro("Luis", id: LuisId) })
-            .Responde("GET /api/resumen", HttpStatusCode.OK, resumen)
-            .Responde("GET /api/liquidacion", HttpStatusCode.OK, liquidacion);
+            .Responde("GET /api/resumen-liquidacion", HttpStatusCode.OK, new ResumenYLiquidacionResponse(resumen, liquidacion));
 
     private static LiquidacionResponse Liquidacion(decimal deuda, params PagoLiquidacionDto[] pagos) =>
         new("2026-10",

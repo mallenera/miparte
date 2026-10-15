@@ -318,13 +318,12 @@ else if (_resumen is not null && _liquidacion is not null)
 
     private async Task RecargarAsync()
     {
-        var mes = Formato.Mes(_mes);
-        var resumen = Api.ObtenerResumenAsync(mes);
-        var liquidacion = Api.ObtenerLiquidacionAsync(mes);
+        // Resumen y liquidación llegan juntos: la API lee una sola vez los gastos y los miembros del mes.
+        var datos = Api.ObtenerResumenYLiquidacionAsync(Formato.Mes(_mes));
         var cierres = OVacia(Api.ListarCierresMesAsync()); // el cierre es informativo aquí: sin él se sigue viendo el resumen
-        await Task.WhenAll(resumen, liquidacion, cierres);
-        _resumen = resumen.Result;
-        _liquidacion = liquidacion.Result;
+        await Task.WhenAll(datos, cierres);
+        _resumen = datos.Result.Resumen;
+        _liquidacion = datos.Result.Liquidacion;
         _cierres = cierres.Result;
     }
 

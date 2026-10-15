@@ -242,5 +242,10 @@ public class CuentaComunAgregadaTests
         Assert.Equal(gastos.Where(g => g.Fecha >= inicio && g.Fecha < fin).Sum(g => g.Importe), resumen.GastadoMes);
         Assert.Equal(esperado.Pendientes.Where(p => p.Importe > 0m).Sum(p => p.Importe), resumen.Pendiente);
         Assert.Equal(esperado.AhorroDisponible, resumen.AhorroDisponible);
+
+        // El endpoint que une resumen y liquidación (lo que usa la pestaña Resumen) da lo mismo.
+        var juntas = await Leer<ResumenYLiquidacionResponse>(await c.GetAsync($"/api/resumen-liquidacion?mes={mes}"));
+        Assert.Equal(resumen, juntas.Resumen.CuentaComun);
+        Assert.Equal(inicio.ToString("yyyy-MM"), juntas.Liquidacion.Mes);
     }
 }

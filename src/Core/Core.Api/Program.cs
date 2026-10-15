@@ -14,6 +14,7 @@ using MiParte.Core.Application.CuentaComun;
 using MiParte.Core.Application.Gastos;
 using MiParte.Core.Application.Liquidacion;
 using MiParte.Core.Application.Miembros;
+using MiParte.Core.Application.Recurrentes;
 using MiParte.Core.Infrastructure;
 using MiParte.Core.Infrastructure.Persistencia;
 
@@ -38,6 +39,8 @@ if (!string.IsNullOrWhiteSpace(connectionString))
 // Casos de uso y repositorios: fuera del if porque solo necesitan el MiParteDbContext, que los tests sustituyen.
 builder.Services.AddRepositorios();
 builder.Services.AddScoped(sp => new ServicioGastos(sp.GetRequiredService<IRepositorioGastos>()));
+builder.Services.AddScoped(sp => new ServicioRecurrentes(
+    sp.GetRequiredService<IRepositorioRecurrentes>(), sp.GetRequiredService<IRepositorioGastos>()));
 builder.Services.AddScoped(sp => new ServicioMiembros(
     sp.GetRequiredService<IRepositorioMiembros>(), sp.GetRequiredService<TimeProvider>()));
 builder.Services.AddScoped(sp => new ServicioCuentaComun(

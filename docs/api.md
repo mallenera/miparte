@@ -45,7 +45,7 @@ Orígenes permitidos: variable de entorno `Cors__OrigenesPermitidos__0` (y `__1`
 
 ### Límites de peticiones (429)
 
-Ventana deslizante de 1 minuto, **por usuario** (`sub` del JWT ya validado) y, sin sesión válida, **por IP**. Al superarla: **429** con `Retry-After` (segundos) y `{ "error": "Demasiadas peticiones..." }`. El front debe tratarlo como un error recuperable y esperar.
+Ventana deslizante de 1 minuto, **por usuario** (`sub` del JWT ya validado) y, sin sesión válida, **por IP**. Al superarla: **429** con `Retry-After` (segundos) y `{ "error": "Demasiadas peticiones..." }`. El front lo trata como un error recuperable: en las lecturas (GET) espera lo que indica `Retry-After` (con tope de 20 s) y reintenta hasta 2 veces mostrando un aviso; si sigue limitado, muestra el mensaje de la API. Las escrituras no se reintentan.
 
 | Ámbito | Límite por defecto | Variable de entorno |
 |---|---|---|
@@ -119,7 +119,7 @@ Los ingresos del hogar **no se guardan** y no hay endpoints de ingresos. Los per
 
 | Método y ruta | Descripción | Request | Response | Errores | Permisos |
 |---|---|---|---|---|---|
-| `GET /api/gastos?mes=YYYY-MM&desde=YYYY-MM-DD&hasta=YYYY-MM-DD&categoriaId=&miembroId=&buscar=` | Lista con repartos; filtros opcionales y combinables. `desde` y `hasta` acotan por fecha del gasto, ambos días incluidos (cada uno puede ir solo); el dashboard los usa para pedir un periodo cualquiera; `miembroId` deja los gastos que paga ese miembro o en cuyo reparto asume un importe > 0; `buscar` es un texto contenido en el concepto (sin distinguir mayúsculas, máx. 200 caracteres; vacío = sin filtro) | - | `GastoResponse[]` 200 | 400 mes inválido, `desde`/`hasta` con formato distinto de YYYY-MM-DD o `desde` posterior a `hasta`, o `buscar` demasiado largo; 409 | miembro |
+| `GET /api/gastos?mes=YYYY-MM&desde=YYYY-MM-DD&hasta=YYYY-MM-DD&categoriaId=&miembroId=&buscar=` | Lista con repartos. **Hay que indicar `mes`, `desde` o `hasta` (al menos uno)**: sin ninguno se devolvería todo el histórico y responde 400. El resto de filtros son opcionales y combinables. `desde` y `hasta` acotan por fecha del gasto, ambos días incluidos (cada uno puede ir solo); el dashboard los usa para pedir un periodo cualquiera; `miembroId` deja los gastos que paga ese miembro o en cuyo reparto asume un importe > 0; `buscar` es un texto contenido en el concepto (sin distinguir mayúsculas, máx. 200 caracteres; vacío = sin filtro) | - | `GastoResponse[]` 200 | 400 sin `mes`, `desde` ni `hasta`, mes inválido, `desde`/`hasta` con formato distinto de YYYY-MM-DD o `desde` posterior a `hasta`, o `buscar` demasiado largo; 409 | miembro |
 | `GET /api/gastos/{id}` | Uno | - | `GastoResponse` 200 | 404; 409 | miembro |
 | `POST /api/gastos` | Crea; el servidor calcula y guarda el reparto | `GastoRequest` | `GastoResponse` 201 | 400 importe, concepto, fecha, categoría o perfil inexistente, pagador no adulto activo, perfil sin valores para los adultos, sin adultos, `pagadoDesdeAhorro` con pagador; 409 sin hogar o ahorro disponible insuficiente (`{ error, disponible }`) | permiso `gastos.crear` |
 | `PUT /api/gastos/{id}` | Edita y recalcula el reparto de este gasto | `GastoRequest` | `GastoResponse` 200 | 400, 404, 409 (también si el ahorro no cubre el gasto) | permiso `gastos.editar` |

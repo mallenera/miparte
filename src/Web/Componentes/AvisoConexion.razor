@@ -5,7 +5,14 @@
 @if (Conexion.Reintentando)
 {
     <div class="aviso warn aviso-sistema" role="status">
-        El servidor se está actualizando o arrancando. Puede tardar hasta un minuto; seguimos intentándolo.
+        @if (Conexion.PorLimite)
+        {
+            <text>Estás haciendo muchas peticiones seguidas. Esperamos unos segundos y seguimos.</text>
+        }
+        else
+        {
+            <text>El servidor se está actualizando o arrancando. Puede tardar hasta un minuto; seguimos intentándolo.</text>
+        }
     </div>
 }
 

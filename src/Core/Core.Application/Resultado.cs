@@ -1,7 +1,7 @@
 namespace MiParte.Core.Application;
 
-/// <summary>Clase de fallo de un caso de uso; la capa HTTP la traduce a su código (400, 409, 404).</summary>
-public enum TipoError { Invalido, Conflicto, NoEncontrado }
+/// <summary>Clase de fallo de un caso de uso; la capa HTTP la traduce a su código (400, 409, 404, 403).</summary>
+public enum TipoError { Invalido, Conflicto, NoEncontrado, Prohibido }
 
 /// <summary>Fallo de un caso de uso, con el mensaje en español y, si hace falta, datos extra para el cliente (p. ej. lo pendiente).</summary>
 public sealed record ErrorAplicacion(TipoError Tipo, string Mensaje, IReadOnlyDictionary<string, object>? Extra = null);
@@ -29,6 +29,9 @@ public sealed record Resultado<T>
     /// <summary>Choca con el estado actual (409).</summary>
     public static Resultado<T> Conflicto(string mensaje, IReadOnlyDictionary<string, object>? extra = null)
         => Fallo(new(TipoError.Conflicto, mensaje, extra));
+
+    /// <summary>Quien lo pide no tiene permiso (403).</summary>
+    public static Resultado<T> Prohibido(string mensaje) => Fallo(new(TipoError.Prohibido, mensaje));
 
     /// <summary>No existe en el hogar (404).</summary>
     public static Resultado<T> NoEncontrado(string mensaje = "No existe.") => Fallo(new(TipoError.NoEncontrado, mensaje));

@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using MiParte.Core.Application.CuentaComun;
 using MiParte.Core.Application.Gastos;
 using MiParte.Core.Application.Liquidacion;
+using MiParte.Core.Application.Miembros;
 using MiParte.Core.Infrastructure.Persistencia;
 
 namespace MiParte.Core.Infrastructure;
@@ -34,6 +35,7 @@ public static class DependencyInjection
         services.AddScoped<IRepositorioLiquidacion>(sp => new RepositorioLiquidacion(sp.GetRequiredService<MiParteDbContext>()));
         services.AddScoped<IRepositorioGastos>(sp => new RepositorioGastos(sp.GetRequiredService<MiParteDbContext>()));
         services.AddScoped<IRepositorioCuentaComun>(sp => new RepositorioCuentaComun(sp.GetRequiredService<MiParteDbContext>()));
+        services.AddScoped<IRepositorioMiembros>(sp => new RepositorioMiembros(sp.GetRequiredService<MiParteDbContext>()));
         return services;
     }
 }

@@ -1,17 +1,20 @@
-using MiParte.Core.Domain;
-using MiParte.Core.Api.Seguridad;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using MiParte.Contracts;
 using MiParte.Core.Api.Gastos;
+using MiParte.Core.Api.Hogares;
+using MiParte.Core.Api.Seguridad;
+using MiParte.Core.Application;
+using MiParte.Core.Application.Cierres;
+using MiParte.Core.Application.Miembros;
+using MiParte.Core.Domain;
 using MiParte.Core.Domain.Entidades;
 using MiParte.Core.Infrastructure.Persistencia;
 
 namespace MiParte.Core.Api.Cierres;
 
 /// <summary>
-/// Cierre de mes: cualquier miembro congela los gastos de un mes (y con ellos su reparto y su liquidación) y solo un admin puede reabrirlo.
-/// Los demás endpoints consultan <see cref="CierreMes"/> antes de tocar gastos.
+/// Cierre de mes: cualquier miembro con permiso congela los gastos de un mes (y con ellos su reparto y su liquidación) y solo
+/// quien tenga permiso para reabrir puede reabrirlo. Solo traducen HTTP y delegan en <see cref="ServicioCierres"/>.
 /// </summary>
 public static class CierresMesEndpoints
 {
@@ -25,121 +28,45 @@ public static class CierresMesEndpoints
         return app;
     }
 
-    /// <summary>Resuelve el miembro activo vinculado al usuario de la petición; devuelve el 401/403 si no hay o no es del hogar.</summary>
-    private static async Task<(Miembro? Yo, IResult? Error)> ExigirMiembroAsync(HttpContext ctx, MiParteDbContext db, CancellationToken ct)
-    {
-        if (!Guid.TryParse(ctx.User.FindFirst("sub")?.Value, out var userId)) return (null, Results.Unauthorized());
-        // Solo se lee (id de usuario y nombre): vale el miembro que ya resolvió el middleware.
-        var yo = ctx.Items.TryGetValue(Hogares.HogarActualMiddleware.ClaveMiembro, out var resuelto)
-            ? resuelto as Miembro
-            : await db.Miembros.AsNoTracking().FirstOrDefaultAsync(m => m.UserId == userId && m.Activo, ct);
-        return yo is null
-            ? (null, Results.Json(new { error = "Solo un miembro activo del hogar puede cerrar un mes." }, statusCode: StatusCodes.Status403Forbidden))
-            : (yo, null);
-    }
-
     /// <summary>Convierte un cierre en su DTO, con el nombre de quien lo cerró.</summary>
-    private static MesCerradoDto ADto(MesCerrado c, IReadOnlyDictionary<Guid, string> autores)
-        => new(ApiComun.FormatoMes(c.Mes), c.CerradoEn, c.CerradoPor is { } u ? autores.GetValueOrDefault(u) : null);
+    private static MesCerradoDto ADto(CierreConAutor c) => new(ApiComun.FormatoMes(c.Cierre.Mes), c.Cierre.CerradoEn, c.Autor);
 
     /// <summary>GET /api/cierres-mes: meses cerrados del hogar, del más reciente al más antiguo. Cualquier miembro. 409 sin hogar.</summary>
     private static async Task<IResult> ListarAsync(
-        [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
+        [FromServices] ServicioCierres servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
-        var cierres = await db.MesesCerrados.AsNoTracking().OrderByDescending(c => c.Mes).ToListAsync(ct);
-        var autores = await db.Miembros.Where(m => m.UserId != null).ToDictionaryAsync(m => m.UserId!.Value, m => m.Nombre, ct);
-        return Results.Ok(cierres.Select(c => ADto(c, autores)).ToList());
+        return Results.Ok((await servicio.ListarAsync(ct)).Select(ADto).ToList());
     }
 
     /// <summary>POST /api/cierres-mes: cierra un mes. Exige el permiso <c>mes.cerrar</c> (403 si no). 400 si el mes es inválido o aún no ha terminado; 409 sin hogar o si ya está cerrado. 201 si se cierra.</summary>
     private static async Task<IResult> CerrarAsync(
-        CerrarMesRequest req, HttpContext ctx, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
+        CerrarMesRequest req, HttpContext ctx, [FromServices] ServicioCierres servicio, [FromServices] ServicioMiembros miembros,
+        [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
-        var (yo, error) = await ExigirMiembroAsync(ctx, db, ct);
-        if (error is not null) return error;
+        if (!Guid.TryParse(ctx.User.FindFirst("sub")?.Value, out var userId)) return Results.Unauthorized();
+        // Solo se lee (id de usuario y nombre): vale el miembro que ya resolvió el middleware, sin otra consulta.
+        var yo = ctx.Items.TryGetValue(HogarActualMiddleware.ClaveMiembro, out var resuelto) && resuelto is Miembro m
+            ? m
+            : await miembros.MiembroActivoAsync(userId, ct);
+        if (yo is null)
+            return Results.Json(new { error = Mensajes.SoloMiembroCierra }, statusCode: StatusCodes.Status403Forbidden);
         if (!ApiComun.TryMes(req?.Mes, out var inicio)) return ApiComun.MesInvalido();
-        // No se puede cerrar un mes que no ha terminado: se seguirían añadiendo gastos.
-        var hoy = DateOnly.FromDateTime(DateTime.UtcNow);
-        if (inicio.AddMonths(1) > hoy) return ApiComun.Invalido("Solo se puede cerrar un mes que ya ha terminado.");
-        if (await db.MesesCerrados.AnyAsync(c => c.Mes == inicio, ct))
-            return Results.Conflict(new { error = "Ese mes ya está cerrado." });
 
-        var cierre = new MesCerrado { Id = Guid.NewGuid(), HogarId = hogarId, Mes = inicio, CerradoEn = DateTimeOffset.UtcNow, CerradoPor = yo!.UserId };
-        db.MesesCerrados.Add(cierre);
-        try
-        {
-            await db.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateException ex) when (RecurrentesEndpoints.EsUnicidadViolada(ex))
-        {
-            // Dos cierres simultáneos del mismo mes: gana el primero y el índice único rechaza al segundo.
-            return Results.Conflict(new { error = "Ese mes ya está cerrado." });
-        }
-        return Results.Created($"/api/cierres-mes/{ApiComun.FormatoMes(inicio)}", ADto(cierre, new Dictionary<Guid, string> { [yo.UserId!.Value] = yo.Nombre }));
+        var r = await servicio.CerrarAsync(hogarId, inicio, yo, ct);
+        if (r.Error is { } error) return ApiComun.Respuesta(error);
+        return Results.Created($"/api/cierres-mes/{ApiComun.FormatoMes(inicio)}", ADto(r.Valor!));
     }
 
     /// <summary>DELETE /api/cierres-mes/{mes}: reabre un mes cerrado. Exige el permiso <c>mes.reabrir</c> (403 si no). 400 si el mes es inválido; 404 si no estaba cerrado; 409 sin hogar. 204 si se reabre.</summary>
     private static async Task<IResult> ReabrirAsync(
-        string mes, HttpContext ctx, [FromServices] MiParteDbContext db, [FromServices] IHogarActual hogar, CancellationToken ct)
+        string mes, [FromServices] ServicioCierres servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
-        if (!ApiComun.TryMes(mes, out var inicio))
- return ApiComun.MesInvalido();
-        var cierre = await db.MesesCerrados.FirstOrDefaultAsync(c => c.Mes == inicio, ct);
-        if (cierre is null) return Results.NotFound();
-        db.MesesCerrados.Remove(cierre);
-        await db.SaveChangesAsync(ct);
-        return Results.NoContent();
-    }
-}
+        if (!ApiComun.TryMes(mes, out var inicio)) return ApiComun.MesInvalido();
 
-/// <summary>Consulta compartida del cierre de mes para los endpoints que modifican gastos.</summary>
-public static class CierreMes
-{
-    /// <summary>Mensaje de error cuando se intenta tocar un mes cerrado.</summary>
-    public const string Mensaje = Application.Mensajes.MesCerrado;
-
-    /// <summary>SQLSTATE con el que los triggers de la base de datos rechazan una escritura de gasto en un mes cerrado.</summary>
-    public const string SqlState = Infrastructure.Persistencia.RepositorioGastos.SqlStateMesCerrado;
-
-    /// <summary>Indica si la excepción es el rechazo de la base de datos por mes cerrado (carrera con un cierre concurrente).</summary>
-    public static bool EsRechazo(DbUpdateException ex)
-        => ex.InnerException is Npgsql.PostgresException { SqlState: SqlState };
-
-    /// <summary>Respuesta 409 de mes cerrado.</summary>
-    public static IResult Rechazo() => Results.Conflict(new { error = Mensaje });
-
-    /// <summary>
-    /// Guarda los cambios; si la base de datos rechaza la escritura porque otra petición cerró el mes después de la
-    /// comprobación previa, devuelve el mismo 409 (y null si se guardó).
-    /// </summary>
-    public static async Task<IResult?> GuardarAsync(MiParteDbContext db, CancellationToken ct)
-    {
-        try
-        {
-            await db.SaveChangesAsync(ct);
-            return null;
-        }
-        catch (DbUpdateException ex) when (EsRechazo(ex))
-        {
-            return Rechazo();
-        }
-    }
-
-    /// <summary>Indica si el mes de la fecha está cerrado en el hogar actual.</summary>
-    public static Task<bool> EstaCerradoAsync(MiParteDbContext db, DateOnly fecha, CancellationToken ct)
-    {
-        var inicio = new DateOnly(fecha.Year, fecha.Month, 1);
-        return db.MesesCerrados.AnyAsync(c => c.Mes == inicio, ct);
-    }
-
-    /// <summary>Respuesta 409 de mes cerrado, o null si ninguna de las fechas cae en un mes cerrado.</summary>
-    public static async Task<IResult?> ComprobarAsync(MiParteDbContext db, CancellationToken ct, params DateOnly[] fechas)
-    {
-        foreach (var f in fechas.Distinct())
-            if (await EstaCerradoAsync(db, f, ct)) return Rechazo();
-        return null;
+        var r = await servicio.ReabrirAsync(inicio, ct);
+        return r.Error is { } error ? ApiComun.Respuesta(error) : Results.NoContent();
     }
 }

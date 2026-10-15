@@ -9,6 +9,9 @@ public static class Mensajes
     /// <summary>El hogar no ha activado la cuenta común.</summary>
     public const string CuentaInactiva = "La cuenta común no está activada en este hogar. Un administrador puede activarla en la configuración del hogar.";
 
+    /// <summary>Quien intenta cerrar un mes no es miembro activo del hogar.</summary>
+    public const string SoloMiembroCierra = "Solo un miembro activo del hogar puede cerrar un mes.";
+
     /// <summary>El hogar no ha activado el ahorro.</summary>
     public const string AhorroInactivo = "El ahorro no está activado en este hogar. Un administrador puede activarlo en la configuración del hogar.";
 }

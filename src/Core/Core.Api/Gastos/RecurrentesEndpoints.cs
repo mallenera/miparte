@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using MiParte.Contracts;
 using MiParte.Core.Api.Seguridad;
 using MiParte.Core.Application.Recurrentes;
@@ -93,8 +92,4 @@ public static class RecurrentesEndpoints
         if (r.Error is { } error) return ApiComun.Respuesta(error);
         return Results.Ok(new GenerarRecurrentesResponse(ApiComun.FormatoMes(r.Valor!.Mes), r.Valor.Creados, r.Valor.YaExistentes));
     }
-
-    /// <summary>Indica si la excepción es una violación de unicidad de PostgreSQL (SqlState 23505).</summary>
-    internal static bool EsUnicidadViolada(DbUpdateException ex)
-        => ex.InnerException is Npgsql.PostgresException { SqlState: "23505" };
 }

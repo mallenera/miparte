@@ -18,6 +18,10 @@ public sealed class ServicioMiembros(IRepositorioMiembros repositorio, TimeProvi
     private const string TipoAdulto = "adulto";
     private const string TipoACargo = "a_cargo";
 
+    /// <summary>Miembro activo del hogar actual vinculado al usuario, o null si no lo es.</summary>
+    public Task<Miembro?> MiembroActivoAsync(Guid userId, CancellationToken ct)
+        => repositorio.MiembroActivoDeUsuarioAsync(userId, ct);
+
     /// <summary>Miembros del hogar actual ordenados por nombre; los inactivos solo si se piden.</summary>
     public Task<IReadOnlyList<Miembro>> ListarAsync(bool incluirInactivos, CancellationToken ct)
         => repositorio.ListarAsync(incluirInactivos, ct);

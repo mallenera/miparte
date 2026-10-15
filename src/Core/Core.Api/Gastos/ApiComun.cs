@@ -1,18 +1,14 @@
-using Microsoft.EntityFrameworkCore;
 using MiParte.Contracts;
 using MiParte.Core.Application;
-using MiParte.Core.Domain;
-using MiParte.Core.Domain.Entidades;
-using MiParte.Core.Infrastructure.Persistencia;
 
 namespace MiParte.Core.Api.Gastos;
 
-/// <summary>Utilidades compartidas por los endpoints de gastos, recurrentes y liquidación.</summary>
+/// <summary>
+/// Utilidades HTTP compartidas por los endpoints de gastos, recurrentes, liquidación, categorías y perfiles: parseo de formatos de
+/// la API y traducción de resultados a respuestas. Las reglas de negocio viven en Core.Domain y Core.Application.
+/// </summary>
 internal static class ApiComun
 {
-    /// <summary>Longitud máxima del concepto de un movimiento.</summary>
-    public const int MaxConcepto = ReglasMovimiento.MaxConcepto;
-
     /// <summary>Parsea "YYYY-MM" estricto; devuelve el primer día del mes.</summary>
     public static bool TryMes(string? mes, out DateOnly inicio) => FormatosApi.TryMes(mes, out inicio);
 
@@ -37,41 +33,10 @@ internal static class ApiComun
         TipoError.NoEncontrado => Results.NotFound(),
         TipoError.Conflicto => Results.Conflict(
             new Dictionary<string, object>(error.Extra ?? new Dictionary<string, object>()) { ["error"] = error.Mensaje }),
+        TipoError.Prohibido => Results.Json(new { error = error.Mensaje }, statusCode: StatusCodes.Status403Forbidden),
         _ => Invalido(error.Mensaje),
     };
 
     /// <summary>Respuesta 409 cuando la petición no tiene hogar seleccionado.</summary>
     public static IResult SinHogar() => Results.Conflict(new { error = "No hay hogar seleccionado." });
-
-    /// <summary>Valida que el importe sea mayor que cero, no exceda el máximo y tenga como mucho 2 decimales; devuelve el mensaje de error o null.</summary>
-    public static string? ValidarImporte(decimal importe) => ReglasMovimiento.ValidarImporte(importe);
-
-    /// <summary>Valida la longitud máxima del concepto; devuelve el mensaje de error o null.</summary>
-    public static string? ValidarConcepto(string? concepto)
-        => ReglasMovimiento.ValidarConcepto(concepto);
-
-    /// <summary>Recorta el concepto y devuelve null si está vacío.</summary>
-    public static string? NormalizarConcepto(string? concepto)
-        => ReglasMovimiento.NormalizarConcepto(concepto);
-
-    /// <summary>Adultos activos del hogar, ordenados por nombre y id.</summary>
-    public static Task<List<Miembro>> AdultosActivos(MiParteDbContext db, CancellationToken ct)
-        => db.Miembros.Where(m => m.Activo && m.Tipo == TipoMiembro.Adulto)
-            .OrderBy(m => m.Nombre).ThenBy(m => m.Id).ToListAsync(ct);
-
-    /// <summary>Indica si el miembro existe en el hogar, está activo y es adulto.</summary>
-    public static Task<bool> EsAdultoActivo(MiParteDbContext db, Guid id, CancellationToken ct)
-        => db.Miembros.AnyAsync(m => m.Id == id && m.Activo && m.Tipo == TipoMiembro.Adulto, ct);
-
-    /// <summary>Calcula el reparto de un gasto entre los adultos activos según el perfil (<see cref="RepartoGasto.Repartir"/>).</summary>
-    public static IReadOnlyList<ParteAsumida>? Repartir(
-        PerfilReparto perfil, IReadOnlyList<Miembro> adultos, decimal importe, Guid pagadoPor, out string? error)
-        => RepartoGasto.Repartir(perfil, adultos, importe, pagadoPor, out error);
-
-    /// <summary>Aplica el reparto al gasto (<see cref="RepartoGasto.Aplicar"/>).</summary>
-    public static void AplicarReparto(Gasto gasto, IReadOnlyList<ParteAsumida> partes) => RepartoGasto.Aplicar(gasto, partes);
-
-    /// <summary>Devuelve el 409 si el hogar actual no tiene la cuenta común activada, o null si puede seguir.</summary>
-    public static async Task<IResult?> ExigirCuentaActivaAsync(MiParteDbContext db, CancellationToken ct)
-        => await db.Hogares.AnyAsync(h => h.CuentaComunActiva, ct) ? null : Results.Conflict(new { error = Mensajes.CuentaInactiva });
 }

@@ -1,9 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MiParte.Core.Application.CuentaComun;
+using MiParte.Core.Application.Categorias;
+using MiParte.Core.Application.Cierres;
 using MiParte.Core.Application.Gastos;
 using MiParte.Core.Application.Liquidacion;
 using MiParte.Core.Application.Miembros;
+using MiParte.Core.Application.Perfiles;
 using MiParte.Core.Application.Recurrentes;
 using MiParte.Core.Infrastructure.Persistencia;
 
@@ -38,6 +41,9 @@ public static class DependencyInjection
         services.AddScoped<IRepositorioCuentaComun>(sp => new RepositorioCuentaComun(sp.GetRequiredService<MiParteDbContext>()));
         services.AddScoped<IRepositorioMiembros>(sp => new RepositorioMiembros(sp.GetRequiredService<MiParteDbContext>()));
         services.AddScoped<IRepositorioRecurrentes>(sp => new RepositorioRecurrentes(sp.GetRequiredService<MiParteDbContext>()));
+        services.AddScoped<IRepositorioPerfiles>(sp => new RepositorioPerfiles(sp.GetRequiredService<MiParteDbContext>()));
+        services.AddScoped<IRepositorioCategorias>(sp => new RepositorioCategorias(sp.GetRequiredService<MiParteDbContext>()));
+        services.AddScoped<IRepositorioCierres>(sp => new RepositorioCierres(sp.GetRequiredService<MiParteDbContext>()));
         return services;
     }
 }

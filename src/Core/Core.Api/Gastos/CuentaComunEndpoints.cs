@@ -51,10 +51,9 @@ public static class CuentaComunEndpoints
     {
         var aportaciones = await db.AportacionesCuenta.ToListAsync(ct);
         var depositos = await db.DepositosAhorro.Select(d => new DepositoDeAhorro(d.Fecha, d.Importe)).ToListAsync(ct);
-        var ahorrado = CuentaComun.Calcular(CuentaComun.InicioMes(fecha), Vigentes(aportaciones), [], [], null, depositos).AhorroAcumulado;
         var retirado = await db.RetiradasAhorro.SumAsync(r => r.Importe, ct);
         var gastado = await db.Gastos.Where(g => g.PagadoDesdeAhorro && g.Id != excluirGasto).SumAsync(g => g.Importe, ct);
-        return ahorrado - retirado - gastado;
+        return AhorroCuenta.Disponible(fecha, new DatosAhorro(Vigentes(aportaciones), depositos, retirado, gastado));
     }
 
     /// <summary>
@@ -90,11 +89,11 @@ public static class CuentaComunEndpoints
 
     /// <summary>Respuesta 409 cuando el hogar no ha activado la cuenta común.</summary>
     internal static IResult CuentaInactiva()
-        => Results.Conflict(new { error = "La cuenta común no está activada en este hogar. Un administrador puede activarla en la configuración del hogar." });
+        => Results.Conflict(new { error = Application.Mensajes.CuentaInactiva });
 
     /// <summary>Respuesta 409 cuando el hogar no ha activado el ahorro.</summary>
     internal static IResult AhorroInactivo()
-        => Results.Conflict(new { error = "El ahorro no está activado en este hogar. Un administrador puede activarlo en la configuración del hogar." });
+        => Results.Conflict(new { error = Application.Mensajes.AhorroInactivo });
 
     /// <summary>Devuelve el 409 si el hogar actual no tiene activados la cuenta común y el ahorro, o null si puede seguir.</summary>
     internal static async Task<IResult?> ExigirAhorroAsync(MiParteDbContext db, CancellationToken ct)

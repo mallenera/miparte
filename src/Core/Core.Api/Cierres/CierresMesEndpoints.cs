@@ -99,10 +99,10 @@ public static class CierresMesEndpoints
 public static class CierreMes
 {
     /// <summary>Mensaje de error cuando se intenta tocar un mes cerrado.</summary>
-    public const string Mensaje = "Ese mes está cerrado: quien tenga permiso para reabrir meses (un administrador) debe reabrirlo para cambiar sus gastos.";
+    public const string Mensaje = Application.Mensajes.MesCerrado;
 
     /// <summary>SQLSTATE con el que los triggers de la base de datos rechazan una escritura de gasto en un mes cerrado.</summary>
-    public const string SqlState = "MP409";
+    public const string SqlState = Infrastructure.Persistencia.RepositorioGastos.SqlStateMesCerrado;
 
     /// <summary>Indica si la excepción es el rechazo de la base de datos por mes cerrado (carrera con un cierre concurrente).</summary>
     public static bool EsRechazo(DbUpdateException ex)

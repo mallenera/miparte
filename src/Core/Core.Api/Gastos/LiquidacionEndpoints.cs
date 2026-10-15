@@ -39,7 +39,6 @@ public static class LiquidacionEndpoints
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
         if (!ApiComun.TryMes(mes, out var inicio)) return ApiComun.MesInvalido();
-        var fin = inicio.AddMonths(1);
 
         var delMes = await GastosDelMes(db, inicio, ct);
         var gastos = delMes.Where(g => !g.EsPersonal).ToList(); // los personales van aparte: no entran en pagado, asumido ni totales
@@ -50,10 +49,9 @@ public static class LiquidacionEndpoints
         var gastosTotales = gastos.Sum(g => g.Importe);
 
         // Lo que adelantó un miembro para la cuenta común cuenta como pagado, y la cuenta le debe lo aún no reembolsado.
-        var reembolsos = await db.ReembolsosCuenta.AsNoTracking().ToListAsync(ct);
-        var gastosCuenta = await GastosDeCuenta(db, ct);
-        var cuenta = CuentaComun.Calcular(
-            inicio, [], gastosCuenta, reembolsos.Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe)));
+        // Una sola consulta con el histórico de la cuenta ya agrupado (en vez de cinco tablas completas).
+        var historico = await HistoricoCuentaComun.LeerAsync(db, inicio, detalleDelMes: false, ct);
+        var cuenta = CuentaComun.Calcular(inicio, [], historico.Gastos, historico.Reembolsos);
         // Los acreedores con pendiente de meses anteriores aparecen aunque no participen en los gastos de este mes (p. ej. un miembro ya inactivo).
         var implicados = miembros.Where(m => m.Activo && m.Tipo == TipoMiembro.Adulto).Select(m => m.Id)
             .Concat(gastos.Where(g => g.PagadoPor is not null).Select(g => g.PagadoPor!.Value))
@@ -80,16 +78,12 @@ public static class LiquidacionEndpoints
 
         // Saldos de la cuenta al final del mes, solo si el hogar la ha activado.
         ResumenCuentaComunDto? resumenCuenta = null;
-        if (await db.Hogares.AnyAsync(h => h.CuentaComunActiva, ct))
+        if (historico.CuentaActiva)
         {
-            var aportaciones = await db.AportacionesCuenta.AsNoTracking().ToListAsync(ct);
-            var retiradas = await db.RetiradasAhorro.Select(r => new RetiradaDeAhorro(r.Fecha, r.Importe)).ToListAsync(ct);
-            var depositos = await db.DepositosAhorro.Select(d => new DepositoDeAhorro(d.Fecha, d.Importe, d.MiembroId)).ToListAsync(ct);
             var estado = CuentaComun.Calcular(
-                inicio, aportaciones.Select(a => new AportacionVigente(a.MiembroId, a.Desde, a.Importe, a.Ahorro)).ToList(),
-                gastosCuenta, reembolsos.Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe)), retiradas, depositos);
+                inicio, historico.Vigentes, historico.Gastos, historico.Reembolsos, historico.Retiradas, historico.Depositos);
             resumenCuenta = new ResumenCuentaComunDto(
-                estado.AportadoMes, gastosCuenta.Where(g => g.Fecha >= inicio && g.Fecha < fin).Sum(g => g.Importe), estado.Saldo,
+                estado.AportadoMes, historico.GastadoMes, estado.Saldo,
                 estado.Efectivo, estado.Pendientes.Where(p => p.Importe > 0m).Sum(p => p.Importe),
                 estado.AhorroMes, estado.AhorroDisponible);
         }

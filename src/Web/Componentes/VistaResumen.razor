@@ -299,18 +299,14 @@ else if (_resumen is not null && _liquidacion is not null)
         await Permisos.AsegurarAsync();
         try
         {
-            _miembros = await Api.ListarMiembrosAsync();
-            try
-            {
-                _categorias = await Api.ListarCategoriasAsync();
-            }
-            catch (ApiException)
-            {
-                // Solo sirven para mostrar la ruta de las subcategorías: sin ellas el resumen usa el nombre suelto.
-                _categorias = [];
-            }
-
-            await RecargarAsync();
+            // En paralelo: la latencia hacia la API se paga una vez y no cinco.
+            var miembros = Api.ListarMiembrosAsync();
+            // Solo sirven para mostrar la ruta de las subcategorías: sin ellas el resumen usa el nombre suelto.
+            var categorias = OVacia(Api.ListarCategoriasAsync());
+            var datos = RecargarAsync();
+            await Task.WhenAll(miembros, categorias, datos);
+            _miembros = miembros.Result;
+            _categorias = categorias.Result;
         }
         catch (ApiException e)
         {
@@ -323,15 +319,25 @@ else if (_resumen is not null && _liquidacion is not null)
     private async Task RecargarAsync()
     {
         var mes = Formato.Mes(_mes);
-        _resumen = await Api.ObtenerResumenAsync(mes);
-        _liquidacion = await Api.ObtenerLiquidacionAsync(mes);
+        var resumen = Api.ObtenerResumenAsync(mes);
+        var liquidacion = Api.ObtenerLiquidacionAsync(mes);
+        var cierres = OVacia(Api.ListarCierresMesAsync()); // el cierre es informativo aquí: sin él se sigue viendo el resumen
+        await Task.WhenAll(resumen, liquidacion, cierres);
+        _resumen = resumen.Result;
+        _liquidacion = liquidacion.Result;
+        _cierres = cierres.Result;
+    }
+
+    /// <summary>Espera una lista opcional: si la API falla, la pantalla sigue con la lista vacía.</summary>
+    private static async Task<List<T>> OVacia<T>(Task<List<T>> carga)
+    {
         try
         {
-            _cierres = await Api.ListarCierresMesAsync();
+            return await carga;
         }
         catch (ApiException)
         {
-            _cierres = []; // el cierre es informativo aquí: sin él se sigue viendo el resumen
+            return [];
         }
     }
 

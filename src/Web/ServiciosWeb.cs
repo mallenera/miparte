@@ -27,6 +27,7 @@ public static class ServiciosWeb
         servicios.AddSingleton<IAlmacenLocal, AlmacenLocalJs>();
         servicios.AddSingleton<ServicioSesion>();
         servicios.AddSingleton<EstadoHogar>();
+        servicios.AddSingleton<CacheLecturas>(); // compartida por todas las páginas: es lo que evita repetir las mismas lecturas al cambiar de pestaña
         servicios.AddSingleton<ServicioAvisos>();
         servicios.AddSingleton<ServicioTema>();
         servicios.AddScoped<ServicioArranque>();

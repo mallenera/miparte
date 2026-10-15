@@ -8,14 +8,14 @@
 
 <h1 class="sr">Gastos de @Hogar.HogarActual?.Nombre</h1>
 
-@if (_cargando)
+@if (_m.Cargando)
 {
     <div class="spinbox" role="status"><div class="spin"></div><span>Cargando gastos…</span></div>
 }
-else if (_errorCarga is not null)
+else if (_m.ErrorCarga is not null)
 {
     <div class="aviso err" role="alert">
-        @_errorCarga
+        @_m.ErrorCarga
         <button class="linkbtn" type="button" @onclick="CargarAsync">Reintentar</button>
     </div>
 }
@@ -25,21 +25,21 @@ else
         <div class="card-head">
             <h2 id="t-gastos">Gastos</h2>
             <div class="modo" role="group" aria-label="Tipo de periodo">
-                <button class="chip chip-btn @(_modoRango ? "" : "sel")" type="button" aria-pressed="@(_modoRango ? "false" : "true")" @onclick="() => CambiarModoAsync(false)">Por mes</button>
-                <button class="chip chip-btn @(_modoRango ? "sel" : "")" type="button" aria-pressed="@(_modoRango ? "true" : "false")" @onclick="() => CambiarModoAsync(true)">Entre fechas</button>
+                <button class="chip chip-btn @(_m.ModoRango ? "" : "sel")" type="button" aria-pressed="@(_m.ModoRango ? "false" : "true")" @onclick="() => _m.CambiarModoAsync(false)">Por mes</button>
+                <button class="chip chip-btn @(_m.ModoRango ? "sel" : "")" type="button" aria-pressed="@(_m.ModoRango ? "true" : "false")" @onclick="() => _m.CambiarModoAsync(true)">Entre fechas</button>
             </div>
         </div>
-        @if (_modoRango)
+        @if (_m.ModoRango)
         {
             <div class="filtros" role="group" aria-label="Periodo">
                 <label>Desde
-                    <input type="date" @bind="_desdeR" @bind:after="AplicarRangoAsync" max="@_hastaR.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" />
+                    <input type="date" @bind="_m.Desde" @bind:after="_m.AplicarRangoAsync" max="@_m.Hasta.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" />
                 </label>
                 <label>Hasta
-                    <input type="date" @bind="_hastaR" @bind:after="AplicarRangoAsync" min="@_desdeR.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" />
+                    <input type="date" @bind="_m.Hasta" @bind:after="_m.AplicarRangoAsync" min="@_m.Desde.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" />
                 </label>
             </div>
-            @if (_desdeR > _hastaR)
+            @if (_m.Desde > _m.Hasta)
             {
                 <div class="aviso err u-mt12" role="alert">La fecha «Desde» no puede ser posterior a «Hasta».</div>
             }
@@ -47,78 +47,78 @@ else
         else
         {
             <div class="mesnav">
-                <button class="linkbtn" type="button" aria-label="Mes anterior" @onclick="() => CambiarMesAsync(-1)"><Icono Nombre="chevron-left" /></button>
+                <button class="linkbtn" type="button" aria-label="Mes anterior" @onclick="() => _m.CambiarMesAsync(-1)"><Icono Nombre="chevron-left" /></button>
                 <span class="tag cur" aria-live="polite">@NombreMes</span>
-                <button class="linkbtn" type="button" aria-label="Mes siguiente" @onclick="() => CambiarMesAsync(1)"><Icono Nombre="chevron-right" /></button>
+                <button class="linkbtn" type="button" aria-label="Mes siguiente" @onclick="() => _m.CambiarMesAsync(1)"><Icono Nombre="chevron-right" /></button>
             </div>
         }
         <div class="filtros" role="search" aria-label="Filtrar gastos">
             <label>Persona
-                <select @bind="_filtroMiembro" @bind:after="AplicarFiltrosAsync">
+                <select @bind="_m.FiltroMiembro" @bind:after="_m.AplicarFiltrosAsync">
                     <option value="">Todas</option>
-                    @foreach (var m in _miembros.Where(m => m.Activo))
+                    @foreach (var m in _m.Miembros.Where(m => m.Activo))
                     {
                         <option value="@m.Id">@m.Nombre</option>
                     }
                 </select>
             </label>
             <label>Categoría
-                <select @bind="_filtroCategoria" @bind:after="AplicarFiltrosAsync">
+                <select @bind="_m.FiltroCategoria" @bind:after="_m.AplicarFiltrosAsync">
                     <option value="">Todas</option>
-                    @foreach (var n in _arbol)
+                    @foreach (var n in _m.Arbol)
                     {
                         <option value="@n.Categoria.Id">@(new string(' ', n.Nivel * 3))@n.Categoria.Nombre</option>
                     }
                 </select>
             </label>
             <label>Concepto
-                <input type="search" maxlength="200" placeholder="Buscar…" @bind="_filtroTexto" @bind:event="onchange" @bind:after="AplicarFiltrosAsync" />
+                <input type="search" maxlength="200" placeholder="Buscar…" @bind="_m.FiltroTexto" @bind:event="onchange" @bind:after="_m.AplicarFiltrosAsync" />
             </label>
-            @if (HayFiltros)
+            @if (_m.HayFiltros)
             {
-                <button class="linkbtn" type="button" @onclick="LimpiarFiltrosAsync">Quitar filtros</button>
+                <button class="linkbtn" type="button" @onclick="_m.LimpiarFiltrosAsync">Quitar filtros</button>
             }
         </div>
-        @if (_soloPaga is not null || _soloCuenta)
+        @if (_m.SoloPaga is not null || _m.SoloCuenta)
         {
-            <p class="muted u-mt10" role="status">Solo lo que paga <b>@(_soloPaga is { } p ? Formato.NombreMiembro(p, _miembros) : "la cuenta común o el ahorro")</b>, no lo que solo asume.</p>
+            <p class="muted u-mt10" role="status">Solo lo que paga <b>@(_m.SoloPaga is { } p ? Formato.NombreMiembro(p, _m.Miembros) : "la cuenta común o el ahorro")</b>, no lo que solo asume.</p>
         }
-        @{ var totales = ListaGastos.Totales(_gastos); }
-        <p class="muted">@(HayFiltros ? "Total filtrado" : _modoRango ? "Total del periodo" : "Total del mes"): <b>@Formato.Euros(totales.TotalHogar)</b> en @totales.CuantosHogar @(totales.CuantosHogar == 1 ? "gasto" : "gastos").
+        @{ var totales = ListaGastos.Totales(_m.Gastos); }
+        <p class="muted">@(_m.HayFiltros ? "Total filtrado" : _m.ModoRango ? "Total del periodo" : "Total del mes"): <b>@Formato.Euros(totales.TotalHogar)</b> en @totales.CuantosHogar @(totales.CuantosHogar == 1 ? "gasto" : "gastos").
             @if (totales.HayPersonales)
             {
                 <span>Personales (fuera de la liquidación): <b>@Formato.Euros(totales.TotalPersonales)</b>.</span>
             }
         </p>
 
-        @if (!_modoRango && MesCerrado)
+        @if (!_m.ModoRango && _m.MesCerrado)
         {
             <div class="aviso warn u-mt12" role="status">
                 Este mes está cerrado: sus gastos no se pueden añadir, editar ni borrar. Un administrador puede reabrirlo desde Resumen.
             </div>
         }
-        else if (_modoRango && _gastos.Any(CerradoGasto))
+        else if (_m.ModoRango && _m.Gastos.Any(_m.CerradoGasto))
         {
             <div class="aviso warn u-mt12" role="status">
                 Los gastos de meses cerrados no se pueden editar ni borrar. Un administrador puede reabrir el mes desde Resumen.
             </div>
         }
 
-        @if (_error is not null)
+        @if (_m.Error is not null)
         {
-            <div class="aviso err u-mt12" role="alert">@_error</div>
+            <div class="aviso err u-mt12" role="alert">@_m.Error</div>
         }
 
         @* Con un gasto en edición el formulario sube sobre la lista (order en CSS): en un periodo largo no hay que bajar hasta el final. *@
         <div class="gastos-cuerpo">
         <div class="u-mt10">
-            @foreach (var g in _gastos)
+            @foreach (var g in _m.Gastos)
             {
                 <div class="gastorow @(g.Personal ? "personal" : "")">
                     <div class="g-main">
-                        <div class="g-concepto">@(string.IsNullOrWhiteSpace(g.Concepto) ? NombreCategoria(g.CategoriaId) : g.Concepto)</div>
+                        <div class="g-concepto">@(string.IsNullOrWhiteSpace(g.Concepto) ? _m.NombreCategoria(g.CategoriaId) : g.Concepto)</div>
                         <div class="muted g-meta">
-                            @g.Fecha.ToString("dd/MM/yyyy", Es) · @NombreCategoria(g.CategoriaId) · paga @(g.PagadoDesdeAhorro ? "el ahorro" : g.PagadoPor is { } quien ? Formato.NombreMiembro(quien, _miembros) : "la cuenta común")
+                            @g.Fecha.ToString("dd/MM/yyyy", Es) · @_m.NombreCategoria(g.CategoriaId) · paga @(g.PagadoDesdeAhorro ? "el ahorro" : g.PagadoPor is { } quien ? Formato.NombreMiembro(quien, _m.Miembros) : "la cuenta común")
                             @if (g.GastoRecurrenteId is not null) { <span class="tag off">recurrente</span> }
                         </div>
                         <div class="g-reparto">
@@ -136,19 +136,19 @@ else
                             }
                             @foreach (var r in g.Repartos)
                             {
-                                <span class="chip"><Avatar Nombre="@Formato.NombreMiembro(r.MiembroId, _miembros)" Color="@ColorDe(r.MiembroId)" Tamano="sm" />@Formato.Euros(r.ImporteAsumido)</span>
+                                <span class="chip"><Avatar Nombre="@Formato.NombreMiembro(r.MiembroId, _m.Miembros)" Color="@_m.ColorDe(r.MiembroId)" Tamano="sm" />@Formato.Euros(r.ImporteAsumido)</span>
                             }
                         </div>
                     </div>
                     <div class="g-importe">@Formato.Euros(g.Importe)</div>
                     <div class="c-acc">
-                        @if (_confirmandoEliminar == g.Id)
+                        @if (_m.ConfirmandoEliminar == g.Id)
                         {
                             <span class="muted">¿Eliminar?</span>
                             <button class="linkbtn danger" type="button" @onclick="() => EliminarAsync(g)">Sí</button>
-                            <button class="linkbtn" type="button" @onclick="() => _confirmandoEliminar = null">No</button>
+                            <button class="linkbtn" type="button" @onclick="() => _m.ConfirmandoEliminar = null">No</button>
                         }
-                        else if (!CerradoGasto(g))
+                        else if (!_m.CerradoGasto(g))
                         {
                             @if (Permisos.Tiene(Claves.GastosEditar))
                             {
@@ -156,89 +156,89 @@ else
                             }
                             @if (Permisos.Tiene(Claves.GastosBorrar))
                             {
-                                <button class="linkbtn danger" type="button" aria-label="Eliminar gasto @g.Concepto" @onclick="() => _confirmandoEliminar = g.Id">Eliminar</button>
+                                <button class="linkbtn danger" type="button" aria-label="Eliminar gasto @g.Concepto" @onclick="() => _m.ConfirmandoEliminar = g.Id">Eliminar</button>
                             }
                         }
                     </div>
                 </div>
             }
 
-            @if (_gastos.Count == 0)
+            @if (_m.Gastos.Count == 0)
             {
-                <div class="empty">@(HayFiltros ? $"Ningún gasto de {(_modoRango ? "este periodo" : "este mes")} coincide con los filtros." : _modoRango ? "No hay gastos entre estas fechas." : "No hay gastos en este mes. Añade el primero abajo.")</div>
+                <div class="empty">@(_m.HayFiltros ? $"Ningún gasto de {(_m.ModoRango ? "este periodo" : "este mes")} coincide con los filtros." : _m.ModoRango ? "No hay gastos entre estas fechas." : "No hay gastos en este mes. Añade el primero abajo.")</div>
             }
         </div>
 
-        @if (_adultos.Count == 0 || _categorias.Count == 0 || _perfiles.Count == 0)
+        @if (_m.Adultos.Count == 0 || _m.Categorias.Count == 0 || _m.Perfiles.Count == 0)
         {
             <div class="aviso warn u-mt14">Para registrar gastos hace falta al menos un adulto, una categoría y un perfil de reparto.</div>
         }
-        else if (!Permisos.Tiene(_editando is null ? Claves.GastosCrear : Claves.GastosEditar))
+        else if (!Permisos.Tiene(_m.Editando is null ? Claves.GastosCrear : Claves.GastosEditar))
         {
-            <div class="aviso warn u-mt14" role="status">No tienes permiso para @(_editando is null ? "crear" : "editar") gastos. Pídeselo a un administrador del hogar.</div>
+            <div class="aviso warn u-mt14" role="status">No tienes permiso para @(_m.Editando is null ? "crear" : "editar") gastos. Pídeselo a un administrador del hogar.</div>
         }
         else
         {
-            <form class="addcat @(_editando is not null ? "editando" : "")" @onsubmit="GuardarAsync">
-                <h3 class="u-titulo-form">@(_editando is null ? "Nuevo gasto" : "Editar gasto")</h3>
+            <form class="addcat @(_m.Editando is not null ? "editando" : "")" @onsubmit="GuardarAsync">
+                <h3 class="u-titulo-form">@(_m.Editando is null ? "Nuevo gasto" : "Editar gasto")</h3>
                 <label>Fecha
-                    <input type="date" required @bind="_fecha" @ref="_campoFecha" />
+                    <input type="date" required @bind="_m.Fecha" @ref="_campoFecha" />
                 </label>
                 <label>Importe (€)
-                    <input inputmode="decimal" required placeholder="0,00" @bind="_importe" @bind:event="oninput" />
+                    <input inputmode="decimal" required placeholder="0,00" @bind="_m.Importe" @bind:event="oninput" />
                 </label>
                 <label>Categoría
-                    <select @bind="_categoria" @bind:after="AlCambiarCategoria">
-                        @foreach (var n in _arbol)
+                    <select @bind="_m.Categoria" @bind:after="_m.AlCambiarCategoria">
+                        @foreach (var n in _m.Arbol)
                         {
                             <option value="@n.Categoria.Id">@(new string(' ', n.Nivel * 3))@n.Categoria.Nombre</option>
                         }
                     </select>
                 </label>
                 <label>Paga
-                    <select @bind="OrigenPago" @bind:after="AlCambiarPagador">
-                        @foreach (var m in _adultos)
+                    <select @bind="_m.OrigenPago" @bind:after="_m.AlCambiarPagador">
+                        @foreach (var m in _m.Adultos)
                         {
                             <option value="@m.Id">@m.Nombre</option>
                         }
-                        @if (_cuentaActiva && PerfilCuentaComun is not null)
+                        @if (_m.CuentaActiva && _m.PerfilCuentaComun is not null)
                         {
                             <option value="">Cuenta común (la paga directamente)</option>
-                            @if (_ahorroActivo || _desdeAhorro)
+                            @if (_m.AhorroActivo || _m.DesdeAhorro)
                             {
                                 <option value="ahorro">Ahorro (se descuenta del ahorro)</option>
                             }
                         }
                     </select>
                 </label>
-                @if (_pagador is not null)
+                @if (_m.Pagador is not null)
                 {
                     <label>Tipo de gasto
-                        <select @bind="TipoGasto">
+                        <select @bind="_m.TipoGasto">
                             <option value="hogar">Del hogar (se reparte)</option>
                             <option value="personal">Personal (solo de quien paga, fuera de la liquidación)</option>
                         </select>
                     </label>
                 }
                 <label>Reparto
-                    <select @bind="_perfil" disabled="@(_personal && _pagador is not null)">
-                        @foreach (var p in PerfilesOfrecidos)
+                    <select @bind="_m.Perfil" disabled="@(_m.Personal && _m.Pagador is not null)">
+                        @foreach (var p in _m.PerfilesOfrecidos)
                         {
                             <option value="@p.Id">@p.Nombre</option>
                         }
                     </select>
-                    @if (CategoriaACargoDeLaCuenta)
+                    @if (_m.CategoriaACargoDeLaCuenta)
                     {
                         <span class="muted">Esta categoría va por defecto a cargo de la cuenta común.</span>
                     }
                 </label>
                 <label>Concepto
-                    <input maxlength="200" placeholder="Opcional" @bind="_concepto" @bind:event="oninput" />
+                    <input maxlength="200" placeholder="Opcional" @bind="_m.Concepto" @bind:event="oninput" />
                 </label>
-                <button class="btn" type="submit" disabled="@(!ImporteValido)">@(_editando is null ? "Añadir" : "Guardar")</button>
-                @if (_editando is not null)
+                <button class="btn" type="submit" disabled="@(!_m.ImporteValido)">@(_m.Editando is null ? "Añadir" : "Guardar")</button>
+                @if (_m.Editando is not null)
                 {
-                    <button class="linkbtn" type="button" @onclick="CancelarEdicion">Cancelar</button>
+                    <button class="linkbtn" type="button" @onclick="_m.CancelarEdicion">Cancelar</button>
                 }
             </form>
         }
@@ -249,26 +249,9 @@ else
 @code {
     private static readonly CultureInfo Es = new("es-ES");
 
-    private List<GastoResponse> _gastos = [];
-    private List<MiembroDto> _miembros = [], _adultos = [];
-    private List<CategoriaDto> _categorias = [];
-    private List<PerfilRepartoDto> _perfiles = [];
-    private List<NodoCategoria> _arbol = [];
-    private bool _cargando = true;
-    private string? _errorCarga, _error;
-    private DateOnly _mes = new(DateTime.Today.Year, DateTime.Today.Month, 1);
-
-    private Guid? _editando, _confirmandoEliminar;
-    private string _filtroMiembro = "", _filtroCategoria = "", _filtroTexto = "";
-    private DateOnly _fecha = DateOnly.FromDateTime(DateTime.Today);
-    private string _importe = "", _concepto = "";
-    private Guid _categoria, _perfil;
-    private Guid? _pagador;
-    private bool _cuentaActiva, _ahorroActivo, _desdeAhorro, _personal;
-
-    /// <summary>Si se listan los gastos entre dos fechas en vez de por mes (para ver una categoría a lo largo de varios meses).</summary>
-    private bool _modoRango;
-    private DateOnly _desdeR, _hastaR;
+    private ModeloGastos _m = default!;
+    private ElementReference _campoFecha;
+    private bool _enfocarFormulario;
 
     /// <summary>Categoría con la que se abre la lista (enlace desde el Dashboard).</summary>
     [Parameter] public Guid? CategoriaInicial { get; set; }
@@ -282,267 +265,51 @@ else
     /// <summary>Solo los gastos pagados por la cuenta común o el ahorro, sin persona (enlace del Dashboard).</summary>
     [Parameter] public bool CuentaComunInicial { get; set; }
 
-    private Guid? _soloPaga;
-    private bool _soloCuenta;
-
     /// <summary>Primer día del periodo con el que se abre la lista; con <see cref="HastaInicial"/> activa el modo «entre fechas».</summary>
     [Parameter] public DateOnly? DesdeInicial { get; set; }
 
     /// <summary>Último día del periodo con el que se abre la lista.</summary>
     [Parameter] public DateOnly? HastaInicial { get; set; }
 
-    /// <summary>Quién paga en el selector: un adulto (su id), la cuenta común ("") o el ahorro ("ahorro").</summary>
-    private string OrigenPago
-    {
-        get => _desdeAhorro ? "ahorro" : _pagador?.ToString() ?? "";
-        set
-        {
-            _desdeAhorro = value == "ahorro";
-            _pagador = _desdeAhorro || value == "" ? null : Guid.Parse(value);
-        }
-    }
-
-    /// <summary>Tipo de gasto en el selector: «hogar» (se reparte y entra en la liquidación) o «personal» (solo de quien paga).</summary>
-    private string TipoGasto
-    {
-        get => _personal ? "personal" : "hogar";
-        set => _personal = value == "personal";
-    }
-
-    /// <summary>Perfil de modo cuenta común del hogar, el único con el que puede pagar la cuenta directamente.</summary>
-    private PerfilRepartoDto? PerfilCuentaComun => _perfiles.FirstOrDefault(p => p.Modo == ModosReparto.CuentaComun);
-
-    private List<MesCerradoDto> _cierres = [];
-
-    /// <summary>El mes mostrado está cerrado: el servidor rechazaría cualquier cambio en sus gastos.</summary>
-    private bool MesCerrado => _cierres.Any(c => c.Mes == Formato.Mes(_mes));
-
-    /// <summary>Perfiles que se ofrecen: el de cuenta común solo con la cuenta activada (si no, la API rechazaría el gasto).</summary>
-    private IEnumerable<PerfilRepartoDto> PerfilesOfrecidos
-        => ListaGastos.PerfilesOfrecidos(_perfiles, _cuentaActiva, _editando is not null ? _perfil : null);
-
-    /// <summary>La categoría elegida está marcada «a cargo de la cuenta común» y la cuenta está activada.</summary>
-    private bool CategoriaACargoDeLaCuenta => _cuentaActiva && _categorias.FirstOrDefault(c => c.Id == _categoria)?.ACargoCuentaComun == true;
-
-    private string NombreMes => _mes.ToString("MMMM yyyy", Es);
-
-    private bool ImporteValido => TryImporte(out _);
+    private string NombreMes => _m.Mes.ToString("MMMM yyyy", Es);
 
     protected override Task OnInitializedAsync()
     {
-        if (CategoriaInicial is { } c) _filtroCategoria = c.ToString();
-        if (MiembroInicial is { } m) _filtroMiembro = m.ToString();
-        _soloPaga = PagadorInicial;
-        _soloCuenta = CuentaComunInicial && PagadorInicial is null;
-        if (DesdeInicial is { } d && HastaInicial is { } h && d <= h)
-        {
-            _modoRango = true;
-            _desdeR = d;
-            _hastaR = h;
-            _mes = new DateOnly(d.Year, d.Month, 1);
-        }
-
+        _m = new ModeloGastos(Api, DateOnly.FromDateTime(DateTime.Today));
+        _m.Abrir(CategoriaInicial, MiembroInicial, PagadorInicial, CuentaComunInicial, DesdeInicial, HastaInicial);
         return CargarAsync();
     }
 
+    /// <summary>
+    /// Carga los datos. La cuenta común se ofrece si el hogar la tiene activada: se lee del hogar ya cargado (<c>/api/yo</c>, que se
+    /// actualiza al cambiar las funciones) en lugar de pedir el estado completo de la cuenta, que son ~9 consultas solo para dos
+    /// booleanos. Si otro administrador la activa desde otro dispositivo, la API sigue rechazando lo que no corresponda.
+    /// </summary>
     private async Task CargarAsync()
     {
-        _cargando = true;
-        _errorCarga = null;
+        _m.IniciarCarga();
         await Permisos.AsegurarAsync();
-        try
-        {
-            var miembros = Api.ListarMiembrosAsync();
-            var categorias = Api.ListarCategoriasAsync();
-            var perfiles = Api.ListarPerfilesAsync();
-            await Task.WhenAll(miembros, categorias, perfiles);
-            _miembros = miembros.Result;
-            _adultos = _miembros.Where(m => m.Tipo == TiposMiembro.Adulto && m.Activo).ToList();
-            _categorias = categorias.Result;
-            _perfiles = perfiles.Result;
-            _arbol = ArbolCategorias.Aplanar(_categorias);
-            _cuentaActiva = CuentaActiva();
-            await RecargarGastosAsync();
-            ReiniciarFormulario();
-        }
-        catch (ApiException e)
-        {
-            _errorCarga = e.Message;
-        }
-
-        _cargando = false;
-    }
-
-    /// <summary>
-    /// La cuenta común se ofrece si el hogar la tiene activada. Se lee del hogar ya cargado (<c>/api/yo</c>, que se actualiza al
-    /// cambiar las funciones) en lugar de pedir el estado completo de la cuenta, que son ~9 consultas solo para dos booleanos.
-    /// Si otro administrador la activa desde otro dispositivo, la API sigue rechazando lo que no corresponda.
-    /// </summary>
-    private bool CuentaActiva()
-    {
         var hogar = Hogar.HogarActual;
-        _ahorroActivo = hogar is { CuentaComunActiva: true, AhorroActivo: true };
-        return hogar is { CuentaComunActiva: true };
-    }
-
-    /// <summary>La cuenta común solo paga gastos con su perfil: al elegirla como pagador se selecciona ese perfil.</summary>
-    private void AlCambiarPagador()
-    {
-        if (_pagador is null) _personal = false; // un gasto personal siempre lo paga una persona
-        if (_pagador is null && PerfilCuentaComun is { } p) _perfil = p.Id;
-    }
-
-    private bool HayFiltros => _filtroMiembro != "" || _filtroCategoria != "" || !string.IsNullOrWhiteSpace(_filtroTexto) || _soloPaga is not null || _soloCuenta;
-
-    /// <summary>Versión de la última petición de gastos: una respuesta tardía de otra selección no pisa la actual.</summary>
-    private int _versionCarga;
-
-    private async Task RecargarGastosAsync()
-    {
-        var version = ++_versionCarga;
-        try
-        {
-            Guid? miembro = Guid.TryParse(_filtroMiembro, out var m) ? m : null;
-            var gastos = _modoRango
-                ? await Api.ListarGastosPorRangoAsync(_desdeR, _hastaR, miembro, _filtroTexto)
-                : await Api.ListarGastosAsync(Formato.Mes(_mes), null, miembro, _filtroTexto);
-            // La categoría se filtra aquí y no en la API para que incluya sus subcategorías.
-            var categorias = Guid.TryParse(_filtroCategoria, out var categoria)
-                ? ArbolCategorias.ConDescendientes(_categorias, categoria)
-                : null;
-
-            if (version == _versionCarga) _gastos = ListaGastos.Filtrar(gastos, new FiltroLista(categorias, _soloPaga, _soloCuenta));
-        }
-        catch (ApiException) when (version != _versionCarga)
-        {
-            // Un fallo de una petición ya superada no debe mostrar un error junto a los resultados de la nueva.
-        }
-
-        try
-        {
-            _cierres = await Api.ListarCierresMesAsync();
-        }
-        catch (ApiException)
-        {
-            _cierres = []; // sin saber qué meses están cerrados, el servidor sigue rechazando los cambios
-        }
-    }
-
-    /// <summary>Vuelve a pedir los gastos del mes con los filtros elegidos; los errores salen en pantalla.</summary>
-    private async Task AplicarFiltrosAsync()
-    {
-        _error = null;
-        _confirmandoEliminar = null;
-        try
-        {
-            await RecargarGastosAsync();
-        }
-        catch (ApiException e)
-        {
-            _error = e.Message;
-        }
-    }
-
-    private Task LimpiarFiltrosAsync()
-    {
-        _filtroMiembro = _filtroCategoria = _filtroTexto = "";
-        _soloPaga = null;
-        _soloCuenta = false;
-        return AplicarFiltrosAsync();
-    }
-
-    /// <summary>Cambia entre la vista por mes y la de entre fechas, conservando el periodo que se estaba viendo.</summary>
-    private async Task CambiarModoAsync(bool rango)
-    {
-        if (rango == _modoRango) return;
-        if (rango)
-        {
-            _desdeR = _mes;
-            _hastaR = _mes.AddMonths(1).AddDays(-1);
-        }
-        else
-        {
-            _mes = new DateOnly(_desdeR.Year, _desdeR.Month, 1);
-        }
-
-        _modoRango = rango;
-        _error = null;
-        _confirmandoEliminar = null;
-        if (_editando is not null) ReiniciarFormulario();
-        await AplicarFiltrosAsync();
-    }
-
-    private Task AplicarRangoAsync() => _desdeR > _hastaR ? Task.CompletedTask : AplicarFiltrosAsync();
-
-    /// <summary>El gasto cae en un mes cerrado: el servidor rechazaría editarlo o borrarlo.</summary>
-    private bool CerradoGasto(GastoResponse g) =>
-        _cierres.Any(c => c.Mes == Formato.Mes(g.Fecha));
-
-    private async Task CambiarMesAsync(int delta)
-    {
-        _mes = _mes.AddMonths(delta);
-        _error = null;
-        _confirmandoEliminar = null;
-        if (_editando is not null) ReiniciarFormulario();
-        try
-        {
-            await RecargarGastosAsync();
-        }
-        catch (ApiException e)
-        {
-            _error = e.Message;
-        }
-    }
-
-    private int ColorDe(Guid id) => ColorMiembro.De(id, _miembros);
-
-    private string NombreCategoria(Guid id) => ArbolCategorias.Ruta(_categorias, id);
-
-    private bool TryImporte(out decimal valor) => EntradaImporte.TryParse(_importe, out valor);
-
-    private void ReiniciarFormulario()
-    {
-        _editando = null;
-        _importe = "";
-        _concepto = "";
-        _categoria = _arbol.Count > 0 ? _arbol[0].Categoria.Id : Guid.Empty;
-        _pagador = (_adultos.FirstOrDefault(m => m.EsYo) ?? _adultos.FirstOrDefault())?.Id ?? Guid.Empty;
-        _desdeAhorro = false;
-        _personal = false;
-        _perfil = PerfilesOfrecidos.FirstOrDefault()?.Id ?? Guid.Empty;
-        AlCambiarCategoria();
-    }
-
-    /// <summary>
-    /// Al elegir una categoría se propone su perfil de reparto por defecto; si va a cargo de la cuenta común (y está activada),
-    /// el de cuenta común. Sin la cuenta activada no se propone un perfil de cuenta común.
-    /// </summary>
-    private void AlCambiarCategoria()
-    {
-        if (_editando is not null) return;
-        var categoria = _categorias.FirstOrDefault(c => c.Id == _categoria);
-        if (CategoriaACargoDeLaCuenta && PerfilCuentaComun is { } cuenta) _perfil = cuenta.Id;
-        else if (categoria?.PerfilRepartoId is { } p && PerfilesOfrecidos.Any(x => x.Id == p)) _perfil = p;
+        await _m.CargarAsync(
+            cuentaActiva: hogar is { CuentaComunActiva: true },
+            ahorroActivo: hogar is { CuentaComunActiva: true, AhorroActivo: true });
     }
 
     private void EmpezarEdicion(GastoResponse g)
     {
-        _editando = g.Id;
-        _fecha = g.Fecha;
-        _importe = g.Importe.ToString(CultureInfo.InvariantCulture);
-        _categoria = g.CategoriaId;
-        _pagador = g.PagadoPor;
-        _desdeAhorro = g.PagadoDesdeAhorro;
-        _personal = g.Personal;
-        _perfil = g.PerfilRepartoId;
-        _concepto = g.Concepto ?? "";
-        _error = null;
+        _m.EmpezarEdicion(g);
         _enfocarFormulario = true;
     }
 
+    private async Task GuardarAsync()
+    {
+        if (await _m.GuardarAsync() is { } aviso) Avisos.Mostrar(aviso);
+    }
 
-    private ElementReference _campoFecha;
-    private bool _enfocarFormulario;
+    private async Task EliminarAsync(GastoResponse g)
+    {
+        if (await _m.EliminarAsync(g) is { } aviso) Avisos.Mostrar(aviso);
+    }
 
     /// <summary>Al empezar a editar lleva el foco (y con él la vista) al formulario, aunque se pulsara «Editar» al final de una lista larga.</summary>
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -556,52 +323,6 @@ else
         catch (Exception e) when (e is JSException or InvalidOperationException)
         {
             // El foco es una comodidad: sin JavaScript disponible la edición sigue funcionando.
-        }
-    }
-    private void CancelarEdicion() => ReiniciarFormulario();
-
-    private Task GuardarAsync() =>
-        EjecutarAsync(async () =>
-        {
-            if (!TryImporte(out var importe)) throw new ApiException(System.Net.HttpStatusCode.BadRequest, EntradaImporte.MensajeInvalido);
-            var peticion = new GastoRequest(_fecha, importe, _categoria, _pagador, _perfil,
-                string.IsNullOrWhiteSpace(_concepto) ? null : _concepto.Trim(), _desdeAhorro, _personal && _pagador is not null);
-            if (_editando is { } id)
-            {
-                await Api.GuardarGastoAsync(id, peticion);
-                ReiniciarFormulario();
-                return "Gasto guardado";
-            }
-
-            await Api.CrearGastoAsync(peticion);
-            _importe = "";
-            _concepto = "";
-            return "Gasto añadido";
-        });
-
-    private Task EliminarAsync(GastoResponse g) =>
-        EjecutarAsync(async () =>
-        {
-            await Api.EliminarGastoAsync(g.Id);
-            _confirmandoEliminar = null;
-            if (_editando == g.Id) ReiniciarFormulario();
-            return "Gasto eliminado";
-        });
-
-    /// <summary>Ejecuta una operación, recarga el mes y muestra el aviso; los errores de la API salen en pantalla.</summary>
-    private async Task EjecutarAsync(Func<Task<string>> accion)
-    {
-        _error = null;
-        try
-        {
-            var aviso = await accion();
-            await RecargarGastosAsync();
-            Avisos.Mostrar(aviso);
-        }
-        catch (ApiException e)
-        {
-            _error = e.Message;
-            _confirmandoEliminar = null;
         }
     }
 }

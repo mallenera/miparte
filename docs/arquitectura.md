@@ -81,10 +81,29 @@ Una regla nueva se prueba primero en su capa (dominio o servicio); los tests HTT
 |---|---|
 | Liquidación, gastos, cuenta común y ahorro, miembros, recurrentes, categorías, perfiles, cierres | **Migradas** a servicio + puerto. |
 | Hogares (crear con semilla, eliminar, `/api/yo`) y auditoría (lectura) | **Pendiente**: aún usan `DbContext` en el endpoint. |
-| Front (`src/Web`) | **En curso**: ver la sección siguiente. |
+| Front (`src/Web`) | **En curso**: lógica de presentación extraída (ver sección Front); pendiente desacoplar de `Core.Domain` y el modo demo. |
 
 ## Front
 
-El front (Blazor WASM) sigue el mismo principio: el componente pinta y reacciona a eventos; la lógica va en clases C# sin
-dependencias de Blazor en `src/Web/Reparto` y vecinos, con tests unitarios. Ver [el estado](#estado-de-la-migración) y las reglas en
-`.claude/rules/web-blazor-y-marca.md`.
+El front (Blazor WASM) sigue el mismo principio: el componente pinta y reacciona a eventos; la lógica de presentación va en clases C#
+sin dependencias de Blazor, con tests unitarios que no renderizan componentes.
+
+| Clase (`src/Web/Reparto`) | Qué resuelve |
+|---|---|
+| `EntradaImporte` | Interpretación del importe escrito en un formulario (coma o punto, máx. 2 decimales, cero opcional). Una sola copia para Gastos, Recurrentes y Cuenta común. |
+| `ListaGastos` | Filtros del cliente (categoría con subcategorías, quién paga), orden, totales y perfiles ofrecidos en el formulario de gastos. |
+| `GraficoGastos` | Agrupación en «Otras categorías» y porcentajes del Dashboard. |
+| `AnalisisGastos`, `ArbolCategorias`, `EdicionPerfil` | Cálculo del Dashboard, árbol de categorías y edición de perfiles (ya existían). |
+
+Las vistas `Vista*` cargan datos con `CoreApiClient`, delegan lo anterior y solo mantienen estado de pantalla (formulario abierto,
+confirmaciones, mensajes). Regla: si un `@code` necesita un `Sum`, un `Where` por una regla de negocio o un parseo, va a una clase de
+`Reparto/` con su test.
+
+### Pendiente en el front
+
+- `Web.csproj` aún referencia `Core.Domain` (catálogo de permisos y `ServidorDemo`); el objetivo es que el front dependa solo de
+  `Contracts`.
+- `ServidorDemo` (modo demo local) reimplementa Core.Api en el navegador y duplica validaciones del servidor.
+- Las vistas siguen inyectando `CoreApiClient`; un servicio de pantalla por área (por ejemplo `ServicioGastosPantalla`) permitiría
+  probar la orquestación (carga, recarga, errores) sin bUnit.
+- `VistaGastos`, `VistaDashboard`, `VistaCuentaComun` y `VistaConfiguracionHogar` siguen siendo largas (400-560 líneas).

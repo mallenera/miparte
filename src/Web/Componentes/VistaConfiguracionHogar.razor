@@ -9,14 +9,14 @@
 
 <h1 class="sr">Configuración de @Hogar.HogarActual?.Nombre</h1>
 
-@if (_cargando)
+@if (_m.Cargando)
 {
     <div class="spinbox" role="status"><div class="spin"></div><span>Cargando el hogar…</span></div>
 }
-else if (_errorCarga is not null)
+else if (_m.ErrorCarga is not null)
 {
     <div class="aviso err" role="alert">
-        @_errorCarga
+        @_m.ErrorCarga
         <button class="linkbtn" type="button" @onclick="CargarAsync">Reintentar</button>
     </div>
 }
@@ -25,13 +25,13 @@ else
     <section class="card" aria-labelledby="t-funciones">
         <div class="card-head"><h2 id="t-funciones">Funciones del hogar</h2></div>
         <p class="muted">Elige qué partes de la aplicación usa este hogar. Desactivar una función no borra sus datos: solo bloquea nuevos movimientos hasta volver a activarla.</p>
-        @if (_errorFunciones is not null)
+        @if (_m.ErrorFunciones is not null)
         {
-            <div class="aviso err u-mt12" role="alert">@_errorFunciones</div>
+            <div class="aviso err u-mt12" role="alert">@_m.ErrorFunciones</div>
         }
         <div class="u-mt12">
             <label class="chk">
-                <input type="checkbox" @key="ClaveCuenta" checked="@CuentaComunActiva" disabled="@(!PuedeFunciones || _guardandoFunciones)"
+                <input type="checkbox" @key="_m.ClaveCuenta" checked="@_m.CuentaComunActiva" disabled="@(!PuedeFunciones || _m.GuardandoFunciones)"
                        @onchange="e => CambiarCuentaComunAsync((bool)e.Value!)" />
                 Habilitar cuenta común
             </label>
@@ -39,12 +39,12 @@ else
         </div>
         <div class="u-mt12">
             <label class="chk">
-                <input type="checkbox" @key="ClaveAhorro" checked="@(CuentaComunActiva && AhorroActivo)"
-                       disabled="@(!PuedeFunciones || !CuentaComunActiva || _guardandoFunciones)"
+                <input type="checkbox" @key="_m.ClaveAhorro" checked="@(_m.CuentaComunActiva && _m.AhorroActivo)"
+                       disabled="@(!PuedeFunciones || !_m.CuentaComunActiva || _m.GuardandoFunciones)"
                        @onchange="e => CambiarAhorroAsync((bool)e.Value!)" />
                 Activar ahorro
             </label>
-            <p class="muted">@(CuentaComunActiva ? "Parte de las aportaciones que se aparta, con ingresos, retiradas y gastos pagados desde el ahorro." : "Necesita la cuenta común habilitada.")</p>
+            <p class="muted">@(_m.CuentaComunActiva ? "Parte de las aportaciones que se aparta, con ingresos, retiradas y gastos pagados desde el ahorro." : "Necesita la cuenta común habilitada.")</p>
         </div>
         @if (!PuedeFunciones)
         {
@@ -56,25 +56,25 @@ else
         <section class="card" aria-labelledby="t-miembros">
             <div class="card-head">
                 <h2 id="t-miembros">Miembros de @Hogar.HogarActual?.Nombre</h2>
-                <span class="tag">@(_miembros.Count) @(_miembros.Count == 1 ? "persona" : "personas")</span>
+                <span class="tag">@(_m.Miembros.Count) @(_m.Miembros.Count == 1 ? "persona" : "personas")</span>
             </div>
-            @if (_errorMiembros is not null)
+            @if (_m.ErrorMiembros is not null)
             {
-                <div class="aviso err" role="alert">@_errorMiembros</div>
+                <div class="aviso err" role="alert">@_m.ErrorMiembros</div>
             }
             <div class="mlist">
-                @foreach (var m in _miembros)
+                @foreach (var m in _m.Miembros)
                 {
                     var miembro = m;
                     <div class="mrow">
-                        <Avatar Nombre="@miembro.Nombre" Color="@ColorMiembro.De(miembro.Id, _miembros)" Tamano="lg" />
-                        @if (_renombrando == miembro.Id)
+                        <Avatar Nombre="@miembro.Nombre" Color="@ColorMiembro.De(miembro.Id, _m.Miembros)" Tamano="lg" />
+                        @if (_m.Renombrando == miembro.Id)
                         {
                             <form class="renombrar" @onsubmit="() => GuardarNombreAsync(miembro)">
                                 <label class="sr" for="nombre-@miembro.Id">Nombre de @miembro.Nombre</label>
-                                <input id="nombre-@miembro.Id" maxlength="100" @bind="_nombreNuevo" @bind:event="oninput" />
-                                <button class="btn btn-sm" type="submit" disabled="@(string.IsNullOrWhiteSpace(_nombreNuevo))">Guardar</button>
-                                <button class="linkbtn" type="button" @onclick="() => _renombrando = null">Cancelar</button>
+                                <input id="nombre-@miembro.Id" maxlength="100" @bind="_m.NombreNuevo" @bind:event="oninput" />
+                                <button class="btn btn-sm" type="submit" disabled="@(string.IsNullOrWhiteSpace(_m.NombreNuevo))">Guardar</button>
+                                <button class="linkbtn" type="button" @onclick="() => _m.Renombrando = null">Cancelar</button>
                             </form>
                         }
                         else
@@ -89,15 +89,15 @@ else
                             <div class="mmeta">
                                 @if (miembro.Tipo == TiposMiembro.ACargo && miembro.ResponsableId is { } resp)
                                 {
-                                    <span>Responsable: @NombreDe(resp)</span>
+                                    <span>Responsable: @_m.NombreDe(resp)</span>
                                 }
                             </div>
                             <div class="macc">
-                                @if (_confirmandoDesactivar == miembro.Id)
+                                @if (_m.ConfirmandoDesactivar == miembro.Id)
                                 {
                                     <span class="muted">¿Desactivar a @miembro.Nombre?</span>
                                     <button class="linkbtn danger" type="button" @onclick="() => DesactivarAsync(miembro)">Sí, desactivar</button>
-                                    <button class="linkbtn" type="button" @onclick="() => _confirmandoDesactivar = null">Cancelar</button>
+                                    <button class="linkbtn" type="button" @onclick="() => _m.ConfirmandoDesactivar = null">Cancelar</button>
                                 }
                                 else
                                 {
@@ -120,7 +120,7 @@ else
                                     @if (PuedeMiembros && !miembro.EsYo)
                                     {
                                         <button class="linkbtn danger" type="button" aria-label="Desactivar a @miembro.Nombre"
-                                                @onclick="() => _confirmandoDesactivar = miembro.Id">Desactivar</button>
+                                                @onclick="() => _m.ConfirmandoDesactivar = miembro.Id">Desactivar</button>
                                     }
                                 }
                             </div>
@@ -133,27 +133,27 @@ else
             {
                 <form class="addm" @onsubmit="AnadirMiembroAsync">
                     <label>Nombre
-                        <input maxlength="100" placeholder="Nombre de la persona" @bind="_nuevoNombre" @bind:event="oninput" />
+                        <input maxlength="100" placeholder="Nombre de la persona" @bind="_m.NuevoNombre" @bind:event="oninput" />
                     </label>
                     <label>Tipo
-                        <select @bind="_nuevoTipo">
+                        <select @bind="_m.NuevoTipo">
                             <option value="@TiposMiembro.Adulto">Adulto</option>
                             <option value="@TiposMiembro.ACargo">A cargo</option>
                         </select>
                     </label>
-                    @if (_nuevoTipo == TiposMiembro.ACargo)
+                    @if (_m.NuevoTipo == TiposMiembro.ACargo)
                     {
                         <label>Responsable
-                            <select @bind="_nuevoResponsable">
+                            <select @bind="_m.NuevoResponsable">
                                 <option value="">Elige un adulto…</option>
-                                @foreach (var a in Adultos)
+                                @foreach (var a in _m.Adultos)
                                 {
                                     <option value="@a.Id">@a.Nombre</option>
                                 }
                             </select>
                         </label>
                     }
-                    <button class="btn" type="submit" disabled="@(string.IsNullOrWhiteSpace(_nuevoNombre) || (_nuevoTipo == TiposMiembro.ACargo && string.IsNullOrEmpty(_nuevoResponsable)))">Añadir</button>
+                    <button class="btn" type="submit" disabled="@(!_m.NuevoMiembroValido)">Añadir</button>
                 </form>
             }
             else
@@ -166,14 +166,14 @@ else
             <section class="card" id="card-invite" aria-labelledby="t-invitar">
                 <h2 id="t-invitar">Invitar a alguien con cuenta</h2>
                 <p class="muted">Genera un enlace de un solo uso que caduca a los 7 días. Quien lo abra solo tiene que iniciar sesión (o crear su cuenta) y aceptar; también puede pegar el código en «Unirme con una invitación».</p>
-                @if (_errorInvitacion is not null)
+                @if (_m.ErrorInvitacion is not null)
                 {
-                    <div class="aviso err u-mt12" role="alert">@_errorInvitacion</div>
+                    <div class="aviso err u-mt12" role="alert">@_m.ErrorInvitacion</div>
                 }
-                @if (_invitacion is { } inv)
+                @if (_m.Invitacion is { } inv)
                 {
                     <div class="invite" role="status">
-                        <span class="lab2">Enlace@(_invitacionPara is null ? "" : " para " + _invitacionPara)</span>
+                        <span class="lab2">Enlace@(_m.InvitacionPara is null ? "" : " para " + _m.InvitacionPara)</span>
                         <code class="token" id="enlace-invitacion">@Enlace(inv)</code>
                         <span class="lab2">Código</span>
                         <code class="token" id="token-invitacion">@inv.Token</code>
@@ -182,13 +182,13 @@ else
                             <button class="btn btn-sm" type="button" @onclick="CompartirAsync">Compartir enlace</button>
                             <button class="btn btn-sm btn-ghost" type="button" @onclick="CopiarEnlaceAsync">Copiar enlace</button>
                             <button class="btn btn-sm btn-ghost" type="button" @onclick="CopiarAsync">Copiar código</button>
-                            <button class="linkbtn" type="button" @onclick="OcultarInvitacion">Cerrar aviso</button>
+                            <button class="linkbtn" type="button" @onclick="_m.OcultarInvitacion">Cerrar aviso</button>
                         </div>
                     </div>
                 }
                 <div class="actions">
-                    <button class="btn btn-orange" type="button" disabled="@(!PuedeInvitar || _creandoInvitacion)" @onclick="() => InvitarAsync(null)">
-                        @(_invitacion is null ? "Invitar miembro" : "Generar otro enlace")
+                    <button class="btn btn-orange" type="button" disabled="@(!PuedeInvitar || _m.CreandoInvitacion)" @onclick="() => InvitarAsync(null)">
+                        @(_m.Invitacion is null ? "Invitar miembro" : "Generar otro enlace")
                     </button>
                     @if (!PuedeInvitar)
                     {
@@ -199,9 +199,9 @@ else
         </div>
     </div>
 
-    <PanelPerfiles Perfiles="_perfiles" Miembros="_miembros" PuedeGestionar="Permisos.Tiene(Claves.PerfilesGestionar)" OnCambiado="CargarSinParpadeoAsync" />
+    <PanelPerfiles Perfiles="_m.Perfiles" Miembros="_m.Miembros" PuedeGestionar="Permisos.Tiene(Claves.PerfilesGestionar)" OnCambiado="_m.CargarSinParpadeoAsync" />
 
-    <PanelPermisos Miembros="_miembros" Puede="PuedePermisos" OnCambiado="CargarSinParpadeoAsync" />
+    <PanelPermisos Miembros="_m.Miembros" Puede="PuedePermisos" OnCambiado="_m.CargarSinParpadeoAsync" />
 
     <section class="card peligro" aria-labelledby="t-eliminar">
         <div class="card-head"><h2 id="t-eliminar">Eliminar hogar</h2></div>
@@ -210,9 +210,9 @@ else
             miembros, gastos y recurrentes, cuenta común y ahorro, cierres de mes, categorías, perfiles de reparto, invitaciones y el
             historial de cambios. No se puede deshacer ni recuperar, y todas las personas del hogar perderán el acceso.
         </div>
-        @if (_errorEliminar is not null)
+        @if (_m.ErrorEliminar is not null)
         {
-            <div class="aviso err u-mt12" role="alert">@_errorEliminar</div>
+            <div class="aviso err u-mt12" role="alert">@_m.ErrorEliminar</div>
         }
         @if (!PuedeEliminar)
         {
@@ -222,42 +222,17 @@ else
         {
             <form class="addm" @onsubmit="EliminarHogarAsync" @onsubmit:preventDefault>
                 <label>Para confirmarlo, escribe el nombre del hogar: <b>@Hogar.HogarActual?.Nombre</b>
-                    <input id="confirmar-eliminar" autocomplete="off" maxlength="100" @bind="_confirmarNombre" @bind:event="oninput" />
+                    <input id="confirmar-eliminar" autocomplete="off" maxlength="100" @bind="_m.ConfirmarNombre" @bind:event="oninput" />
                 </label>
-                <button class="btn btn-danger" type="submit" disabled="@(!NombreCoincide || _eliminando)">Eliminar hogar definitivamente</button>
+                <button class="btn btn-danger" type="submit" disabled="@(!_m.NombreCoincide || _m.Eliminando)">Eliminar hogar definitivamente</button>
             </form>
         }
     </section>
 }
 
+
 @code {
-    private List<MiembroDto> _miembros = [];
-    private List<PerfilRepartoDto> _perfiles = [];
-    private bool _cargando = true;
-    private string? _errorCarga, _errorMiembros, _errorInvitacion;
-
-    private Guid? _renombrando, _confirmandoDesactivar;
-    private string _nombreNuevo = "";
-
-    private string _nuevoNombre = "", _nuevoTipo = TiposMiembro.Adulto, _nuevoResponsable = "";
-
-    private InvitacionCreada? _invitacion;
-    private string? _invitacionPara;
-
-    private string _confirmarNombre = "";
-    private string? _errorEliminar;
-    private bool _eliminando;
-    private bool _creandoInvitacion;
-
-    private string? _errorFunciones;
-    private bool _guardandoFunciones;
-
-    // Cambia tras cada intento para recrear las casillas: si la API rechaza el cambio, el navegador no debe quedarse con la marca que puso la persona.
-    private int _versionFunciones;
-
-    private string ClaveCuenta => $"cuenta-{_versionFunciones}";
-
-    private string ClaveAhorro => $"ahorro-{_versionFunciones}";
+    private ModeloConfiguracionHogar _m = default!;
 
     private bool PuedeMiembros => Permisos.Tiene(Claves.MiembrosGestionar);
 
@@ -269,178 +244,47 @@ else
 
     private bool PuedeEliminar => Permisos.Tiene(Claves.HogarEliminar);
 
-    private bool NombreCoincide => _confirmarNombre.Trim() == Hogar.HogarActual?.Nombre;
+    protected override Task OnInitializedAsync()
+    {
+        _m = new ModeloConfiguracionHogar(Api, Hogar, Permisos, Arranque);
+        return CargarAsync();
+    }
 
-    /// <summary>Elimina el hogar actual (la API verifica permiso y nombre) y lleva al usuario a donde le corresponda sin él.</summary>
+    private Task CargarAsync() => _m.CargarAsync();
+
+    private Task CambiarCuentaComunAsync(bool activa) => Mostrar(_m.CambiarCuentaComunAsync(activa));
+
+    private Task CambiarAhorroAsync(bool activo) => Mostrar(_m.CambiarAhorroAsync(activo));
+
+    private void EmpezarRenombrar(MiembroDto m) => _m.EmpezarRenombrar(m);
+
+    private Task GuardarNombreAsync(MiembroDto m) => Mostrar(_m.GuardarNombreAsync(m));
+
+    private Task CambiarRolAsync(MiembroDto m) => Mostrar(_m.CambiarRolAsync(m));
+
+    private Task DesactivarAsync(MiembroDto m) => Mostrar(_m.DesactivarAsync(m));
+
+    private Task AnadirMiembroAsync() => Mostrar(_m.AnadirMiembroAsync());
+
+    private Task InvitarAsync(Guid? miembroId) => Mostrar(_m.InvitarAsync(miembroId));
+
+    /// <summary>Espera la operación del modelo y, si salió bien, muestra su aviso.</summary>
+    private async Task Mostrar(Task<string?> operacion)
+    {
+        if (await operacion is { } aviso) Avisos.Mostrar(aviso);
+    }
+
+    /// <summary>Elimina el hogar actual y lleva al usuario a donde le corresponda sin él.</summary>
     private async Task EliminarHogarAsync()
     {
-        if (!NombreCoincide || Hogar.HogarActual is not { } actual) return;
-        _errorEliminar = null;
-        _eliminando = true;
-        try
+        if (await _m.EliminarHogarAsync() is not { } eliminado) return;
+        Avisos.Mostrar(eliminado.Aviso);
+        Navegacion.NavigateTo(eliminado.Destino switch
         {
-            await Api.EliminarHogarAsync(actual.Nombre);
-            Avisos.Mostrar($"Hogar «{actual.Nombre}» eliminado");
-            var destino = await Arranque.CargarAsync();
-            Navegacion.NavigateTo(destino switch
-            {
-                DestinoArranque.SinHogar => "sin-hogar",
-                DestinoArranque.ElegirHogar => "elegir-hogar",
-                _ => "",
-            }, replace: true);
-        }
-        catch (ApiException e)
-        {
-            _errorEliminar = e.Message;
-        }
-        finally
-        {
-            _eliminando = false;
-        }
-    }
-
-    private bool CuentaComunActiva => Hogar.HogarActual?.CuentaComunActiva ?? false;
-
-    private bool AhorroActivo => Hogar.HogarActual?.AhorroActivo ?? false;
-
-    private IEnumerable<MiembroDto> Adultos => _miembros.Where(m => m.Tipo == TiposMiembro.Adulto && m.Activo);
-
-    protected override Task OnInitializedAsync() => CargarAsync();
-
-    private string NombreDe(Guid id) => _miembros.FirstOrDefault(m => m.Id == id)?.Nombre ?? "—";
-
-    private async Task CargarAsync()
-    {
-        _cargando = true;
-        _errorCarga = null;
-        await CargarSinParpadeoAsync();
-        _cargando = false;
-    }
-
-    private async Task CargarSinParpadeoAsync()
-    {
-        try
-        {
-            var miembros = Api.ListarMiembrosAsync();
-            var perfiles = Api.ListarPerfilesAsync();
-            await Task.WhenAll(miembros, perfiles);
-            _miembros = miembros.Result;
-            Permisos.Establecer(_miembros);
-            _perfiles = perfiles.Result;
-        }
-        catch (ApiException e)
-        {
-            _errorCarga = e.Message;
-        }
-    }
-
-    private Task CambiarCuentaComunAsync(bool activa) =>
-        EjecutarFuncionAsync(
-            () => Api.ActivarCuentaComunAsync(activa), activa, AhorroActivo,
-            activa ? "Cuenta común habilitada" : "Cuenta común deshabilitada");
-
-    private Task CambiarAhorroAsync(bool activo) =>
-        EjecutarFuncionAsync(
-            () => Api.ActivarAhorroAsync(activo), CuentaComunActiva, activo,
-            activo ? "Ahorro activado" : "Ahorro desactivado");
-
-    /// <summary>Aplica un cambio de funciones del hogar y, si la API lo acepta, lo refleja en el estado compartido (menú y pestañas).</summary>
-    private async Task EjecutarFuncionAsync(Func<Task> accion, bool cuentaComun, bool ahorro, string aviso)
-    {
-        _errorFunciones = null;
-        _guardandoFunciones = true;
-        try
-        {
-            await accion();
-            Hogar.ActualizarFunciones(cuentaComun, ahorro);
-            Avisos.Mostrar(aviso);
-        }
-        catch (ApiException e)
-        {
-            _errorFunciones = e.Message;
-        }
-        finally
-        {
-            _guardandoFunciones = false;
-            _versionFunciones++;
-        }
-    }
-
-    private void EmpezarRenombrar(MiembroDto m)
-    {
-        _renombrando = m.Id;
-        _nombreNuevo = m.Nombre;
-        _errorMiembros = null;
-    }
-
-    private Task GuardarNombreAsync(MiembroDto m) =>
-        EjecutarMiembroAsync(async () =>
-        {
-            await Api.ActualizarMiembroAsync(m.Id, new ActualizarMiembroRequest(Nombre: _nombreNuevo.Trim()));
-            _renombrando = null;
-            return "Nombre actualizado";
-        });
-
-    private Task CambiarRolAsync(MiembroDto m) =>
-        EjecutarMiembroAsync(async () =>
-        {
-            await Api.ActualizarMiembroAsync(m.Id, new ActualizarMiembroRequest(Rol: m.Rol == "admin" ? "miembro" : "admin"));
-            return m.Rol == "admin" ? $"{m.Nombre} ya no es admin" : $"{m.Nombre} ahora es admin";
-        });
-
-    private Task DesactivarAsync(MiembroDto m) =>
-        EjecutarMiembroAsync(async () =>
-        {
-            await Api.ActualizarMiembroAsync(m.Id, new ActualizarMiembroRequest(Activo: false));
-            _confirmandoDesactivar = null;
-            return $"{m.Nombre} desactivado";
-        });
-
-    private Task AnadirMiembroAsync() =>
-        EjecutarMiembroAsync(async () =>
-        {
-            Guid? responsable = _nuevoTipo == TiposMiembro.ACargo && Guid.TryParse(_nuevoResponsable, out var r) ? r : null;
-            await Api.CrearMiembroAsync(new CrearMiembroRequest(_nuevoNombre.Trim(), _nuevoTipo, responsable));
-            var nombre = _nuevoNombre.Trim();
-            _nuevoNombre = "";
-            _nuevoResponsable = "";
-            return $"{nombre} añadido";
-        });
-
-    /// <summary>Ejecuta una operación sobre miembros, recarga la lista y muestra el aviso o el error de la API.</summary>
-    private async Task EjecutarMiembroAsync(Func<Task<string>> accion)
-    {
-        _errorMiembros = null;
-        try
-        {
-            var aviso = await accion();
-            await CargarSinParpadeoAsync();
-            Avisos.Mostrar(aviso);
-        }
-        catch (ApiException e)
-        {
-            _errorMiembros = e.Message;
-        }
-    }
-
-    private async Task InvitarAsync(Guid? miembroId)
-    {
-        _errorInvitacion = null;
-        _creandoInvitacion = true;
-        try
-        {
-            _invitacion = await Api.CrearInvitacionAsync(new CrearInvitacionRequest(miembroId));
-            _invitacionPara = miembroId is { } id ? NombreDe(id) : null;
-            Avisos.Mostrar("Invitación creada");
-        }
-        catch (ApiException e)
-        {
-            _errorInvitacion = e.Message;
-        }
-        finally
-        {
-            _creandoInvitacion = false;
-        }
+            DestinoArranque.SinHogar => "sin-hogar",
+            DestinoArranque.ElegirHogar => "elegir-hogar",
+            _ => "",
+        }, replace: true);
     }
 
     // El código va en el fragmento (#token=...): el navegador no lo envía al servidor ni lo deja en Referer o registros.
@@ -449,10 +293,10 @@ else
 
     private async Task CopiarEnlaceAsync()
     {
-        if (_invitacion is null) return;
+        if (_m.Invitacion is null) return;
         try
         {
-            await JS.InvokeVoidAsync("navigator.clipboard.writeText", Enlace(_invitacion));
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", Enlace(_m.Invitacion));
             Avisos.Mostrar("Enlace copiado");
         }
         catch (JSException)
@@ -463,14 +307,14 @@ else
 
     private async Task CompartirAsync()
     {
-        if (_invitacion is null) return;
+        if (_m.Invitacion is null) return;
         try
         {
             await JS.InvokeVoidAsync("navigator.share", new
             {
                 title = "Invitación a Mi parte, tu parte",
                 text = $"Te invito al hogar «{Hogar.HogarActual?.Nombre}» en Mi parte, tu parte:",
-                url = Enlace(_invitacion),
+                url = Enlace(_m.Invitacion),
             });
         }
         catch (JSException e) when (e.Message.Contains("AbortError", StringComparison.Ordinal))
@@ -486,21 +330,15 @@ else
 
     private async Task CopiarAsync()
     {
-        if (_invitacion is null) return;
+        if (_m.Invitacion is null) return;
         try
         {
-            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _invitacion.Token);
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _m.Invitacion.Token);
             Avisos.Mostrar("Código copiado");
         }
         catch (JSException)
         {
             Avisos.Mostrar("Selecciona el código y cópialo con Ctrl+C");
         }
-    }
-
-    private void OcultarInvitacion()
-    {
-        _invitacion = null;
-        _invitacionPara = null;
     }
 }

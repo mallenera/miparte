@@ -40,10 +40,3 @@ ALTER TABLE ONLY public.invitacion_hogar
 
 ALTER TABLE ONLY public.invitacion_hogar
     ADD CONSTRAINT invitacion_hogar_token_hash_key UNIQUE (token_hash);
-
-
---
--- Name: invitacion_hogar_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX invitacion_hogar_idx ON public.invitacion_hogar USING btree (hogar_id);

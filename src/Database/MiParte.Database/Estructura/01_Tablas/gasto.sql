@@ -47,10 +47,24 @@ ALTER TABLE ONLY public.gasto
 
 
 --
+-- Name: gasto_ahorro_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX gasto_ahorro_idx ON public.gasto USING btree (hogar_id, fecha) INCLUDE (importe) WHERE pagado_desde_ahorro;
+
+
+--
 -- Name: gasto_categoria_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX gasto_categoria_idx ON public.gasto USING btree (hogar_id, categoria_id);
+
+
+--
+-- Name: gasto_cuenta_comun_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX gasto_cuenta_comun_idx ON public.gasto USING btree (hogar_id, fecha) INCLUDE (importe, pagado_por) WHERE a_cargo_cuenta_comun;
 
 
 --

@@ -88,6 +88,12 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
     /// <summary>Concepto del ingreso al ahorro.</summary>
     public string ConceptoDeposito { get; set; } = "";
 
+    /// <summary>Fecha a la que corresponde el saldo inicial de la cuenta.</summary>
+    public DateOnly? FechaSaldoInicial { get; set; }
+
+    /// <summary>Importe del saldo inicial, tal como se escribe.</summary>
+    public string ImporteSaldoInicial { get; set; } = "";
+
     /// <summary>La aportación es válida: importe de 0 o más y ahorro entre 0 y el importe (sin ahorro activo el campo no cuenta).</summary>
     public bool AportacionValida => EntradaImporte.TryParse(ImporteAportacion, permitirCero: true, out var importe)
         && EntradaImporte.TryParse(
@@ -103,6 +109,9 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
 
     /// <summary>El importe del reembolso es válido.</summary>
     public bool ReembolsoValido => EntradaImporte.TryParse(ImporteReembolso, out _);
+
+    /// <summary>El saldo inicial tiene fecha y un importe de 0 o más.</summary>
+    public bool SaldoInicialValido => FechaSaldoInicial is not null && EntradaImporte.TryParse(ImporteSaldoInicial, permitirCero: true, out _);
 
     // ───── Lecturas para pintar ─────
 
@@ -152,6 +161,14 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
         if (Estado.Pendientes.All(p => p.MiembroId != Reembolsado))
             Reembolsado = Estado.Pendientes.FirstOrDefault()?.MiembroId ?? Guid.Empty;
         AlCambiarAportante();
+        AlCambiarSaldoInicial();
+    }
+
+    /// <summary>Al recargar, el formulario del saldo inicial muestra el que hay (o el mes mostrado si todavía no hay ninguno).</summary>
+    private void AlCambiarSaldoInicial()
+    {
+        FechaSaldoInicial = Estado?.SaldoInicial?.Fecha ?? _mes;
+        ImporteSaldoInicial = Estado?.SaldoInicial?.Importe.ToString(CultureInfo.InvariantCulture) ?? "";
     }
 
     /// <summary>Pasa al mes anterior (-1) o siguiente (1) y recarga.</summary>
@@ -223,6 +240,26 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
             ImporteRetirada = "";
             ConceptoRetirada = "";
             return "Retirada registrada";
+        });
+
+    /// <summary>Fija el saldo inicial de la cuenta a partir de la fecha y el importe escritos (sustituye el que hubiera).</summary>
+    public Task<string?> FijarSaldoInicialAsync() =>
+        EjecutarAsync(async () =>
+        {
+            if (FechaSaldoInicial is not { } fecha)
+                throw new ApiException(System.Net.HttpStatusCode.BadRequest, "Indica la fecha a la que corresponde el saldo.");
+            if (!EntradaImporte.TryParse(ImporteSaldoInicial, permitirCero: true, out var importe))
+                throw new ApiException(System.Net.HttpStatusCode.BadRequest, "Introduce un importe de 0 o más con máximo 2 decimales.");
+            await api.FijarSaldoInicialAsync(new FijarSaldoInicialRequest(fecha, importe));
+            return "Saldo inicial guardado";
+        });
+
+    /// <summary>Quita el saldo inicial de la cuenta.</summary>
+    public Task<string?> EliminarSaldoInicialAsync() =>
+        EjecutarAsync(async () =>
+        {
+            await api.EliminarSaldoInicialAsync();
+            return "Saldo inicial quitado";
         });
 
     /// <summary>Elimina un ingreso al ahorro.</summary>

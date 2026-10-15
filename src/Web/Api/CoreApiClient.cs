@@ -260,6 +260,17 @@ public sealed class CoreApiClient
     public Task<AportacionCuentaDto> FijarAportacionAsync(FijarAportacionRequest peticion, CancellationToken ct = default) =>
         EnviarAsync<AportacionCuentaDto>(HttpMethod.Put, "api/cuenta-comun/aportaciones", peticion, ct);
 
+    /// <summary>Fija el saldo inicial de la cuenta para gastos a una fecha, sustituyendo el anterior (<c>PUT /api/cuenta-comun/saldo-inicial</c>).</summary>
+    /// <param name="peticion">Fecha e importe (0 o más).</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<SaldoInicialDto> FijarSaldoInicialAsync(FijarSaldoInicialRequest peticion, CancellationToken ct = default) =>
+        EnviarAsync<SaldoInicialDto>(HttpMethod.Put, "api/cuenta-comun/saldo-inicial", peticion, ct);
+
+    /// <summary>Quita el saldo inicial de la cuenta (<c>DELETE /api/cuenta-comun/saldo-inicial</c>).</summary>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task EliminarSaldoInicialAsync(CancellationToken ct = default) =>
+        EnviarSinRespuestaAsync(HttpMethod.Delete, "api/cuenta-comun/saldo-inicial", ct);
+
     /// <summary>Registra un reembolso de la cuenta común a quien adelantó gastos (<c>POST /api/cuenta-comun/reembolsos</c>).</summary>
     /// <param name="peticion">Miembro, importe, fecha y concepto.</param>
     /// <param name="ct">Token de cancelación.</param>

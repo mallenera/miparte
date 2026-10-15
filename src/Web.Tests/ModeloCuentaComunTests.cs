@@ -125,6 +125,51 @@ public class ModeloCuentaComunTests
     }
 
     [Fact]
+    public async Task Fijar_el_saldo_inicial_envia_fecha_e_importe_con_coma_decimal()
+    {
+        var (m, api) = Crear(Estado());
+        api.Responde("PUT /api/cuenta-comun/saldo-inicial", HttpStatusCode.OK, new SaldoInicialDto(new DateOnly(2026, 9, 30), 1200.5m));
+        await m.CargarAsync();
+        m.FechaSaldoInicial = new DateOnly(2026, 9, 30);
+        m.ImporteSaldoInicial = "1200,50";
+
+        var aviso = await m.FijarSaldoInicialAsync();
+
+        Assert.Equal("Saldo inicial guardado", aviso);
+        var cuerpo = api.Cuerpos["PUT /api/cuenta-comun/saldo-inicial"];
+        Assert.Contains("\"fecha\":\"2026-09-30\"", cuerpo);
+        Assert.Contains("\"importe\":1200.5", cuerpo);
+    }
+
+    [Fact]
+    public async Task Un_saldo_inicial_negativo_no_llega_a_la_api()
+    {
+        var (m, api) = Crear(Estado());
+        await m.CargarAsync();
+        m.ImporteSaldoInicial = "-5";
+
+        Assert.False(m.SaldoInicialValido);
+        var aviso = await m.FijarSaldoInicialAsync();
+
+        Assert.Null(aviso);
+        Assert.Contains("máximo 2 decimales", m.Error);
+        Assert.DoesNotContain("PUT /api/cuenta-comun/saldo-inicial", api.Recibidas);
+    }
+
+    [Fact]
+    public async Task El_formulario_del_saldo_inicial_muestra_el_que_hay()
+    {
+        var estado = Estado() with { SaldoInicial = new SaldoInicialDto(new DateOnly(2026, 6, 1), 800m) };
+        var (m, _) = Crear(estado);
+
+        await m.CargarAsync();
+
+        Assert.Equal(new DateOnly(2026, 6, 1), m.FechaSaldoInicial);
+        Assert.Equal("800", m.ImporteSaldoInicial);
+        Assert.True(m.SaldoInicialValido);
+    }
+
+    [Fact]
     public async Task Reembolsar_envia_el_concepto_recortado_y_limpia_el_formulario()
     {
         var pendiente = new PendienteCuentaDto(_marcos.Id, "Marcos", 95m);

@@ -99,6 +99,10 @@ public static class Dtos
             s.Partes.Select(p => new PartePersonaDto(
                 p.MiembroId, nombres.GetValueOrDefault(p.MiembroId, ""), p.Aportado, p.Ahorrado, p.PorcentajeGastos, p.PorcentajeAhorro,
                 p.ParteSaldo, p.ParteAhorro, p.Pendiente)).ToList(),
-            d.AhorroActivo);
+            d.AhorroActivo, ADto(s.Extracto), s.SaldoInicial is { } si ? new SaldoInicialDto(si.Fecha, si.Importe) : null);
     }
+
+    /// <summary>Extracto del mes en la forma que devuelve la API.</summary>
+    private static ExtractoCuentaComunDto ADto(ExtractoCuentaComun x) => new(
+        x.EfectivoInicial, x.Aportaciones, x.SaldoInicialFijado, x.GastosCuenta, x.GastosAdelantadosDelAhorro, x.Reembolsos, x.EfectivoFinal);
 }

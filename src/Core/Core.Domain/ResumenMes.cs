@@ -5,7 +5,8 @@ namespace MiParte.Core.Domain;
 /// <summary>Histórico de la cuenta común hasta el fin de un mes, ya agrupado, en la forma que usa <see cref="CuentaComun.Calcular"/>.</summary>
 public sealed record HistoricoCuenta(
     IReadOnlyList<AportacionVigente> Vigentes, IReadOnlyList<GastoDeCuenta> Gastos, IReadOnlyList<ReembolsoDeCuenta> Reembolsos,
-    IReadOnlyList<RetiradaDeAhorro> Retiradas, IReadOnlyList<DepositoDeAhorro> Depositos, bool CuentaActiva, decimal GastadoMes);
+    IReadOnlyList<RetiradaDeAhorro> Retiradas, IReadOnlyList<DepositoDeAhorro> Depositos, bool CuentaActiva, decimal GastadoMes,
+    IReadOnlyList<GastoDeCuenta>? GastosDelMes = null, SaldoInicialCuenta? SaldoInicial = null);
 
 /// <summary>Importe asociado a un miembro.</summary>
 public sealed record ImporteMiembro(Guid MiembroId, decimal Importe);
@@ -72,7 +73,8 @@ public static class ResumenMes
         if (historico.CuentaActiva)
         {
             var estado = CuentaComun.Calcular(
-                inicio, historico.Vigentes, historico.Gastos, historico.Reembolsos, historico.Retiradas, historico.Depositos);
+                inicio, historico.Vigentes, historico.Gastos, historico.Reembolsos, historico.Retiradas, historico.Depositos,
+                historico.SaldoInicial);
             resumenCuenta = new ResumenCuenta(
                 estado.AportadoMes, historico.GastadoMes, estado.Saldo,
                 estado.Efectivo, estado.Pendientes.Where(p => p.Importe > 0m).Sum(p => p.Importe),

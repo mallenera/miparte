@@ -22,6 +22,8 @@ public static class CuentaComunEndpoints
         app.MapPut("/api/cuenta-comun/activacion", ActivarAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.HogarFunciones);
         app.MapPut("/api/cuenta-comun/ahorro/activacion", ActivarAhorroAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.HogarFunciones);
         app.MapPut("/api/cuenta-comun/aportaciones", FijarAportacionAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
+        app.MapPut("/api/cuenta-comun/saldo-inicial", FijarSaldoInicialAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
+        app.MapDelete("/api/cuenta-comun/saldo-inicial", BorrarSaldoInicialAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
         app.MapPost("/api/cuenta-comun/reembolsos", CrearReembolsoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
         app.MapDelete("/api/cuenta-comun/reembolsos/{id:guid}", BorrarReembolsoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
         app.MapPost("/api/cuenta-comun/depositos-ahorro", CrearDepositoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.AhorroMovimientos);
@@ -71,6 +73,24 @@ public static class CuentaComunEndpoints
         if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
         var r = await servicio.FijarAportacionAsync(new FijarAportacion(hogarId, req.MiembroId, req.Desde, req.Importe, req.Ahorro), ct);
         return r.Error is { } error ? ApiComun.Respuesta(error) : Results.Ok(r.Valor!.ADto());
+    }
+
+    /// <summary>PUT /api/cuenta-comun/saldo-inicial: fija el dinero que había en la cuenta para gastos a una fecha, sustituyendo el anterior. 400 si el importe es negativo, tiene más de 2 decimales o es demasiado grande; 409 sin hogar o con la cuenta común sin activar. 200 con el saldo guardado.</summary>
+    private static async Task<IResult> FijarSaldoInicialAsync(
+        FijarSaldoInicialRequest req, [FromServices] ServicioCuentaComun servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
+    {
+        if (hogar.HogarId is null) return ApiComun.SinHogar();
+        var r = await servicio.FijarSaldoInicialAsync(req.Fecha, req.Importe, ct);
+        return r.Error is { } error ? ApiComun.Respuesta(error) : Results.Ok(new SaldoInicialDto(r.Valor!.Fecha, r.Valor.Importe));
+    }
+
+    /// <summary>DELETE /api/cuenta-comun/saldo-inicial: quita el saldo inicial. 409 sin hogar; 404 si no hay ninguno; 204 si se quita.</summary>
+    private static async Task<IResult> BorrarSaldoInicialAsync(
+        [FromServices] ServicioCuentaComun servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
+    {
+        if (hogar.HogarId is null) return ApiComun.SinHogar();
+        var r = await servicio.EliminarSaldoInicialAsync(ct);
+        return r.Error is { } error ? ApiComun.Respuesta(error) : Results.NoContent();
     }
 
     /// <summary>POST /api/cuenta-comun/reembolsos: registra un pago de la cuenta a quien adelantó gastos. 400 si el importe es inválido o el miembro no es del hogar; 409 sin hogar o si supera lo pendiente de reembolsar al miembro. 201 si se crea.</summary>

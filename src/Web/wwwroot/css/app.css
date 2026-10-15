@@ -359,6 +359,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .u-sec { margin: 16px 0 0 !important; }
 .u-titulo-form { flex: 1 1 100%; margin: 0 !important; }
 .u-fila-mt10 { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
+/* Extracto de la cuenta común: concepto a la izquierda y importe alineado a la derecha, como en un extracto bancario. */
+.extracto { width: 100%; border-collapse: collapse; margin-top: 10px; font-variant-numeric: tabular-nums; }
+.extracto th, .extracto td { padding: 8px 0; border-top: 1px solid var(--line); text-align: left; font-weight: 400; }
+.extracto td { text-align: right; white-space: nowrap; }
+.extracto tr.total th, .extracto tr.total td { font-weight: 700; border-top: 2px solid var(--line-2); }
 .who { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; min-width: 0; }
 
 /* Pestañas: píldoras sueltas en lugar de una barra con subrayado */

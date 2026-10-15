@@ -23,6 +23,7 @@ internal static class RepositoriosEnMemoria
     {
         var fin = inicio.AddMonths(1);
         var gastos = a.Gastos.Where(g => g.ACargoCuentaComun && g.Fecha < fin).ToList();
+        var gastosDelMes = gastos.Where(g => g.Fecha >= inicio).ToList();
         return new HistoricoCuenta(
             a.Aportaciones.Select(x => new AportacionVigente(x.MiembroId, x.Desde, x.Importe, x.Ahorro)).ToList(),
             gastos.Select(g => new GastoDeCuenta(g.PagadoPor, g.Fecha, g.Importe, g.PagadoDesdeAhorro)).ToList(),
@@ -30,7 +31,9 @@ internal static class RepositoriosEnMemoria
             a.Retiradas.Where(r => r.Fecha < fin).Select(r => new RetiradaDeAhorro(r.Fecha, r.Importe)).ToList(),
             a.Depositos.Where(d => d.Fecha < fin).Select(d => new DepositoDeAhorro(d.Fecha, d.Importe, d.MiembroId)).ToList(),
             a.Hogar.CuentaComunActiva,
-            gastos.Where(g => g.Fecha >= inicio).Sum(g => g.Importe));
+            gastosDelMes.Sum(g => g.Importe),
+            gastosDelMes.Select(g => new GastoDeCuenta(g.PagadoPor, g.Fecha, g.Importe, g.PagadoDesdeAhorro)).ToList(),
+            a.Hogar.SaldoInicialFecha is { } f && a.Hogar.SaldoInicialImporte is { } i ? new SaldoInicialCuenta(f, i) : null);
     }
 
     /// <summary>Datos del ahorro; <paramref name="excluirGasto"/> deja fuera un gasto que se estÃ¡ editando.</summary>
@@ -165,6 +168,16 @@ internal sealed class RepositorioCuentaComunEnMemoria(AlmacenDemo a) : IReposito
             a.Depositos.Where(d => d.Fecha >= inicio && d.Fecha < fin).OrderBy(d => d.Fecha).ThenBy(d => d.Id)
                 .Select(d => M(d.Id, d.MiembroId, d.Fecha, d.Importe, d.Concepto)).ToList(),
             a.Nombres()));
+    }
+
+    public Task<SaldoInicialCuenta?> SaldoInicialAsync(CancellationToken ct)
+        => Task.FromResult(a.Hogar.SaldoInicialFecha is { } f && a.Hogar.SaldoInicialImporte is { } i ? new SaldoInicialCuenta(f, i) : null);
+
+    public Task EstablecerSaldoInicialAsync(SaldoInicialCuenta? saldo, CancellationToken ct)
+    {
+        a.Hogar.SaldoInicialFecha = saldo?.Fecha;
+        a.Hogar.SaldoInicialImporte = saldo?.Importe;
+        return Task.CompletedTask;
     }
 
     public Task<bool> ExisteMiembroAsync(Guid id, CancellationToken ct) => Task.FromResult(a.Miembros.Any(m => m.Id == id));

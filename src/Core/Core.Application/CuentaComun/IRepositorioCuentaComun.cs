@@ -18,6 +18,12 @@ public interface IRepositorioCuentaComun
     /// <summary>Activa o desactiva la cuenta común del hogar (no borra datos).</summary>
     Task EstablecerCuentaActivaAsync(bool activa, CancellationToken ct);
 
+    /// <summary>Saldo inicial de la cuenta para gastos, o null si no se ha fijado.</summary>
+    Task<SaldoInicialCuenta?> SaldoInicialAsync(CancellationToken ct);
+
+    /// <summary>Fija el saldo inicial de la cuenta para gastos, o lo quita si <paramref name="saldo"/> es null.</summary>
+    Task EstablecerSaldoInicialAsync(SaldoInicialCuenta? saldo, CancellationToken ct);
+
     /// <summary>Activa o desactiva el ahorro del hogar (no borra datos).</summary>
     Task EstablecerAhorroActivoAsync(bool activo, CancellationToken ct);
 

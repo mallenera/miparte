@@ -22,6 +22,10 @@ public class Hogar
     public bool CuentaComunActiva { get; set; }
     /// <summary>Si el hogar usa el ahorro de la cuenta común (aportaciones con ahorro, depósitos, retiradas y gastos desde el ahorro); solo tiene efecto con la cuenta común activada.</summary>
     public bool AhorroActivo { get; set; }
+    /// <summary>Fecha del saldo inicial de la cuenta común (null si no se ha fijado); va con <see cref="SaldoInicialImporte"/>.</summary>
+    public DateOnly? SaldoInicialFecha { get; set; }
+    /// <summary>Dinero que había en la cuenta para gastos a <see cref="SaldoInicialFecha"/> (null si no se ha fijado).</summary>
+    public decimal? SaldoInicialImporte { get; set; }
 }
 
 /// <summary>Persona del hogar que participa en gastos e ingresos; puede o no tener usuario asociado.</summary>

@@ -8,8 +8,11 @@ namespace MiParte.Core.Application.CuentaComun;
 /// <param name="Estado">Saldos, pendientes y ahorro acumulados hasta el fin del mes.</param>
 /// <param name="Partes">«Su parte» de cada persona.</param>
 /// <param name="Detalle">Aportaciones, movimientos del mes y nombres de los miembros.</param>
+/// <param name="Extracto">Cómo cambia el efectivo de la cuenta en el mes, como un extracto bancario.</param>
+/// <param name="SaldoInicial">Saldo inicial fijado para la cuenta, o null.</param>
 public sealed record EstadoCuentaDelMes(
-    DateOnly Mes, EstadoCuentaComun Estado, IReadOnlyList<PartePersona> Partes, HistoricoCuentaDetallado Detalle);
+    DateOnly Mes, EstadoCuentaComun Estado, IReadOnlyList<PartePersona> Partes, HistoricoCuentaDetallado Detalle,
+    ExtractoCuentaComun Extracto, SaldoInicialCuenta? SaldoInicial);
 
 /// <summary>Datos de una aportación mensual de un adulto.</summary>
 public sealed record FijarAportacion(Guid HogarId, Guid MiembroId, DateOnly Desde, decimal Importe, decimal Ahorro);
@@ -30,9 +33,34 @@ public sealed class ServicioCuentaComun(IRepositorioCuentaComun repositorio, Tim
     {
         var detalle = await repositorio.HistoricoDetalladoAsync(inicio, ct);
         var h = detalle.Historico;
-        var estado = Domain.CuentaComun.Calcular(inicio, h.Vigentes, h.Gastos, h.Reembolsos, h.Retiradas, h.Depositos);
+        var saldoInicial = h.SaldoInicial;
+        var estado = Domain.CuentaComun.Calcular(inicio, h.Vigentes, h.Gastos, h.Reembolsos, h.Retiradas, h.Depositos, saldoInicial);
         var partes = Domain.CuentaComun.PartesPorPersona(inicio, h.Vigentes, estado, h.Depositos);
-        return new EstadoCuentaDelMes(inicio, estado, partes, detalle);
+        var reembolsos = detalle.ReembolsosDelMes.Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe)).ToList();
+        var extracto = Domain.CuentaComun.Extracto(inicio, h.Vigentes, h.GastosDelMes ?? [], reembolsos, saldoInicial, estado);
+        return new EstadoCuentaDelMes(inicio, estado, partes, detalle, extracto, saldoInicial);
+    }
+
+    /// <summary>
+    /// Fija el saldo inicial de la cuenta para gastos a partir de una fecha, sustituyendo el que hubiera. Es dinero que ya estaba en la
+    /// cuenta, así que no puede ser negativo. Es un conflicto si la cuenta común no está activada.
+    /// </summary>
+    public async Task<Resultado<SaldoInicialCuenta>> FijarSaldoInicialAsync(DateOnly fecha, decimal importe, CancellationToken ct)
+    {
+        if (await ExigirActivaAsync<SaldoInicialCuenta>(ct) is { } inactiva) return inactiva;
+        if (ReglasCuentaComun.ValidarSaldoInicial(importe) is { } error) return Resultado<SaldoInicialCuenta>.Invalido(error);
+
+        var saldo = new SaldoInicialCuenta(fecha, importe);
+        await repositorio.EstablecerSaldoInicialAsync(saldo, ct);
+        return Resultado<SaldoInicialCuenta>.Ok(saldo);
+    }
+
+    /// <summary>Quita el saldo inicial de la cuenta; no encontrado si no hay ninguno.</summary>
+    public async Task<Resultado<bool>> EliminarSaldoInicialAsync(CancellationToken ct)
+    {
+        if (await repositorio.SaldoInicialAsync(ct) is null) return Resultado<bool>.NoEncontrado();
+        await repositorio.EstablecerSaldoInicialAsync(null, ct);
+        return Resultado<bool>.Ok(true);
     }
 
     /// <summary>Activa o desactiva la cuenta común; desactivarla no borra datos, solo bloquea nuevas escrituras.</summary>

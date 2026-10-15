@@ -109,6 +109,8 @@ public record ActivarAhorroRequest(bool Activo);
 /// <param name="Activa">Si el hogar tiene activada la cuenta común; si es false las escrituras de la cuenta y los gastos a su cargo responden 409 (las cifras se devuelven igualmente).</param>
 /// <param name="Partes">«Su parte» de cada miembro con aportaciones o depósitos hasta el mes.</param>
 /// <param name="AhorroActivo">Si el hogar tiene activado el ahorro; si es false las escrituras del ahorro responden 409.</param>
+/// <param name="Extracto">Cómo cambia el efectivo de la cuenta en el mes, como un extracto bancario.</param>
+/// <param name="SaldoInicial">Saldo inicial fijado para la cuenta (con su fecha), o null si no hay.</param>
 public record CuentaComunResponse(
     string Mes, decimal AportadoMes, decimal Aportado, decimal Gastado, decimal Saldo,
     IReadOnlyList<PendienteCuentaDto> Pendientes, decimal Efectivo,
@@ -117,4 +119,29 @@ public record CuentaComunResponse(
     IReadOnlyList<RetiradaAhorroDto>? RetiradasAhorro = null,
     decimal AhorroDepositado = 0m, IReadOnlyList<DepositoAhorroDto>? DepositosAhorro = null,
     decimal AhorroGastado = 0m, bool Activa = true, IReadOnlyList<PartePersonaDto>? Partes = null,
-    bool AhorroActivo = true);
+    bool AhorroActivo = true, ExtractoCuentaComunDto? Extracto = null, SaldoInicialDto? SaldoInicial = null);
+
+/// <summary>
+/// Extracto del mes de la cuenta común: el efectivo al inicio, lo que entra y sale, y el efectivo al final. Los importes llevan su signo
+/// natural: las entradas son positivas y las salidas se restan al sumar, así que la suma de los movimientos da la diferencia exacta.
+/// </summary>
+/// <param name="EfectivoInicial">Efectivo al inicio del mes (el final del mes anterior).</param>
+/// <param name="Aportaciones">Lo que ponen los adultos para gastos este mes (sin la parte de ahorro).</param>
+/// <param name="SaldoInicialFijado">Saldo inicial fijado si cae en este mes; 0 si no.</param>
+/// <param name="GastosCuenta">Gastos que paga la cuenta directamente este mes.</param>
+/// <param name="GastosAdelantadosDelAhorro">Gastos pagados desde el ahorro por un miembro: suben el efectivo porque la cuenta queda a deber ese importe.</param>
+/// <param name="Reembolsos">Reembolsos a quien adelantó gastos este mes.</param>
+/// <param name="EfectivoFinal">Efectivo al final del mes.</param>
+public record ExtractoCuentaComunDto(
+    decimal EfectivoInicial, decimal Aportaciones, decimal SaldoInicialFijado, decimal GastosCuenta,
+    decimal GastosAdelantadosDelAhorro, decimal Reembolsos, decimal EfectivoFinal);
+
+/// <summary>Saldo inicial de la cuenta común: dinero que ya había en la cuenta para gastos a una fecha.</summary>
+/// <param name="Fecha">Día al que corresponde el saldo.</param>
+/// <param name="Importe">Importe (0 o más, máx. 2 decimales).</param>
+public record SaldoInicialDto(DateOnly Fecha, decimal Importe);
+
+/// <summary>PUT /api/cuenta-comun/saldo-inicial: fija (o sustituye) el saldo inicial de la cuenta para gastos.</summary>
+/// <param name="Fecha">Día al que corresponde el saldo.</param>
+/// <param name="Importe">Dinero que había en la cuenta a esa fecha (0 o más, máx. 2 decimales).</param>
+public record FijarSaldoInicialRequest(DateOnly Fecha, decimal Importe);

@@ -26,6 +26,22 @@ public sealed class RepositorioCuentaComun(MiParteDbContext db) : IRepositorioCu
     }
 
     /// <inheritdoc />
+    public async Task<SaldoInicialCuenta?> SaldoInicialAsync(CancellationToken ct)
+    {
+        var h = await db.Hogares.Select(x => new { x.SaldoInicialFecha, x.SaldoInicialImporte }).FirstOrDefaultAsync(ct);
+        return h?.SaldoInicialFecha is { } fecha && h.SaldoInicialImporte is { } importe ? new SaldoInicialCuenta(fecha, importe) : null;
+    }
+
+    /// <inheritdoc />
+    public async Task EstablecerSaldoInicialAsync(SaldoInicialCuenta? saldo, CancellationToken ct)
+    {
+        var h = await db.Hogares.FirstAsync(ct);
+        h.SaldoInicialFecha = saldo?.Fecha;
+        h.SaldoInicialImporte = saldo?.Importe;
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <inheritdoc />
     public async Task EstablecerAhorroActivoAsync(bool activo, CancellationToken ct)
     {
         var h = await db.Hogares.FirstAsync(ct);
@@ -39,7 +55,7 @@ public sealed class RepositorioCuentaComun(MiParteDbContext db) : IRepositorioCu
         // Todo lo que necesita el cálculo en una sola consulta y ya agrupado: el histórico no se trae fila a fila.
         var h = await HistoricoCuentaComun.LeerAsync(db, inicio, detalleDelMes: true, ct);
         return new HistoricoCuentaDetallado(
-            new HistoricoCuenta(h.Vigentes, h.Gastos, h.Reembolsos, h.Retiradas, h.Depositos, h.CuentaActiva, h.GastadoMes),
+            new HistoricoCuenta(h.Vigentes, h.Gastos, h.Reembolsos, h.Retiradas, h.Depositos, h.CuentaActiva, h.GastadoMes, h.GastosDelMes, h.SaldoInicial),
             h.AhorroActivo,
             h.Aportaciones.Select(a => new AportacionRegistrada(a.Id, a.MiembroId, a.Fecha, a.Importe, a.Ahorro)).ToList(),
             h.ReembolsosDelMes, h.RetiradasDelMes, h.DepositosDelMes, h.Nombres);

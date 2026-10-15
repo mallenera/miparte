@@ -31,7 +31,7 @@ public sealed class RepositorioLiquidacion(MiParteDbContext db) : IRepositorioLi
     {
         // Una sola consulta con el histórico de la cuenta ya agrupado (en vez de cinco tablas completas).
         var h = await HistoricoCuentaComun.LeerAsync(db, inicio, detalleDelMes: false, ct);
-        return new HistoricoCuenta(h.Vigentes, h.Gastos, h.Reembolsos, h.Retiradas, h.Depositos, h.CuentaActiva, h.GastadoMes);
+        return new HistoricoCuenta(h.Vigentes, h.Gastos, h.Reembolsos, h.Retiradas, h.Depositos, h.CuentaActiva, h.GastadoMes, h.GastosDelMes, h.SaldoInicial);
     }
 
     /// <inheritdoc />

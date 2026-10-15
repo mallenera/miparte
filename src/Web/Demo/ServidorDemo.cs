@@ -122,6 +122,8 @@ public sealed partial class ServidorDemo
             ("cuenta-comun", 4, "PUT") when subruta == "ahorro" && ruta[3] == "activacion" => await ActivarAhorro((await Cuerpo<ActivarAhorroRequest>())!, ct),
             ("cuenta-comun", 3, "PUT") when subruta == "activacion" => Ok(new { activa = await _cuenta.ActivarCuentaAsync((await Cuerpo<ActivarCuentaComunRequest>())!.Activa, ct) }),
             ("cuenta-comun", 3, "PUT") when subruta == "aportaciones" => await FijarAportacion((await Cuerpo<FijarAportacionRequest>())!, ct),
+            ("cuenta-comun", 3, "PUT") when subruta == "saldo-inicial" => await FijarSaldoInicial((await Cuerpo<FijarSaldoInicialRequest>())!, ct),
+            ("cuenta-comun", 3, "DELETE") when subruta == "saldo-inicial" => Sin(await _cuenta.EliminarSaldoInicialAsync(ct)),
             ("cuenta-comun", 3, "POST") when subruta == "reembolsos" => await CrearReembolso((await Cuerpo<CrearReembolsoRequest>())!, ct),
             ("cuenta-comun", 4, "DELETE") when subruta == "reembolsos" && id is { } i => Sin(await _cuenta.EliminarReembolsoAsync(i, ct)),
             ("cuenta-comun", 3, "POST") when subruta == "depositos-ahorro" => await CrearDeposito((await Cuerpo<CrearDepositoAhorroRequest>())!, ct),
@@ -290,6 +292,12 @@ public sealed partial class ServidorDemo
     {
         var res = await _cuenta.FijarAportacionAsync(new FijarAportacion(IdHogar, r.MiembroId, r.Desde, r.Importe, r.Ahorro), ct);
         return res.Error is { } e ? Error(e) : Ok(res.Valor!.ADto());
+    }
+
+    private async Task<HttpResponseMessage> FijarSaldoInicial(FijarSaldoInicialRequest r, CancellationToken ct)
+    {
+        var res = await _cuenta.FijarSaldoInicialAsync(r.Fecha, r.Importe, ct);
+        return res.Error is { } e ? Error(e) : Ok(new SaldoInicialDto(res.Valor!.Fecha, res.Valor.Importe));
     }
 
     private async Task<HttpResponseMessage> CrearReembolso(CrearReembolsoRequest r, CancellationToken ct)

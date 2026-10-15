@@ -44,11 +44,15 @@ public sealed class HistoricoCuentaComun
     private readonly List<Fila> _filas;
     private readonly DateOnly _inicio;
 
-    private HistoricoCuentaComun(List<Fila> filas, DateOnly inicio)
+    private HistoricoCuentaComun(List<Fila> filas, DateOnly inicio, SaldoInicialCuenta? saldoInicial)
     {
         _filas = filas;
         _inicio = inicio;
+        SaldoInicial = saldoInicial;
     }
+
+    /// <summary>Saldo inicial fijado para la cuenta, o null; lo usan el estado de la cuenta y el resumen del mes.</summary>
+    public SaldoInicialCuenta? SaldoInicial { get; }
 
     /// <summary>
     /// Lee en una consulta lo necesario para calcular la cuenta al final del mes que empieza en <paramref name="inicio"/>.
@@ -71,12 +75,13 @@ public sealed class HistoricoCuentaComun
                 Tipo = TipoGastos, Id = vacio, MiembroId = g.Key.PagadoPor ?? vacio, Fecha = inicio,
                 Importe = g.Sum(x => x.Importe), Ahorro = 0m, Marca = g.Key.PagadoDesdeAhorro, Marca2 = false, Texto = "",
             });
+        // Del mes, por pagador y origen: el extracto necesita separar lo que paga la cuenta, lo que adelanta alguien y lo que sale del ahorro.
         var gastosMes = db.Gastos.Where(g => g.ACargoCuentaComun && g.Fecha >= inicio && g.Fecha < fin)
-            .GroupBy(g => true)
+            .GroupBy(g => new { g.PagadoPor, g.PagadoDesdeAhorro })
             .Select(g => new Fila
             {
-                Tipo = TipoGastosMes, Id = vacio, MiembroId = vacio, Fecha = inicio,
-                Importe = g.Sum(x => x.Importe), Ahorro = 0m, Marca = false, Marca2 = false, Texto = "",
+                Tipo = TipoGastosMes, Id = vacio, MiembroId = g.Key.PagadoPor ?? vacio, Fecha = inicio,
+                Importe = g.Sum(x => x.Importe), Ahorro = 0m, Marca = g.Key.PagadoDesdeAhorro, Marca2 = false, Texto = "",
             });
         var reembolsos = db.ReembolsosCuenta.Where(r => r.Fecha < fin)
             .GroupBy(r => r.MiembroId)
@@ -138,7 +143,11 @@ public sealed class HistoricoCuentaComun
                 }));
         }
 
-        return new HistoricoCuentaComun(await consulta.AsNoTracking().ToListAsync(ct), inicio);
+        var filas = await consulta.AsNoTracking().ToListAsync(ct);
+        var saldo = await db.Hogares.Select(x => new { x.SaldoInicialFecha, x.SaldoInicialImporte }).FirstOrDefaultAsync(ct);
+        var saldoInicial = saldo?.SaldoInicialFecha is { } fecha && saldo.SaldoInicialImporte is { } importe
+            ? new SaldoInicialCuenta(fecha, importe) : null;
+        return new HistoricoCuentaComun(filas, inicio, saldoInicial);
     }
 
     private IEnumerable<Fila> De(int tipo) => _filas.Where(f => f.Tipo == tipo);
@@ -165,6 +174,9 @@ public sealed class HistoricoCuentaComun
 
     /// <summary>Total de los gastos a cargo de la cuenta con fecha dentro del mes (también los pagados desde el ahorro).</summary>
     public decimal GastadoMes => De(TipoGastosMes).Sum(f => f.Importe);
+
+    /// <summary>Gastos a cargo de la cuenta con fecha en el mes, agrupados por pagador y origen (una fila por grupo).</summary>
+    public List<GastoDeCuenta> GastosDelMes => De(TipoGastosMes).Select(f => new GastoDeCuenta(Nulo(f.MiembroId), _inicio, f.Importe, f.Marca)).ToList();
 
     /// <summary>Reembolsos hasta el fin del mes, agrupados por miembro.</summary>
     public List<ReembolsoDeCuenta> Reembolsos => De(TipoReembolsos).Select(f => new ReembolsoDeCuenta(f.MiembroId, _inicio, f.Importe)).ToList();

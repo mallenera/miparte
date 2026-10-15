@@ -74,6 +74,68 @@ else if (_m.Estado is not null)
         }
     </section>
 
+    @if (_m.Estado.Extracto is { } x)
+    {
+        <section class="card" aria-labelledby="t-extracto">
+            <div class="card-head"><h2 id="t-extracto">Extracto de @_m.NombreMes</h2></div>
+            <p class="muted">Cómo cambia el efectivo de la cuenta este mes, como un extracto del banco. El ahorro va aparte.</p>
+            <table class="extracto" id="extracto">
+                <tbody>
+                    <tr><th scope="row">Efectivo al inicio del mes</th><td>@Formato.Euros(x.EfectivoInicial)</td></tr>
+                    <tr><th scope="row">+ Aportaciones para gastos</th><td>@Formato.Euros(x.Aportaciones)</td></tr>
+                    @if (x.SaldoInicialFijado != 0)
+                    {
+                        <tr><th scope="row">+ Saldo inicial fijado</th><td>@Formato.Euros(x.SaldoInicialFijado)</td></tr>
+                    }
+                    <tr><th scope="row">− Gastos pagados por la cuenta</th><td>@Formato.Euros(x.GastosCuenta)</td></tr>
+                    @if (x.GastosAdelantadosDelAhorro != 0)
+                    {
+                        <tr><th scope="row">+ Gastos del ahorro adelantados por un miembro</th><td>@Formato.Euros(x.GastosAdelantadosDelAhorro)</td></tr>
+                    }
+                    <tr><th scope="row">− Reembolsos a quien adelantó gastos</th><td>@Formato.Euros(x.Reembolsos)</td></tr>
+                </tbody>
+                <tfoot>
+                    <tr class="total"><th scope="row">Efectivo al final del mes</th><td id="efectivo-final">@Formato.Euros(x.EfectivoFinal)</td></tr>
+                </tfoot>
+            </table>
+        </section>
+    }
+
+    <section class="card" aria-labelledby="t-saldo-inicial">
+        <div class="card-head"><h2 id="t-saldo-inicial">Saldo inicial</h2></div>
+        <p class="muted">
+            Dinero que había en la cuenta para gastos a una fecha, por ejemplo el saldo del banco al empezar a usar la app.
+            Los meses anteriores a esa fecha no lo cuentan.
+        </p>
+        @if (_m.Estado.SaldoInicial is { } si)
+        {
+            <div class="u-fila-mt10">
+                <span class="chip">A fecha del&nbsp;<b>@si.Fecha.ToString("dd/MM/yyyy", Es)</b>&nbsp;había&nbsp;<b>@Formato.Euros(si.Importe)</b></span>
+            </div>
+        }
+        else
+        {
+            <div class="empty">Todavía no has fijado un saldo inicial.</div>
+        }
+
+        @if (PuedeCuenta)
+        {
+            <form class="addcat" id="form-saldo-inicial" @onsubmit="FijarSaldoInicialAsync">
+                <label>Fecha
+                    <input type="date" required @bind="_m.FechaSaldoInicial" />
+                </label>
+                <label>Importe (€)
+                    <input inputmode="decimal" required placeholder="0,00" @bind="_m.ImporteSaldoInicial" @bind:event="oninput" />
+                </label>
+                <button class="btn" type="submit" disabled="@(!_m.SaldoInicialValido || _m.Enviando)">Guardar saldo inicial</button>
+                @if (_m.Estado.SaldoInicial is not null)
+                {
+                    <button class="linkbtn danger" type="button" disabled="@_m.Enviando" @onclick="QuitarSaldoInicialAsync">Quitar saldo inicial</button>
+                }
+            </form>
+        }
+    </section>
+
     <section class="card" aria-labelledby="t-partes">
         <div class="card-head"><h2 id="t-partes">Su parte</h2></div>
         <p class="muted">Lo que ha puesto cada persona y la porción que le corresponde del saldo (en proporción a lo aportado para gastos) @(_m.Estado.AhorroActivo ? "y del ahorro (en proporción a lo ahorrado)." : "")</p>
@@ -356,6 +418,10 @@ else if (_m.Estado is not null)
     private Task ReembolsarAsync() => Mostrar(_m.ReembolsarAsync());
 
     private Task IngresarAhorroAsync() => Mostrar(_m.IngresarAhorroAsync());
+
+    private Task FijarSaldoInicialAsync() => Mostrar(_m.FijarSaldoInicialAsync());
+
+    private Task QuitarSaldoInicialAsync() => Mostrar(_m.EliminarSaldoInicialAsync());
 
     private Task RetirarAhorroAsync() => Mostrar(_m.RetirarAhorroAsync());
 

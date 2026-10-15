@@ -169,6 +169,53 @@ public class ServicioCuentaComunTests
         Assert.Equal(60m, s.Estado.Saldo);
     }
 
+    [Fact]
+    public async Task El_saldo_inicial_se_suma_al_saldo_y_aparece_en_el_extracto()
+    {
+        var r = await Servicio.FijarSaldoInicialAsync(Septiembre.AddDays(9), 300m, default);
+
+        Assert.Null(r.Error);
+        var estado = await Servicio.EstadoAsync(Septiembre, default);
+        Assert.Equal(300m, estado.Estado.Saldo);
+        Assert.Equal(300m, estado.SaldoInicial!.Importe);
+        Assert.Equal(300m, estado.Extracto.SaldoInicialFijado);
+        Assert.Equal(0m, estado.Extracto.EfectivoInicial);
+        Assert.Equal(300m, estado.Extracto.EfectivoFinal);
+    }
+
+    [Fact]
+    public async Task El_saldo_inicial_con_la_cuenta_inactiva_es_conflicto()
+    {
+        _repo.Cuenta = false;
+
+        var r = await Servicio.FijarSaldoInicialAsync(Septiembre, 300m, default);
+
+        Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
+        Assert.Null(_repo.Saldo);
+    }
+
+    [Fact]
+    public async Task El_saldo_inicial_no_puede_ser_negativo()
+    {
+        var r = await Servicio.FijarSaldoInicialAsync(Septiembre, -1m, default);
+
+        Assert.Equal(TipoError.Invalido, r.Error!.Tipo);
+        Assert.Null(_repo.Saldo);
+    }
+
+    [Fact]
+    public async Task Quitar_el_saldo_inicial_sin_tenerlo_no_existe()
+    {
+        var sin = await Servicio.EliminarSaldoInicialAsync(default);
+        Assert.Equal(TipoError.NoEncontrado, sin.Error!.Tipo);
+
+        await Servicio.FijarSaldoInicialAsync(Septiembre, 300m, default);
+        var quitado = await Servicio.EliminarSaldoInicialAsync(default);
+
+        Assert.Null(quitado.Error);
+        Assert.Null(_repo.Saldo);
+    }
+
     /// <summary>Repositorio en memoria: cada colección es lo que «hay» en el hogar.</summary>
     private sealed class RepositorioFalso : IRepositorioCuentaComun
     {
@@ -181,6 +228,15 @@ public class ServicioCuentaComunTests
         public Dictionary<Guid, decimal> ReembolsadoA { get; } = [];
         public bool Cuenta { get; set; }
         public bool Ahorro { get; set; }
+        public SaldoInicialCuenta? Saldo { get; set; }
+
+        public Task<SaldoInicialCuenta?> SaldoInicialAsync(CancellationToken ct) => Task.FromResult(Saldo);
+
+        public Task EstablecerSaldoInicialAsync(SaldoInicialCuenta? saldo, CancellationToken ct)
+        {
+            Saldo = saldo;
+            return Task.CompletedTask;
+        }
 
         public Task<bool> CuentaActivaAsync(CancellationToken ct) => Task.FromResult(Cuenta);
 
@@ -206,7 +262,7 @@ public class ServicioCuentaComunTests
                 vigentes, [], Reembolsos.Select(r => new ReembolsoDeCuenta(r.MiembroId, inicio, r.Importe)).ToList(),
                 Retiradas.Where(r => r.Fecha < fin).Select(r => new RetiradaDeAhorro(inicio, r.Importe)).ToList(),
                 Depositos.Where(d => d.Fecha < fin).Select(d => new DepositoDeAhorro(d.Fecha, d.Importe, d.MiembroId)).ToList(),
-                Cuenta, 0m);
+                Cuenta, 0m, [], Saldo);
             return Task.FromResult(new HistoricoCuentaDetallado(
                 historico, Ahorro, Aportaciones.Select(a => new AportacionRegistrada(a.Id, a.MiembroId, a.Desde, a.Importe, a.Ahorro)).ToList(),
                 [], [], [], Miembros.ToDictionary(m => m.Id, m => m.Nombre)));

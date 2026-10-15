@@ -20,8 +20,8 @@ Core.Api  ──►  Core.Application  ──►  Core.Domain
 | `Core.Api` | Minimal API: lee claims y query string, llama al servicio y traduce el resultado a un código HTTP. Permisos con `RequierePermiso`. | Consultas EF, `DbContext` en endpoints, reglas de negocio. |
 | `Core.Mapeo` | Mapeo entidad → DTO de `Contracts` (`Dtos`) y parseo de parámetros de consulta (`ConsultasApi`). Lo comparten `Core.Api` y el modo demo del front, para que respondan igual. | Reglas de negocio ni acceso a datos. |
 
-Las excepciones permitidas a «Api no usa `DbContext`» son infraestructura transversal: `HogarActualMiddleware`, `CacheAcceso`,
-`RequierePermisoExtensions`, y los endpoints de hogares y auditoría, que aún no están migrados (ver el estado al final).
+La única excepción a «Api no usa `DbContext`» es la infraestructura transversal: `HogarActualMiddleware`, `CacheAcceso` y
+`RequierePermisoExtensions`.
 
 ### Flujo de una petición
 
@@ -43,6 +43,8 @@ Las excepciones permitidas a «Api no usa `DbContext`» son infraestructura tran
 | Categorías | `ServicioCategorias` | `IRepositorioCategorias` (+ `IRepositorioGastos`) | `ReglasCategoria` |
 | Perfiles de reparto | `ServicioPerfiles` | `IRepositorioPerfiles` | `ReglasPerfil`, `TextoModoReparto` |
 | Cierre de mes | `ServicioCierres` | `IRepositorioCierres` | — |
+| Hogares (crear con semilla, eliminar, listar) | `ServicioHogares` | `IRepositorioHogares` | `SemillaHogar` |
+| Historial | `ServicioAuditoria` | `IRepositorioAuditoria` | — |
 
 ## Cómo añadir o cambiar una regla
 
@@ -81,7 +83,7 @@ Una regla nueva se prueba primero en su capa (dominio o servicio); los tests HTT
 | Área | Estado |
 |---|---|
 | Liquidación, gastos, cuenta común y ahorro, miembros, recurrentes, categorías, perfiles, cierres | **Migradas** a servicio + puerto. |
-| Hogares (crear con semilla, eliminar, `/api/yo`) y auditoría (lectura) | **Pendiente**: aún usan `DbContext` en el endpoint. |
+| Hogares (crear con semilla, eliminar, `/api/yo`) y auditoría (lectura) | **Migradas**: ningún endpoint de `Core.Api` usa `DbContext`. |
 | Front (`src/Web`) | **Hecho en las pestañas principales**: lógica de presentación extraída, un modelo de pantalla por pestaña (Gastos, Recurrentes, Cuenta común, Resumen, Dashboard y Configuración del hogar) y modo demo sobre los casos de uso reales (ver sección Front). Pendiente: Categorías, paneles de perfiles, permisos e historial y las pantallas de acceso. |
 
 ## Front

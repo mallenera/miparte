@@ -11,9 +11,11 @@ using MiParte.Core.Api.Miembros;
 using MiParte.Core.Api.Reparto;
 using MiParte.Core.Api.Seguridad;
 using MiParte.Core.Application.CuentaComun;
+using MiParte.Core.Application.Auditoria;
 using MiParte.Core.Application.Categorias;
 using MiParte.Core.Application.Cierres;
 using MiParte.Core.Application.Gastos;
+using MiParte.Core.Application.Hogares;
 using MiParte.Core.Application.Liquidacion;
 using MiParte.Core.Application.Miembros;
 using MiParte.Core.Application.Perfiles;
@@ -43,6 +45,8 @@ if (!string.IsNullOrWhiteSpace(connectionString))
 builder.Services.AddRepositorios();
 builder.Services.AddScoped(sp => new ServicioGastos(sp.GetRequiredService<IRepositorioGastos>()));
 builder.Services.AddScoped(sp => new ServicioPerfiles(sp.GetRequiredService<IRepositorioPerfiles>()));
+builder.Services.AddScoped(sp => new ServicioHogares(sp.GetRequiredService<IRepositorioHogares>()));
+builder.Services.AddScoped(sp => new ServicioAuditoria(sp.GetRequiredService<IRepositorioAuditoria>()));
 builder.Services.AddScoped(sp => new ServicioCategorias(
     sp.GetRequiredService<IRepositorioCategorias>(), sp.GetRequiredService<IRepositorioGastos>()));
 builder.Services.AddScoped(sp => new ServicioCierres(

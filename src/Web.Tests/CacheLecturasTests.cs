@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.Extensions.Time.Testing;
 using MiParte.Contracts;
 using MiParte.Web.Api;
+using MiParte.Web.Autenticacion;
 using MiParte.Web.Hogares;
 
 namespace MiParte.Web.Tests;
@@ -21,12 +22,18 @@ public class CacheLecturasTests
 
     private readonly FakeTimeProvider _reloj = new(new DateTimeOffset(2026, 10, 7, 10, 0, 0, TimeSpan.Zero));
     private readonly EstadoHogar _hogar = new(new AlmacenMemoria());
+    private readonly AlmacenMemoria _almacen = new();
+    private ServicioSesion _sesion = null!;
 
     private async Task<CoreApiClient> ClienteAsync()
     {
         await _hogar.AplicarAsync(new YoResponse(null, [Casa, Otra], Casa));
         await _hogar.SeleccionarAsync(Casa.Id);
-        var cache = new CacheLecturas(_hogar, _reloj);
+        var auth = new SupabaseAuthClient(new HttpClient(new ManejadorFalso(_ => throw new InvalidOperationException()))
+            { BaseAddress = new Uri("https://x.supabase.co/auth/v1/") }, _reloj);
+        _sesion = new ServicioSesion(auth, _almacen, _reloj);
+        await _sesion.IniciarDemoAsync(); // una sesión cualquiera: lo que cuenta aquí es el cambio de usuario
+        var cache = new CacheLecturas(_hogar, _sesion, _reloj);
         return new CoreApiClient(new HttpClient(_api) { BaseAddress = new Uri("http://localhost:5001/") }, cache);
     }
 
@@ -159,5 +166,34 @@ public class CacheLecturasTests
         await api.ListarGastosAsync("2026-10");
 
         Assert.Equal(2, Peticiones("GET /api/gastos"));
+    }
+
+    /// <summary>La lista de miembros lleva `EsYo` y permisos del que pregunta: no puede servirse a otra persona del mismo navegador.</summary>
+    [Fact]
+    public async Task Al_cerrar_sesion_o_entrar_otro_usuario_no_se_reutilizan_las_lecturas_del_anterior()
+    {
+        var api = await ClienteAsync();
+        await api.ListarMiembrosAsync();
+
+        await _sesion.DescartarAsync(); // p. ej. un 401: la sesión se descarta sin pasar por EstadoHogar.LimpiarAsync
+        await api.ListarMiembrosAsync();
+        Assert.Equal(2, Peticiones("GET /api/miembros"));
+
+        await _sesion.IniciarDemoAsync();
+        await api.ListarMiembrosAsync();
+        Assert.Equal(3, Peticiones("GET /api/miembros"));
+    }
+
+    /// <summary>Renovar el token no cambia de usuario: la caché se conserva.</summary>
+    [Fact]
+    public async Task Con_el_mismo_usuario_la_cache_se_conserva_al_cambiar_la_sesion()
+    {
+        var api = await ClienteAsync();
+        await api.ListarMiembrosAsync();
+
+        await _sesion.IniciarDemoAsync(); // mismo usuario de la demo: SesionCambiada se dispara con el mismo UserId
+        await api.ListarMiembrosAsync();
+
+        Assert.Equal(1, Peticiones("GET /api/miembros"));
     }
 }

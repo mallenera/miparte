@@ -9,6 +9,10 @@
     <ProjectReference Include="..\..\BuildingBlocks\Auth\MiParte.Auth.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="MiParte.Core.Tests" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>

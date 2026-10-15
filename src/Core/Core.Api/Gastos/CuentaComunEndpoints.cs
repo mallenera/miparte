@@ -160,10 +160,10 @@ public static class CuentaComunEndpoints
             ApiComun.FormatoMes(inicio), e.AportadoMes, e.Aportado, e.Gastado, e.Saldo,
             e.Pendientes.Select(p => new PendienteCuentaDto(p.MiembroId, nombres.GetValueOrDefault(p.MiembroId, ""), p.Importe)).ToList(),
             e.Efectivo, h.Aportaciones.Select(a => new AportacionCuentaDto(a.Id, a.MiembroId, a.Fecha, a.Importe, a.Ahorro)).ToList(),
-            h.ReembolsosDelMes,
+            h.ReembolsosDelMes.Select(r => new ReembolsoCuentaDto(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto)).ToList(),
             e.AhorroMes, e.AhorroAcumulado, e.AhorroRetirado, e.AhorroDisponible,
-            h.RetiradasDelMes,
-            e.AhorroDepositado, h.DepositosDelMes,
+            h.RetiradasDelMes.Select(r => new RetiradaAhorroDto(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto)).ToList(),
+            e.AhorroDepositado, h.DepositosDelMes.Select(d => new DepositoAhorroDto(d.Id, d.MiembroId, d.Fecha, d.Importe, d.Concepto)).ToList(),
             e.AhorroGastado, h.CuentaActiva,
             partes.Select(p => new PartePersonaDto(
                 p.MiembroId, nombres.GetValueOrDefault(p.MiembroId, ""), p.Aportado, p.Ahorrado, p.PorcentajeGastos, p.PorcentajeAhorro,

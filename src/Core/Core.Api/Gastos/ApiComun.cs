@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using MiParte.Contracts;
+using MiParte.Core.Application;
 using MiParte.Core.Domain;
 using MiParte.Core.Domain.Entidades;
 using MiParte.Core.Infrastructure.Persistencia;
@@ -10,9 +11,7 @@ namespace MiParte.Core.Api.Gastos;
 internal static class ApiComun
 {
     /// <summary>Longitud máxima del concepto de un movimiento.</summary>
-    public const int MaxConcepto = 200;
-    /// <summary>Importe máximo admitido en un movimiento.</summary>
-    private const decimal MaxImporte = 9_999_999_999.99m;
+    public const int MaxConcepto = ReglasMovimiento.MaxConcepto;
 
     /// <summary>Parsea "YYYY-MM" estricto; devuelve el primer día del mes.</summary>
     public static bool TryMes(string? mes, out DateOnly inicio) => FormatosApi.TryMes(mes, out inicio);
@@ -32,25 +31,28 @@ internal static class ApiComun
     /// <summary>Respuesta 400 por una fecha con formato distinto de YYYY-MM-DD; <paramref name="parametro"/> es el nombre del parámetro.</summary>
     public static IResult FechaInvalida(string parametro) => Invalido($"La fecha «{parametro}» debe tener el formato YYYY-MM-DD.");
 
+    /// <summary>Traduce el fallo de un caso de uso a su respuesta HTTP: 400, 404 o 409 (con los datos extra, como lo pendiente).</summary>
+    public static IResult Respuesta(ErrorAplicacion error) => error.Tipo switch
+    {
+        TipoError.NoEncontrado => Results.NotFound(),
+        TipoError.Conflicto => Results.Conflict(
+            new Dictionary<string, object>(error.Extra ?? new Dictionary<string, object>()) { ["error"] = error.Mensaje }),
+        _ => Invalido(error.Mensaje),
+    };
+
     /// <summary>Respuesta 409 cuando la petición no tiene hogar seleccionado.</summary>
     public static IResult SinHogar() => Results.Conflict(new { error = "No hay hogar seleccionado." });
 
     /// <summary>Valida que el importe sea mayor que cero, no exceda el máximo y tenga como mucho 2 decimales; devuelve el mensaje de error o null.</summary>
-    public static string? ValidarImporte(decimal importe)
-    {
-        if (importe <= 0) return "El importe debe ser mayor que cero.";
-        if (importe > MaxImporte) return "El importe es demasiado grande.";
-        if (decimal.Round(importe, 2) != importe) return "El importe admite como máximo 2 decimales.";
-        return null;
-    }
+    public static string? ValidarImporte(decimal importe) => ReglasMovimiento.ValidarImporte(importe);
 
     /// <summary>Valida la longitud máxima del concepto; devuelve el mensaje de error o null.</summary>
     public static string? ValidarConcepto(string? concepto)
-        => concepto is { Length: > MaxConcepto } ? $"El concepto admite como máximo {MaxConcepto} caracteres." : null;
+        => ReglasMovimiento.ValidarConcepto(concepto);
 
     /// <summary>Recorta el concepto y devuelve null si está vacío.</summary>
     public static string? NormalizarConcepto(string? concepto)
-        => string.IsNullOrWhiteSpace(concepto) ? null : concepto.Trim();
+        => ReglasMovimiento.NormalizarConcepto(concepto);
 
     /// <summary>Adultos activos del hogar, ordenados por nombre y id.</summary>
     public static Task<List<Miembro>> AdultosActivos(MiParteDbContext db, CancellationToken ct)

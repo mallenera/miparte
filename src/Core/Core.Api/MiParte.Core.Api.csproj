@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Contracts\MiParte.Contracts.csproj" />
     <ProjectReference Include="..\Core.Domain\MiParte.Core.Domain.csproj" />
+    <ProjectReference Include="..\Core.Application\MiParte.Core.Application.csproj" />
     <ProjectReference Include="..\Core.Infrastructure\MiParte.Core.Infrastructure.csproj" />
     <ProjectReference Include="..\..\BuildingBlocks\Auth\MiParte.Auth.csproj" />
   </ItemGroup>

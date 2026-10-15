@@ -1,9 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using MiParte.Contracts;
 using MiParte.Core.Domain;
-using MiParte.Core.Infrastructure.Persistencia;
 
-namespace MiParte.Core.Api.Gastos;
+namespace MiParte.Core.Infrastructure.Persistencia;
 
 /// <summary>
 /// Lo que necesita el cálculo de la cuenta común (<see cref="CuentaComun.Calcular"/>), leído de la base de datos en una sola
@@ -12,7 +10,7 @@ namespace MiParte.Core.Api.Gastos;
 /// agrupado (un par de filas por miembro) y acotado al fin del mes pedido, que es lo único que el cálculo usa; solo el
 /// detalle del mes (<paramref name="detalleDelMes"/>) y las aportaciones, que son pocas, llegan fila a fila.
 /// </summary>
-internal sealed class HistoricoCuentaComun
+public sealed class HistoricoCuentaComun
 {
     private const int TipoAportacion = 0, TipoReembolsoMes = 1, TipoRetiradaMes = 2, TipoDepositoMes = 3, TipoReembolsos = 4,
         TipoGastos = 5, TipoGastosMes = 6, TipoRetiradas = 7, TipoDepositos = 8, TipoNombre = 9, TipoFunciones = 10;
@@ -182,14 +180,14 @@ internal sealed class HistoricoCuentaComun
     public Dictionary<Guid, string> Nombres => De(TipoNombre).ToDictionary(f => f.Id, f => f.Texto);
 
     /// <summary>Reembolsos del mes, uno a uno.</summary>
-    public List<ReembolsoCuentaDto> ReembolsosDelMes => De(TipoReembolsoMes).OrderBy(f => f.Fecha).ThenBy(f => f.Id)
-        .Select(f => new ReembolsoCuentaDto(f.Id, f.MiembroId, f.Fecha, f.Importe, Texto(f))).ToList();
+    public List<MovimientoCuenta> ReembolsosDelMes => De(TipoReembolsoMes).OrderBy(f => f.Fecha).ThenBy(f => f.Id)
+        .Select(f => new MovimientoCuenta(f.Id, f.MiembroId, f.Fecha, f.Importe, Texto(f))).ToList();
 
     /// <summary>Retiradas de ahorro del mes, una a una.</summary>
-    public List<RetiradaAhorroDto> RetiradasDelMes => De(TipoRetiradaMes).OrderBy(f => f.Fecha).ThenBy(f => f.Id)
-        .Select(f => new RetiradaAhorroDto(f.Id, f.MiembroId, f.Fecha, f.Importe, Texto(f))).ToList();
+    public List<MovimientoCuenta> RetiradasDelMes => De(TipoRetiradaMes).OrderBy(f => f.Fecha).ThenBy(f => f.Id)
+        .Select(f => new MovimientoCuenta(f.Id, f.MiembroId, f.Fecha, f.Importe, Texto(f))).ToList();
 
     /// <summary>Depósitos de ahorro del mes, uno a uno.</summary>
-    public List<DepositoAhorroDto> DepositosDelMes => De(TipoDepositoMes).OrderBy(f => f.Fecha).ThenBy(f => f.Id)
-        .Select(f => new DepositoAhorroDto(f.Id, f.MiembroId, f.Fecha, f.Importe, Texto(f))).ToList();
+    public List<MovimientoCuenta> DepositosDelMes => De(TipoDepositoMes).OrderBy(f => f.Fecha).ThenBy(f => f.Id)
+        .Select(f => new MovimientoCuenta(f.Id, f.MiembroId, f.Fecha, f.Importe, Texto(f))).ToList();
 }

@@ -10,6 +10,7 @@ using MiParte.Core.Api.Hogares;
 using MiParte.Core.Api.Miembros;
 using MiParte.Core.Api.Reparto;
 using MiParte.Core.Api.Seguridad;
+using MiParte.Core.Application.Liquidacion;
 using MiParte.Core.Infrastructure;
 using MiParte.Core.Infrastructure.Persistencia;
 
@@ -30,6 +31,11 @@ if (!string.IsNullOrWhiteSpace(connectionString))
 {
     builder.Services.AddPersistencia(connectionString);
 }
+
+// Casos de uso y repositorios: fuera del if porque solo necesitan el MiParteDbContext, que los tests sustituyen.
+builder.Services.AddRepositorios();
+builder.Services.AddScoped(sp => new ServicioLiquidacion(
+    sp.GetRequiredService<IRepositorioLiquidacion>(), sp.GetRequiredService<TimeProvider>()));
 
 // CORS: orígenes en Cors:OrigenesPermitidos (env Cors__OrigenesPermitidos__0, ...).
 // Sin configuración no se permite ningún origen cruzado.

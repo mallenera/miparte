@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using MiParte.Core.Application.Liquidacion;
 using MiParte.Core.Infrastructure.Persistencia;
 
 namespace MiParte.Core.Infrastructure;
@@ -18,6 +19,17 @@ public static class DependencyInjection
         services.AddDbContext<MiParteDbContext>(o => o
             .UseNpgsql(connectionString)
             .UseSnakeCaseNamingConvention());
+        return services;
+    }
+
+    /// <summary>
+    /// Registra los repositorios (scoped). Van aparte de <see cref="AddPersistencia"/> porque dependen solo del
+    /// <see cref="MiParteDbContext"/>, que los tests sustituyen por uno en memoria.
+    /// </summary>
+    public static IServiceCollection AddRepositorios(this IServiceCollection services)
+    {
+        // Con fábrica: sin cadena de conexión no hay DbContext y la validación de DI no debe impedir arrancar (/health).
+        services.AddScoped<IRepositorioLiquidacion>(sp => new RepositorioLiquidacion(sp.GetRequiredService<MiParteDbContext>()));
         return services;
     }
 }

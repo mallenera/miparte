@@ -5,9 +5,9 @@
 <section class="card" aria-labelledby="t-permisos">
     <div class="card-head"><h2 id="t-permisos">Permisos</h2></div>
     <p class="muted">Cada adulto con cuenta tiene los permisos que se le asignen, también los admins. Siempre debe quedar alguien con el permiso de cambiar permisos.</p>
-    @if (_error is not null)
+    @if (_m.Error is not null)
     {
-        <div class="aviso err" role="alert">@_error</div>
+        <div class="aviso err" role="alert">@_m.Error</div>
     }
     <div class="mlist">
         @foreach (var m in Miembros.Where(m => m.Tipo == TiposMiembro.Adulto && m.Activo && m.Vinculado))
@@ -27,13 +27,13 @@
                 <div class="macc">
                     @if (Puede)
                     {
-                        <button class="linkbtn" type="button" aria-expanded="@((_abierto == miembro.Id).ToString().ToLowerInvariant())"
-                                aria-label="Permisos de @miembro.Nombre" @onclick="() => Alternar(miembro)">
-                            @(_abierto == miembro.Id ? "Cerrar" : "Permisos")
+                        <button class="linkbtn" type="button" aria-expanded="@((_m.Abierto == miembro.Id).ToString().ToLowerInvariant())"
+                                aria-label="Permisos de @miembro.Nombre" @onclick="() => _m.Alternar(miembro)">
+                            @(_m.Abierto == miembro.Id ? "Cerrar" : "Permisos")
                         </button>
                     }
                 </div>
-                @if (_abierto == miembro.Id)
+                @if (_m.Abierto == miembro.Id)
                 {
                     <div class="permisos">
                         <div class="plantillas" role="group" aria-label="Plantillas de permisos">
@@ -41,12 +41,12 @@
                             @foreach (var plantilla in Claves.Plantillas)
                             {
                                 var p = plantilla;
-                                <button class="btn btn-ghost btn-sm" type="button" title="@p.Descripcion" disabled="@_guardando" @onclick="() => Aplicar(p.Claves)">@p.Nombre</button>
+                                <button class="btn btn-ghost btn-sm" type="button" title="@p.Descripcion" disabled="@_m.Guardando" @onclick="() => _m.Aplicar(p.Claves)">@p.Nombre</button>
                             }
-                            <button class="linkbtn" type="button" disabled="@_guardando" @onclick="() => Aplicar(Claves.Todos.Select(x => x.Clave))">Marcar todo</button>
-                            <button class="linkbtn" type="button" disabled="@_guardando" @onclick="() => Aplicar([])">Desmarcar todo</button>
+                            <button class="linkbtn" type="button" disabled="@_m.Guardando" @onclick="() => _m.Aplicar(Claves.Todos.Select(x => x.Clave))">Marcar todo</button>
+                            <button class="linkbtn" type="button" disabled="@_m.Guardando" @onclick="() => _m.Aplicar([])">Desmarcar todo</button>
                         </div>
-                        @foreach (var grupo in Grupos)
+                        @foreach (var grupo in ModeloPermisos.Grupos)
                         {
                             <fieldset class="permisos-grupo">
                                 <legend>@grupo.Key</legend>
@@ -54,20 +54,20 @@
                                 {
                                     var clave = p.Clave;
                                     <label class="chk">
-                                        <input type="checkbox" @key="@(clave + _version)" checked="@_borrador.Contains(clave)" disabled="@_guardando"
-                                               @onchange="e => Marcar(clave, (bool)e.Value!)" />
+                                        <input type="checkbox" @key="@(clave + _m.Version)" checked="@_m.Marcado(clave)" disabled="@_m.Guardando"
+                                               @onchange="e => _m.Marcar(clave, (bool)e.Value!)" />
                                         @p.Etiqueta
                                     </label>
                                 }
                             </fieldset>
                         }
-                        @if (miembro.EsYo && !_borrador.Contains(Claves.PermisosGestionar))
+                        @if (miembro.EsYo && !_m.Marcado(Claves.PermisosGestionar))
                         {
                             <div class="aviso warn u-mt12" role="status">Te quitas a ti mismo el permiso de cambiar permisos: después otra persona tendrá que devolvértelo.</div>
                         }
                         <div class="actions">
-                            <button class="btn btn-sm" type="button" disabled="@_guardando" @onclick="() => GuardarAsync(miembro)">Guardar permisos</button>
-                            <button class="linkbtn" type="button" @onclick="() => _abierto = null">Cancelar</button>
+                            <button class="btn btn-sm" type="button" disabled="@_m.Guardando" @onclick="() => GuardarAsync(miembro)">Guardar permisos</button>
+                            <button class="linkbtn" type="button" @onclick="() => _m.Abierto = null">Cancelar</button>
                         </div>
                     </div>
                 }
@@ -80,16 +80,9 @@
     }
 </section>
 
+
 @code {
-    private readonly HashSet<string> _borrador = [];
-    private Guid? _abierto;
-    private bool _guardando;
-    private string? _error;
-
-    // Cambia al aplicar una plantilla para recrear las casillas: el navegador no debe quedarse con marcas que ya no coinciden con el borrador.
-    private int _version;
-
-    private static IEnumerable<IGrouping<string, MiParte.Core.Domain.Permiso>> Grupos => Claves.Todos.GroupBy(p => p.Grupo);
+    private ModeloPermisos _m = default!;
 
     /// <summary>Miembros del hogar con sus permisos efectivos.</summary>
     [Parameter] public List<MiembroDto> Miembros { get; set; } = [];
@@ -100,49 +93,12 @@
     /// <summary>Se invoca tras guardar, para que la vista recargue los miembros.</summary>
     [Parameter] public EventCallback OnCambiado { get; set; }
 
-    private void Alternar(MiembroDto m)
-    {
-        _error = null;
-        if (_abierto == m.Id)
-        {
-            _abierto = null;
-            return;
-        }
-        _abierto = m.Id;
-        Aplicar(m.Permisos ?? []);
-    }
-
-    private void Aplicar(IEnumerable<string> claves)
-    {
-        _borrador.Clear();
-        foreach (var clave in claves) _borrador.Add(clave);
-        _version++;
-    }
-
-    private void Marcar(string clave, bool marcado)
-    {
-        if (marcado) _borrador.Add(clave);
-        else _borrador.Remove(clave);
-    }
+    protected override void OnInitialized() => _m = new ModeloPermisos(Api);
 
     private async Task GuardarAsync(MiembroDto m)
     {
-        _error = null;
-        _guardando = true;
-        try
-        {
-            await Api.ActualizarMiembroAsync(m.Id, new ActualizarMiembroRequest(Permisos: Claves.Todos.Select(p => p.Clave).Where(_borrador.Contains).ToList()));
-            _abierto = null;
-            Avisos.Mostrar($"Permisos de {m.Nombre} guardados");
-            await OnCambiado.InvokeAsync();
-        }
-        catch (ApiException e)
-        {
-            _error = e.Message;
-        }
-        finally
-        {
-            _guardando = false;
-        }
+        if (await _m.GuardarAsync(m) is not { } aviso) return;
+        Avisos.Mostrar(aviso);
+        await OnCambiado.InvokeAsync();
     }
 }

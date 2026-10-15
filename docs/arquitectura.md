@@ -84,7 +84,7 @@ Una regla nueva se prueba primero en su capa (dominio o servicio); los tests HTT
 |---|---|
 | Liquidación, gastos, cuenta común y ahorro, miembros, recurrentes, categorías, perfiles, cierres | **Migradas** a servicio + puerto. |
 | Hogares (crear con semilla, eliminar, `/api/yo`) y auditoría (lectura) | **Migradas**: ningún endpoint de `Core.Api` usa `DbContext`. |
-| Front (`src/Web`) | **Hecho en las pestañas principales**: lógica de presentación extraída, un modelo de pantalla por pestaña (Gastos, Recurrentes, Cuenta común, Resumen, Dashboard y Configuración del hogar) y modo demo sobre los casos de uso reales (ver sección Front). Pendiente: Categorías, paneles de perfiles, permisos e historial y las pantallas de acceso. |
+| Front (`src/Web`) | **Hecho en las pestañas principales**: lógica de presentación extraída, un modelo de pantalla por pestaña (Gastos, Recurrentes, Cuenta común, Resumen, Dashboard y Configuración del hogar) y modo demo sobre los casos de uso reales (ver sección Front). Pendiente: el editor de perfiles y las pantallas de acceso. |
 
 ## Front
 
@@ -94,7 +94,7 @@ componentes.
 
 | Pieza | Dónde | Qué resuelve |
 |---|---|---|
-| Modelos de pantalla | `src/Web/Modelos` | Un modelo por pestaña: `ModeloGastos`, `ModeloRecurrentes`, `ModeloCuentaComun`, `ModeloResumen`, `ModeloDashboard` y `ModeloConfiguracionHogar`. Guardan el estado de la pantalla, cargan los datos de referencia y ejecutan las operaciones contra la API (guardar, eliminar, recargar con control de respuestas tardías) devolviendo el aviso a mostrar o dejando el error. La vista lo crea con `CoreApiClient` y enlaza sus propiedades; la parte que depende del navegador (foco, portapapeles, «Compartir», navegación) se queda en la vista. |
+| Modelos de pantalla | `src/Web/Modelos` | Un modelo por pestaña o panel: `ModeloGastos`, `ModeloRecurrentes`, `ModeloCuentaComun`, `ModeloResumen`, `ModeloDashboard`, `ModeloConfiguracionHogar`, `ModeloCategorias`, `ModeloHistorial` y `ModeloPermisos`. Guardan el estado de la pantalla, cargan los datos de referencia y ejecutan las operaciones contra la API (guardar, eliminar, recargar con control de respuestas tardías) devolviendo el aviso a mostrar o dejando el error. La vista lo crea con `CoreApiClient` y enlaza sus propiedades; la parte que depende del navegador (foco, portapapeles, «Compartir», navegación) se queda en la vista. |
 | `EntradaImporte` | `src/Web/Reparto` | Interpretación del importe escrito en un formulario (coma o punto, máx. 2 decimales, cero opcional). Una sola copia para Gastos, Recurrentes y Cuenta común. |
 | `ListaGastos` | `src/Web/Reparto` | Filtros del cliente (categoría con subcategorías, quién paga), orden, totales y perfiles ofrecidos. |
 | `GraficoGastos` | `src/Web/Reparto` | Agrupación en «Otras categorías» y porcentajes del Dashboard. |
@@ -122,6 +122,6 @@ un front que solo dependa de `Contracts`, la demo tendría que volver a ser un s
 
 ### Pendiente en el front
 
-- Aplicar el patrón a las vistas que quedan: `VistaCategorias`, `PanelPerfiles`, `PanelPermisos`, `PanelHistorial` y las de
+- Aplicar el patrón a lo que queda: `PanelPerfiles`/`EditorPerfil` y las pantallas de
   acceso (login, registro, unirse).
 - `CatalogoPermisos` sigue en `Core.Domain` y el front lo usa directamente (claves de permiso y etiquetas).

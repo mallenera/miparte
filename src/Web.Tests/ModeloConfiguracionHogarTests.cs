@@ -85,6 +85,23 @@ public class ModeloConfiguracionHogarTests
     }
 
     [Fact]
+    public async Task Desactivar_las_recurrentes_las_guarda_sin_tocar_las_demas_funciones()
+    {
+        var (m, api, hogar) = Crear(cuenta: true, ahorro: true);
+        api.Responde("PUT /api/hogar/recurrentes", HttpStatusCode.OK, new { activas = false });
+        await m.CargarAsync();
+        Assert.True(m.RecurrentesActivas);
+
+        var aviso = await m.CambiarRecurrentesAsync(false);
+
+        Assert.Equal("Recurrentes desactivadas", aviso);
+        Assert.Equal("{\"activas\":false}", api.Cuerpos["PUT /api/hogar/recurrentes"]);
+        Assert.False(hogar.HogarActual!.RecurrentesActivas);
+        Assert.True(hogar.HogarActual.CuentaComunActiva);
+        Assert.True(hogar.HogarActual.AhorroActivo);
+    }
+
+    [Fact]
     public async Task Un_miembro_a_cargo_exige_responsable_para_poder_anadirse()
     {
         var (m, _, _) = Crear();

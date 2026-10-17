@@ -4,6 +4,7 @@ using MiParte.Core.Api.Hogares;
 using MiParte.Core.Api.Seguridad;
 using MiParte.Core.Application.Miembros;
 using MiParte.Core.Domain;
+using MiParte.Core.Mapeo;
 using MiParte.Core.Infrastructure.Persistencia;
 
 namespace MiParte.Core.Api.Miembros;
@@ -88,6 +89,6 @@ public static class EnlacesGrupoEndpoints
         var r = await servicio.UnirseAsync(userId, req.Token, req.Nombre, ct);
         if (r.Error is { } error) return MiembrosEndpoints.Error(error);
         var h = r.Valor!;
-        return Results.Ok(new HogarResumen(h.Id, h.Nombre, h.CuentaComunActiva, h.AhorroActivo, TextoTipoGrupo.ATexto(h.Tipo)));
+        return Results.Ok(h.ADto());
     }
 }

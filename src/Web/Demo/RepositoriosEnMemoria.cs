@@ -72,6 +72,33 @@ internal sealed class RepositorioLiquidacionEnMemoria(AlmacenDemo a) : IReposito
     }
 
     public Task<bool> EliminarPagoAsync(Guid id, CancellationToken ct) => Task.FromResult(a.Pagos.RemoveAll(p => p.Id == id) > 0);
+
+    public Task<ModoLiquidacion> ModoAsync(CancellationToken ct) => Task.FromResult(a.Hogar.LiquidacionModo);
+
+    public Task EstablecerModoAsync(ModoLiquidacion modo, CancellationToken ct)
+    {
+        a.Hogar.LiquidacionModo = modo;
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<Gasto>> GastosPendientesAsync(CancellationToken ct)
+        => Task.FromResult<IReadOnlyList<Gasto>>(a.Gastos.Where(g => g.CicloLiquidacionId is null).ToList());
+
+    public Task<int> UltimoNumeroCicloAsync(CancellationToken ct) => Task.FromResult(a.Ciclos.Count == 0 ? 0 : a.Ciclos.Max(c => c.Numero));
+
+    public Task CerrarCicloAsync(CicloLiquidacion ciclo, IReadOnlyList<Guid> gastos, CancellationToken ct)
+    {
+        a.Ciclos.Add(ciclo);
+        foreach (var g in a.Gastos.Where(g => gastos.Contains(g.Id))) g.CicloLiquidacionId = ciclo.Id;
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<CicloConAutor>> ListarCiclosAsync(CancellationToken ct)
+        => Task.FromResult<IReadOnlyList<CicloConAutor>>(a.Ciclos.OrderByDescending(c => c.Numero)
+            .Select(c => new CicloConAutor(c, a.Miembros.FirstOrDefault(m => m.Id == c.CerradoPor)?.Nombre)).ToList());
+
+    /// <summary>En memoria no hay concurrencia que serializar: la operación se ejecuta tal cual.</summary>
+    public Task<T> EnExclusionAsync<T>(Func<Task<T>> operacion, CancellationToken ct) => operacion();
 }
 
 /// <summary>Gastos en memoria.</summary>
@@ -306,6 +333,14 @@ internal sealed class RepositorioRecurrentesEnMemoria(AlmacenDemo a) : IReposito
 {
     private readonly List<GastoRecurrente> _porAnadir = [];
     private readonly List<GastoRecurrente> _porEliminar = [];
+
+    public Task<bool> RecurrentesActivasAsync(CancellationToken ct) => Task.FromResult(a.Hogar.RecurrentesActivas);
+
+    public Task EstablecerRecurrentesActivasAsync(bool activas, CancellationToken ct)
+    {
+        a.Hogar.RecurrentesActivas = activas;
+        return Task.CompletedTask;
+    }
 
     public Task<IReadOnlyList<GastoRecurrente>> ListarAsync(CancellationToken ct)
         => Task.FromResult<IReadOnlyList<GastoRecurrente>>(a.Recurrentes.OrderBy(r => r.DiaMes).ThenBy(r => r.Id).ToList());

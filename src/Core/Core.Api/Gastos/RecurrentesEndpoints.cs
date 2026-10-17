@@ -26,6 +26,7 @@ public static class RecurrentesEndpoints
         escritura.MapPut("{id:guid}", EditarAsync);
         escritura.MapDelete("{id:guid}", BorrarAsync);
         escritura.MapPost("generar", GenerarAsync).RequireRateLimiting(LimitacionPeticiones.Costosa);
+        app.MapPut("/api/hogar/recurrentes", ActivarAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.HogarFunciones);
         return app;
     }
 
@@ -78,7 +79,18 @@ public static class RecurrentesEndpoints
         return r.Error is { } error ? ApiComun.Respuesta(error) : Results.NoContent();
     }
 
-    /// <summary>Crea los gastos del mes para las plantillas activas que aún no tengan uno. Idempotente. 409 si el mes está cerrado.</summary>
+    /// <summary>
+    /// PUT /api/hogar/recurrentes (permiso <c>hogar.funciones</c>): activa o desactiva los gastos recurrentes del hogar. Desactivarlos no
+    /// borra las plantillas, solo bloquea crear plantillas y generar gastos. 403 sin el permiso; 409 sin hogar; 200 con el estado resultante.
+    /// </summary>
+    private static async Task<IResult> ActivarAsync(
+        ActivarRecurrentesRequest req, [FromServices] ServicioRecurrentes servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
+    {
+        if (hogar.HogarId is null) return ApiComun.SinHogar();
+        return Results.Ok(new { activas = await servicio.ActivarAsync(req.Activas, ct) });
+    }
+
+    /// <summary>Crea los gastos del mes para las plantillas activas que aún no tengan uno. Idempotente. 409 si las recurrentes están desactivadas en el hogar o el mes está cerrado.</summary>
     private static async Task<IResult> GenerarAsync(
         [FromQuery] string? mes, [FromServices] ServicioRecurrentes servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
     {

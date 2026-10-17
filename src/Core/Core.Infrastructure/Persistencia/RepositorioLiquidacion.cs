@@ -58,4 +58,57 @@ public sealed class RepositorioLiquidacion(MiParteDbContext db) : IRepositorioLi
         await db.SaveChangesAsync(ct);
         return true;
     }
+
+    /// <inheritdoc />
+    public async Task<ModoLiquidacion> ModoAsync(CancellationToken ct)
+        => await db.Hogares.Select(h => h.LiquidacionModo).SingleAsync(ct);
+
+    /// <inheritdoc />
+    public async Task EstablecerModoAsync(ModoLiquidacion modo, CancellationToken ct)
+    {
+        var h = await db.Hogares.FirstAsync(ct);
+        h.LiquidacionModo = modo;
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Gasto>> GastosPendientesAsync(CancellationToken ct)
+        => await db.Gastos.AsNoTracking().Include(g => g.Repartos).Where(g => g.CicloLiquidacionId == null).ToListAsync(ct);
+
+    /// <inheritdoc />
+    public async Task<int> UltimoNumeroCicloAsync(CancellationToken ct)
+        => await db.CiclosLiquidacion.Select(c => (int?)c.Numero).MaxAsync(ct) ?? 0;
+
+    /// <inheritdoc />
+    public async Task CerrarCicloAsync(CicloLiquidacion ciclo, IReadOnlyList<Guid> gastos, CancellationToken ct)
+    {
+        var ids = gastos.ToArray();
+        db.CiclosLiquidacion.Add(ciclo);
+        await db.SaveChangesAsync(ct); // primero el ciclo: los gastos lo referencian por clave foránea y la auditoría lo registra aquí
+        // Sin seguimiento de cambios: el cierre queda en la auditoría como un solo evento (el del ciclo), no uno por gasto.
+        var marcados = await db.Gastos.Where(x => ids.Contains(x.Id))
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.CicloLiquidacionId, ciclo.Id), ct);
+        // Un gasto borrado a la vez por otra petición deja el total desfasado: se aborta (rollback) en vez de cerrar a medias.
+        if (marcados != ids.Length) throw new CierreConcurrenteException();
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<CicloConAutor>> ListarCiclosAsync(CancellationToken ct)
+    {
+        var ciclos = await db.CiclosLiquidacion.AsNoTracking().OrderByDescending(c => c.Numero).ToListAsync(ct);
+        var nombres = await db.Miembros.AsNoTracking().ToDictionaryAsync(m => m.Id, m => m.Nombre, ct);
+        return ciclos.Select(c => new CicloConAutor(c, nombres.GetValueOrDefault(c.CerradoPor))).ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<T> EnExclusionAsync<T>(Func<Task<T>> operacion, CancellationToken ct)
+    {
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        // Bloquea la fila del hogar hasta el COMMIT: dos cierres del mismo hogar no pueden leer los mismos gastos pendientes.
+        var hogarId = await db.Hogares.Select(h => h.Id).SingleAsync(ct);
+        await db.Database.ExecuteSqlInterpolatedAsync($"select 1 from public.hogar where id = {hogarId} for update", ct);
+        var resultado = await operacion();
+        await tx.CommitAsync(ct);
+        return resultado;
+    }
 }

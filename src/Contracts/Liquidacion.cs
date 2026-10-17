@@ -92,3 +92,24 @@ public record ResumenYLiquidacionResponse(ResumenMensualResponse Resumen, Liquid
 /// <param name="Concepto">Descripción opcional del pago.</param>
 public record CrearPagoLiquidacionRequest(
     DateOnly Mes, Guid DeMiembroId, Guid AMiembroId, decimal Importe, DateOnly? Fecha, string? Concepto);
+
+/// <summary>Ciclo de liquidación ya cerrado: lo que liquidó, cuándo y quién lo cerró.</summary>
+/// <param name="Id">Identificador del ciclo.</param>
+/// <param name="Numero">Número del ciclo dentro del hogar, desde 1.</param>
+/// <param name="CerradoEn">Instante en que se cerró.</param>
+/// <param name="CerradoPor">Miembro que cerró el ciclo.</param>
+/// <param name="Autor">Nombre de quien lo cerró (null si ya no consta).</param>
+/// <param name="DesdeGastoFecha">Fecha del gasto más antiguo que liquida.</param>
+/// <param name="HastaFecha">Fecha del gasto más reciente que liquida.</param>
+/// <param name="Total">Suma de los importes de los gastos que liquida.</param>
+public record CicloLiquidacionDto(
+    Guid Id, int Numero, DateTimeOffset CerradoEn, Guid CerradoPor, string? Autor, DateOnly DesdeGastoFecha, DateOnly HastaFecha,
+    decimal Total);
+
+/// <summary>PUT /api/hogar/liquidacion (permiso <c>hogar.funciones</c>): cambia el modo de liquidación del hogar.</summary>
+/// <param name="Modo">"mensual" o "ciclos" (ver <c>ModosLiquidacion</c>).</param>
+public record ModoLiquidacionRequest(string? Modo);
+
+/// <summary>Modo de liquidación resultante tras PUT /api/hogar/liquidacion.</summary>
+/// <param name="Modo">"mensual" o "ciclos".</param>
+public record ModoLiquidacionResponse(string Modo);

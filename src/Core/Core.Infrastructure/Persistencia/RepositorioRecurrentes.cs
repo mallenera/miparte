@@ -14,6 +14,17 @@ public sealed class RepositorioRecurrentes(MiParteDbContext db) : IRepositorioRe
     private const string SqlStateUnicidad = "23505";
 
     /// <inheritdoc />
+    public Task<bool> RecurrentesActivasAsync(CancellationToken ct) => db.Hogares.AnyAsync(h => h.RecurrentesActivas, ct);
+
+    /// <inheritdoc />
+    public async Task EstablecerRecurrentesActivasAsync(bool activas, CancellationToken ct)
+    {
+        var h = await db.Hogares.FirstAsync(ct);
+        h.RecurrentesActivas = activas;
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<GastoRecurrente>> ListarAsync(CancellationToken ct)
         => await db.GastosRecurrentes.AsNoTracking().OrderBy(r => r.DiaMes).ThenBy(r => r.Id).ToListAsync(ct);
 

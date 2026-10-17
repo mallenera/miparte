@@ -120,6 +120,7 @@ public sealed partial class ServidorDemo
             ("auditoria", 2, "GET") => Ok(new List<EventoAuditoriaDto>()),
 
             ("cuenta-comun", 2, "GET") => await EstadoCuentaComun(mes, ct),
+            ("hogar", 3, "PUT") when subruta == "recurrentes" => Ok(new { activas = await _recurrentes.ActivarAsync((await Cuerpo<ActivarRecurrentesRequest>())!.Activas, ct) }),
             ("cuenta-comun", 4, "PUT") when subruta == "ahorro" && ruta[3] == "activacion" => await ActivarAhorro((await Cuerpo<ActivarAhorroRequest>())!, ct),
             ("cuenta-comun", 3, "PUT") when subruta == "activacion" => Ok(new { activa = await _cuenta.ActivarCuentaAsync((await Cuerpo<ActivarCuentaComunRequest>())!.Activa, ct) }),
             ("cuenta-comun", 3, "PUT") when subruta == "aportaciones" => await FijarAportacion((await Cuerpo<FijarAportacionRequest>())!, ct),
@@ -142,6 +143,9 @@ public sealed partial class ServidorDemo
             ("resumen-liquidacion", 2, "GET") => await ResumenYLiquidacion(mes, ct),
             ("pagos-liquidacion", 2, "POST") => await CrearPago((await Cuerpo<CrearPagoLiquidacionRequest>())!, ct),
             ("pagos-liquidacion", 3, "DELETE") when id is { } i => Sin(await _liquidacion.EliminarPagoAsync(i, ct)),
+            ("hogar", 3, "PUT") when subruta == "liquidacion" => await CambiarModoLiquidacion((await Cuerpo<ModoLiquidacionRequest>())!, ct),
+            ("liquidacion", 3, "GET") when subruta == "ciclos" => Ok((await _liquidacion.ListarCiclosAsync(ct)).Select(c => c.ADto()).ToList()),
+            ("liquidacion", 3, "POST") when subruta == "ciclos" => await CerrarCiclo(ct),
 
             _ => NoEncontrado(),
         };
@@ -332,6 +336,22 @@ public sealed partial class ServidorDemo
         if (!TryMes(mes, out var inicio)) return MesInvalido();
         var r = await _liquidacion.ResumenYLiquidacionAsync(inicio, ct);
         return Ok(new ResumenYLiquidacionResponse(r.Resumen.ADto(), r.Liquidacion.ADto(inicio)));
+    }
+
+    private async Task<HttpResponseMessage> CambiarModoLiquidacion(ModoLiquidacionRequest r, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(r?.Modo) || !TextoModoLiquidacion.TryParse(r.Modo, out var modo))
+            return Mal(HttpStatusCode.BadRequest, "El modo de liquidación debe ser «mensual» o «ciclos».");
+        var nuevo = await _liquidacion.CambiarModoAsync(modo, ct);
+        return Ok(new ModoLiquidacionResponse(TextoModoLiquidacion.ATexto(nuevo)));
+    }
+
+    private async Task<HttpResponseMessage> CerrarCiclo(CancellationToken ct)
+    {
+        var yo = await _miembros.MiembroActivoAsync(IdUsuario, ct);
+        if (yo is null) return Mal(HttpStatusCode.Forbidden, Mensajes.SoloMiembroCierra);
+        var res = await _liquidacion.CerrarCicloAsync(yo, ct);
+        return res.Error is { } e ? Error(e) : Respuesta(HttpStatusCode.Created, res.Valor!.ADto());
     }
 
     private async Task<HttpResponseMessage> CrearPago(CrearPagoLiquidacionRequest r, CancellationToken ct)

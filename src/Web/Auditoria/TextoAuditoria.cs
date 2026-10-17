@@ -32,6 +32,7 @@ public static class TextoAuditoria
         ["aportacion_cuenta"] = "una aportación a la cuenta común", ["reembolso_cuenta"] = "un reembolso de la cuenta común",
         ["retirada_ahorro"] = "una retirada de ahorro", ["deposito_ahorro"] = "un ingreso de ahorro",
         ["perfil_reparto"] = "un perfil de reparto", ["categoria"] = "una categoría",
+        ["ciclo_liquidacion"] = "un cierre de liquidación",
     };
 
     private static readonly Dictionary<string, string> Campos = new()
@@ -41,7 +42,8 @@ public static class TextoAuditoria
         ["tipo"] = "Tipo", ["modo"] = "Modo", ["notas"] = "Notas", ["pagadoPor"] = "Pagado por", ["miembroId"] = "Miembro",
         ["responsableId"] = "Responsable", ["repartos"] = "Reparto", ["detalle"] = "Detalle", ["ahorro"] = "Ahorro",
         ["aCargoCuentaComun"] = "A cargo de la cuenta común", ["pagadoDesdeAhorro"] = "Pagado desde el ahorro",
-        ["permisos"] = "Permisos", ["cuentaComunActiva"] = "Cuenta común activada", ["ahorroActivo"] = "Ahorro activado",
+        ["permisos"] = "Permisos", ["cuentaComunActiva"] = "Cuenta común activada", ["ahorroActivo"] = "Ahorro activado", ["recurrentesActivas"] = "Recurrentes activadas",
+        ["liquidacionModo"] = "Modo de liquidación",
     };
 
     /// <summary>Frase del evento sin el autor: «creó un gasto "Compra"», «borró una categoría»…</summary>

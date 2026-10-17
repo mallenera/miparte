@@ -791,6 +791,21 @@ public class ComponentesTests : BunitContext
     }
 
     [Fact]
+    public void Recurrentes_desactivadas_avisa_sin_cargar_datos_ni_ofrece_generar()
+    {
+        var api = ApiRecurrentes(Alquiler());
+        Registrar(api, Casa with { RecurrentesActivas = false });
+
+        var c = Render<VistaRecurrentes>();
+
+        Assert.Contains("no están activadas en este hogar", c.Markup);
+        Assert.Contains("href=\"/hogar/configuracion\"", c.Markup);
+        Assert.Empty(c.FindAll("#generar"));
+        Assert.DoesNotContain("GET /api/gastos-recurrentes", api.Recibidas);
+        Assert.DoesNotContain("GET /api/miembros", api.Recibidas);
+    }
+
+    [Fact]
     public void Recurrentes_sin_plantillas_no_permite_generar_y_lo_explica()
     {
         Registrar(ApiRecurrentes());
@@ -1034,6 +1049,63 @@ public class ComponentesTests : BunitContext
         Assert.Contains("\"ahorro\":0", api.Cuerpos["PUT /api/cuenta-comun/aportaciones"]);
     }
 
+    [Fact]
+    public async Task Configuracion_pasa_la_liquidacion_a_ciclos_desde_el_selector()
+    {
+        var api = ApiConHogar(soyAdmin: true)
+            .Responde("PUT /api/hogar/liquidacion", HttpStatusCode.OK, new ModoLiquidacionResponse(ModosLiquidacion.Ciclos));
+        var c = await ConfiguracionAsync(true, Casa, api);
+
+        var selector = c.FindAll("select").First(s => s.TextContent.Contains("Por ciclos"));
+        Assert.Equal("mensual", selector.QuerySelector("option[selected]")?.GetAttribute("value"));
+        selector.Change("ciclos");
+
+        Assert.Contains("\"modo\":\"ciclos\"", api.Cuerpos["PUT /api/hogar/liquidacion"]);
+        Assert.Contains("Por ciclos: cada vez que el grupo quiera cerrar", c.Markup);
+    }
+
+    [Fact]
+    public void Resumen_en_modo_ciclos_cierra_la_liquidacion_solo_tras_confirmarlo_y_no_ofrece_pagos()
+    {
+        var ciclo = new CicloLiquidacionDto(Guid.NewGuid(), 1, DateTimeOffset.UtcNow, AnaId, "Ana",
+            new DateOnly(2026, 10, 3), new DateOnly(2026, 10, 5), 150m);
+        var resumen = new ResumenMensualResponse("2026-10", 80m,
+            [new ResumenMiembroDto(AnaId, "Ana", 80m, 40m), new ResumenMiembroDto(LuisId, "Luis", 0m, 40m)], []);
+        var api = ApiResumen(resumen, Liquidacion(40m))
+            .Responde("GET /api/liquidacion/ciclos", HttpStatusCode.OK, new[] { ciclo })
+            .Responde("POST /api/liquidacion/ciclos", HttpStatusCode.Created, ciclo);
+        Registrar(api, new HogarResumen(Guid.NewGuid(), "Casa", LiquidacionModo: ModosLiquidacion.Ciclos));
+
+        var c = Render<VistaResumen>();
+
+        Assert.DoesNotContain("Registrar pago", c.Markup);
+        Assert.Contains("Liquidación n.º 1", c.Markup);
+        Assert.DoesNotContain("POST /api/liquidacion/ciclos", api.Recibidas);
+
+        // Primer clic: pide confirmación en la propia página, sin cerrar nada todavía.
+        c.FindAll("button").First(b => b.TextContent.Trim() == "Cerrar liquidación").Click();
+        Assert.Contains("¿Cerrar la liquidación?", c.Markup);
+        Assert.DoesNotContain("POST /api/liquidacion/ciclos", api.Recibidas);
+
+        c.FindAll("button").First(b => b.TextContent.Contains("Sí, cerrar")).Click();
+        Assert.Contains("POST /api/liquidacion/ciclos", api.Recibidas);
+    }
+
+    [Fact]
+    public void Resumen_en_modo_mensual_no_muestra_el_cierre_de_ciclos()
+    {
+        var resumen = new ResumenMensualResponse("2026-10", 80m,
+            [new ResumenMiembroDto(AnaId, "Ana", 80m, 40m), new ResumenMiembroDto(LuisId, "Luis", 0m, 40m)], []);
+        var api = ApiResumen(resumen, Liquidacion(40m));
+        Registrar(api, Casa);
+
+        var c = Render<VistaResumen>();
+
+        Assert.DoesNotContain("Cerrar liquidación", c.Markup);
+        Assert.DoesNotContain("GET /api/liquidacion/ciclos", api.Recibidas);
+        Assert.Contains("Registrar pago", c.Markup);
+    }
+
     private async Task<IRenderedComponent<VistaConfiguracionHogar>> ConfiguracionAsync(bool soyAdmin, HogarResumen hogar, ApiFalsa? api = null)
     {
         Registrar(api ?? ApiConHogar(soyAdmin));
@@ -1066,6 +1138,21 @@ public class ComponentesTests : BunitContext
 
         Assert.Contains("\"activo\":true", api.Cuerpos["PUT /api/cuenta-comun/ahorro/activacion"]);
         Assert.True(Services.GetRequiredService<EstadoHogar>().HogarActual!.AhorroActivo);
+    }
+
+    [Fact]
+    public async Task Configuracion_desactiva_las_recurrentes_sin_tocar_la_cuenta_ni_el_ahorro()
+    {
+        var api = ApiConHogar(soyAdmin: true).Responde("PUT /api/hogar/recurrentes", HttpStatusCode.OK, new { activas = false });
+        var c = await ConfiguracionAsync(true, Casa with { CuentaComunActiva = true, AhorroActivo = true }, api);
+
+        c.FindAll(".chk input")[2].Change(false);
+
+        Assert.Contains("\"activas\":false", api.Cuerpos["PUT /api/hogar/recurrentes"]);
+        var hogar = Services.GetRequiredService<EstadoHogar>().HogarActual!;
+        Assert.False(hogar.RecurrentesActivas);
+        Assert.True(hogar.CuentaComunActiva);
+        Assert.True(hogar.AhorroActivo);
     }
 
     [Fact]

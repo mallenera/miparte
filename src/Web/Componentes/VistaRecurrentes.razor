@@ -8,7 +8,16 @@
 
 <h1 class="sr">Gastos recurrentes de @Hogar.HogarActual?.Nombre</h1>
 
-@if (_m.Cargando)
+@if (_desactivadas)
+{
+    <section class="card" aria-labelledby="t-desactivadas">
+        <h2 id="t-desactivadas">Gastos recurrentes desactivados</h2>
+        <div class="aviso warn u-mt12" role="status">
+            Las recurrentes no están activadas en este hogar, así que no se crean plantillas ni se generan gastos. Un administrador puede activarlas en la <NavLink href="/hogar/configuracion">configuración del hogar</NavLink>.
+        </div>
+    </section>
+}
+else if (_m.Cargando)
 {
     <EsqueletoLista Texto="Cargando gastos recurrentes…" Filas="4" />
 }
@@ -152,10 +161,13 @@ else
 @code {
     private ModeloRecurrentes _m = default!;
 
+    /// <summary>Con las recurrentes desactivadas en el hogar no se cargan datos ni se ofrece generar.</summary>
+    private bool _desactivadas => Hogar.HogarActual is { RecurrentesActivas: false };
+
     protected override Task OnInitializedAsync()
     {
         _m = new ModeloRecurrentes(Api, () => Reloj.GetLocalNow().DateTime);
-        return CargarAsync();
+        return _desactivadas ? Task.CompletedTask : CargarAsync();
     }
 
     private async Task CargarAsync()

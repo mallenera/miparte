@@ -30,9 +30,20 @@ public sealed class ServicioRecurrentes(IRepositorioRecurrentes recurrentes, IRe
     /// <summary>Una plantilla; null si no existe en el hogar.</summary>
     public Task<GastoRecurrente?> ObtenerAsync(Guid id, CancellationToken ct) => recurrentes.ObtenerAsync(id, ct);
 
-    /// <summary>Crea una plantilla. Inválida si el importe, el día, la categoría, el pagador o el perfil no valen.</summary>
+    /// <summary>Activa o desactiva los gastos recurrentes del hogar. Desactivarlos no borra las plantillas: quedan pausadas hasta volver a activarlos.</summary>
+    public async Task<bool> ActivarAsync(bool activas, CancellationToken ct)
+    {
+        await recurrentes.EstablecerRecurrentesActivasAsync(activas, ct);
+        return activas;
+    }
+
+    /// <summary>
+    /// Crea una plantilla. Conflicto si el hogar tiene desactivados los gastos recurrentes; inválida si el importe, el día, la categoría,
+    /// el pagador o el perfil no valen.
+    /// </summary>
     public async Task<Resultado<GastoRecurrente>> CrearAsync(Guid hogarId, DatosRecurrente datos, CancellationToken ct)
     {
+        if (!await recurrentes.RecurrentesActivasAsync(ct)) return Resultado<GastoRecurrente>.Conflicto(Mensajes.RecurrentesInactivas);
         if (await ValidarAsync(datos, ct) is { } error) return Resultado<GastoRecurrente>.Invalido(error);
 
         var plantilla = new GastoRecurrente
@@ -79,11 +90,13 @@ public sealed class ServicioRecurrentes(IRepositorioRecurrentes recurrentes, IRe
 
     /// <summary>
     /// Crea los gastos del mes que empieza en <paramref name="inicio"/> para las plantillas activas que aún no tengan uno. Es
-    /// idempotente: o se generan todos los pendientes o ninguno. Conflicto si el mes está cerrado o una plantilla va a cargo de la
-    /// cuenta común y el hogar no la ha activado; inválido si algún gasto no se puede repartir.
+    /// idempotente: o se generan todos los pendientes o ninguno. Conflicto si el hogar tiene desactivados los gastos recurrentes, si el
+    /// mes está cerrado o si una plantilla va a cargo de la cuenta común y el hogar no la ha activado; inválido si algún gasto no se
+    /// puede repartir.
     /// </summary>
     public async Task<Resultado<GeneracionDelMes>> GenerarAsync(DateOnly inicio, CancellationToken ct)
     {
+        if (!await recurrentes.RecurrentesActivasAsync(ct)) return Resultado<GeneracionDelMes>.Conflicto(Mensajes.RecurrentesInactivas);
         if (await gastos.MesCerradoAsync(inicio, ct)) return Resultado<GeneracionDelMes>.Conflicto(Mensajes.MesCerrado);
 
         // Dos peticiones simultáneas pueden leer lo mismo y generar duplicados: el índice único gasto_recurrente_mes_uq lo impide

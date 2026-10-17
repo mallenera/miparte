@@ -52,6 +52,9 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
     /// <summary>Conjunto de <see cref="MesCerrado"/> del hogar actual.</summary>
     public DbSet<MesCerrado> MesesCerrados => Set<MesCerrado>();
 
+    /// <summary>Conjunto de <see cref="CicloLiquidacion"/> del hogar actual (liquidaciones por ciclo ya cerradas).</summary>
+    public DbSet<CicloLiquidacion> CiclosLiquidacion => Set<CicloLiquidacion>();
+
     /// <summary>Conjunto de <see cref="EventoAuditoria"/> del hogar actual (solo de añadir; lo lee únicamente un admin).</summary>
     public DbSet<EventoAuditoria> Auditoria => Set<EventoAuditoria>();
 
@@ -94,6 +97,10 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
             e.ToTable("hogar");
             e.Property(x => x.CreadoEn).HasDefaultValueSql("now()"); // lo asigna la base de datos
             e.Property(x => x.Tipo).HasConversion(v => TextoTipoGrupo.ATexto(v), v => TextoATipoGrupo(v));
+            e.Property(x => x.LiquidacionModo).HasColumnName("liquidacion_modo")
+                .HasConversion(v => TextoModoLiquidacion.ATexto(v), v => TextoAModoLiquidacion(v));
+            e.Ignore(x => x.PeriodoPropio); // se deriva de periodo_desde y periodo_hasta (ver Hogar.PeriodoPropio)
+            e.Property(x => x.RecurrentesActivas).HasColumnName("recurrentes_activas"); // EF siempre envía el valor; el DEFAULT de la columna solo cubre inserciones ajenas
             e.HasQueryFilter(x => x.Id == HogarId);
         });
 
@@ -158,6 +165,14 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
         {
             e.ToTable("mes_cerrado");
             e.Property(x => x.CerradoEn).HasDefaultValueSql("now()");
+            e.HasQueryFilter(x => x.HogarId == HogarId);
+        });
+
+        b.Entity<CicloLiquidacion>(e =>
+        {
+            e.ToTable("ciclo_liquidacion");
+            e.Property(x => x.CerradoEn).HasDefaultValueSql("now()");
+            e.Property(x => x.Total).HasPrecision(12, 2);
             e.HasQueryFilter(x => x.HogarId == HogarId);
         });
 
@@ -252,4 +267,8 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
     /// <summary>Convierte el texto de la columna <c>hogar.tipo</c> al tipo de grupo; falla si el valor es desconocido (la base lo impide).</summary>
     private static TipoGrupo TextoATipoGrupo(string t)
         => TextoTipoGrupo.TryParse(t, out var tipo) ? tipo : throw new InvalidOperationException($"Tipo de grupo desconocido: {t}");
+
+    /// <summary>Convierte el texto de la columna <c>hogar.liquidacion_modo</c> al modo; falla si el valor es desconocido (la base lo impide).</summary>
+    private static ModoLiquidacion TextoAModoLiquidacion(string t)
+        => TextoModoLiquidacion.TryParse(t, out var modo) ? modo : throw new InvalidOperationException($"Modo de liquidación desconocido: {t}");
 }

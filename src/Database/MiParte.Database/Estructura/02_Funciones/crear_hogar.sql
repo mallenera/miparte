@@ -18,7 +18,8 @@ begin
         raise exception 'Usuario no autenticado';
     end if;
 
-    insert into public.hogar (nombre) values (p_nombre_hogar) returning id into v_hogar;
+    -- Esta función solo crea hogares de tipo «hogar»; el resto de tipos se crea desde la API (ServicioHogares).
+    insert into public.hogar (nombre, tipo) values (p_nombre_hogar, 'hogar') returning id into v_hogar;
     insert into public.miembro (hogar_id, nombre, tipo, user_id, rol)
     values (v_hogar, p_nombre_miembro, 'adulto', auth.uid(), 'admin')
     returning id into v_miembro;

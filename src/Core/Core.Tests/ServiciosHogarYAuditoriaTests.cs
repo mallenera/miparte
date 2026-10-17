@@ -16,7 +16,7 @@ public class ServicioHogaresTests
     [Fact]
     public async Task Crear_deja_al_creador_como_adulto_admin_con_cuenta()
     {
-        var r = await Servicio.CrearAsync(_usuario, "  Casa ", " Ana ", default);
+        var r = await Servicio.CrearAsync(_usuario, "  Casa ", " Ana ", TipoGrupo.Hogar, default);
 
         Assert.Null(r.Error);
         Assert.Equal("Casa", r.Valor!.Nombre);
@@ -25,13 +25,22 @@ public class ServicioHogaresTests
         Assert.Equal(r.Valor.Id, creador.HogarId);
     }
 
+    [Fact]
+    public async Task Crear_guarda_el_tipo_del_grupo_que_se_pide()
+    {
+        var r = await Servicio.CrearAsync(_usuario, "Piso", "Ana", TipoGrupo.Viaje, default);
+
+        Assert.Equal(TipoGrupo.Viaje, r.Valor!.Tipo);
+        Assert.Equal(TipoGrupo.Viaje, Assert.Single(_repo.Hogares).Tipo);
+    }
+
     [Theory]
     [InlineData("", "Ana")]
     [InlineData("Casa", "  ")]
     [InlineData(null, null)]
     public async Task Crear_sin_nombres_es_invalido(string? hogar, string? miembro)
     {
-        var r = await Servicio.CrearAsync(_usuario, hogar, miembro, default);
+        var r = await Servicio.CrearAsync(_usuario, hogar, miembro, TipoGrupo.Hogar, default);
 
         Assert.Equal(TipoError.Invalido, r.Error!.Tipo);
         Assert.Empty(_repo.Hogares);
@@ -40,7 +49,7 @@ public class ServicioHogaresTests
     [Fact]
     public async Task Crear_con_nombre_demasiado_largo_es_invalido()
     {
-        var r = await Servicio.CrearAsync(_usuario, new string('x', 101), "Ana", default);
+        var r = await Servicio.CrearAsync(_usuario, new string('x', 101), "Ana", TipoGrupo.Hogar, default);
 
         Assert.Equal(TipoError.Invalido, r.Error!.Tipo);
     }
@@ -50,7 +59,7 @@ public class ServicioHogaresTests
     {
         _repo.Pertenencias = ServicioHogares.MaxHogaresPorUsuario;
 
-        var r = await Servicio.CrearAsync(_usuario, "Casa", "Ana", default);
+        var r = await Servicio.CrearAsync(_usuario, "Casa", "Ana", TipoGrupo.Hogar, default);
 
         Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
     }
@@ -58,7 +67,7 @@ public class ServicioHogaresTests
     [Fact]
     public async Task Obtener_un_hogar_ajeno_no_revela_su_existencia()
     {
-        var propio = (await Servicio.CrearAsync(_usuario, "Casa", "Ana", default)).Valor!;
+        var propio = (await Servicio.CrearAsync(_usuario, "Casa", "Ana", TipoGrupo.Hogar, default)).Valor!;
 
         Assert.NotNull(await Servicio.ObtenerAsync(_usuario, propio.Id, default));
         Assert.Null(await Servicio.ObtenerAsync(Guid.NewGuid(), propio.Id, default));
@@ -67,7 +76,7 @@ public class ServicioHogaresTests
     [Fact]
     public async Task Eliminar_exige_el_nombre_exacto_y_luego_lo_borra()
     {
-        var hogar = (await Servicio.CrearAsync(_usuario, "Casa", "Ana", default)).Valor!;
+        var hogar = (await Servicio.CrearAsync(_usuario, "Casa", "Ana", TipoGrupo.Hogar, default)).Valor!;
         _repo.Actual = hogar;
 
         var mal = await Servicio.EliminarAsync("casa", default);

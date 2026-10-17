@@ -9,6 +9,25 @@ public enum ModoReparto { Porcentaje, Partes, CuentaComun, Individual }
 /// <summary>Rol de un miembro dentro del hogar.</summary>
 public enum RolMiembro { Admin, Miembro }
 
+/// <summary>Tipo de grupo de gastos compartidos. Por defecto, un hogar.</summary>
+public enum TipoGrupo
+{
+    /// <summary>Hogar familiar o de convivencia habitual (valor por defecto).</summary>
+    Hogar,
+
+    /// <summary>Piso compartido por personas que no forman una familia.</summary>
+    PisoCompartido,
+
+    /// <summary>Viaje con gastos comunes durante un periodo acotado.</summary>
+    Viaje,
+
+    /// <summary>Evento puntual, como una boda o una cena de grupo.</summary>
+    Evento,
+
+    /// <summary>Cualquier otro grupo de gastos compartidos.</summary>
+    Otro,
+}
+
 /// <summary>Hogar: unidad de multitenencia a la que pertenecen todos los datos de negocio.</summary>
 public class Hogar
 {
@@ -22,6 +41,8 @@ public class Hogar
     public bool CuentaComunActiva { get; set; }
     /// <summary>Si el hogar usa el ahorro de la cuenta común (aportaciones con ahorro, depósitos, retiradas y gastos desde el ahorro); solo tiene efecto con la cuenta común activada.</summary>
     public bool AhorroActivo { get; set; }
+    /// <summary>Tipo de grupo; lo fija la creación y determina las categorías sembradas (ver <see cref="SemillaHogar"/>).</summary>
+    public TipoGrupo Tipo { get; set; } = TipoGrupo.Hogar;
     /// <summary>Fecha del saldo inicial de la cuenta común (null si no se ha fijado); va con <see cref="SaldoInicialImporte"/>.</summary>
     public DateOnly? SaldoInicialFecha { get; set; }
     /// <summary>Dinero que había en la cuenta para gastos a <see cref="SaldoInicialFecha"/> (null si no se ha fijado).</summary>

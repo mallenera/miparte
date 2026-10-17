@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using MiParte.Core.Domain;
 using MiParte.Core.Domain.Entidades;
 using MiParte.Core.Infrastructure.Auditoria;
 
@@ -90,6 +91,7 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
         {
             e.ToTable("hogar");
             e.Property(x => x.CreadoEn).HasDefaultValueSql("now()"); // lo asigna la base de datos
+            e.Property(x => x.Tipo).HasConversion(v => TextoTipoGrupo.ATexto(v), v => TextoATipoGrupo(v));
             e.HasQueryFilter(x => x.Id == HogarId);
         });
 
@@ -235,4 +237,8 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
         "individual" => ModoReparto.Individual,
         _ => throw new InvalidOperationException($"Modo de reparto desconocido: {t}"),
     };
+
+    /// <summary>Convierte el texto de la columna <c>hogar.tipo</c> al tipo de grupo; falla si el valor es desconocido (la base lo impide).</summary>
+    private static TipoGrupo TextoATipoGrupo(string t)
+        => TextoTipoGrupo.TryParse(t, out var tipo) ? tipo : throw new InvalidOperationException($"Tipo de grupo desconocido: {t}");
 }

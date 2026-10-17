@@ -10,9 +10,11 @@ CREATE TABLE public.hogar (
     ahorro_activo boolean DEFAULT false NOT NULL,
     saldo_inicial_fecha date,
     saldo_inicial_importe numeric(12,2),
+    tipo text DEFAULT 'hogar'::text NOT NULL,
     CONSTRAINT hogar_nombre_check CHECK ((length(btrim(nombre)) > 0)),
     CONSTRAINT hogar_saldo_inicial_check CHECK (((saldo_inicial_fecha IS NULL) = (saldo_inicial_importe IS NULL))),
-    CONSTRAINT hogar_saldo_inicial_importe_check CHECK ((saldo_inicial_importe >= (0)::numeric))
+    CONSTRAINT hogar_saldo_inicial_importe_check CHECK ((saldo_inicial_importe >= (0)::numeric)),
+    CONSTRAINT hogar_tipo_check CHECK ((tipo = ANY (ARRAY['hogar'::text, 'piso_compartido'::text, 'viaje'::text, 'evento'::text, 'otro'::text])))
 );
 
 

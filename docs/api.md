@@ -75,7 +75,7 @@ Permisos: "miembro" = cualquier miembro activo del hogar (incluye admin). "admin
 |---|---|---|---|---|---|
 | `GET /api/yo` | Usuario, sus hogares y hogar actual | (cabecera `X-Hogar-Id` opcional) | `YoResponse` 200 | 401 | autenticado |
 | `GET /api/hogares` | Hogares del usuario (ordenados por nombre) | - | `HogarResumen[]` 200 | 401 | autenticado |
-| `POST /api/hogares` | Crea hogar; el creador es admin y adulto; siembra perfiles y categorías | `CrearHogarRequest` | `HogarResumen` 201 | 400 nombres vacíos o > 100 caracteres; 409 máximo 10 hogares por usuario | autenticado |
+| `POST /api/hogares` | Crea hogar; el creador es admin y adulto; siembra perfiles y categorías. `tipo` opcional (`hogar` por defecto; ver «Tipo de grupo» en §4) | `CrearHogarRequest` | `HogarResumen` 201 | 400 nombres vacíos o > 100 caracteres, o `tipo` no válido; 409 máximo 10 hogares por usuario | autenticado |
 | `DELETE /api/hogar?nombre=` | **Irreversible.** Elimina el hogar actual (cabecera `X-Hogar-Id`) y, en cascada, todos sus datos: miembros, gastos y recurrentes, cuenta común y ahorro, cierres de mes, categorías, perfiles, invitaciones y el historial. `nombre` debe ser el nombre exacto del hogar (distingue mayúsculas) | - | 204 | 400 nombre ausente o distinto; 403 sin el permiso `hogar.eliminar`; 409 sin hogar | permiso `hogar.eliminar` |
 | `GET /api/hogares/{id}` | Un hogar del usuario | - | `HogarResumen` 200 | 404 si no existe o no eres miembro | autenticado |
 
@@ -198,8 +198,8 @@ Total: 52 endpoints de negocio (5 hogares/yo, 6 miembros/invitaciones, 4 categor
 ```json
 {
   "userId": "7c1f6d3e-0b8a-4f55-9a53-1d2f6c1b9e10",
-  "hogares": [ { "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez", "cuentaComunActiva": false, "ahorroActivo": false } ],
-  "hogarActual": { "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez", "cuentaComunActiva": false, "ahorroActivo": false }
+  "hogares": [ { "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez", "cuentaComunActiva": false, "ahorroActivo": false, "tipo": "hogar" } ],
+  "hogarActual": { "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez", "cuentaComunActiva": false, "ahorroActivo": false, "tipo": "hogar" }
 }
 ```
 
@@ -209,8 +209,16 @@ Total: 52 endpoints de negocio (5 hogares/yo, 6 miembros/invitaciones, 4 categor
 { "nombreHogar": "Casa Pérez", "nombreMiembro": "Ana" }
 ```
 ```json
-{ "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez" }
+{ "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez", "cuentaComunActiva": false, "ahorroActivo": false, "tipo": "hogar" }
 ```
+
+`POST /api/hogares` con tipo de grupo (`tipo` es opcional; sin él se crea un «hogar»):
+
+```json
+{ "nombreHogar": "Piso de la playa", "nombreMiembro": "Ana", "tipo": "viaje" }
+```
+
+**Tipo de grupo (`tipo`).** `HogarResumen` y `CrearHogarRequest` llevan un campo de texto `tipo` con los valores `hogar` (por defecto: si se omite en la creación, o si el hogar es anterior a este campo), `piso_compartido`, `viaje`, `evento` y `otro`. Cualquier otro valor da 400. El tipo se guarda en `hogar.tipo` y determina las categorías sembradas al crear el hogar (`hogar` mantiene las 6 de siempre; los demás tipos siembran sus categorías con perfil «Por partes»). El tipo no se cambia después.
 
 ### Miembros
 
@@ -426,7 +434,7 @@ Error típico si se pasa de la deuda (409): `{ "error": "El importe supera la de
 - **Reparto guardado e inmutable**: cada gasto guarda sus `repartos` al crearse. Cambiar un perfil después no recalcula gastos antiguos. Solo `PUT /api/gastos/{id}` recalcula ese gasto. Editar una plantilla recurrente tampoco toca los gastos ya generados. El último miembro absorbe el céntimo sobrante.
 - **Quién interviene**: pagador y reparto solo se asignan a adultos activos. Los miembros `a_cargo` necesitan un responsable adulto activo.
 - **Recurrentes**: `diaMes` entre 1 y 28. `generar` es idempotente por mes y plantilla; una plantilla con gastos generados no se borra, se desactiva.
-- **Semilla al crear hogar**: 4 perfiles (`Cuenta común`, `Por partes`, `Porcentaje fijo`, `Individual`; el creador queda con 1 parte en "Por partes" y 100 % en "Porcentaje fijo") y 6 categorías (Hipoteca/Alquiler, Alimentación, Suministros, Gastos varios de casa e Hijo con "Por partes"; Ocio personal con "Individual"). El creador es admin y adulto.
+- **Semilla al crear hogar**: 4 perfiles para cualquier tipo (`Cuenta común`, `Por partes`, `Porcentaje fijo`, `Individual`; el creador queda con 1 parte en "Por partes" y 100 % en "Porcentaje fijo"). Las 6 categorías estándar (Hipoteca/Alquiler, Alimentación, Suministros, Gastos varios de casa e Hijo con "Por partes"; Ocio personal con "Individual") solo aplican al tipo `hogar`; `piso_compartido`, `viaje`, `evento` y `otro` siembran sus categorías propias con "Por partes" (ver «Tipo de grupo» en §4). El creador es admin y adulto.
 - **Quién soy**: `MiembroDto.esYo` es `true` en el miembro vinculado al usuario autenticado (en `GET /api/miembros`, `PUT` y `DELETE`; el alta siempre devuelve `false`). El front lo usa para saber si mostrar los controles de admin y cuál es "su" miembro.
 - **Roles y permisos**: el rol (`admin` / `miembro`) solo decide la plantilla de permisos de quien no tiene lista propia; el hogar siempre conserva al menos un admin activo y vinculado (409). Un adulto responsable de miembros a cargo activos no se puede desactivar (409).
 - **Permisos por miembro** (`miembro.permisos`, nulo = sin lista propia). `MiembroDto.permisos` devuelve los **efectivos**: la lista propia si existe; si no, la plantilla del rol (admin todos, miembro los marcados «defecto»); los adultos sin cuenta y los a cargo, ninguno. Cualquier adulto con cuenta, **admins incluidos**, puede tener cualquier combinación. Sin el permiso la API responde 403 `{ "error": "No tienes permiso para ..." }`; las lecturas siguen abiertas a cualquier miembro. Un miembro con `permisos.gestionar` los cambia con `PUT /api/miembros/{id}` y `permisos` (lista completa de claves; 400 clave desconocida; 409 si el destino no es un adulto con cuenta). Cambiar el `rol` sin enviar `permisos` devuelve al miembro a la plantilla del rol nuevo. **Invariante**: siempre queda al menos un adulto activo con cuenta con `permisos.gestionar` (409 si el cambio lo impide). Catálogo (17): `gastos.crear`, `gastos.editar`, `gastos.borrar`, `recurrentes.gestionar` (también `POST /api/gastos-recurrentes/generar`), `pagos.registrar` (crear y borrar pagos de liquidación), `mes.cerrar`, `cuenta.movimientos` (aportaciones y reembolsos), `ahorro.movimientos` (ingresos y retiradas), `categorias.gestionar`, `perfiles.gestionar` (todos «defecto»); `mes.reabrir`, `historial.ver`, `miembros.gestionar` (añadir, renombrar a otros, desactivar, responsable), `invitaciones.crear`, `hogar.funciones` (cuenta común y ahorro) `permisos.gestionar` y `hogar.eliminar` (eliminar el hogar; sin «defecto»). Cualquiera puede renombrarse a sí mismo. Plantillas para la web (`CatalogoPermisos.Plantillas`): Solo lectura, Colaborador (defecto), Gestor (todo salvo `hogar.funciones`, `permisos.gestionar` y `hogar.eliminar`) y Administrador (todo).

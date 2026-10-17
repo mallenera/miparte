@@ -2,6 +2,7 @@ using Bunit;
 using Microsoft.JSInterop;
 using MiParte.Contracts;
 using MiParte.Web.Componentes;
+using MiParte.Web.Reparto;
 
 namespace MiParte.Web.Tests;
 
@@ -104,13 +105,35 @@ public class TarjetaCompartirTests : BunitContext
     }
 
     [Fact]
-    public void Los_enlaces_de_whatsapp_y_correo_llevan_el_texto_y_se_ven_junto_a_el()
+    public void Los_enlaces_de_whatsapp_y_correo_llevan_el_mensaje_generico_y_se_ven_junto_a_el()
     {
         var cut = Renderizar(puedeCompartir: false);
 
-        var whatsapp = cut.Find("a[href^='https://wa.me/']");
-        Assert.Contains("Luis%20debe%20a%20Ana", whatsapp.GetAttribute("href"));
+        var whatsapp = cut.Find("a[href^='https://wa.me/']").GetAttribute("href");
+        Assert.Contains(Uri.EscapeDataString(ResumenCompartible.MensajeEnlace), whatsapp);
         Assert.StartsWith("mailto:?subject=", cut.Find("a[href^='mailto:']").GetAttribute("href"));
         Assert.NotNull(cut.Find("textarea"));
+    }
+
+    [Fact]
+    public void Los_enlaces_no_llevan_importes_ni_nombres_de_miembros_ni_del_hogar()
+    {
+        var cut = Renderizar(puedeCompartir: false);
+
+        var enlaces = cut.FindAll("a[href^='https://wa.me/'], a[href^='mailto:']")
+            .Select(a => a.GetAttribute("href")!)
+            .ToList();
+        Assert.Equal(2, enlaces.Count);
+
+        foreach (var href in enlaces)
+        {
+            // Se comprueba también la URL decodificada, por si un dato se hubiera escapado.
+            var claro = Uri.UnescapeDataString(href);
+            Assert.DoesNotMatch(@"\d", claro);
+            Assert.DoesNotContain("€", claro);
+            Assert.DoesNotContain("Luis", claro);
+            Assert.DoesNotContain("Ana", claro);
+            Assert.DoesNotContain("Piso", claro);
+        }
     }
 }

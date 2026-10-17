@@ -26,6 +26,16 @@
                     <ValidationMessage For="() => _crear.NombreHogar" />
                 </div>
                 <div class="fieldrow">
+                    <label for="tipo">Tipo de grupo</label>
+                    <InputSelect id="tipo" @bind-Value="_crear.Tipo" aria-describedby="tipo-ayuda">
+                        @foreach (var opcion in NombresTiposGrupo.Opciones)
+                        {
+                            <option value="@opcion.Valor">@opcion.Nombre</option>
+                        }
+                    </InputSelect>
+                    <p id="tipo-ayuda" class="ayuda-campo muted">@NombresTiposGrupo.Descripcion(_crear.Tipo)</p>
+                </div>
+                <div class="fieldrow">
                     <label for="yo">Tu nombre en el hogar</label>
                     <InputText id="yo" @bind-Value="_crear.NombreMiembro" />
                     <ValidationMessage For="() => _crear.NombreMiembro" />
@@ -63,7 +73,7 @@
     private bool _enviando;
 
     private Task CrearAsync() =>
-        EjecutarAsync(() => Api.CrearHogarAsync(new CrearHogarRequest(_crear.NombreHogar.Trim(), _crear.NombreMiembro.Trim())));
+        EjecutarAsync(() => Api.CrearHogarAsync(new CrearHogarRequest(_crear.NombreHogar.Trim(), _crear.NombreMiembro.Trim(), _crear.Tipo)));
 
     private Task UnirseAsync() =>
         EjecutarAsync(() => Api.AceptarInvitacionAsync(new AceptarInvitacionRequest(
@@ -101,6 +111,9 @@
         [Required(ErrorMessage = "Indica tu nombre.")]
         [StringLength(100, ErrorMessage = "Máximo 100 caracteres.")]
         public string NombreMiembro { get; set; } = "";
+
+        /// <summary>Valor de <see cref="TiposGrupo"/>; «hogar» por defecto.</summary>
+        public string Tipo { get; set; } = TiposGrupo.Hogar;
     }
 
     private sealed class UnirseModelo

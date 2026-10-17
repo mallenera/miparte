@@ -1184,6 +1184,27 @@ public class ComponentesTests : BunitContext
     }
 
     [Fact]
+    public void Nuevo_gasto_muestra_solo_el_formulario_de_alta_sin_lista_ni_filtros()
+    {
+        var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
+        var perfil = new PerfilRepartoDto(Guid.NewGuid(), "Individual", "individual", []);
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
+            .Responde("GET /api/categorias", HttpStatusCode.OK, new[] { new CategoriaDto(Guid.NewGuid(), "Casa", null, null) })
+            .Responde("GET /api/perfiles", HttpStatusCode.OK, new[] { perfil })
+            .Responde("GET /api/gastos", HttpStatusCode.OK, Array.Empty<GastoResponse>())
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, Cuenta(0m));
+        Registrar(api);
+        _permisos.Fijar([MiParte.Core.Domain.CatalogoPermisos.GastosCrear]);
+
+        var c = Render<VistaGastos>(p => p.Add(x => x.SoloAlta, true));
+
+        Assert.Single(c.FindAll("form.addcat"));
+        Assert.Empty(c.FindAll(".filtros"));
+        Assert.Equal("Nuevo gasto", c.Find("#t-gastos").TextContent.Trim());
+    }
+
+    [Fact]
     public void Categorias_sin_permiso_no_ofrece_formulario_ni_acciones()
     {
         var api = new ApiFalsa()

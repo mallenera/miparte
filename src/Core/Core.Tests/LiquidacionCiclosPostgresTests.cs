@@ -58,8 +58,9 @@ public class LiquidacionCiclosPostgresTests
         Assert.Equal(new[] { 2, 1 }, lista.Select(x => x.Numero));
         Assert.Equal(100m, lista[1].Total);
 
-        // Volver al modo mensual no altera los ciclos cerrados.
-        await Leer<ModoLiquidacionResponse>(await c.PutAsJsonAsync("/api/hogar/liquidacion", new ModoLiquidacionRequest("mensual")));
+        // Con ciclos cerrados no se vuelve a mensual: sus gastos quedarían fuera del cálculo mensual. Los ciclos no cambian.
+        var cambio = await c.PutAsJsonAsync("/api/hogar/liquidacion", new ModoLiquidacionRequest("mensual"));
+        Assert.Equal(HttpStatusCode.Conflict, cambio.StatusCode);
         Assert.Equal(2, (await Leer<List<CicloLiquidacionDto>>(await c.GetAsync("/api/liquidacion/ciclos"))).Count);
     }
 }

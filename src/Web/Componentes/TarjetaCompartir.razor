@@ -3,7 +3,7 @@
 
 <section class="card" aria-labelledby="t-compartir">
     <div class="card-head"><h2 id="t-compartir">Compartir el resumen</h2></div>
-    <p class="muted">Texto con las transferencias del mes. La otra persona no necesita tener cuenta.</p>
+    <p class="muted">@(PorCiclos ? "Texto con las transferencias pendientes de liquidar." : "Texto con las transferencias del mes.") La otra persona no necesita tener cuenta.</p>
 
     <textarea id="@IdArea" class="resumen-texto" readonly rows="7" aria-label="Texto del resumen de liquidación" value="@_texto"></textarea>
 
@@ -41,9 +41,15 @@
     /// <summary>Miembros del hogar, para nombrar a quien aparezca en una transferencia.</summary>
     [Parameter] public IReadOnlyList<MiembroDto> Miembros { get; set; } = [];
 
+    /// <summary>Si la liquidación es por ciclos: el texto habla de lo pendiente y no del mes.</summary>
+    [Parameter] public bool PorCiclos { get; set; }
+
     protected override void OnParametersSet()
     {
-        _texto = ResumenCompartible.Generar(NombreHogar, Mes, Liquidacion, Miembros);
+        var anterior = _texto;
+        _texto = ResumenCompartible.Generar(NombreHogar, Mes, Liquidacion, Miembros, PorCiclos);
+        // Un aviso de «Texto copiado.» se refiere al texto que había entonces: si el texto cambia (otro mes, otra liquidación), se retira.
+        if (_texto != anterior) _aviso = "";
         var titulo = Uri.EscapeDataString(TituloCorreo);
         _enlaceWhatsApp = $"https://wa.me/?text={Uri.EscapeDataString(_texto)}";
         _enlaceCorreo = $"mailto:?subject={titulo}&body={Uri.EscapeDataString(_texto)}";

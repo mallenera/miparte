@@ -59,7 +59,16 @@ public sealed class RepositorioEnlacesGrupo(MiParteDbContext db) : IRepositorioE
             enlace.HogarId, userId, RegistroAuditoria.Usar, "enlace_grupo", enlace.Id, despues: new { usadoPor = userId, usadoEn = ahora }));
 
         db.Miembros.Add(nuevo);
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException { SqlState: "23505" })
+        {
+            // Otra unión del mismo usuario se confirmó antes (miembro_hogar_id_user_id_key). Sin COMMIT la transacción se
+            // deshace entera: el uso contado arriba tampoco queda y la auditoría no se escribe.
+            return ResultadoUsoEnlace.UsuarioYaEnHogar;
+        }
         await tx.CommitAsync(ct);
         return ResultadoUsoEnlace.Usado;
     }

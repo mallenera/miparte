@@ -65,12 +65,19 @@ public sealed class ServicioLiquidacion(IRepositorioLiquidacion repositorio, Tim
             await LiquidarAsync(inicio, delMes, miembros, ct));
     }
 
-    /// <summary>Cambia el modo de liquidación del hogar. No altera los gastos ni los ciclos ya cerrados.</summary>
-    public async Task<ModoLiquidacion> CambiarModoAsync(ModoLiquidacion modo, CancellationToken ct)
-    {
-        await repositorio.EstablecerModoAsync(modo, ct);
-        return modo;
-    }
+    /// <summary>
+    /// Cambia el modo de liquidación del hogar. No altera los gastos ni los ciclos ya cerrados. Pasar a mensual es un conflicto si
+    /// el hogar tiene ciclos cerrados: sus gastos ya están liquidados y el cálculo mensual no los contaría. Va bajo exclusión para
+    /// que no se cruce con un cierre de ciclo en curso.
+    /// </summary>
+    public Task<Resultado<ModoLiquidacion>> CambiarModoAsync(ModoLiquidacion modo, CancellationToken ct)
+        => repositorio.EnExclusionAsync(async () =>
+        {
+            if (modo == ModoLiquidacion.Mensual && await repositorio.UltimoNumeroCicloAsync(ct) > 0)
+                return Resultado<ModoLiquidacion>.Conflicto(Mensajes.CiclosCerradosSinMensual);
+            await repositorio.EstablecerModoAsync(modo, ct);
+            return Resultado<ModoLiquidacion>.Ok(modo);
+        }, ct);
 
     /// <summary>Ciclos cerrados del hogar, del más reciente al más antiguo.</summary>
     public Task<IReadOnlyList<CicloConAutor>> ListarCiclosAsync(CancellationToken ct) => repositorio.ListarCiclosAsync(ct);

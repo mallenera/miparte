@@ -54,6 +54,8 @@ public sealed class ServicioGastos(IRepositorioGastos repositorio)
     {
         var gasto = await repositorio.ObtenerParaEditarAsync(id, ct);
         if (gasto is null) return Resultado<Gasto>.NoEncontrado();
+        // Un gasto ya liquidado por un ciclo cerrado no cambia: el cierre ya lo dio por bueno con su importe y reparto.
+        if (gasto.CicloLiquidacionId is not null) return Resultado<Gasto>.Conflicto(Mensajes.GastoEnCiclo);
         var preparado = await PrepararAsync(datos, ct);
         if (preparado.Error is { } invalido) return Resultado<Gasto>.Invalido(invalido);
         // Ni sacarlo de un mes cerrado ni meterlo en uno.
@@ -72,11 +74,12 @@ public sealed class ServicioGastos(IRepositorioGastos repositorio)
         return await repositorio.GuardarAsync(ct) ? Resultado<Gasto>.Ok(gasto) : Resultado<Gasto>.Conflicto(Mensajes.MesCerrado);
     }
 
-    /// <summary>Borra el gasto y su reparto. No encontrado si no existe; conflicto si su mes está cerrado.</summary>
+    /// <summary>Borra el gasto y su reparto. No encontrado si no existe; conflicto si su mes está cerrado o si ya liquida un ciclo cerrado.</summary>
     public async Task<Resultado<bool>> BorrarAsync(Guid id, CancellationToken ct)
     {
         var gasto = await repositorio.ObtenerParaEditarAsync(id, ct);
         if (gasto is null) return Resultado<bool>.NoEncontrado();
+        if (gasto.CicloLiquidacionId is not null) return Resultado<bool>.Conflicto(Mensajes.GastoEnCiclo);
         if (await repositorio.MesCerradoAsync(gasto.Fecha, ct)) return Resultado<bool>.Conflicto(Mensajes.MesCerrado);
 
         repositorio.Eliminar(gasto);

@@ -10,6 +10,9 @@ public enum ResultadoUsoEnlace
 
     /// <summary>Otra petición se adelantó: el enlace se revocó o caducó mientras tanto.</summary>
     EnlaceNoDisponible,
+
+    /// <summary>Otra petición del mismo usuario se adelantó: ya figura en el hogar. No cuenta uso ni deja miembro nuevo.</summary>
+    UsuarioYaEnHogar,
 }
 
 /// <summary>

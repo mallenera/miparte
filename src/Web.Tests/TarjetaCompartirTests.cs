@@ -104,6 +104,32 @@ public class TarjetaCompartirTests : BunitContext
     }
 
     [Fact]
+    public void Si_cambia_el_texto_se_retira_el_aviso_de_copiado_del_texto_anterior()
+    {
+        var cut = Renderizar(puedeCompartir: false, copiadoOk: true);
+        Boton(cut, "Copiar texto").Click();
+        cut.WaitForAssertion(() => Assert.Contains("Texto copiado", cut.Find("[role=status]").TextContent));
+
+        cut.Render(p => p.Add(c => c.Mes, new DateOnly(2026, 9, 15)));
+
+        Assert.Equal("", cut.Find("[role=status]").TextContent.Trim());
+        var area = cut.Find("textarea");
+        Assert.Contains("septiembre 2026", area.GetAttribute("value") ?? area.TextContent);
+    }
+
+    [Fact]
+    public void Con_liquidacion_por_ciclos_el_texto_no_lleva_el_mes()
+    {
+        var cut = Renderizar(puedeCompartir: false);
+
+        cut.Render(p => p.Add(c => c.PorCiclos, true));
+
+        var area = cut.Find("textarea");
+        Assert.Contains("Resumen de Piso · gastos pendientes de liquidar", area.GetAttribute("value") ?? area.TextContent);
+        Assert.DoesNotContain("octubre", area.GetAttribute("value") ?? area.TextContent);
+    }
+
+    [Fact]
     public void Los_enlaces_de_whatsapp_y_correo_llevan_el_texto_y_se_ven_junto_a_el()
     {
         var cut = Renderizar(puedeCompartir: false);

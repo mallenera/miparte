@@ -21,6 +21,12 @@ public static class Mensajes
     /// <summary>Se intenta cerrar un ciclo en un hogar que liquida por meses.</summary>
     public const string HogarNoEsCiclos = "El hogar liquida por meses. Un administrador puede pasarlo a liquidación por ciclos en la configuración del hogar.";
 
+    /// <summary>Se intenta pasar a liquidación mensual un hogar que ya tiene ciclos cerrados.</summary>
+    public const string CiclosCerradosSinMensual = "No se puede volver a liquidación mensual mientras haya ciclos cerrados: sus gastos ya están liquidados y el cálculo mensual no los vería.";
+
+    /// <summary>Se intenta editar o borrar un gasto que ya forma parte de un ciclo cerrado.</summary>
+    public const string GastoEnCiclo = "Este gasto ya forma parte de una liquidación cerrada: no se puede editar ni borrar.";
+
     /// <summary>Se intenta cerrar un ciclo sin gastos pendientes de liquidar.</summary>
     public const string SinGastosPendientes = "No hay gastos sin liquidar";
 

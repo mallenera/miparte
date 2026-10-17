@@ -121,8 +121,13 @@ public sealed class ServicioEnlacesGrupo(IRepositorioEnlacesGrupo enlaces, IRepo
             UserId = userId, Rol = RolMiembro.Miembro,
         };
 
-        if (await enlaces.UsarAsync(enlace, userId, nuevo, ahora, ct) == ResultadoUsoEnlace.EnlaceNoDisponible)
-            return Resultado<Hogar>.Conflicto("El enlace de grupo ha dejado de estar disponible.");
+        switch (await enlaces.UsarAsync(enlace, userId, nuevo, ahora, ct))
+        {
+            case ResultadoUsoEnlace.EnlaceNoDisponible:
+                return Resultado<Hogar>.Conflicto("El enlace de grupo ha dejado de estar disponible.");
+            case ResultadoUsoEnlace.UsuarioYaEnHogar:
+                return Resultado<Hogar>.Conflicto("Ya perteneces a este hogar.");
+        }
 
         return Resultado<Hogar>.Ok(await miembros.HogarAsync(enlace.HogarId, ct));
     }

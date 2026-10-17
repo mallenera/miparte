@@ -16,3 +16,8 @@ src/Web/wwwroot/appsettings.Development.json
 
 # Dependencias de npm
 node_modules/
+
+# Skills instaladas con herramientas externas (no forman parte del proyecto)
+.agents/
+.claude/skills/
+skills-lock.json

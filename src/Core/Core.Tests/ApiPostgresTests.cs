@@ -139,6 +139,40 @@ public class ApiPostgresTests
     }
 
     [SkippableFact]
+    public async Task CuentaComunCompleta_ResumenYEstadoRespondenOk_EnPostgres()
+    {
+        Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
+        await using var e = new Entorno();
+        var user = await e.CrearUsuarioAsync();
+        var hogar = await CrearHogar(e.Cliente(user), "Casa diag", "Ana");
+        var c = e.Cliente(user, hogar.Id);
+        var ana = (await Leer<List<MiembroDto>>(await c.GetAsync("/api/miembros"))).Single();
+        var perfilCuenta = (await Leer<List<PerfilRepartoDto>>(await c.GetAsync("/api/perfiles"))).Single(p => p.Modo == "cuenta_comun");
+        await Leer<JsonElement>(await c.PutAsJsonAsync("/api/cuenta-comun/activacion", new ActivarCuentaComunRequest(true)));
+        await Leer<JsonElement>(await c.PutAsJsonAsync("/api/cuenta-comun/ahorro/activacion", new ActivarAhorroRequest(true)));
+        var cat = await Leer<CategoriaDto>(await c.PostAsJsonAsync("/api/categorias",
+            new GuardarCategoriaRequest("Comunidad", null, null, true)), HttpStatusCode.Created);
+        await Leer<JsonElement>(await c.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(ana.Id, new DateOnly(2026, 9, 1), 300m, 50m)));
+        await Leer<JsonElement>(await c.PutAsJsonAsync("/api/cuenta-comun/saldo-inicial", new FijarSaldoInicialRequest(new DateOnly(2026, 8, 15), 1000m)));
+        await Leer<GastoResponse>(await c.PostAsJsonAsync("/api/gastos", new GastoRequest(new DateOnly(2026, 9, 10), 100m, cat.Id, ana.Id, perfilCuenta.Id, "A")), HttpStatusCode.Created);
+        await Leer<GastoResponse>(await c.PostAsJsonAsync("/api/gastos", new GastoRequest(new DateOnly(2026, 10, 5), 40m, cat.Id, null, perfilCuenta.Id, "B")), HttpStatusCode.Created);
+        await Leer<GastoResponse>(await c.PostAsJsonAsync("/api/gastos", new GastoRequest(new DateOnly(2026, 10, 6), 20m, cat.Id, null, perfilCuenta.Id, "C", PagadoDesdeAhorro: true)), HttpStatusCode.Created);
+        await Leer<JsonElement>(await c.PostAsJsonAsync("/api/cuenta-comun/reembolsos", new CrearReembolsoRequest(ana.Id, 30m, new DateOnly(2026, 10, 7), "R")), HttpStatusCode.Created);
+        await Leer<JsonElement>(await c.PostAsJsonAsync("/api/cuenta-comun/retiradas-ahorro", new CrearRetiradaAhorroRequest(ana.Id, 10m, new DateOnly(2026, 10, 8), "T")), HttpStatusCode.Created);
+        await Leer<JsonElement>(await c.PostAsJsonAsync("/api/cuenta-comun/depositos-ahorro", new CrearDepositoAhorroRequest(ana.Id, 5m, new DateOnly(2026, 9, 20), "D")), HttpStatusCode.Created);
+
+        var luis = await Leer<MiembroDto>(await c.PostAsJsonAsync("/api/miembros", new CrearMiembroRequest("Luis", "adulto")), HttpStatusCode.Created);
+        await Leer<JsonElement>(await c.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(luis.Id, new DateOnly(2026, 10, 1), 200m, 0m)));
+        await Leer<JsonElement>(await c.PostAsJsonAsync("/api/cuenta-comun/depositos-ahorro", new CrearDepositoAhorroRequest(luis.Id, 7m, new DateOnly(2026, 10, 2), null)), HttpStatusCode.Created);
+        await Leer<GastoResponse>(await c.PostAsJsonAsync("/api/gastos", new GastoRequest(new DateOnly(2026, 10, 9), 15m, cat.Id, luis.Id, perfilCuenta.Id, "D")), HttpStatusCode.Created);
+        foreach (var mes in new[] { "2026-06", "2026-08", "2026-09", "2026-10", "2026-11" })
+        {
+            await Leer<JsonElement>(await c.GetAsync($"/api/cuenta-comun?mes={mes}"));
+            await Leer<JsonElement>(await c.GetAsync($"/api/resumen?mes={mes}"));
+        }
+    }
+
+    [SkippableFact]
     public async Task Yo_ListaVariosHogares_SinCabeceraYConCabecera_EnPostgres()
     {
         Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");

@@ -1,0 +1,23 @@
+@* Marcador de carga con la forma de una lista: sustituye al spinner mientras llegan los datos. *@
+<div class="esqueleto" role="status" aria-live="polite">
+    <span class="sr">@Texto</span>
+    @for (var i = 0; i < Filas; i++)
+    {
+        <div class="esq-fila" aria-hidden="true">
+            <span class="esq-bloque esq-avatar"></span>
+            <span class="esq-texto">
+                <span class="esq-bloque esq-linea"></span>
+                <span class="esq-bloque esq-linea corta"></span>
+            </span>
+            <span class="esq-bloque esq-importe"></span>
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>Texto que leen los lectores de pantalla mientras carga.</summary>
+    [Parameter] public string Texto { get; set; } = "Cargando…";
+
+    /// <summary>Número de filas de marcador.</summary>
+    [Parameter] public int Filas { get; set; } = 5;
+}

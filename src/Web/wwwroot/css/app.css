@@ -392,9 +392,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .card {
     background: linear-gradient(to top right, color-mix(in srgb, var(--surface) 92%, transparent), color-mix(in srgb, var(--surface-2) 55%, transparent));
     border: 1px solid var(--line); border-radius: var(--radius); padding: 26px; min-width: 0; box-shadow: var(--shadow);
-    transition: transform var(--ease), border-color var(--ease);
+    transition: border-color var(--ease);
 }
-.card:hover { transform: scale(1.02); border-color: var(--line-2); }
+/* Sin escala al pasar el ratón: las tarjetas son paneles grandes y el zoom las hacía temblar. */
+.card:hover { border-color: var(--line-2); }
 .card h2 { font: 600 1.25rem/1.25 var(--font-display); }
 .card h3 { font-size: .75rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); margin-top: 24px; }
 .card > p.muted { margin-top: 4px; font-size: .88rem; }
@@ -452,6 +453,7 @@ input.invalid, input[aria-invalid="true"] { border-color: var(--err); outline: 0
 .btn-ghost:hover:not([disabled]) { color: var(--ink); background: var(--surface-2); border-color: var(--wine-text); box-shadow: none; }
 .btn-sm { min-height: 38px; padding: 0 16px; font-size: .85rem; }
 .btn-block { width: 100%; }
+.btn:active:not([disabled]) { transform: scale(.98); transition-duration: 80ms; }
 .btn[disabled] { opacity: .4; cursor: not-allowed; }
 .linkbtn {
     display: inline-flex; align-items: center; border: 0; background: none; color: var(--wine-text); font-weight: 600; text-decoration: underline;
@@ -466,6 +468,7 @@ input.invalid, input[aria-invalid="true"] { border-color: var(--err); outline: 0
     transition: transform var(--ease), background-color var(--ease);
 }
 .iconbtn:hover:not([disabled]) { background: var(--surface-2); transform: scale(1.02); }
+.iconbtn:active:not([disabled]) { transform: scale(.94); transition-duration: 80ms; }
 .iconbtn[disabled] { opacity: .35; cursor: not-allowed; }
 
 /* Avisos de estado: siempre con texto, nunca solo color */
@@ -614,6 +617,19 @@ input.invalid, input[aria-invalid="true"] { border-color: var(--err); outline: 0
 .hcard h3 { font: 600 1.1rem var(--font-display); margin: 0; text-transform: none; letter-spacing: 0; color: var(--ink); display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
 .spin { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--orange); animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Esqueleto de listas (EsqueletoLista.razor): tiene la forma de las filas y un pulso suave de fondo. */
+.esqueleto { display: grid; gap: 0; padding: 4px 0; }
+.esq-fila { display: flex; align-items: center; gap: 14px; padding: 14px 4px; border-bottom: 1px solid var(--line); }
+.esq-fila:last-child { border-bottom: 0; }
+.esq-texto { flex: 1; min-width: 0; display: grid; gap: 8px; }
+.esq-bloque { display: block; border-radius: 8px; background: var(--surface-2); animation: esq-pulso 1.4s ease-in-out infinite; }
+.esq-avatar { width: 34px; height: 34px; border-radius: 50%; flex: none; }
+.esq-linea { height: 12px; width: 62%; }
+.esq-linea.corta { width: 36%; height: 10px; }
+.esq-importe { width: 78px; height: 16px; flex: none; }
+@keyframes esq-pulso { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .esq-bloque { animation: none; } }
 .spinbox { display: grid; justify-items: center; gap: 14px; padding: 70px 8px; color: var(--ink-2); }
 @media (prefers-reduced-motion: reduce) { *, *:hover { transition: none !important; transform: none !important; scroll-behavior: auto !important; } .spin { animation: none; border-top-color: var(--wine); } }
 

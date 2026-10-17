@@ -9,6 +9,25 @@ public enum ModoReparto { Porcentaje, Partes, CuentaComun, Individual }
 /// <summary>Rol de un miembro dentro del hogar.</summary>
 public enum RolMiembro { Admin, Miembro }
 
+/// <summary>Tipo de grupo de gastos compartidos. Por defecto, un hogar.</summary>
+public enum TipoGrupo
+{
+    /// <summary>Hogar familiar o de convivencia habitual (valor por defecto).</summary>
+    Hogar,
+
+    /// <summary>Piso compartido por personas que no forman una familia.</summary>
+    PisoCompartido,
+
+    /// <summary>Viaje con gastos comunes durante un periodo acotado.</summary>
+    Viaje,
+
+    /// <summary>Evento puntual, como una boda o una cena de grupo.</summary>
+    Evento,
+
+    /// <summary>Cualquier otro grupo de gastos compartidos.</summary>
+    Otro,
+}
+
 /// <summary>Hogar: unidad de multitenencia a la que pertenecen todos los datos de negocio.</summary>
 public class Hogar
 {

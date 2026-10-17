@@ -47,6 +47,26 @@ public class HogaresTests
     }
 
     [Fact]
+    public async Task CrearHogar_SinTipo_O_ConTipoValido_DevuelveTipoHogar_Y_TipoInvalido_400()
+    {
+        using var f = Crear(Secreto);
+        var c = ConToken(f, Guid.NewGuid());
+
+        // Un cliente anterior, sin el campo tipo, sigue creando hogares.
+        var anterior = await c.PostAsync("/api/hogares", new StringContent(
+            """{"nombreHogar":"Casa","nombreMiembro":"Ana"}""", System.Text.Encoding.UTF8, "application/json"));
+        Assert.Equal(HttpStatusCode.Created, anterior.StatusCode);
+        Assert.Equal(TiposGrupo.Hogar, (await anterior.Content.ReadFromJsonAsync<HogarResumen>(Web))!.Tipo);
+
+        // Un tipo válido se acepta; de momento se devuelve como hogar porque aún no se guarda (fase 2).
+        var valido = await c.PostAsJsonAsync("/api/hogares", new CrearHogarRequest("Piso", "Ana", TiposGrupo.PisoCompartido));
+        Assert.Equal(HttpStatusCode.Created, valido.StatusCode);
+
+        var invalido = await c.PostAsJsonAsync("/api/hogares", new CrearHogarRequest("Otro", "Ana", "condominio"));
+        Assert.Equal(HttpStatusCode.BadRequest, invalido.StatusCode);
+    }
+
+    [Fact]
     public async Task CrearHogar_SiembraPerfilesCategoriasYDetalleDelCreador_ComoAdmin()
     {
         using var f = Crear(Secreto);

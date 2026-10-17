@@ -75,7 +75,7 @@ Permisos: "miembro" = cualquier miembro activo del hogar (incluye admin). "admin
 |---|---|---|---|---|---|
 | `GET /api/yo` | Usuario, sus hogares y hogar actual | (cabecera `X-Hogar-Id` opcional) | `YoResponse` 200 | 401 | autenticado |
 | `GET /api/hogares` | Hogares del usuario (ordenados por nombre) | - | `HogarResumen[]` 200 | 401 | autenticado |
-| `POST /api/hogares` | Crea hogar; el creador es admin y adulto; siembra perfiles y categorías | `CrearHogarRequest` | `HogarResumen` 201 | 400 nombres vacíos o > 100 caracteres; 409 máximo 10 hogares por usuario | autenticado |
+| `POST /api/hogares` | Crea hogar; el creador es admin y adulto; siembra perfiles y categorías. `tipo` opcional (`hogar` por defecto; ver «Tipo de grupo» en §4) | `CrearHogarRequest` | `HogarResumen` 201 | 400 nombres vacíos o > 100 caracteres, o `tipo` no válido; 409 máximo 10 hogares por usuario | autenticado |
 | `DELETE /api/hogar?nombre=` | **Irreversible.** Elimina el hogar actual (cabecera `X-Hogar-Id`) y, en cascada, todos sus datos: miembros, gastos y recurrentes, cuenta común y ahorro, cierres de mes, categorías, perfiles, invitaciones y el historial. `nombre` debe ser el nombre exacto del hogar (distingue mayúsculas) | - | 204 | 400 nombre ausente o distinto; 403 sin el permiso `hogar.eliminar`; 409 sin hogar | permiso `hogar.eliminar` |
 | `GET /api/hogares/{id}` | Un hogar del usuario | - | `HogarResumen` 200 | 404 si no existe o no eres miembro | autenticado |
 
@@ -198,8 +198,8 @@ Total: 52 endpoints de negocio (5 hogares/yo, 6 miembros/invitaciones, 4 categor
 ```json
 {
   "userId": "7c1f6d3e-0b8a-4f55-9a53-1d2f6c1b9e10",
-  "hogares": [ { "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez", "cuentaComunActiva": false, "ahorroActivo": false } ],
-  "hogarActual": { "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez", "cuentaComunActiva": false, "ahorroActivo": false }
+  "hogares": [ { "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez", "cuentaComunActiva": false, "ahorroActivo": false, "tipo": "hogar" } ],
+  "hogarActual": { "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez", "cuentaComunActiva": false, "ahorroActivo": false, "tipo": "hogar" }
 }
 ```
 
@@ -209,8 +209,16 @@ Total: 52 endpoints de negocio (5 hogares/yo, 6 miembros/invitaciones, 4 categor
 { "nombreHogar": "Casa Pérez", "nombreMiembro": "Ana" }
 ```
 ```json
-{ "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez" }
+{ "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez", "cuentaComunActiva": false, "ahorroActivo": false, "tipo": "hogar" }
 ```
+
+`POST /api/hogares` con tipo de grupo (`tipo` es opcional; sin él se crea un «hogar»):
+
+```json
+{ "nombreHogar": "Piso de la playa", "nombreMiembro": "Ana", "tipo": "viaje" }
+```
+
+**Tipo de grupo (`tipo`).** `HogarResumen` y `CrearHogarRequest` llevan un campo de texto `tipo` con los valores `hogar` (por defecto: si se omite en la creación, o si el hogar es anterior a este campo), `piso_compartido`, `viaje`, `evento` y `otro`. Cualquier otro valor da 400. Hasta que la base de datos guarde el tipo (fase 2 de grupos), la creación valida el valor pero el hogar se guarda y se devuelve siempre como `hogar`.
 
 ### Miembros
 

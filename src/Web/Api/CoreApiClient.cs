@@ -39,6 +39,15 @@ public sealed class CoreApiClient
     public Task<HogarResumen> AceptarInvitacionAsync(AceptarInvitacionRequest peticion, CancellationToken ct = default) =>
         EnviarAsync<HogarResumen>(HttpMethod.Post, "api/invitaciones/aceptar", peticion, ct);
 
+    /// <summary>
+    /// Une al usuario al hogar de un enlace de grupo reutilizable (<c>POST /api/enlaces-grupo/unirse</c>, sin hogar actual).
+    /// Sin <c>Nombre</c> no se une a nadie: 400 si el enlace es válido y pide nombre, 404 si el código no es de un grupo.
+    /// </summary>
+    /// <param name="peticion">Código del enlace y, para entrar como miembro nuevo, el nombre.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<HogarResumen> UnirseEnlaceGrupoAsync(UnirseEnlaceGrupoRequest peticion, CancellationToken ct = default) =>
+        EnviarAsync<HogarResumen>(HttpMethod.Post, "api/enlaces-grupo/unirse", peticion, ct);
+
     /// <summary>Miembros activos del hogar actual (<c>GET /api/miembros</c>); <c>EsYo</c> marca al usuario autenticado.</summary>
     /// <param name="incluirInactivos">Incluye también a los desactivados (<c>?incluirInactivos=true</c>), para poner nombre a quien aparece en el historial.</param>
     /// <param name="ct">Token de cancelación.</param>
@@ -372,8 +381,9 @@ public sealed class CoreApiClient
     private void InvalidarTrasEscritura(HttpMethod metodo, string ruta)
     {
         if (_cache is null || metodo == HttpMethod.Get) return;
-        // Aceptar una invitación vincula a un miembro; crear o borrar un hogar cambia de contexto por completo.
-        if (ruta.StartsWith("api/invitaciones", StringComparison.Ordinal) || ruta.StartsWith("api/hogar", StringComparison.Ordinal))
+        // Aceptar una invitación o unirse por enlace añade o vincula un miembro; crear o borrar un hogar cambia de contexto por completo.
+        if (ruta.StartsWith("api/invitaciones", StringComparison.Ordinal) || ruta.StartsWith("api/enlaces-grupo", StringComparison.Ordinal)
+            || ruta.StartsWith("api/hogar", StringComparison.Ordinal))
         {
             _cache.Limpiar();
             return;

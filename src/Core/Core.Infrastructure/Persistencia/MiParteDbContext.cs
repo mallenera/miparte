@@ -35,6 +35,8 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
 
     /// <summary>Conjunto de <see cref="InvitacionHogar"/> del hogar actual.</summary>
     public DbSet<InvitacionHogar> Invitaciones => Set<InvitacionHogar>();
+    /// <summary>Conjunto de <see cref="EnlaceGrupo"/> del hogar actual.</summary>
+    public DbSet<EnlaceGrupo> EnlacesGrupo => Set<EnlaceGrupo>();
     /// <summary>Conjunto de <see cref="PagoLiquidacionRegistro"/> del hogar actual.</summary>
     public DbSet<PagoLiquidacionRegistro> PagosLiquidacion => Set<PagoLiquidacionRegistro>();
 
@@ -124,6 +126,15 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
             e.HasKey(x => x.Id);
             e.Property(x => x.CreadaEn).HasDefaultValueSql("now()");
             // FK (hogar_id, miembro_id) -> miembro(hogar_id, id): se aplica en SQL; EF solo mapea columnas.
+            e.HasQueryFilter(x => x.HogarId == HogarId);
+        });
+
+        b.Entity<EnlaceGrupo>(e =>
+        {
+            e.ToTable("enlace_grupo");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.CreadoEn).HasDefaultValueSql("now()");
+            // FK (hogar_id, creado_por) -> miembro(hogar_id, id) y las restricciones de caducidad y hash: se aplican en SQL.
             e.HasQueryFilter(x => x.HogarId == HogarId);
         });
 

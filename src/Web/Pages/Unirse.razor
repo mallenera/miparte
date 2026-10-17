@@ -1,15 +1,17 @@
 @page "/unirse"
 @using System.ComponentModel.DataAnnotations
+@using MiParte.Web.Modelos
 @inject ServicioSesion Sesion
 @inject CoreApiClient Api
 @inject ServicioArranque Arranque
+@inject EstadoHogar Hogar
 @inject IAlmacenLocal Almacen
 @inject NavigationManager Navegacion
 
 <PageTitle>Unirme al hogar · Mi parte, tu parte</PageTitle>
 
 <div class="auth ancho">
-    <h1 class="page-title">Te han invitado a un hogar</h1>
+    <h1 class="page-title">Unirte a un hogar</h1>
 
     @if (!_listo)
     {
@@ -18,19 +20,56 @@
     else if (_token is null)
     {
         <div class="aviso warn" role="alert">
-            El enlace no trae ninguna invitación. Pide que te lo envíen de nuevo o pega el código en
-            <a href="sin-hogar">«Unirme con una invitación»</a>.
+            El enlace no trae el código para unirte. Pide a quien te lo envió que te mande el enlace de nuevo. Si tienes un código
+            de invitación, pégalo en <a href="sin-hogar">«Unirme con una invitación»</a>.
         </div>
     }
     else if (Sesion.SesionActual is null)
     {
         <section class="card">
             <div class="card-body">
-                <p>Para unirte necesitas una cuenta. Al entrar volverás aquí y podrás aceptar la invitación.</p>
+                <p>Para unirte necesitas una cuenta. Al entrar volverás aquí y podrás terminar de unirte.</p>
                 <div class="actions">
                     <a class="btn" href="@ConFragmento("login")">Iniciar sesión</a>
                     <a class="btn btn-ghost" href="@ConFragmento("registro")">Crear cuenta</a>
                 </div>
+            </div>
+        </section>
+    }
+    else if (_grupo.Estado == EstadoUnirseEnlace.Comprobando)
+    {
+        <p>Comprobando el enlace…</p>
+    }
+    else if (_grupo.Estado != EstadoUnirseEnlace.EsInvitacion)
+    {
+        @* Enlace de grupo: el mensaje, si lo hay, y lo que puede hacer la persona desde aquí. *@
+        @if (TextoAviso is not null)
+        {
+            <div class="aviso err" role="alert">@TextoAviso</div>
+        }
+        <section class="card">
+            <div class="card-body">
+                @if (_grupo.Estado == EstadoUnirseEnlace.PideNombre)
+                {
+                    <p>Este enlace es de un grupo. Indica tu nombre para entrar como miembro nuevo.</p>
+                    <EditForm Model="_modeloGrupo" OnValidSubmit="UnirseGrupoAsync">
+                        <DataAnnotationsValidator />
+                        <div class="fieldrow">
+                            <label for="nombre-grupo">Tu nombre en el grupo</label>
+                            <InputText id="nombre-grupo" @bind-Value="_modeloGrupo.Nombre" />
+                            <ValidationMessage For="() => _modeloGrupo.Nombre" />
+                        </div>
+                        <button class="btn" type="submit" disabled="@_enviando">Unirme al grupo</button>
+                    </EditForm>
+                }
+                @if (_error is not null || _grupo.PuedeReintentar)
+                {
+                    <button class="btn btn-ghost" type="button" disabled="@_enviando" @onclick="ReintentarTodoAsync">Reintentar</button>
+                }
+                @if (_grupo.Estado == EstadoUnirseEnlace.YaEsMiembro)
+                {
+                    <a class="btn" href="">Ir a tu hogar</a>
+                }
             </div>
         </section>
     }
@@ -65,8 +104,13 @@
 
 @code {
     private readonly Modelo _modelo = new();
+    private readonly NombreGrupoModelo _modeloGrupo = new();
+    private ModeloUnirseEnlace _grupo = null!;
     private string? _token, _error;
     private bool _listo, _enviando, _aceptada, _guardado;
+
+    /// <summary>Aviso del enlace de grupo; un error de carga posterior a la unión tiene prioridad sobre el de la unión.</summary>
+    private string? TextoAviso => _error ?? _grupo.Mensaje;
 
     protected override async Task OnInitializedAsync()
     {
@@ -83,7 +127,15 @@
         }
 
         _token = delEnlace ?? await InvitacionPendiente.LeerAsync(Almacen);
+        _grupo = new ModeloUnirseEnlace(Api);
         _listo = true;
+
+        // Con sesión, antes de mostrar el formulario se mira qué es el código: enlace de grupo o invitación nominal.
+        if (_token is not null && Sesion.SesionActual is not null)
+        {
+            await _grupo.ComprobarAsync(_token);
+            await TrasEstadoGrupoAsync();
+        }
     }
 
     /// <summary>Sin almacenamiento el código solo vive en la URL, así que viaja en el fragmento por login y registro.</summary>
@@ -136,9 +188,94 @@
         }
     }
 
+    private async Task UnirseGrupoAsync()
+    {
+        if (_enviando || _token is null) return;
+        _enviando = true;
+        _error = null;
+        try
+        {
+            await _grupo.UnirseAsync(_token, _modeloGrupo.Nombre.Trim());
+        }
+        finally
+        {
+            _enviando = false;
+        }
+        await TrasEstadoGrupoAsync();
+    }
+
+    private Task ReintentarTodoAsync() => _error is not null ? ContinuarGrupoAsync() : ReintentarGrupoAsync();
+
+    private async Task ReintentarGrupoAsync()
+    {
+        if (_enviando) return;
+        _enviando = true;
+        try
+        {
+            await _grupo.ReintentarAsync();
+        }
+        finally
+        {
+            _enviando = false;
+        }
+        await TrasEstadoGrupoAsync();
+    }
+
+    /// <summary>Acciones tras cambiar el estado del enlace: descarta el código cuando ya no sirve y continúa si se ha unido.</summary>
+    private async Task TrasEstadoGrupoAsync()
+    {
+        switch (_grupo.Estado)
+        {
+            case EstadoUnirseEnlace.Unido:
+                // El enlace es reutilizable: guardado, mandaría a esta página en cada acceso y daría 409.
+                await InvitacionPendiente.DescartarAsync(Almacen);
+                await ContinuarGrupoAsync();
+                break;
+            case EstadoUnirseEnlace.Revocado:
+            case EstadoUnirseEnlace.Caducado:
+            case EstadoUnirseEnlace.YaEsMiembro:
+                await InvitacionPendiente.DescartarAsync(Almacen);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Carga los hogares tras unirse por enlace. Si la persona ya tenía hogares no se cambia el activo: se va a la elección para que
+    /// elija. Si no tenía ninguno, el hogar nuevo es el único y pasa a ser el activo. Si falla, queda reintentable sin volver a unirse.
+    /// </summary>
+    private async Task ContinuarGrupoAsync()
+    {
+        if (_enviando) return;
+        _enviando = true;
+        _error = null;
+        try
+        {
+            await Arranque.CargarAsync();
+            var idNuevo = _grupo.Hogar?.Id;
+            var teniaOtros = Hogar.Hogares.Any(h => h.Id != idNuevo);
+            Navegacion.NavigateTo(teniaOtros ? "elegir-hogar" : "", replace: true);
+        }
+        catch (ApiException)
+        {
+            // Sin detalles técnicos: el usuario ya está dentro del hogar, solo falta cargar sus datos.
+            _error = "Ya formas parte del hogar, pero no se han podido cargar tus datos. Pulsa «Reintentar».";
+        }
+        finally
+        {
+            _enviando = false;
+        }
+    }
+
     private sealed class Modelo
     {
         [StringLength(100, ErrorMessage = "Máximo 100 caracteres.")]
         public string? Nombre { get; set; }
+    }
+
+    private sealed class NombreGrupoModelo
+    {
+        [Required(ErrorMessage = "Indica tu nombre en el grupo.")]
+        [StringLength(100, ErrorMessage = "Máximo 100 caracteres.")]
+        public string Nombre { get; set; } = "";
     }
 }

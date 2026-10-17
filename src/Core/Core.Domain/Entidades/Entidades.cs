@@ -99,6 +99,30 @@ public class InvitacionHogar
 }
 
 /// <summary>
+/// Enlace de grupo reutilizable (tabla <c>enlace_grupo</c>): quien lo abre se une al hogar tantas veces como haga falta, a diferencia de
+/// <see cref="InvitacionHogar"/>, que es de un solo uso. Solo se guarda el hash del token.
+/// </summary>
+public class EnlaceGrupo
+{
+    /// <summary>Identificador del enlace.</summary>
+    public Guid Id { get; set; }
+    /// <summary>Hogar al que da acceso.</summary>
+    public Guid HogarId { get; set; }
+    /// <summary>Hash SHA-256 del token (nunca se almacena el token en claro).</summary>
+    public string TokenHash { get; set; } = "";
+    /// <summary>Miembro que lo creó.</summary>
+    public Guid CreadoPor { get; set; }
+    /// <summary>Fecha de creación.</summary>
+    public DateTimeOffset CreadoEn { get; set; }
+    /// <summary>Fecha a partir de la cual deja de admitir uniones; null = sin caducidad.</summary>
+    public DateTimeOffset? CaducaEn { get; set; }
+    /// <summary>False cuando se ha revocado: ya no admite uniones, pero se conserva para el historial.</summary>
+    public bool Activo { get; set; } = true;
+    /// <summary>Número de uniones hechas con el enlace. Es informativo: no limita nada.</summary>
+    public int Usos { get; set; }
+}
+
+/// <summary>
 /// Transferencia real entre miembros que salda la liquidación de un mes (tabla
 /// pago_liquidacion). Se llama PagoLiquidacionRegistro porque el record de dominio
 /// puro MiParte.Core.Domain.PagoLiquidacion (Liquidacion.cs) ya usa ese nombre.

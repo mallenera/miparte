@@ -47,7 +47,8 @@ public class PermisosTests
         string[] soloConAsignacion =
         [
             CatalogoPermisos.MesReabrir, CatalogoPermisos.HistorialVer, CatalogoPermisos.MiembrosGestionar,
-            CatalogoPermisos.InvitacionesCrear, CatalogoPermisos.HogarFunciones, CatalogoPermisos.PermisosGestionar, CatalogoPermisos.HogarEliminar,
+            CatalogoPermisos.InvitacionesCrear, CatalogoPermisos.EnlacesGestionar, CatalogoPermisos.HogarFunciones,
+            CatalogoPermisos.PermisosGestionar, CatalogoPermisos.HogarEliminar,
         ];
         Assert.All(soloConAsignacion, c => Assert.DoesNotContain(c, CatalogoPermisos.PorDefecto));
         Assert.Equal(CatalogoPermisos.Todos.Count - soloConAsignacion.Length, CatalogoPermisos.PorDefecto.Count);

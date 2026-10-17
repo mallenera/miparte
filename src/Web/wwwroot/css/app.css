@@ -406,6 +406,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .card-stack { display: grid; gap: 24px; min-width: 0; }
 .page-title { font: 600 1.9rem/1.15 var(--font-display); letter-spacing: -.01em; }
 
+/* Resumen compartible: texto de la liquidación (también sirve de plan B para copiarlo a mano) y sus acciones */
+.resumen-texto { width: 100%; min-height: 160px; resize: vertical; font: inherit; font-size: .92rem; line-height: 1.5; color: var(--ink); background: color-mix(in srgb, var(--bg) 60%, transparent); border: 1px solid var(--line-2); border-radius: 12px; padding: 12px 14px; white-space: pre-wrap; }
+.resumen-texto:focus-visible { outline: 0; border-color: var(--cta); box-shadow: 0 0 0 3px color-mix(in srgb, var(--cta) 28%, transparent); }
+.compartir-acc { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.compartir-acc .linkbtn { min-height: 44px; display: inline-flex; align-items: center; padding: 0 10px; }
+
 /* Formularios */
 label { display: grid; gap: 6px; font-size: .8rem; font-weight: 600; color: var(--ink-2); min-width: 0; }
 input, select {

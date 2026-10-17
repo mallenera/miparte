@@ -96,7 +96,7 @@ public class HogarActualMiddleware(RequestDelegate next)
         if (HttpMethods.IsGet(ctx.Request.Method) || HttpMethods.IsHead(ctx.Request.Method) || HttpMethods.IsOptions(ctx.Request.Method)) return;
         var ruta = ctx.Request.Path;
         if (!ruta.StartsWithSegments("/api/miembros") && !ruta.StartsWithSegments("/api/invitaciones") && !ruta.StartsWithSegments("/api/hogares")
-            && !ruta.StartsWithSegments("/api/hogar"))
+            && !ruta.StartsWithSegments("/api/hogar") && !ruta.StartsWithSegments("/api/enlaces-grupo"))
             return;
 
         var cache = ctx.RequestServices.GetService<CacheAcceso>();

@@ -1,0 +1,97 @@
+@* Tarjeta «Compartir el resumen»: el texto de la liquidación del mes, con copiar, compartir (solo si el navegador lo permite) y enlaces a WhatsApp y correo. El texto siempre se ve y se puede seleccionar. *@
+@inject IJSRuntime JS
+
+<section class="card" aria-labelledby="t-compartir">
+    <div class="card-head"><h2 id="t-compartir">Compartir el resumen</h2></div>
+    <p class="muted">Texto con las transferencias del mes. La otra persona no necesita tener cuenta.</p>
+
+    <textarea id="@IdArea" class="resumen-texto" readonly rows="7" aria-label="Texto del resumen de liquidación" value="@_texto"></textarea>
+
+    <div class="compartir-acc">
+        <button class="btn" type="button" @onclick="CopiarAsync">Copiar texto</button>
+        @if (_puedeCompartir)
+        {
+            <button class="btn btn-ghost" type="button" @onclick="CompartirAsync">Compartir</button>
+        }
+        <a class="linkbtn" href="@_enlaceWhatsApp" target="_blank" rel="noopener">Enviar por WhatsApp</a>
+        <a class="linkbtn" href="@_enlaceCorreo">Enviar por correo</a>
+    </div>
+
+    <p class="muted u-mt8-inline" role="status" aria-live="polite">@_aviso</p>
+</section>
+
+@code {
+    private const string IdArea = "resumen-liquidacion-texto";
+
+    private string _texto = "";
+    private string _enlaceWhatsApp = "";
+    private string _enlaceCorreo = "";
+    private string _aviso = "";
+    private bool _puedeCompartir;
+
+    /// <summary>Nombre del hogar, que va en el título del texto.</summary>
+    [Parameter, EditorRequired] public string NombreHogar { get; set; } = "";
+
+    /// <summary>Mes resumido (cualquier día del mes).</summary>
+    [Parameter, EditorRequired] public DateOnly Mes { get; set; }
+
+    /// <summary>Liquidación completa del mes, sin filtros de la pantalla.</summary>
+    [Parameter, EditorRequired] public LiquidacionResponse Liquidacion { get; set; } = default!;
+
+    /// <summary>Miembros del hogar, para nombrar a quien aparezca en una transferencia.</summary>
+    [Parameter] public IReadOnlyList<MiembroDto> Miembros { get; set; } = [];
+
+    protected override void OnParametersSet()
+    {
+        _texto = ResumenCompartible.Generar(NombreHogar, Mes, Liquidacion, Miembros);
+        var titulo = Uri.EscapeDataString(TituloCorreo);
+        _enlaceWhatsApp = $"https://wa.me/?text={Uri.EscapeDataString(_texto)}";
+        _enlaceCorreo = $"mailto:?subject={titulo}&body={Uri.EscapeDataString(_texto)}";
+    }
+
+    protected override async Task OnAfterRenderAsync(bool primera)
+    {
+        if (!primera) return;
+        // Web Share depende del navegador: sin él el botón no se pinta y los demás caminos siguen disponibles.
+        var puede = await JS.InvokeAsync<bool>("compartirResumen.puedeCompartir");
+        if (puede != _puedeCompartir)
+        {
+            _puedeCompartir = puede;
+            StateHasChanged();
+        }
+    }
+
+    private string TituloCorreo => $"Resumen de {NombreHogar}";
+
+    private async Task CopiarAsync()
+    {
+        // Si el propio JS falla (p. ej. el módulo no carga), se trata como una copia que no ha funcionado: se pide copiar a mano.
+        bool copiado;
+        try
+        {
+            copiado = await JS.InvokeAsync<bool>("compartirResumen.copiar", IdArea, _texto);
+        }
+        catch (JSException)
+        {
+            copiado = false;
+        }
+
+        _aviso = copiado
+            ? "Texto copiado."
+            : "No se pudo copiar automáticamente. El texto está seleccionado: cópialo con Ctrl+C o con una pulsación larga.";
+    }
+
+    private async Task CompartirAsync()
+    {
+        try
+        {
+            // Si la persona cierra la hoja de compartir no hay nada que decir: el aviso anterior se queda como está.
+            if (await JS.InvokeAsync<bool>("compartirResumen.compartir", TituloCorreo, _texto))
+                _aviso = "Resumen enviado.";
+        }
+        catch (JSException)
+        {
+            _aviso = "No se pudo compartir. Copia el texto.";
+        }
+    }
+}

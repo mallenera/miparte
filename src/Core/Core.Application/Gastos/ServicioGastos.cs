@@ -50,42 +50,44 @@ public sealed class ServicioGastos(IRepositorioGastos repositorio)
     }
 
     /// <summary>Actualiza el gasto y recalcula solo su reparto, sin tocar el resto del histórico. No encontrado si no existe.</summary>
-    public async Task<Resultado<Gasto>> EditarAsync(Guid id, DatosGasto datos, CancellationToken ct)
-    {
-        var gasto = await repositorio.ObtenerParaEditarAsync(id, ct);
-        if (gasto is null) return Resultado<Gasto>.NoEncontrado();
-        // Un gasto ya liquidado por un ciclo cerrado no cambia: el cierre ya lo dio por bueno con su importe y reparto.
-        if (gasto.CicloLiquidacionId is not null) return Resultado<Gasto>.Conflicto(Mensajes.GastoEnCiclo);
-        var preparado = await PrepararAsync(datos, ct);
-        if (preparado.Error is { } invalido) return Resultado<Gasto>.Invalido(invalido);
-        // Ni sacarlo de un mes cerrado ni meterlo en uno.
-        if (await ComprobarAsync(datos, preparado.CuentaComun, excluir: id, [gasto.Fecha, datos.Fecha], ct) is { } fallo) return fallo;
+    public Task<Resultado<Gasto>> EditarAsync(Guid id, DatosGasto datos, CancellationToken ct)
+        => repositorio.EnExclusionAsync(async () =>
+        {
+            var gasto = await repositorio.ObtenerParaEditarAsync(id, ct);
+            if (gasto is null) return Resultado<Gasto>.NoEncontrado();
+            // Un gasto ya liquidado por un ciclo cerrado no cambia: el cierre ya lo dio por bueno con su importe y reparto.
+            if (gasto.CicloLiquidacionId is not null) return Resultado<Gasto>.Conflicto(Mensajes.GastoEnCiclo);
+            var preparado = await PrepararAsync(datos, ct);
+            if (preparado.Error is { } invalido) return Resultado<Gasto>.Invalido(invalido);
+            // Ni sacarlo de un mes cerrado ni meterlo en uno.
+            if (await ComprobarAsync(datos, preparado.CuentaComun, excluir: id, [gasto.Fecha, datos.Fecha], ct) is { } fallo) return fallo;
 
-        gasto.Fecha = datos.Fecha;
-        gasto.Importe = datos.Importe;
-        gasto.CategoriaId = datos.CategoriaId;
-        gasto.PagadoPor = datos.PagadoPor;
-        gasto.PerfilRepartoId = datos.PerfilRepartoId;
-        gasto.Concepto = ReglasMovimiento.NormalizarConcepto(datos.Concepto);
-        gasto.ACargoCuentaComun = preparado.CuentaComun;
-        gasto.PagadoDesdeAhorro = datos.PagadoDesdeAhorro;
-        gasto.EsPersonal = datos.Personal;
-        RepartoGasto.Aplicar(gasto, preparado.Partes!);
-        return await repositorio.GuardarAsync(ct) ? Resultado<Gasto>.Ok(gasto) : Resultado<Gasto>.Conflicto(Mensajes.MesCerrado);
-    }
+            gasto.Fecha = datos.Fecha;
+            gasto.Importe = datos.Importe;
+            gasto.CategoriaId = datos.CategoriaId;
+            gasto.PagadoPor = datos.PagadoPor;
+            gasto.PerfilRepartoId = datos.PerfilRepartoId;
+            gasto.Concepto = ReglasMovimiento.NormalizarConcepto(datos.Concepto);
+            gasto.ACargoCuentaComun = preparado.CuentaComun;
+            gasto.PagadoDesdeAhorro = datos.PagadoDesdeAhorro;
+            gasto.EsPersonal = datos.Personal;
+            RepartoGasto.Aplicar(gasto, preparado.Partes!);
+            return await repositorio.GuardarAsync(ct) ? Resultado<Gasto>.Ok(gasto) : Resultado<Gasto>.Conflicto(Mensajes.MesCerrado);
+        }, ct);
 
     /// <summary>Borra el gasto y su reparto. No encontrado si no existe; conflicto si su mes está cerrado o si ya liquida un ciclo cerrado.</summary>
-    public async Task<Resultado<bool>> BorrarAsync(Guid id, CancellationToken ct)
-    {
-        var gasto = await repositorio.ObtenerParaEditarAsync(id, ct);
-        if (gasto is null) return Resultado<bool>.NoEncontrado();
-        if (gasto.CicloLiquidacionId is not null) return Resultado<bool>.Conflicto(Mensajes.GastoEnCiclo);
-        if (await repositorio.MesCerradoAsync(gasto.Fecha, ct)) return Resultado<bool>.Conflicto(Mensajes.MesCerrado);
-        if (await repositorio.FechaEnPeriodoCerradoAsync(gasto.Fecha, ct)) return Resultado<bool>.Conflicto(Mensajes.PeriodoCerrado);
+    public Task<Resultado<bool>> BorrarAsync(Guid id, CancellationToken ct)
+        => repositorio.EnExclusionAsync(async () =>
+        {
+            var gasto = await repositorio.ObtenerParaEditarAsync(id, ct);
+            if (gasto is null) return Resultado<bool>.NoEncontrado();
+            if (gasto.CicloLiquidacionId is not null) return Resultado<bool>.Conflicto(Mensajes.GastoEnCiclo);
+            if (await repositorio.MesCerradoAsync(gasto.Fecha, ct)) return Resultado<bool>.Conflicto(Mensajes.MesCerrado);
+            if (await repositorio.FechaEnPeriodoCerradoAsync(gasto.Fecha, ct)) return Resultado<bool>.Conflicto(Mensajes.PeriodoCerrado);
 
-        repositorio.Eliminar(gasto);
-        return await repositorio.GuardarAsync(ct) ? Resultado<bool>.Ok(true) : Resultado<bool>.Conflicto(Mensajes.MesCerrado);
-    }
+            repositorio.Eliminar(gasto);
+            return await repositorio.GuardarAsync(ct) ? Resultado<bool>.Ok(true) : Resultado<bool>.Conflicto(Mensajes.MesCerrado);
+        }, ct);
 
     /// <summary>Resultado de validar los datos: el reparto y si va a cargo de la cuenta común, o el mensaje de error.</summary>
     private sealed record Preparado(IReadOnlyList<ParteAsumida>? Partes, string? Error, bool CuentaComun);

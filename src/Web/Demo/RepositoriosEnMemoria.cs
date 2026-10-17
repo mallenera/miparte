@@ -124,6 +124,9 @@ internal sealed class RepositorioGastosEnMemoria(AlmacenDemo a) : IRepositorioGa
 
     public Task<Gasto?> ObtenerParaEditarAsync(Guid id, CancellationToken ct) => ObtenerAsync(id, ct);
 
+    /// <summary>En memoria no hay concurrencia que serializar: la operación se ejecuta tal cual.</summary>
+    public Task<T> EnExclusionAsync<T>(Func<Task<T>> operacion, CancellationToken ct) => operacion();
+
     public Task<bool> CategoriaExisteAsync(Guid id, CancellationToken ct) => Task.FromResult(a.Categorias.Any(c => c.Id == id));
 
     public Task<bool> EsAdultoActivoAsync(Guid id, CancellationToken ct)

@@ -98,4 +98,18 @@ public sealed class RepositorioGastos(MiParteDbContext db) : IRepositorioGastos
             return false;
         }
     }
+
+    /// <inheritdoc />
+    public async Task<T> EnExclusionAsync<T>(Func<Task<T>> operacion, CancellationToken ct)
+    {
+        // Sin base relacional (EF en memoria de las pruebas HTTP) no hay transacciones ni bloqueos que pedir.
+        if (!db.Database.IsRelational()) return await operacion();
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        // Mismo bloqueo que el cierre de ciclo: la fila del hogar queda bloqueada hasta el COMMIT.
+        var hogarId = await db.Hogares.Select(h => h.Id).SingleAsync(ct);
+        await db.Database.ExecuteSqlInterpolatedAsync($"select 1 from public.hogar where id = {hogarId} for update", ct);
+        var resultado = await operacion();
+        await tx.CommitAsync(ct);
+        return resultado;
+    }
 }

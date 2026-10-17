@@ -224,4 +224,28 @@ public class ServicioGastosTests
         Assert.Equal(Mensajes.GastoEnCiclo, r.Error.Mensaje);
         Assert.Single(_repo.Gastos);
     }
+
+    [Fact]
+    public async Task Editar_SeEjecutaBajoLaExclusionDelHogar()
+    {
+        var creado = (await Servicio.CrearAsync(Hogar, Datos(900m), default)).Valor!;
+        var antes = _repo.Exclusiones;
+
+        var r = await Servicio.EditarAsync(creado.Id, Datos(300m), default);
+
+        Assert.Null(r.Error);
+        Assert.Equal(antes + 1, _repo.Exclusiones);
+    }
+
+    [Fact]
+    public async Task Borrar_SeEjecutaBajoLaExclusionDelHogar()
+    {
+        var creado = (await Servicio.CrearAsync(Hogar, Datos(), default)).Valor!;
+        var antes = _repo.Exclusiones;
+
+        var r = await Servicio.BorrarAsync(creado.Id, default);
+
+        Assert.Null(r.Error);
+        Assert.Equal(antes + 1, _repo.Exclusiones);
+    }
 }

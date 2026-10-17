@@ -31,8 +31,10 @@ public static class TiposGrupo
 /// <param name="CuentaComunActiva">Si el hogar tiene activada la cuenta común.</param>
 /// <param name="AhorroActivo">Si el hogar tiene activado el ahorro de la cuenta común.</param>
 /// <param name="Tipo">Tipo de grupo (ver <see cref="TiposGrupo"/>); "hogar" por defecto.</param>
+/// <param name="RecurrentesActivas">Si el hogar genera gastos recurrentes; con false no se crean plantillas ni se generan gastos.</param>
 public record HogarResumen(
-    Guid Id, string Nombre, bool CuentaComunActiva = false, bool AhorroActivo = false, string Tipo = TiposGrupo.Hogar);
+    Guid Id, string Nombre, bool CuentaComunActiva = false, bool AhorroActivo = false, string Tipo = TiposGrupo.Hogar,
+    bool RecurrentesActivas = true);
 
 /// <summary>Respuesta de GET /api/yo: usuario, sus hogares y el hogar actual (null si no se puede determinar).</summary>
 /// <param name="UserId">Identificador del usuario (claim "sub" del JWT), o null si no consta.</param>

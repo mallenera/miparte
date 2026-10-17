@@ -307,6 +307,14 @@ internal sealed class RepositorioRecurrentesEnMemoria(AlmacenDemo a) : IReposito
     private readonly List<GastoRecurrente> _porAnadir = [];
     private readonly List<GastoRecurrente> _porEliminar = [];
 
+    public Task<bool> RecurrentesActivasAsync(CancellationToken ct) => Task.FromResult(a.Hogar.RecurrentesActivas);
+
+    public Task EstablecerRecurrentesActivasAsync(bool activas, CancellationToken ct)
+    {
+        a.Hogar.RecurrentesActivas = activas;
+        return Task.CompletedTask;
+    }
+
     public Task<IReadOnlyList<GastoRecurrente>> ListarAsync(CancellationToken ct)
         => Task.FromResult<IReadOnlyList<GastoRecurrente>>(a.Recurrentes.OrderBy(r => r.DiaMes).ThenBy(r => r.Id).ToList());
 

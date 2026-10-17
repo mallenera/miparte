@@ -88,6 +88,6 @@ public static class EnlacesGrupoEndpoints
         var r = await servicio.UnirseAsync(userId, req.Token, req.Nombre, req.MiembroId, ct);
         if (r.Error is { } error) return MiembrosEndpoints.Error(error);
         var h = r.Valor!;
-        return Results.Ok(new HogarResumen(h.Id, h.Nombre, h.CuentaComunActiva, h.AhorroActivo, TextoTipoGrupo.ATexto(h.Tipo)));
+        return Results.Ok(new HogarResumen(h.Id, h.Nombre, h.CuentaComunActiva, h.AhorroActivo, TextoTipoGrupo.ATexto(h.Tipo), h.RecurrentesActivas));
     }
 }

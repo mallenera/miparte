@@ -42,7 +42,7 @@ public static class Dtos
 
     /// <summary>Hogar con las funciones activadas y su tipo de grupo.</summary>
     public static HogarResumen ADto(this Hogar h)
-        => new(h.Id, h.Nombre, h.CuentaComunActiva, h.AhorroActivo, TextoTipoGrupo.ATexto(h.Tipo));
+        => new(h.Id, h.Nombre, h.CuentaComunActiva, h.AhorroActivo, TextoTipoGrupo.ATexto(h.Tipo), h.RecurrentesActivas);
 
     /// <summary>Pago de liquidación.</summary>
     public static PagoLiquidacionDto ADto(this PagoLiquidacionRegistro p)

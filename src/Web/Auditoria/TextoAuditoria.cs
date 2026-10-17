@@ -41,7 +41,7 @@ public static class TextoAuditoria
         ["tipo"] = "Tipo", ["modo"] = "Modo", ["notas"] = "Notas", ["pagadoPor"] = "Pagado por", ["miembroId"] = "Miembro",
         ["responsableId"] = "Responsable", ["repartos"] = "Reparto", ["detalle"] = "Detalle", ["ahorro"] = "Ahorro",
         ["aCargoCuentaComun"] = "A cargo de la cuenta común", ["pagadoDesdeAhorro"] = "Pagado desde el ahorro",
-        ["permisos"] = "Permisos", ["cuentaComunActiva"] = "Cuenta común activada", ["ahorroActivo"] = "Ahorro activado",
+        ["permisos"] = "Permisos", ["cuentaComunActiva"] = "Cuenta común activada", ["ahorroActivo"] = "Ahorro activado", ["recurrentesActivas"] = "Recurrentes activadas",
     };
 
     /// <summary>Frase del evento sin el autor: «creó un gasto "Compra"», «borró una categoría»…</summary>

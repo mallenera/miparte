@@ -81,10 +81,11 @@ public sealed class EstadoHogar
     /// </summary>
     /// <param name="cuentaComunActiva">Si el hogar usa la cuenta común.</param>
     /// <param name="ahorroActivo">Si el hogar usa el ahorro.</param>
-    public void ActualizarFunciones(bool cuentaComunActiva, bool ahorroActivo)
+    /// <param name="recurrentesActivas">Si el hogar genera gastos recurrentes.</param>
+    public void ActualizarFunciones(bool cuentaComunActiva, bool ahorroActivo, bool recurrentesActivas)
     {
         if (HogarActual is not { } actual) return;
-        var nuevo = actual with { CuentaComunActiva = cuentaComunActiva, AhorroActivo = ahorroActivo };
+        var nuevo = actual with { CuentaComunActiva = cuentaComunActiva, AhorroActivo = ahorroActivo, RecurrentesActivas = recurrentesActivas };
         Hogares = Hogares.Select(h => h.Id == nuevo.Id ? nuevo : h).ToList();
         HogarActual = nuevo;
         Cambiado?.Invoke();

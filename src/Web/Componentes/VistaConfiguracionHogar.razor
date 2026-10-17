@@ -46,6 +46,14 @@ else
             </label>
             <p class="muted">@(_m.CuentaComunActiva ? "Parte de las aportaciones que se aparta, con ingresos, retiradas y gastos pagados desde el ahorro." : "Necesita la cuenta común habilitada.")</p>
         </div>
+        <div class="u-mt12">
+            <label class="chk">
+                <input type="checkbox" @key="_m.ClaveRecurrentes" checked="@_m.RecurrentesActivas" disabled="@(!PuedeFunciones || _m.GuardandoFunciones)"
+                       @onchange="e => CambiarRecurrentesAsync((bool)e.Value!)" />
+                Activar recurrentes
+            </label>
+            <p class="muted">Crea cada mes los gastos de las plantillas (alquiler, suscripciones…). Desactivarlo deja las plantillas pausadas, sin borrarlas.</p>
+        </div>
         @if (!PuedeFunciones)
         {
             <p class="muted u-mt12">No tienes permiso para cambiar estas funciones. Pídeselo a un administrador del hogar.</p>
@@ -255,6 +263,8 @@ else
     private Task CambiarCuentaComunAsync(bool activa) => Mostrar(_m.CambiarCuentaComunAsync(activa));
 
     private Task CambiarAhorroAsync(bool activo) => Mostrar(_m.CambiarAhorroAsync(activo));
+
+    private Task CambiarRecurrentesAsync(bool activas) => Mostrar(_m.CambiarRecurrentesAsync(activas));
 
     private void EmpezarRenombrar(MiembroDto m) => _m.EmpezarRenombrar(m);
 

@@ -263,6 +263,12 @@ public sealed class CoreApiClient
     public Task ActivarAhorroAsync(bool activo, CancellationToken ct = default) =>
         EnviarAsync<System.Text.Json.JsonElement>(HttpMethod.Put, "api/cuenta-comun/ahorro/activacion", new ActivarAhorroRequest(activo), ct);
 
+    /// <summary>Activa o desactiva los gastos recurrentes del hogar; solo con <c>hogar.funciones</c> (<c>PUT /api/hogar/recurrentes</c>).</summary>
+    /// <param name="activas">true para crear plantillas y generar gastos.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task ActivarRecurrentesAsync(bool activas, CancellationToken ct = default) =>
+        EnviarAsync<System.Text.Json.JsonElement>(HttpMethod.Put, "api/hogar/recurrentes", new ActivarRecurrentesRequest(activas), ct);
+
     /// <summary>Fija lo que aporta un adulto a la cuenta común desde un mes (<c>PUT /api/cuenta-comun/aportaciones</c>).</summary>
     /// <param name="peticion">Adulto, mes de inicio (día 1) e importe.</param>
     /// <param name="ct">Token de cancelación.</param>

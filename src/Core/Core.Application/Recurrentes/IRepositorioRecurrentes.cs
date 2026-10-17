@@ -21,6 +21,12 @@ public enum ResultadoGuardadoGenerados
 /// </summary>
 public interface IRepositorioRecurrentes
 {
+    /// <summary>Si el hogar tiene activados los gastos recurrentes.</summary>
+    Task<bool> RecurrentesActivasAsync(CancellationToken ct);
+
+    /// <summary>Activa o desactiva los gastos recurrentes del hogar (no borra plantillas).</summary>
+    Task EstablecerRecurrentesActivasAsync(bool activas, CancellationToken ct);
+
     /// <summary>Plantillas ordenadas por día del mes.</summary>
     Task<IReadOnlyList<GastoRecurrente>> ListarAsync(CancellationToken ct);
 

@@ -120,6 +120,7 @@ public sealed partial class ServidorDemo
             ("auditoria", 2, "GET") => Ok(new List<EventoAuditoriaDto>()),
 
             ("cuenta-comun", 2, "GET") => await EstadoCuentaComun(mes, ct),
+            ("hogar", 3, "PUT") when subruta == "recurrentes" => Ok(new { activas = await _recurrentes.ActivarAsync((await Cuerpo<ActivarRecurrentesRequest>())!.Activas, ct) }),
             ("cuenta-comun", 4, "PUT") when subruta == "ahorro" && ruta[3] == "activacion" => await ActivarAhorro((await Cuerpo<ActivarAhorroRequest>())!, ct),
             ("cuenta-comun", 3, "PUT") when subruta == "activacion" => Ok(new { activa = await _cuenta.ActivarCuentaAsync((await Cuerpo<ActivarCuentaComunRequest>())!.Activa, ct) }),
             ("cuenta-comun", 3, "PUT") when subruta == "aportaciones" => await FijarAportacion((await Cuerpo<FijarAportacionRequest>())!, ct),

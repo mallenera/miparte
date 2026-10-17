@@ -95,6 +95,7 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
             e.Property(x => x.CreadoEn).HasDefaultValueSql("now()"); // lo asigna la base de datos
             e.Property(x => x.Tipo).HasConversion(v => TextoTipoGrupo.ATexto(v), v => TextoATipoGrupo(v));
             e.Ignore(x => x.PeriodoPropio); // se deriva de periodo_desde y periodo_hasta (ver Hogar.PeriodoPropio)
+            e.Property(x => x.RecurrentesActivas).HasColumnName("recurrentes_activas"); // EF siempre envía el valor; el DEFAULT de la columna solo cubre inserciones ajenas
             e.HasQueryFilter(x => x.Id == HogarId);
         });
 

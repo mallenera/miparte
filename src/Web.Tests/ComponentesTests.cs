@@ -791,6 +791,21 @@ public class ComponentesTests : BunitContext
     }
 
     [Fact]
+    public void Recurrentes_desactivadas_avisa_sin_cargar_datos_ni_ofrece_generar()
+    {
+        var api = ApiRecurrentes(Alquiler());
+        Registrar(api, Casa with { RecurrentesActivas = false });
+
+        var c = Render<VistaRecurrentes>();
+
+        Assert.Contains("no están activadas en este hogar", c.Markup);
+        Assert.Contains("href=\"/hogar/configuracion\"", c.Markup);
+        Assert.Empty(c.FindAll("#generar"));
+        Assert.DoesNotContain("GET /api/gastos-recurrentes", api.Recibidas);
+        Assert.DoesNotContain("GET /api/miembros", api.Recibidas);
+    }
+
+    [Fact]
     public void Recurrentes_sin_plantillas_no_permite_generar_y_lo_explica()
     {
         Registrar(ApiRecurrentes());
@@ -1066,6 +1081,21 @@ public class ComponentesTests : BunitContext
 
         Assert.Contains("\"activo\":true", api.Cuerpos["PUT /api/cuenta-comun/ahorro/activacion"]);
         Assert.True(Services.GetRequiredService<EstadoHogar>().HogarActual!.AhorroActivo);
+    }
+
+    [Fact]
+    public async Task Configuracion_desactiva_las_recurrentes_sin_tocar_la_cuenta_ni_el_ahorro()
+    {
+        var api = ApiConHogar(soyAdmin: true).Responde("PUT /api/hogar/recurrentes", HttpStatusCode.OK, new { activas = false });
+        var c = await ConfiguracionAsync(true, Casa with { CuentaComunActiva = true, AhorroActivo = true }, api);
+
+        c.FindAll(".chk input")[2].Change(false);
+
+        Assert.Contains("\"activas\":false", api.Cuerpos["PUT /api/hogar/recurrentes"]);
+        var hogar = Services.GetRequiredService<EstadoHogar>().HogarActual!;
+        Assert.False(hogar.RecurrentesActivas);
+        Assert.True(hogar.CuentaComunActiva);
+        Assert.True(hogar.AhorroActivo);
     }
 
     [Fact]

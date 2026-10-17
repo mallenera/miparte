@@ -41,6 +41,8 @@ public class Hogar
     public bool CuentaComunActiva { get; set; }
     /// <summary>Si el hogar usa el ahorro de la cuenta común (aportaciones con ahorro, depósitos, retiradas y gastos desde el ahorro); solo tiene efecto con la cuenta común activada.</summary>
     public bool AhorroActivo { get; set; }
+    /// <summary>Si el hogar genera gastos recurrentes (alta de plantillas y generación del mes); desactivarlo deja las plantillas pausadas, sin borrarlas.</summary>
+    public bool RecurrentesActivas { get; set; } = true;
     /// <summary>Tipo de grupo; lo fija la creación y determina las categorías sembradas (ver <see cref="SemillaHogar"/>).</summary>
     public TipoGrupo Tipo { get; set; } = TipoGrupo.Hogar;
     /// <summary>Fecha del saldo inicial de la cuenta común (null si no se ha fijado); va con <see cref="SaldoInicialImporte"/>.</summary>

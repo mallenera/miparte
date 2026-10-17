@@ -36,6 +36,9 @@ public sealed class ModeloConfiguracionHogar(CoreApiClient api, EstadoHogar hoga
     /// <summary>Si el hogar tiene activado el ahorro.</summary>
     public bool AhorroActivo => hogar.HogarActual?.AhorroActivo ?? false;
 
+    /// <summary>Si el hogar genera gastos recurrentes (plantillas y generación mensual).</summary>
+    public bool RecurrentesActivas => hogar.HogarActual?.RecurrentesActivas ?? false;
+
     /// <summary>Nombre del miembro, o «—» si no está.</summary>
     public string NombreDe(Guid id) => Miembros.FirstOrDefault(m => m.Id == id)?.Nombre ?? "—";
 
@@ -76,6 +79,9 @@ public sealed class ModeloConfiguracionHogar(CoreApiClient api, EstadoHogar hoga
 
     /// <summary>Clave de la casilla de ahorro (cambia tras cada intento).</summary>
     public string ClaveAhorro => $"ahorro-{_versionFunciones}";
+
+    /// <summary>Clave de la casilla de recurrentes (cambia tras cada intento).</summary>
+    public string ClaveRecurrentes => $"recurrentes-{_versionFunciones}";
 
     // ───── Formularios ─────
 
@@ -147,24 +153,30 @@ public sealed class ModeloConfiguracionHogar(CoreApiClient api, EstadoHogar hoga
     /// <summary>Habilita o deshabilita la cuenta común; devuelve el aviso, o null si la API lo rechazó.</summary>
     public Task<string?> CambiarCuentaComunAsync(bool activa) =>
         EjecutarFuncionAsync(
-            () => api.ActivarCuentaComunAsync(activa), activa, AhorroActivo,
+            () => api.ActivarCuentaComunAsync(activa), activa, AhorroActivo, RecurrentesActivas,
             activa ? "Cuenta común habilitada" : "Cuenta común deshabilitada");
 
     /// <summary>Activa o desactiva el ahorro; devuelve el aviso, o null si la API lo rechazó.</summary>
     public Task<string?> CambiarAhorroAsync(bool activo) =>
         EjecutarFuncionAsync(
-            () => api.ActivarAhorroAsync(activo), CuentaComunActiva, activo,
+            () => api.ActivarAhorroAsync(activo), CuentaComunActiva, activo, RecurrentesActivas,
             activo ? "Ahorro activado" : "Ahorro desactivado");
 
+    /// <summary>Activa o desactiva los gastos recurrentes; desactivarlos no borra las plantillas. Devuelve el aviso, o null si la API lo rechazó.</summary>
+    public Task<string?> CambiarRecurrentesAsync(bool activas) =>
+        EjecutarFuncionAsync(
+            () => api.ActivarRecurrentesAsync(activas), CuentaComunActiva, AhorroActivo, activas,
+            activas ? "Recurrentes activadas" : "Recurrentes desactivadas");
+
     /// <summary>Aplica un cambio de funciones y, si la API lo acepta, lo refleja en el estado compartido (menú y pestañas).</summary>
-    private async Task<string?> EjecutarFuncionAsync(Func<Task> accion, bool cuentaComun, bool ahorro, string aviso)
+    private async Task<string?> EjecutarFuncionAsync(Func<Task> accion, bool cuentaComun, bool ahorro, bool recurrentes, string aviso)
     {
         ErrorFunciones = null;
         GuardandoFunciones = true;
         try
         {
             await accion();
-            hogar.ActualizarFunciones(cuentaComun, ahorro);
+            hogar.ActualizarFunciones(cuentaComun, ahorro, recurrentes);
             return aviso;
         }
         catch (ApiException e)

@@ -187,6 +187,45 @@ public class ServicioRecurrentesTests
         Assert.Equal(4, _recurrentes.IntentosDeGuardado);
     }
 
+    [Fact]
+    public async Task Crear_ConRecurrentesDesactivadas_EsConflictoYNoGuarda()
+    {
+        _recurrentes.Activas = false;
+
+        var r = await Servicio.CrearAsync(Hogar, Datos(), default);
+
+        Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
+        Assert.Equal(Mensajes.RecurrentesInactivas, r.Error.Mensaje);
+        Assert.Empty(_recurrentes.Plantillas);
+    }
+
+    [Fact]
+    public async Task Generar_ConRecurrentesDesactivadas_EsConflictoYNoCreaGastos()
+    {
+        await Plantilla();
+        _recurrentes.Activas = false;
+
+        var r = await Servicio.GenerarAsync(Septiembre, default);
+
+        Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
+        Assert.Empty(_gastos.Gastos);
+    }
+
+    [Fact]
+    public async Task Desactivar_NoBorraLasPlantillas_YReactivarVuelveAGenerar()
+    {
+        var p = await Plantilla();
+
+        Assert.False(await Servicio.ActivarAsync(false, default));
+        Assert.False(_recurrentes.Activas);
+        Assert.Single(_recurrentes.Plantillas);
+        Assert.Equal(p.Id, _recurrentes.Plantillas[0].Id);
+
+        await Servicio.ActivarAsync(true, default);
+        var r = await Servicio.GenerarAsync(Septiembre, default);
+        Assert.Equal(1, r.Valor!.Creados);
+    }
+
     /// <summary>Repositorio de plantillas en memoria; comparte la lista de gastos con el repositorio de gastos.</summary>
     private sealed class RepositorioRecurrentesFalso(RepositorioGastosFalso gastos) : IRepositorioRecurrentes
     {
@@ -194,12 +233,21 @@ public class ServicioRecurrentesTests
         public int DuplicadosAntesDeGuardar { get; set; }
         public bool SimularOtraPeticion { get; set; } = true;
         public int IntentosDeGuardado { get; private set; }
+        public bool Activas { get; set; } = true;
 
         private readonly List<GastoRecurrente> _porAnadir = [];
         private readonly List<GastoRecurrente> _porEliminar = [];
 
         public Task<IReadOnlyList<GastoRecurrente>> ListarAsync(CancellationToken ct)
             => Task.FromResult<IReadOnlyList<GastoRecurrente>>(Plantillas.OrderBy(p => p.DiaMes).ToList());
+
+        public Task<bool> RecurrentesActivasAsync(CancellationToken ct) => Task.FromResult(Activas);
+
+        public Task EstablecerRecurrentesActivasAsync(bool activas, CancellationToken ct)
+        {
+            Activas = activas;
+            return Task.CompletedTask;
+        }
 
         public Task<GastoRecurrente?> ObtenerAsync(Guid id, CancellationToken ct) => Task.FromResult(Plantillas.FirstOrDefault(p => p.Id == id));
 

@@ -137,10 +137,11 @@ Los ingresos del hogar **no se guardan** y no hay endpoints de ingresos. Los per
 |---|---|---|---|---|---|
 | `GET /api/gastos-recurrentes` | Lista (por `diaMes`) | - | `GastoRecurrenteResponse[]` 200 | 409 sin hogar | miembro |
 | `GET /api/gastos-recurrentes/{id}` | Una plantilla | - | `GastoRecurrenteResponse` 200 | 404; 409 | miembro |
-| `POST /api/gastos-recurrentes` | Crea plantilla | `GastoRecurrenteRequest` | `GastoRecurrenteResponse` 201 | 400 importe, `diaMes` fuera de 1-28, categoría o perfil inexistente, pagador no adulto activo; 409 | permiso `recurrentes.gestionar` |
+| `POST /api/gastos-recurrentes` | Crea plantilla | `GastoRecurrenteRequest` | `GastoRecurrenteResponse` 201 | 400 importe, `diaMes` fuera de 1-28, categoría o perfil inexistente, pagador no adulto activo; 409 sin hogar o con las recurrentes desactivadas en el hogar | permiso `recurrentes.gestionar` |
 | `PUT /api/gastos-recurrentes/{id}` | Edita (no toca gastos ya generados) | `GastoRecurrenteRequest` | `GastoRecurrenteResponse` 200 | 400, 404, 409 | permiso `recurrentes.gestionar` |
 | `DELETE /api/gastos-recurrentes/{id}` | Borra | - | 204 | 404; 409 si ya tiene gastos generados (desactivar con PUT `activo=false`) | permiso `recurrentes.gestionar` |
-| `POST /api/gastos-recurrentes/generar?mes=YYYY-MM` | Crea los gastos del mes de las plantillas activas sin gasto ese mes (idempotente, todo o nada). Sin cuerpo | - | `GenerarRecurrentesResponse` 200 | 400 mes inválido o plantilla no repartible; 409 sin hogar | permiso `recurrentes.gestionar` |
+| `PUT /api/hogar/recurrentes` | **Permiso `hogar.funciones`.** Activa o desactiva los gastos recurrentes del hogar (`{ "activas": true }`). Desactivarlos no borra plantillas: quedan pausadas. Con ellos desactivados, `POST /api/gastos-recurrentes` y `POST /api/gastos-recurrentes/generar` responden 409 (`"Las recurrentes no están activadas en este hogar."`); las consultas, la edición y el borrado siguen funcionando | `ActivarRecurrentesRequest` | `{ "activas": bool }` 200 | 403 sin el permiso; 409 sin hogar | permiso `hogar.funciones` |
+| `POST /api/gastos-recurrentes/generar?mes=YYYY-MM` | Crea los gastos del mes de las plantillas activas sin gasto ese mes (idempotente, todo o nada). Sin cuerpo | - | `GenerarRecurrentesResponse` 200 | 400 mes inválido o plantilla no repartible; 409 sin hogar o con las recurrentes desactivadas en el hogar | permiso `recurrentes.gestionar` |
 
 ### 3.8 Resumen, liquidación y pagos
 
@@ -202,8 +203,8 @@ Total: 56 endpoints de negocio (5 hogares/yo, 10 miembros/invitaciones/enlaces d
 ```json
 {
   "userId": "7c1f6d3e-0b8a-4f55-9a53-1d2f6c1b9e10",
-  "hogares": [ { "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez", "cuentaComunActiva": false, "ahorroActivo": false, "tipo": "hogar" } ],
-  "hogarActual": { "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez", "cuentaComunActiva": false, "ahorroActivo": false, "tipo": "hogar" }
+  "hogares": [ { "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez", "cuentaComunActiva": false, "ahorroActivo": false, "tipo": "hogar", "recurrentesActivas": true } ],
+  "hogarActual": { "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez", "cuentaComunActiva": false, "ahorroActivo": false, "tipo": "hogar", "recurrentesActivas": true }
 }
 ```
 
@@ -213,7 +214,7 @@ Total: 56 endpoints de negocio (5 hogares/yo, 10 miembros/invitaciones/enlaces d
 { "nombreHogar": "Casa Pérez", "nombreMiembro": "Ana" }
 ```
 ```json
-{ "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez", "cuentaComunActiva": false, "ahorroActivo": false, "tipo": "hogar" }
+{ "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez", "cuentaComunActiva": false, "ahorroActivo": false, "tipo": "hogar", "recurrentesActivas": true }
 ```
 
 `POST /api/hogares` con tipo de grupo (`tipo` es opcional; sin él se crea un «hogar»):
@@ -359,6 +360,8 @@ Categoría a cargo de la cuenta común (con la cuenta activada; el servidor asig
 ```
 
 ### Gastos recurrentes
+
+**Activación por hogar.** `hogar.recurrentes_activas` (true por defecto, también para los hogares existentes; `HogarResumen` lo devuelve como `recurrentesActivas`). Lo cambia un admin con `PUT /api/hogar/recurrentes`. Con ello desactivado no se crean plantillas ni se generan gastos (409), pero las plantillas existentes se conservan pausadas, y el `DELETE` y las consultas siguen funcionando. El cambio queda en el historial como el de los demás interruptores del hogar.
 
 `POST /api/gastos-recurrentes`:
 

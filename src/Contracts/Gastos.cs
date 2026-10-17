@@ -65,3 +65,7 @@ public record GastoRecurrenteResponse(
 /// <param name="Creados">Número de gastos creados.</param>
 /// <param name="YaExistentes">Número de plantillas que ya tenían gasto en ese mes.</param>
 public record GenerarRecurrentesResponse(string Mes, int Creados, int YaExistentes);
+
+/// <summary>PUT /api/hogar/recurrentes (permiso <c>hogar.funciones</c>): activa o desactiva los gastos recurrentes del hogar.</summary>
+/// <param name="Activas">true para crear plantillas y generar gastos; false las deja pausadas sin borrarlas.</param>
+public record ActivarRecurrentesRequest(bool Activas);

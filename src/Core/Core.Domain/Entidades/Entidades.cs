@@ -47,6 +47,27 @@ public class Hogar
     public DateOnly? SaldoInicialFecha { get; set; }
     /// <summary>Dinero que había en la cuenta para gastos a <see cref="SaldoInicialFecha"/> (null si no se ha fijado).</summary>
     public decimal? SaldoInicialImporte { get; set; }
+    /// <summary>Primer día del periodo propio del hogar (columna <c>periodo_desde</c>); null = el hogar usa meses.</summary>
+    public DateOnly? PeriodoDesde { get; set; }
+    /// <summary>Último día del periodo propio (columna <c>periodo_hasta</c>); null con <see cref="PeriodoDesde"/> informado = periodo abierto.</summary>
+    public DateOnly? PeriodoHasta { get; set; }
+
+    /// <summary>
+    /// Periodo propio del hogar como value object, a partir de <see cref="PeriodoDesde"/> y <see cref="PeriodoHasta"/>.
+    /// Null si el hogar no tiene periodo propio. Un mes se guarda como su rango de días (vuelve como <see cref="TipoPeriodo.Rango"/>,
+    /// con el mismo <see cref="Periodo.Contiene"/>). EF no mapea esta propiedad: solo las dos columnas.
+    /// </summary>
+    public Periodo? PeriodoPropio
+    {
+        get => PeriodoDesde is null ? null
+            : PeriodoHasta is null ? Periodo.Abierto(PeriodoDesde.Value)
+            : Periodo.Rango(PeriodoDesde.Value, PeriodoHasta.Value);
+        set
+        {
+            PeriodoDesde = value?.Desde;
+            PeriodoHasta = value is null || value.Tipo == TipoPeriodo.Abierto ? null : value.Hasta;
+        }
+    }
 }
 
 /// <summary>Persona del hogar que participa en gastos e ingresos; puede o no tener usuario asociado.</summary>

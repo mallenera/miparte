@@ -94,6 +94,7 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
             e.ToTable("hogar");
             e.Property(x => x.CreadoEn).HasDefaultValueSql("now()"); // lo asigna la base de datos
             e.Property(x => x.Tipo).HasConversion(v => TextoTipoGrupo.ATexto(v), v => TextoATipoGrupo(v));
+            e.Ignore(x => x.PeriodoPropio); // se deriva de periodo_desde y periodo_hasta (ver Hogar.PeriodoPropio)
             e.HasQueryFilter(x => x.Id == HogarId);
         });
 

@@ -273,6 +273,8 @@ Siete decisiones condicionan el desarrollo; la D3 es la única que depende de un
 
 El orden va de lo más delicado (el cálculo) a lo más vistoso (el chatbot), para tener siempre algo que funciona.
 
+Estado a 2026-10-17: todas las fases de este plan están implementadas en el código. Lo que falta es verificar en entornos reales y cerrar algunas decisiones; el detalle y el orden están en [plan-de-accion.md](plan-de-accion.md).
+
 - **Base:** miembros, categorías y subcategorías, alta de gastos, cuenta común con aportaciones y perfiles de reparto.
 - **Cálculo:** liquidación mensual con tests unitarios de todos los modos de reparto, incluido el caso A=2X, B=X y el reparto 2 contra 1, y de que un gasto guardado no cambie al cambiar el porcentaje.
 - **Comodidad:** gastos recurrentes, edición, filtros y dashboard mensual.

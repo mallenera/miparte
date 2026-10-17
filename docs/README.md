@@ -12,6 +12,7 @@ Punto de entrada a todo lo que define *Mi parte, tu parte*. Léelo antes de toca
 | [asistente.md](asistente.md) | Chatbot: arquitectura, funciones de consulta, defensas frente a prompt injection, contrato de `Assistant.Api` y configuración | Contrato del asistente |
 | [despliegue.md](despliegue.md) | Despliegue gratuito: Cloudflare Pages (front), Render (Core.Api) y Supabase | Guía operativa |
 | [demo.md](demo.md) | Cuenta demo real: ejecutar `demo.sql`, programar su restablecimiento (pg_cron) y botón manual en GitHub Actions | Guía operativa |
+| [plan-de-accion.md](plan-de-accion.md) | Estado resumido, lo hecho y el plan de acción pendiente por fases, con criterios de hecho | Prioridades de trabajo |
 | [referencia/maqueta.html](referencia/maqueta.html) | Maqueta interactiva con datos de ejemplo y la lógica de reparto/liquidación/cuenta común en JS | Comportamiento esperado de la UI |
 | [referencia/identidad-de-marca.dc.html](referencia/identidad-de-marca.dc.html) | Hoja de identidad original (código fuente del lienzo de diseño) | Variantes del logotipo |
 
@@ -25,7 +26,7 @@ Los dos ficheros de `referencia/` son exportaciones de los artefactos de claude.
 
 ## Estado: diseño frente a código
 
-Actualizado el 2026-10-10. Mantén esta tabla al día cuando cierres o cambies algo.
+Actualizado el 2026-10-17 (todas las ramas de funcionalidad están fusionadas en `master`). Lo pendiente, con su orden y criterios de hecho, está en [plan-de-accion.md](plan-de-accion.md). Mantén esta tabla al día cuando cierres o cambies algo.
 
 | Tema del diseño | Estado en el código |
 |---|---|

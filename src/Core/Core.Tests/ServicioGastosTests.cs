@@ -57,6 +57,21 @@ public class ServicioGastosTests
     }
 
     [Fact]
+    public async Task AdultoSinCuenta_PagaYFiguraEnElReparto()
+    {
+        // Ana no tiene usuario vinculado: un adulto sin cuenta paga y reparte como cualquier otro adulto del hogar.
+        Assert.Null(_repo.Miembros.Single(m => m.Id == _ana).UserId);
+
+        var r = await Servicio.CrearAsync(Hogar, Datos(900m, pagadoPor: _ana), default);
+
+        Assert.Null(r.Error);
+        Assert.Equal(_ana, r.Valor!.PagadoPor);
+        var partes = r.Valor.Repartos.ToDictionary(x => x.MiembroId, x => x.ImporteAsumido);
+        Assert.Equal(600m, partes[_ana]);
+        Assert.Equal(300m, partes[_marcos]);
+    }
+
+    [Fact]
     public async Task Crear_ConPerfilDeCuentaComun_NoRepartePeroExigeLaCuentaActiva()
     {
         var sinCuenta = await Servicio.CrearAsync(Hogar, Datos(perfil: _cuenta, cuentaPaga: true), default);

@@ -117,7 +117,7 @@ public sealed class RepositorioMiembros(MiParteDbContext db) : IRepositorioMiemb
             // Dos invitaciones distintas pueden apuntar al mismo miembro: la lectura previa no bloquea, así que el vínculo se hace
             // condicional y atómico (user_id IS NULL y activo). Si otra aceptación se adelantó afecta 0 filas y se revierte todo.
             var vinculados = await db.Miembros.IgnoreQueryFilters()
-                .Where(x => x.HogarId == inv.HogarId && x.Id == destino && x.UserId == null && x.Activo)
+                .Where(x => x.HogarId == inv.HogarId && x.Id == destino && x.UserId == null && x.Activo && x.Tipo == TipoMiembro.Adulto)
                 .ExecuteUpdateAsync(s => s.SetProperty(x => x.UserId, userId), ct);
             if (vinculados == 0) return ResultadoConsumo.MiembroNoDisponible;
             db.Auditoria.Add(RegistroAuditoria.Manual(

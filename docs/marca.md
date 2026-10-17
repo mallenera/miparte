@@ -60,17 +60,19 @@ Tres tramos en `wwwroot/css/app.css`: móvil (hasta 640 px, usable desde 375 px)
 
 ## Temas
 
-Estética «SaaS premium» (rediseño de `feature/web-design`; el código manda sobre las tablas de color de arriba): superficies con gradientes sutiles, rejilla asimétrica, mucho aire, hover `scale(1.02)` de 300 ms e iconos Lucide incrustados como SVG (`Componentes/Icono.razor`; el front es Blazor, no React, y no usa Tailwind: los valores `slate` son tokens de `app.css`). Una sola llamada a la acción vistosa por pantalla (`.btn`, color `--cta`).
+Estética v3b (rama `feature/marca-v3b`; el código manda sobre las tablas de color de arriba): neutros cálidos de marca, superficies planas (sin degradados ni sombras en reposo; solo llevan sombra las superposiciones reales: menú, panel del asistente, botón flotante y avisos), rejilla asimétrica, mucho aire, hover `scale(1.02)` de 300 ms e iconos Lucide incrustados como SVG (`Componentes/Icono.razor`; el front es Blazor, no React, y no usa Tailwind: los valores `slate` son tokens de `app.css`). Una sola llamada a la acción por pantalla (`.btn`, color `--cta`): burdeos en Claro y Oscuro, que son los temas de marca.
 
 El usuario elige tema en su menú (esquina superior derecha) y se recuerda en `localStorage` (`miparte.tema`). Se aplica con el atributo `data-tema` de `<html>`; sin él se sigue al sistema (claro u oscuro). Todos los temas redefinen los mismos tokens de `app.css` (`--wine` principal de marca, `--orange` acento, `--cta` acción); los componentes nunca llevan colores propios.
 
 | Tema | Tipo | Base | Acción (`--cta`) |
 |---|---|---|---|
-| Claro | claro | slate-50, burdeos y naranja de marca | menta |
-| Oscuro | oscuro | slate-950 / slate-100, resplandor burdeos | menta neón `#3DFFB4` |
+| Claro | claro | crema `#FBF5EF`, burdeos y naranja de marca | burdeos |
+| Oscuro | oscuro | `#1C1114` / `#F5ECE6`, burdeos y naranja de marca | burdeos `#A32D40` |
 | Océano | claro | azul petróleo, acento ámbar | cian |
 | Bosque | claro | verde profundo, acento dorado | lima |
 | Medianoche | oscuro | índigo profundo, acento ámbar | azul eléctrico |
 | Grafito | oscuro | grises de carbón, acento dorado | oro |
 
 Los estados (ok/err/warn) y los colores de miembro no cambian en los temas claros, y en los oscuros usan la variante oscura. Las translucideces (cristal de tarjetas y menús, resplandores) se derivan de los tokens con `color-mix`, así que un tema nuevo = un bloque `[data-tema="..."]` en `app.css` + una entrada en `ServicioTema.Todos` y en la lista de `index.html`.
+
+En Océano, Bosque, Medianoche y Grafito `--wine` cambia de tono con el tema; son preferencias del usuario, no identidad de marca. El símbolo del logotipo conserva siempre sus colores.

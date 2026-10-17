@@ -43,12 +43,18 @@ public sealed class HistoricoCuentaComun
 
     private readonly List<Fila> _filas;
     private readonly DateOnly _inicio;
+    // Frecuencia de aportación del hogar: se copia en cada aportación para que el cálculo sepa en qué meses cobra.
+    private readonly FrecuenciaAportacion _frecuencia;
 
-    private HistoricoCuentaComun(List<Fila> filas, DateOnly inicio, SaldoInicialCuenta? saldoInicial)
+    /// <summary>Frecuencia con la que aporta el hogar a la cuenta común.</summary>
+    public FrecuenciaAportacion Frecuencia => _frecuencia;
+
+    private HistoricoCuentaComun(List<Fila> filas, DateOnly inicio, SaldoInicialCuenta? saldoInicial, FrecuenciaAportacion frecuencia)
     {
         _filas = filas;
         _inicio = inicio;
         SaldoInicial = saldoInicial;
+        _frecuencia = frecuencia;
     }
 
     /// <summary>Saldo inicial fijado para la cuenta, o null; lo usan el estado de la cuenta y el resumen del mes.</summary>
@@ -144,10 +150,10 @@ public sealed class HistoricoCuentaComun
         }
 
         var filas = await consulta.AsNoTracking().ToListAsync(ct);
-        var saldo = await db.Hogares.Select(x => new { x.SaldoInicialFecha, x.SaldoInicialImporte }).FirstOrDefaultAsync(ct);
+        var saldo = await db.Hogares.Select(x => new { x.SaldoInicialFecha, x.SaldoInicialImporte, x.AportacionFrecuencia }).FirstOrDefaultAsync(ct);
         var saldoInicial = saldo?.SaldoInicialFecha is { } fecha && saldo.SaldoInicialImporte is { } importe
             ? new SaldoInicialCuenta(fecha, importe) : null;
-        return new HistoricoCuentaComun(filas, inicio, saldoInicial);
+        return new HistoricoCuentaComun(filas, inicio, saldoInicial, saldo?.AportacionFrecuencia ?? FrecuenciaAportacion.Mensual);
     }
 
     private IEnumerable<Fila> De(int tipo) => _filas.Where(f => f.Tipo == tipo);
@@ -167,7 +173,7 @@ public sealed class HistoricoCuentaComun
 
     /// <summary>Las aportaciones en la forma que usa el cálculo del dominio.</summary>
     public List<AportacionVigente> Vigentes => De(TipoAportacion)
-        .Select(f => new AportacionVigente(f.MiembroId, f.Fecha, f.Importe, f.Ahorro)).ToList();
+        .Select(f => new AportacionVigente(f.MiembroId, f.Fecha, f.Importe, f.Ahorro, _frecuencia)).ToList();
 
     /// <summary>Gastos a cargo de la cuenta hasta el fin del mes, agrupados por pagador y origen (una fila por grupo).</summary>
     public List<GastoDeCuenta> Gastos => De(TipoGastos).Select(f => new GastoDeCuenta(Nulo(f.MiembroId), _inicio, f.Importe, f.Marca)).ToList();

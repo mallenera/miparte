@@ -35,4 +35,13 @@ public static class Mensajes
 
     /// <summary>Otro cierre de ciclo se ha completado a la vez; hay que volver a mirar los gastos pendientes.</summary>
     public const string CierreConcurrente = "Otra persona acaba de cerrar la liquidación. Revisa los gastos pendientes y vuelve a intentarlo.";
+
+    /// <summary>Se intenta crear, editar o borrar un gasto dentro del periodo propio ya cerrado del hogar.</summary>
+    public const string PeriodoCerrado = "El periodo está cerrado.";
+
+    /// <summary>Se intenta cerrar un periodo que ya estaba cerrado.</summary>
+    public const string PeriodoYaCerrado = "El periodo ya está cerrado.";
+
+    /// <summary>Se intenta reabrir un periodo que no estaba cerrado.</summary>
+    public const string PeriodoNoCerrado = "El periodo no estaba cerrado.";
 }

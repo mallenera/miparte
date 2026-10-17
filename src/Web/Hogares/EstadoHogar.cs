@@ -102,6 +102,27 @@ public sealed class EstadoHogar
         Cambiado?.Invoke();
     }
 
+    /// <summary>Actualiza la frecuencia de aportación del hogar actual tras cambiarla, sin volver a pedir <c>/api/yo</c>.</summary>
+    /// <param name="frecuencia">Frecuencia nueva (ver <c>FrecuenciasAportacion</c>).</param>
+    public void ActualizarAportacionFrecuencia(string frecuencia)
+    {
+        if (HogarActual is not { } actual) return;
+        var nuevo = actual with { AportacionFrecuencia = frecuencia };
+        Hogares = Hogares.Select(h => h.Id == nuevo.Id ? nuevo : h).ToList();
+        HogarActual = nuevo;
+        Cambiado?.Invoke();
+    }
+
+    /// <summary>Marca como cerrado el periodo propio del hogar actual tras cerrarlo, sin volver a pedir <c>/api/yo</c>.</summary>
+    public void MarcarPeriodoCerrado()
+    {
+        if (HogarActual is not { } actual) return;
+        var nuevo = actual with { PeriodoCerrado = true };
+        Hogares = Hogares.Select(h => h.Id == nuevo.Id ? nuevo : h).ToList();
+        HogarActual = nuevo;
+        Cambiado?.Invoke();
+    }
+
     /// <summary>Olvida hogares y elección (al cerrar sesión), para que otro usuario del mismo navegador no la herede.</summary>
     public async Task LimpiarAsync()
     {

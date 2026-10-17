@@ -46,6 +46,23 @@ else
             </label>
             <p class="muted">@(_m.CuentaComunActiva ? "Parte de las aportaciones que se aparta, con ingresos, retiradas y gastos pagados desde el ahorro." : "Necesita la cuenta común habilitada.")</p>
         </div>
+        @if (_m.CuentaComunActiva)
+        {
+            <div class="u-mt12">
+                <label class="filtro">Frecuencia de las aportaciones
+                    <select @key="_m.ClaveFrecuencia" disabled="@(!PuedeFunciones || _m.GuardandoFunciones)"
+                            @onchange="e => CambiarFrecuenciaAsync((string)e.Value!)">
+                        <option value="@FrecuenciasAportacion.Mensual" selected="@(_m.AportacionFrecuencia == FrecuenciasAportacion.Mensual)">Cada mes</option>
+                        <option value="@FrecuenciasAportacion.Bimestral" selected="@(_m.AportacionFrecuencia == FrecuenciasAportacion.Bimestral)">Cada dos meses</option>
+                        <option value="@FrecuenciasAportacion.Trimestral" selected="@(_m.AportacionFrecuencia == FrecuenciasAportacion.Trimestral)">Cada tres meses</option>
+                        <option value="@FrecuenciasAportacion.Semestral" selected="@(_m.AportacionFrecuencia == FrecuenciasAportacion.Semestral)">Cada seis meses</option>
+                        <option value="@FrecuenciasAportacion.Anual" selected="@(_m.AportacionFrecuencia == FrecuenciasAportacion.Anual)">Cada año</option>
+                        <option value="@FrecuenciasAportacion.Unica" selected="@(_m.AportacionFrecuencia == FrecuenciasAportacion.Unica)">Una sola vez</option>
+                    </select>
+                </label>
+                <p class="muted">Cada cobro cubre un periodo: con «Cada dos meses», cada adulto aporta su cantidad una vez cada dos meses. «Una sola vez» es una única aportación por persona para el grupo.</p>
+            </div>
+        }
         <div class="u-mt12">
             <label class="chk">
                 <input type="checkbox" @key="_m.ClaveRecurrentes" checked="@_m.RecurrentesActivas" disabled="@(!PuedeFunciones || _m.GuardandoFunciones)"
@@ -79,6 +96,38 @@ else
             <p class="muted u-mt12">No tienes permiso para cambiar estas funciones. Pídeselo a un administrador del hogar.</p>
         }
     </section>
+
+    @if (_m.Periodo is { } periodo)
+    {
+        <section class="card" aria-labelledby="t-periodo">
+            <div class="card-head"><h2 id="t-periodo">Periodo del viaje</h2></div>
+            <p class="u-mt12">Periodo del grupo: @TextoPeriodo(periodo).</p>
+            @if (_m.PeriodoCerrado)
+            {
+                <p class="muted u-mt12">El periodo está cerrado: sus gastos no se pueden editar ni borrar, y su liquidación final ya está hecha.</p>
+            }
+            else
+            {
+                <p class="muted u-mt12">Al cerrar el viaje, sus gastos quedan bloqueados: no se podrán editar ni borrar. Los gastos pendientes se liquidan en un cierre final.</p>
+                @if (_m.ConfirmandoCierre)
+                {
+                    <div class="aviso warn u-mt12" role="alert">¿Cerrar el viaje? Sus gastos quedarán bloqueados hasta que se reabra el periodo.</div>
+                    <div class="u-mt12">
+                        <button class="btn btn-danger" type="button" disabled="@_m.CerrandoPeriodo" @onclick="CerrarPeriodoAsync">Sí, cerrar viaje</button>
+                        <button class="linkbtn" type="button" disabled="@_m.CerrandoPeriodo" @onclick="() => _m.ConfirmandoCierre = false">Cancelar</button>
+                    </div>
+                }
+                else
+                {
+                    <button class="btn btn-sm u-mt12" type="button" disabled="@_m.CerrandoPeriodo" @onclick="() => _m.ConfirmandoCierre = true">Cerrar viaje</button>
+                }
+                @if (_m.ErrorPeriodo is not null)
+                {
+                    <div class="aviso err u-mt12" role="alert">@_m.ErrorPeriodo</div>
+                }
+            }
+        </section>
+    }
 
     <div class="cols-even">
         <section class="card" aria-labelledby="t-miembros">
@@ -287,6 +336,13 @@ else
     private Task CambiarRecurrentesAsync(bool activas) => Mostrar(_m.CambiarRecurrentesAsync(activas));
 
     private Task CambiarLiquidacionAsync(string modo) => Mostrar(_m.CambiarLiquidacionAsync(modo));
+
+    private Task CambiarFrecuenciaAsync(string frecuencia) => Mostrar(_m.CambiarFrecuenciaAsync(frecuencia));
+
+    private Task CerrarPeriodoAsync() => Mostrar(_m.CerrarPeriodoAsync());
+
+    /// <summary>Texto legible de un periodo: «YYYY-MM-DD al YYYY-MM-DD» o «desde el YYYY-MM-DD» si sigue abierto.</summary>
+    private static string TextoPeriodo(string periodo) => periodo.EndsWith('/') ? $"desde el {periodo[..^1]}" : periodo.Replace("/", " al ");
 
     private void EmpezarRenombrar(MiembroDto m) => _m.EmpezarRenombrar(m);
 

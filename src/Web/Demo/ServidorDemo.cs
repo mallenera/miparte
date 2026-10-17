@@ -8,6 +8,7 @@ using MiParte.Core.Application.CuentaComun;
 using MiParte.Core.Application.Gastos;
 using MiParte.Core.Application.Liquidacion;
 using MiParte.Core.Application.Miembros;
+using MiParte.Core.Application.Periodos;
 using MiParte.Core.Application.Perfiles;
 using MiParte.Core.Application.Recurrentes;
 using MiParte.Core.Domain;
@@ -36,6 +37,7 @@ public sealed partial class ServidorDemo
     private readonly ServicioPerfiles _perfiles;
     private readonly ServicioCategorias _categorias;
     private readonly ServicioCierres _cierres;
+    private readonly ServicioPeriodos _periodos;
 
     /// <summary>Crea el servidor con el hogar de ejemplo, fechado respecto a hoy.</summary>
     /// <param name="reloj">Reloj para situar los gastos de ejemplo en el mes actual y el anterior.</param>
@@ -53,6 +55,7 @@ public sealed partial class ServidorDemo
         _perfiles = new ServicioPerfiles(new RepositorioPerfilesEnMemoria(_almacen));
         _categorias = new ServicioCategorias(new RepositorioCategoriasEnMemoria(_almacen), gastos);
         _cierres = new ServicioCierres(new RepositorioCierresEnMemoria(_almacen), reloj);
+        _periodos = new ServicioPeriodos(new RepositorioPeriodosEnMemoria(_almacen), new RepositorioLiquidacionEnMemoria(_almacen), reloj);
     }
 
     private HogarResumen Hogar => _almacen.Hogar.ADto();
@@ -144,6 +147,9 @@ public sealed partial class ServidorDemo
             ("pagos-liquidacion", 2, "POST") => await CrearPago((await Cuerpo<CrearPagoLiquidacionRequest>())!, ct),
             ("pagos-liquidacion", 3, "DELETE") when id is { } i => Sin(await _liquidacion.EliminarPagoAsync(i, ct)),
             ("hogar", 3, "PUT") when subruta == "liquidacion" => await CambiarModoLiquidacion((await Cuerpo<ModoLiquidacionRequest>())!, ct),
+            ("hogar", 3, "PUT") when subruta == "aportaciones" => await FijarFrecuencia((await Cuerpo<FijarFrecuenciaAportacionRequest>())!, ct),
+            ("hogar", 3, "POST") when subruta == "cerrar-periodo" => await CerrarPeriodo(ct),
+            ("hogar", 3, "POST") when subruta == "reabrir-periodo" => Sin(await _periodos.ReabrirAsync(ct)),
             ("liquidacion", 3, "GET") when subruta == "ciclos" => Ok((await _liquidacion.ListarCiclosAsync(ct)).Select(c => c.ADto()).ToList()),
             ("liquidacion", 3, "POST") when subruta == "ciclos" => await CerrarCiclo(ct),
 
@@ -344,6 +350,22 @@ public sealed partial class ServidorDemo
             return Mal(HttpStatusCode.BadRequest, "El modo de liquidación debe ser «mensual» o «ciclos».");
         var res = await _liquidacion.CambiarModoAsync(modo, ct);
         return res.Error is { } e ? Error(e) : Ok(new ModoLiquidacionResponse(TextoModoLiquidacion.ATexto(res.Valor)));
+    }
+
+    private async Task<HttpResponseMessage> FijarFrecuencia(FijarFrecuenciaAportacionRequest r, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(r?.Frecuencia) || !TextoFrecuenciaAportacion.TryParse(r.Frecuencia, out var frecuencia))
+            return Mal(HttpStatusCode.BadRequest, "La frecuencia de aportación debe ser unica, mensual, bimestral, trimestral, semestral o anual.");
+        var res = await _cuenta.CambiarFrecuenciaAsync(frecuencia, ct);
+        return res.Error is { } e ? Error(e) : Ok(new FrecuenciaAportacionResponse(TextoFrecuenciaAportacion.ATexto(res.Valor)));
+    }
+
+    private async Task<HttpResponseMessage> CerrarPeriodo(CancellationToken ct)
+    {
+        var yo = await _miembros.MiembroActivoAsync(IdUsuario, ct);
+        if (yo is null) return Mal(HttpStatusCode.Forbidden, Mensajes.SoloMiembroCierra);
+        var res = await _periodos.CerrarAsync(yo, ct);
+        return res.Error is { } e ? Error(e) : Ok(new CierrePeriodoResponse(res.Valor!.Periodo.ATexto(), res.Valor.CerradoEn, res.Valor.Ciclo?.ADto()));
     }
 
     private async Task<HttpResponseMessage> CerrarCiclo(CancellationToken ct)

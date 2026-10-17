@@ -14,6 +14,15 @@ public static class ResumenCompartible
     /// <summary>Línea que sustituye a las transferencias cuando el mes está saldado.</summary>
     public const string TodoCuadrado = "Todo cuadrado";
 
+    /// <summary>
+    /// Mensaje de los enlaces de WhatsApp y correo. Va sin importes ni nombres a propósito: las URL pasan por
+    /// servidores ajenos, así que el detalle solo se muestra y se copia dentro de la aplicación.
+    /// </summary>
+    public const string MensajeEnlace = "Te paso el resumen de nuestros gastos compartidos en Mi parte, tu parte. Está en la app.";
+
+    /// <summary>Asunto del correo de los enlaces: genérico, sin nombre del hogar ni mes.</summary>
+    public const string AsuntoEnlace = "Resumen de nuestros gastos compartidos";
+
     /// <summary>Genera el texto del resumen: título con hogar y mes, y una línea por transferencia o «Todo cuadrado».</summary>
     /// <param name="nombreHogar">Nombre del hogar, tal como lo ve la persona.</param>
     /// <param name="mes">Cualquier día del mes resumido.</param>

@@ -36,8 +36,14 @@ public interface IRepositorioCuentaComun
     /// <summary>Si el miembro existe en el hogar, está activo y es adulto.</summary>
     Task<bool> EsAdultoActivoAsync(Guid id, CancellationToken ct);
 
-    /// <summary>Todas las aportaciones del hogar, en la forma que usa el cálculo.</summary>
+    /// <summary>Todas las aportaciones del hogar, en la forma que usa el cálculo (cada una con la frecuencia del hogar).</summary>
     Task<IReadOnlyList<AportacionVigente>> AportacionesAsync(CancellationToken ct);
+
+    /// <summary>Con qué frecuencia aportan los miembros a la cuenta común.</summary>
+    Task<FrecuenciaAportacion> FrecuenciaAsync(CancellationToken ct);
+
+    /// <summary>Fija con qué frecuencia aportan los miembros a la cuenta común.</summary>
+    Task EstablecerFrecuenciaAsync(FrecuenciaAportacion frecuencia, CancellationToken ct);
 
     /// <summary>Todos los depósitos de ahorro; <paramref name="excluir"/> deja fuera uno.</summary>
     Task<IReadOnlyList<DepositoDeAhorro>> DepositosAsync(Guid? excluir, CancellationToken ct);

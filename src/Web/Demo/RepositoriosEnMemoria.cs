@@ -5,6 +5,7 @@ using MiParte.Core.Application.CuentaComun;
 using MiParte.Core.Application.Gastos;
 using MiParte.Core.Application.Liquidacion;
 using MiParte.Core.Application.Miembros;
+using MiParte.Core.Application.Periodos;
 using MiParte.Core.Application.Perfiles;
 using MiParte.Core.Application.Recurrentes;
 using MiParte.Core.Domain;
@@ -25,7 +26,7 @@ internal static class RepositoriosEnMemoria
         var gastos = a.Gastos.Where(g => g.ACargoCuentaComun && g.Fecha < fin).ToList();
         var gastosDelMes = gastos.Where(g => g.Fecha >= inicio).ToList();
         return new HistoricoCuenta(
-            a.Aportaciones.Select(x => new AportacionVigente(x.MiembroId, x.Desde, x.Importe, x.Ahorro)).ToList(),
+            a.Aportaciones.Select(x => new AportacionVigente(x.MiembroId, x.Desde, x.Importe, x.Ahorro, a.Hogar.AportacionFrecuencia)).ToList(),
             gastos.Select(g => new GastoDeCuenta(g.PagadoPor, g.Fecha, g.Importe, g.PagadoDesdeAhorro)).ToList(),
             a.Reembolsos.Where(r => r.Fecha < fin).Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe)).ToList(),
             a.Retiradas.Where(r => r.Fecha < fin).Select(r => new RetiradaDeAhorro(r.Fecha, r.Importe)).ToList(),
@@ -33,12 +34,12 @@ internal static class RepositoriosEnMemoria
             a.Hogar.CuentaComunActiva,
             gastosDelMes.Sum(g => g.Importe),
             gastosDelMes.Select(g => new GastoDeCuenta(g.PagadoPor, g.Fecha, g.Importe, g.PagadoDesdeAhorro)).ToList(),
-            a.Hogar.SaldoInicialFecha is { } f && a.Hogar.SaldoInicialImporte is { } i ? new SaldoInicialCuenta(f, i) : null);
+            a.Hogar.SaldoInicialFecha is { } f && a.Hogar.SaldoInicialImporte is { } i ? new SaldoInicialCuenta(f, i) : null, a.Hogar.AportacionFrecuencia);
     }
 
     /// <summary>Datos del ahorro; <paramref name="excluirGasto"/> deja fuera un gasto que se estÃ¡ editando.</summary>
     internal static DatosAhorro Ahorro(AlmacenDemo a, Guid? excluirGasto) => new(
-        a.Aportaciones.Select(x => new AportacionVigente(x.MiembroId, x.Desde, x.Importe, x.Ahorro)).ToList(),
+        a.Aportaciones.Select(x => new AportacionVigente(x.MiembroId, x.Desde, x.Importe, x.Ahorro, a.Hogar.AportacionFrecuencia)).ToList(),
         a.Depositos.Select(d => new DepositoDeAhorro(d.Fecha, d.Importe)).ToList(),
         a.Retiradas.Sum(r => r.Importe),
         a.Gastos.Where(g => g.PagadoDesdeAhorro && g.Id != excluirGasto).Sum(g => g.Importe));
@@ -145,6 +146,11 @@ internal sealed class RepositorioGastosEnMemoria(AlmacenDemo a) : IRepositorioGa
         return Task.FromResult(a.Cierres.Any(c => c.Mes == inicio));
     }
 
+    /// <inheritdoc />
+    public Task<bool> FechaEnPeriodoCerradoAsync(DateOnly fecha, CancellationToken ct)
+        => Task.FromResult(a.Hogar.PeriodoCerradoEn is not null && a.Hogar.PeriodoDesde is { } desde && a.Hogar.PeriodoHasta is { } hasta
+            && desde <= fecha && fecha <= hasta);
+
     public void Anadir(Gasto gasto) => _porAnadir.Add(gasto);
 
     public void Eliminar(Gasto gasto) => _porEliminar.Add(gasto);
@@ -214,7 +220,15 @@ internal sealed class RepositorioCuentaComunEnMemoria(AlmacenDemo a) : IReposito
 
     public Task<IReadOnlyList<AportacionVigente>> AportacionesAsync(CancellationToken ct)
         => Task.FromResult<IReadOnlyList<AportacionVigente>>(
-            a.Aportaciones.Select(x => new AportacionVigente(x.MiembroId, x.Desde, x.Importe, x.Ahorro)).ToList());
+            a.Aportaciones.Select(x => new AportacionVigente(x.MiembroId, x.Desde, x.Importe, x.Ahorro, a.Hogar.AportacionFrecuencia)).ToList());
+
+    public Task<FrecuenciaAportacion> FrecuenciaAsync(CancellationToken ct) => Task.FromResult(a.Hogar.AportacionFrecuencia);
+
+    public Task EstablecerFrecuenciaAsync(FrecuenciaAportacion frecuencia, CancellationToken ct)
+    {
+        a.Hogar.AportacionFrecuencia = frecuencia;
+        return Task.CompletedTask;
+    }
 
     public Task<IReadOnlyList<DepositoDeAhorro>> DepositosAsync(Guid? excluir, CancellationToken ct)
         => Task.FromResult<IReadOnlyList<DepositoDeAhorro>>(
@@ -507,4 +521,14 @@ internal sealed class RepositorioCierresEnMemoria(AlmacenDemo a) : IRepositorioC
     }
 
     public Task<bool> EliminarAsync(DateOnly inicio, CancellationToken ct) => Task.FromResult(a.Cierres.RemoveAll(c => c.Mes == inicio) > 0);
+}
+
+/// <summary>Periodo propio del hogar en memoria, para cerrarlo y reabrirlo en la demo.</summary>
+internal sealed class RepositorioPeriodosEnMemoria(AlmacenDemo a) : IRepositorioPeriodos
+{
+    /// <inheritdoc />
+    public Task<Hogar?> HogarAsync(CancellationToken ct) => Task.FromResult<Hogar?>(a.Hogar);
+
+    /// <inheritdoc />
+    public Task GuardarAsync(CancellationToken ct) => Task.CompletedTask;
 }

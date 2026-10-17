@@ -17,12 +17,18 @@ public sealed class RepositorioHogares(MiParteDbContext db) : IRepositorioHogare
         => (await db.Hogares.IgnoreQueryFilters()
                 .Where(h => db.Miembros.IgnoreQueryFilters().Any(m => m.HogarId == h.Id && m.UserId == userId && m.Activo))
                 .OrderBy(h => h.Nombre)
-                .Select(h => new { h.Id, h.Nombre, h.CuentaComunActiva, h.AhorroActivo, h.Tipo, h.RecurrentesActivas, h.LiquidacionModo })
+                .Select(h => new
+                {
+                    h.Id, h.Nombre, h.CuentaComunActiva, h.AhorroActivo, h.Tipo, h.RecurrentesActivas, h.LiquidacionModo,
+                    h.PeriodoDesde, h.PeriodoHasta, h.PeriodoCerradoEn, h.AportacionFrecuencia,
+                })
                 .ToListAsync(ct))
             .Select(h => new Hogar
             {
                 Id = h.Id, Nombre = h.Nombre, CuentaComunActiva = h.CuentaComunActiva, AhorroActivo = h.AhorroActivo, Tipo = h.Tipo,
                 RecurrentesActivas = h.RecurrentesActivas, LiquidacionModo = h.LiquidacionModo,
+                PeriodoDesde = h.PeriodoDesde, PeriodoHasta = h.PeriodoHasta, PeriodoCerradoEn = h.PeriodoCerradoEn,
+                AportacionFrecuencia = h.AportacionFrecuencia,
             })
             .ToList();
 

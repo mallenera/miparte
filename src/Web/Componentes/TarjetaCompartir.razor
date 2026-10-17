@@ -50,9 +50,11 @@
         _texto = ResumenCompartible.Generar(NombreHogar, Mes, Liquidacion, Miembros, PorCiclos);
         // Un aviso de «Texto copiado.» se refiere al texto que había entonces: si el texto cambia (otro mes, otra liquidación), se retira.
         if (_texto != anterior) _aviso = "";
-        var titulo = Uri.EscapeDataString(TituloCorreo);
-        _enlaceWhatsApp = $"https://wa.me/?text={Uri.EscapeDataString(_texto)}";
-        _enlaceCorreo = $"mailto:?subject={titulo}&body={Uri.EscapeDataString(_texto)}";
+        // Los enlaces llevan solo el mensaje genérico: ni importes ni nombres en la URL.
+        var mensaje = Uri.EscapeDataString(ResumenCompartible.MensajeEnlace);
+        var asunto = Uri.EscapeDataString(ResumenCompartible.AsuntoEnlace);
+        _enlaceWhatsApp = $"https://wa.me/?text={mensaje}";
+        _enlaceCorreo = $"mailto:?subject={asunto}&body={mensaje}";
     }
 
     protected override async Task OnAfterRenderAsync(bool primera)

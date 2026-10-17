@@ -30,7 +30,24 @@ public static class CuentaComunEndpoints
         app.MapDelete("/api/cuenta-comun/depositos-ahorro/{id:guid}", BorrarDepositoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.AhorroMovimientos);
         app.MapPost("/api/cuenta-comun/retiradas-ahorro", CrearRetiradaAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.AhorroMovimientos);
         app.MapDelete("/api/cuenta-comun/retiradas-ahorro/{id:guid}", BorrarRetiradaAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.AhorroMovimientos);
+        app.MapPut("/api/hogar/aportaciones", FijarFrecuenciaAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.HogarFunciones);
         return app;
+    }
+
+    /// <summary>
+    /// PUT /api/hogar/aportaciones (permiso <c>hogar.funciones</c>): fija con qué frecuencia aportan los miembros a la cuenta común
+    /// (unica, mensual, bimestral, trimestral, semestral o anual). 400 si la frecuencia no es válida; 403 sin el permiso; 409 sin hogar o si
+    /// con la nueva frecuencia el ahorro ya retirado o gastado dejaría de tener respaldo; 200 con la frecuencia guardada.
+    /// </summary>
+    private static async Task<IResult> FijarFrecuenciaAsync(
+        FijarFrecuenciaAportacionRequest req, [FromServices] ServicioCuentaComun servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
+    {
+        if (hogar.HogarId is null) return ApiComun.SinHogar();
+        if (string.IsNullOrWhiteSpace(req?.Frecuencia) || !TextoFrecuenciaAportacion.TryParse(req.Frecuencia, out var frecuencia))
+            return ApiComun.Invalido("La frecuencia de aportación debe ser unica, mensual, bimestral, trimestral, semestral o anual.");
+
+        var r = await servicio.CambiarFrecuenciaAsync(frecuencia, ct);
+        return r.Error is { } error ? ApiComun.Respuesta(error) : Results.Ok(new FrecuenciaAportacionResponse(TextoFrecuenciaAportacion.ATexto(r.Valor)));
     }
 
     /// <summary>GET /api/cuenta-comun?mes=YYYY-MM: saldo acumulado, ahorro, reembolsos pendientes, aportaciones, y reembolsos y retiradas de ahorro del mes. 409 sin hogar; 400 si el mes es inválido.</summary>

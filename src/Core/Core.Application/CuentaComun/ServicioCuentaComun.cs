@@ -70,6 +70,20 @@ public sealed class ServicioCuentaComun(IRepositorioCuentaComun repositorio, Tim
         return activa;
     }
 
+    /// <summary>
+    /// Cambia con qué frecuencia aportan los miembros. Afecta también a los cobros ya pasados (cada aportación hereda la frecuencia del
+    /// hogar), así que es un conflicto si con la nueva frecuencia el ahorro ya retirado o gastado dejaría de tener respaldo.
+    /// </summary>
+    public async Task<Resultado<FrecuenciaAportacion>> CambiarFrecuenciaAsync(FrecuenciaAportacion frecuencia, CancellationToken ct)
+    {
+        var con = (await repositorio.AportacionesAsync(ct)).Select(a => a with { Frecuencia = frecuencia }).ToList();
+        var falta = await HolguraAsync(con, await repositorio.DepositosAsync(null, ct), ct);
+        if (falta is { } f) return SinRespaldo<FrecuenciaAportacion>("cambiar la frecuencia de las aportaciones", f);
+
+        await repositorio.EstablecerFrecuenciaAsync(frecuencia, ct);
+        return Resultado<FrecuenciaAportacion>.Ok(frecuencia);
+    }
+
     /// <summary>Activa o desactiva el ahorro; exige la cuenta común activada.</summary>
     public async Task<Resultado<bool>> ActivarAhorroAsync(bool activo, CancellationToken ct)
     {
@@ -97,7 +111,7 @@ public sealed class ServicioCuentaComun(IRepositorioCuentaComun repositorio, Tim
         // Rebajar el ahorro no puede dejar sin respaldo lo que ya se retiró o se gastó desde el ahorro.
         var existentes = await repositorio.AportacionesAsync(ct);
         var tras = existentes.Where(x => !(x.MiembroId == a.MiembroId && x.Desde == a.Desde))
-            .Append(new AportacionVigente(a.MiembroId, a.Desde, a.Importe, a.Ahorro)).ToList();
+            .Append(new AportacionVigente(a.MiembroId, a.Desde, a.Importe, a.Ahorro, await repositorio.FrecuenciaAsync(ct))).ToList();
         var falta = await HolguraAsync(tras, await repositorio.DepositosAsync(null, ct), ct);
         if (falta is { } f) return SinRespaldo<AportacionCuenta>("rebajar el ahorro de esta aportación", f);
 

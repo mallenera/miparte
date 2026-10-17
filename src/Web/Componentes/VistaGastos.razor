@@ -6,7 +6,7 @@
 @inject ServicioAvisos Avisos
 @inject ServicioPermisos Permisos
 
-<h1 class="sr">Gastos de @Hogar.HogarActual?.Nombre</h1>
+<h1 class="sr">@(SoloAlta ? $"Nuevo gasto en {Hogar.HogarActual?.Nombre}" : $"Gastos de {Hogar.HogarActual?.Nombre}")</h1>
 
 @if (_m.Cargando)
 {
@@ -22,6 +22,15 @@ else if (_m.ErrorCarga is not null)
 else
 {
     <section class="card" aria-labelledby="t-gastos">
+        @* La pestaña «Nuevo gasto» muestra solo el formulario de alta, sin filtros ni lista. *@
+        @if (SoloAlta)
+        {
+            <div class="card-head">
+                <h2 id="t-gastos">Nuevo gasto</h2>
+            </div>
+        }
+        else
+        {
         <div class="card-head">
             <h2 id="t-gastos">Gastos</h2>
             <div class="modo" role="group" aria-label="Tipo de periodo">
@@ -83,13 +92,14 @@ else
         {
             <p class="muted u-mt10" role="status">Solo lo que paga <b>@(_m.SoloPaga is { } p ? Formato.NombreMiembro(p, _m.Miembros) : "la cuenta común o el ahorro")</b>, no lo que solo asume.</p>
         }
-        @{ var totales = ListaGastos.Totales(_m.Gastos); }
+        var totales = ListaGastos.Totales(_m.Gastos);
         <p class="muted">@(_m.HayFiltros ? "Total filtrado" : _m.ModoRango ? "Total del periodo" : "Total del mes"): <b>@Formato.Euros(totales.TotalHogar)</b> en @totales.CuantosHogar @(totales.CuantosHogar == 1 ? "gasto" : "gastos").
             @if (totales.HayPersonales)
             {
                 <span>Personales (fuera de la liquidación): <b>@Formato.Euros(totales.TotalPersonales)</b>.</span>
             }
         </p>
+        }
 
         @if (!_m.ModoRango && _m.MesCerrado)
         {
@@ -111,6 +121,8 @@ else
 
         @* Con un gasto en edición el formulario sube sobre la lista (order en CSS): en un periodo largo no hay que bajar hasta el final. *@
         <div class="gastos-cuerpo">
+        @if (!SoloAlta)
+        {
         <div class="u-mt10">
             @foreach (var g in _m.Gastos)
             {
@@ -168,6 +180,7 @@ else
                 <div class="empty">@(_m.HayFiltros ? $"Ningún gasto de {(_m.ModoRango ? "este periodo" : "este mes")} coincide con los filtros." : _m.ModoRango ? "No hay gastos entre estas fechas." : "No hay gastos en este mes. Añade el primero abajo.")</div>
             }
         </div>
+        }
 
         @if (_m.Adultos.Count == 0 || _m.Categorias.Count == 0 || _m.Perfiles.Count == 0)
         {
@@ -180,7 +193,10 @@ else
         else
         {
             <form class="addcat @(_m.Editando is not null ? "editando" : "")" @onsubmit="GuardarAsync">
-                <h3 class="u-titulo-form">@(_m.Editando is null ? "Nuevo gasto" : "Editar gasto")</h3>
+                @if (!SoloAlta)
+                {
+                    <h3 class="u-titulo-form">@(_m.Editando is null ? "Nuevo gasto" : "Editar gasto")</h3>
+                }
                 <label>Fecha
                     <input type="date" required @bind="_m.Fecha" @ref="_campoFecha" />
                 </label>
@@ -270,6 +286,9 @@ else
 
     /// <summary>Último día del periodo con el que se abre la lista.</summary>
     [Parameter] public DateOnly? HastaInicial { get; set; }
+
+    /// <summary>Muestra solo el formulario de alta (pestaña «Nuevo gasto»), sin la lista del mes ni sus filtros.</summary>
+    [Parameter] public bool SoloAlta { get; set; }
 
     private string NombreMes => _m.Mes.ToString("MMMM yyyy", Es);
 

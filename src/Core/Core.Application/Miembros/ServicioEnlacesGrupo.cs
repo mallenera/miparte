@@ -89,12 +89,12 @@ public sealed class ServicioEnlacesGrupo(IRepositorioEnlacesGrupo enlaces, IRepo
     }
 
     /// <summary>
-    /// Une al usuario (sin hogar actual) al hogar del enlace: como miembro nuevo con <paramref name="nombreNuevo"/>, o vinculado a
-    /// <paramref name="miembroId"/> si es un adulto existente sin cuenta. No requiere permiso, pero el enlace debe estar activo y sin
-    /// caducar. Cada unión cuenta en <c>usos</c>; el enlace sirve para más personas. 400 sin token o sin nombre; 404 token desconocido o
-    /// miembro ajeno; 409 revocado, caducado, usuario ya en el hogar o miembro no disponible.
+    /// Une al usuario (sin hogar actual) al hogar del enlace como miembro nuevo con <paramref name="nombreNuevo"/>. No requiere permiso,
+    /// pero el enlace debe estar activo y sin caducar. Cada unión cuenta en <c>usos</c>; el enlace sirve para más personas. Nunca
+    /// vincula un miembro existente: eso solo se hace por invitación. 400 sin token o sin nombre; 404 token desconocido; 409 revocado,
+    /// caducado o usuario ya en el hogar.
     /// </summary>
-    public async Task<Resultado<Hogar>> UnirseAsync(Guid userId, string? token, string? nombreNuevo, Guid? miembroId, CancellationToken ct)
+    public async Task<Resultado<Hogar>> UnirseAsync(Guid userId, string? token, string? nombreNuevo, CancellationToken ct)
     {
         token = token?.Trim();
         if (string.IsNullOrEmpty(token)) return Resultado<Hogar>.Invalido("El token es obligatorio.");
@@ -111,37 +111,18 @@ public sealed class ServicioEnlacesGrupo(IRepositorioEnlacesGrupo enlaces, IRepo
         // Un usuario no puede figurar dos veces en el mismo hogar (activo o no).
         if (await miembros.UsuarioEnHogarAsync(enlace.HogarId, userId, ct)) return Resultado<Hogar>.Conflicto("Ya perteneces a este hogar.");
 
-        Miembro? nuevo = null;
-        Guid? vincular = null;
-        if (miembroId is { } existente)
+        var nombre = nombreNuevo?.Trim();
+        if (string.IsNullOrEmpty(nombre)) return Resultado<Hogar>.Invalido("Hay que indicar un nombre para unirse al hogar.");
+        if (nombre.Length > ReglasMiembros.MaxLongitudNombre)
+            return Resultado<Hogar>.Invalido($"El nombre admite como máximo {ReglasMiembros.MaxLongitudNombre} caracteres.");
+        var nuevo = new Miembro
         {
-            var m = await miembros.MiembroDeHogarAsync(enlace.HogarId, existente, ct);
-            if (m is null) return Resultado<Hogar>.NoEncontrado("El miembro no existe en este hogar.");
-            if (!m.Activo) return Resultado<Hogar>.Conflicto("El miembro está desactivado.");
-            if (m.UserId is not null) return Resultado<Hogar>.Conflicto("El miembro ya está vinculado a un usuario.");
-            if (m.Tipo != TipoMiembro.Adulto) return Resultado<Hogar>.Conflicto("Solo un adulto puede vincularse con su propia cuenta.");
-            vincular = m.Id;
-        }
-        else
-        {
-            var nombre = nombreNuevo?.Trim();
-            if (string.IsNullOrEmpty(nombre)) return Resultado<Hogar>.Invalido("Hay que indicar un nombre para unirse al hogar.");
-            if (nombre.Length > ReglasMiembros.MaxLongitudNombre)
-                return Resultado<Hogar>.Invalido($"El nombre admite como máximo {ReglasMiembros.MaxLongitudNombre} caracteres.");
-            nuevo = new Miembro
-            {
-                Id = Guid.NewGuid(), HogarId = enlace.HogarId, Nombre = nombre, Tipo = TipoMiembro.Adulto,
-                UserId = userId, Rol = RolMiembro.Miembro,
-            };
-        }
+            Id = Guid.NewGuid(), HogarId = enlace.HogarId, Nombre = nombre, Tipo = TipoMiembro.Adulto,
+            UserId = userId, Rol = RolMiembro.Miembro,
+        };
 
-        switch (await enlaces.UsarAsync(enlace, userId, nuevo, vincular, ahora, ct))
-        {
-            case ResultadoUsoEnlace.EnlaceNoDisponible:
-                return Resultado<Hogar>.Conflicto("El enlace de grupo ha dejado de estar disponible.");
-            case ResultadoUsoEnlace.MiembroNoDisponible:
-                return Resultado<Hogar>.Conflicto("El miembro ya no está disponible o ya está vinculado a un usuario.");
-        }
+        if (await enlaces.UsarAsync(enlace, userId, nuevo, ahora, ct) == ResultadoUsoEnlace.EnlaceNoDisponible)
+            return Resultado<Hogar>.Conflicto("El enlace de grupo ha dejado de estar disponible.");
 
         return Resultado<Hogar>.Ok(await miembros.HogarAsync(enlace.HogarId, ct));
     }

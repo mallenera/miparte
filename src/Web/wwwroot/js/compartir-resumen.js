@@ -25,13 +25,14 @@ window.compartirResumen = {
         return false;
     },
 
-    // Devuelve false si la persona cierra la hoja de compartir o el navegador no deja compartir.
+    // Devuelve false si la persona cierra la hoja de compartir. Cualquier otro error se relanza para que el componente lo muestre.
     compartir: async function (titulo, texto) {
         try {
             await navigator.share({ title: titulo, text: texto });
             return true;
         } catch (e) {
-            return false;
+            if (e && e.name === 'AbortError') return false;
+            throw e;
         }
     }
 };

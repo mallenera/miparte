@@ -1,3 +1,5 @@
+using System.Text.Json;
+using MiParte.Contracts;
 using MiParte.Core.Application;
 using MiParte.Core.Application.Miembros;
 using MiParte.Core.Domain;
@@ -154,7 +156,7 @@ public class ServicioEnlacesGrupoTests
     {
         var enlace = AnadirEnlace("tok");
 
-        var r = await Servicio.UnirseAsync(_userNuevo, "tok", "  Laura ", null, default);
+        var r = await Servicio.UnirseAsync(_userNuevo, "tok", "  Laura ", default);
 
         Assert.Null(r.Error);
         Assert.Equal(HogarPrueba, r.Valor!.Id);
@@ -171,8 +173,8 @@ public class ServicioEnlacesGrupoTests
         var enlace = AnadirEnlace("tok");
         var otro = Guid.NewGuid();
 
-        var primera = await Servicio.UnirseAsync(_userNuevo, "tok", "Laura", null, default);
-        var segunda = await Servicio.UnirseAsync(otro, "tok", "Iván", null, default);
+        var primera = await Servicio.UnirseAsync(_userNuevo, "tok", "Laura", default);
+        var segunda = await Servicio.UnirseAsync(otro, "tok", "Iván", default);
 
         Assert.Null(primera.Error);
         Assert.Null(segunda.Error);
@@ -185,7 +187,7 @@ public class ServicioEnlacesGrupoTests
     {
         AnadirEnlace("tok", activo: false);
 
-        var r = await Servicio.UnirseAsync(_userNuevo, "tok", "Laura", null, default);
+        var r = await Servicio.UnirseAsync(_userNuevo, "tok", "Laura", default);
 
         Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
         Assert.DoesNotContain(_miembros.Miembros, m => m.UserId == _userNuevo);
@@ -197,7 +199,7 @@ public class ServicioEnlacesGrupoTests
         AnadirEnlace("tok", caduca: Inicio.AddHours(1));
         _reloj.Avanzar(TimeSpan.FromHours(2));
 
-        var r = await Servicio.UnirseAsync(_userNuevo, "tok", "Laura", null, default);
+        var r = await Servicio.UnirseAsync(_userNuevo, "tok", "Laura", default);
 
         Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
     }
@@ -208,7 +210,7 @@ public class ServicioEnlacesGrupoTests
         AnadirEnlace("tok", caduca: null);
         _reloj.Avanzar(TimeSpan.FromDays(3650));
 
-        var r = await Servicio.UnirseAsync(_userNuevo, "tok", "Laura", null, default);
+        var r = await Servicio.UnirseAsync(_userNuevo, "tok", "Laura", default);
 
         Assert.Null(r.Error);
     }
@@ -216,7 +218,7 @@ public class ServicioEnlacesGrupoTests
     [Fact]
     public async Task Unirse_TokenDesconocido_EsNoEncontrado()
     {
-        var r = await Servicio.UnirseAsync(_userNuevo, "no-existe", "Laura", null, default);
+        var r = await Servicio.UnirseAsync(_userNuevo, "no-existe", "Laura", default);
 
         Assert.Equal(TipoError.NoEncontrado, r.Error!.Tipo);
     }
@@ -224,7 +226,7 @@ public class ServicioEnlacesGrupoTests
     [Fact]
     public async Task Unirse_TokenVacio_EsInvalido()
     {
-        var r = await Servicio.UnirseAsync(_userNuevo, "   ", "Laura", null, default);
+        var r = await Servicio.UnirseAsync(_userNuevo, "   ", "Laura", default);
 
         Assert.Equal(TipoError.Invalido, r.Error!.Tipo);
     }
@@ -234,7 +236,7 @@ public class ServicioEnlacesGrupoTests
     {
         AnadirEnlace("tok");
 
-        var r = await Servicio.UnirseAsync(_userNuevo, "tok", "  ", null, default);
+        var r = await Servicio.UnirseAsync(_userNuevo, "tok", "  ", default);
 
         Assert.Equal(TipoError.Invalido, r.Error!.Tipo);
     }
@@ -244,55 +246,26 @@ public class ServicioEnlacesGrupoTests
     {
         AnadirEnlace("tok");
 
-        var r = await Servicio.UnirseAsync(_userAdmin, "tok", "Ana otra vez", null, default);
+        var r = await Servicio.UnirseAsync(_userAdmin, "tok", "Ana otra vez", default);
 
         Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
     }
 
     [Fact]
-    public async Task Unirse_VinculaUnAdultoExistenteSinCuentaEnVezDeCrearOtro()
+    public async Task Unirse_ConMiembroIdEnLaPeticion_SeIgnoraYCreaUnMiembroNuevo()
     {
-        var enlace = AnadirEnlace("tok");
+        // Un cliente malicioso envía el id de un adulto sin cuenta: el enlace no puede vincularlo a su propia cuenta.
+        AnadirEnlace("tok");
         var antes = _miembros.Miembros.Count;
+        var cuerpo = $"{{\"token\":\"tok\",\"nombre\":\"Laura\",\"miembroId\":\"{_sinCuenta.Id}\"}}";
+        var peticion = JsonSerializer.Deserialize<UnirseEnlaceGrupoRequest>(cuerpo, new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
 
-        var r = await Servicio.UnirseAsync(_userNuevo, "tok", null, _sinCuenta.Id, default);
+        var r = await Servicio.UnirseAsync(_userNuevo, peticion.Token, peticion.Nombre, default);
 
         Assert.Null(r.Error);
-        Assert.Equal(_userNuevo, _sinCuenta.UserId);
-        Assert.Equal(antes, _miembros.Miembros.Count);
-        Assert.Equal(1, enlace.Usos);
-    }
-
-    [Fact]
-    public async Task Unirse_MiembroYaVinculadoAOtroUsuario_EsConflicto()
-    {
-        AnadirEnlace("tok");
-
-        var r = await Servicio.UnirseAsync(_userNuevo, "tok", null, _sinPermiso.Id, default);
-
-        Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
-        Assert.Equal(_userSinPermiso, _sinPermiso.UserId);
-    }
-
-    [Fact]
-    public async Task Unirse_MiembroAClargo_EsConflictoPorqueNoTieneCuenta()
-    {
-        AnadirEnlace("tok");
-
-        var r = await Servicio.UnirseAsync(_userNuevo, "tok", null, _aCargo.Id, default);
-
-        Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
-        Assert.Null(_aCargo.UserId);
-    }
-
-    [Fact]
-    public async Task Unirse_MiembroDeOtroHogar_EsNoEncontrado()
-    {
-        AnadirEnlace("tok");
-
-        var r = await Servicio.UnirseAsync(_userNuevo, "tok", null, Guid.NewGuid(), default);
-
-        Assert.Equal(TipoError.NoEncontrado, r.Error!.Tipo);
+        Assert.Null(_sinCuenta.UserId);
+        Assert.Equal(antes + 1, _miembros.Miembros.Count);
+        Assert.Contains(_miembros.Miembros, m => m.UserId == _userNuevo && m.Nombre == "Laura" && m.Id != _sinCuenta.Id);
     }
 
     [Fact]
@@ -301,7 +274,7 @@ public class ServicioEnlacesGrupoTests
         AnadirEnlace("tok");
         _enlaces.ResultadoUso = ResultadoUsoEnlace.EnlaceNoDisponible;
 
-        var r = await Servicio.UnirseAsync(_userNuevo, "tok", "Laura", null, default);
+        var r = await Servicio.UnirseAsync(_userNuevo, "tok", "Laura", default);
 
         Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
     }
@@ -343,13 +316,11 @@ public class ServicioEnlacesGrupoTests
         public Task<EnlaceGrupo?> PorHashAsync(string hash, CancellationToken ct)
             => Task.FromResult(Enlaces.FirstOrDefault(e => e.TokenHash == hash));
 
-        public Task<ResultadoUsoEnlace> UsarAsync(
-            EnlaceGrupo enlace, Guid userId, Miembro? nuevo, Guid? miembroVinculado, DateTimeOffset ahora, CancellationToken ct)
+        public Task<ResultadoUsoEnlace> UsarAsync(EnlaceGrupo enlace, Guid userId, Miembro nuevo, DateTimeOffset ahora, CancellationToken ct)
         {
             if (ResultadoUso != ResultadoUsoEnlace.Usado) return Task.FromResult(ResultadoUso);
             enlace.Usos++;
-            if (miembroVinculado is { } destino) miembros.Miembros.First(m => m.Id == destino).UserId = userId;
-            if (nuevo is not null) miembros.Miembros.Add(nuevo);
+            miembros.Miembros.Add(nuevo);
             return Task.FromResult(ResultadoUsoEnlace.Usado);
         }
     }

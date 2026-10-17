@@ -92,7 +92,7 @@ Permisos: "miembro" = cualquier miembro activo del hogar (incluye admin). "admin
 | `GET /api/enlaces-grupo` | Lista los enlaces de grupo del hogar (activos, revocados y caducados), sin token | - | `EnlaceGrupoDto[]` 200 | 403 sin el permiso; 409 sin hogar | permiso `enlaces.gestionar` |
 | `POST /api/enlaces-grupo` | Crea un enlace reutilizable. `caducaEn` opcional (sin él, no caduca). El token en claro solo se devuelve aquí | `CrearEnlaceGrupoRequest` (cuerpo opcional) | `EnlaceGrupoCreado` 201 | 400 `caducaEn` ya pasada; 403 sin el permiso; 409 sin hogar | permiso `enlaces.gestionar` |
 | `DELETE /api/enlaces-grupo/{id}` | Revoca el enlace: deja de admitir uniones, pero se conserva (`activo` = false). Revocar uno ya revocado no hace nada | - | 204 | 403 sin el permiso; 404 no es de este hogar; 409 sin hogar | permiso `enlaces.gestionar` |
-| `POST /api/enlaces-grupo/unirse` | Une al usuario al hogar del enlace (SinHogarActual). Con `nombre` entra como adulto nuevo; con `miembroId` se vincula a un adulto existente sin cuenta | `UnirseEnlaceGrupoRequest` | `HogarResumen` 200 | 400 token vacío o nombre obligatorio (máx. 100); 404 token no válido o miembro de otro hogar; 409 enlace revocado o caducado, ya perteneces al hogar, miembro desactivado, a cargo o ya vinculado | autenticado (sin permiso especial) |
+| `POST /api/enlaces-grupo/unirse` | Une al usuario al hogar del enlace (SinHogarActual) como adulto nuevo con `nombre`. No vincula miembros existentes (un `miembroId` en el cuerpo se ignora) | `UnirseEnlaceGrupoRequest` | `HogarResumen` 200 | 400 token vacío o nombre obligatorio (máx. 100); 404 token no válido; 409 enlace revocado o caducado, o ya perteneces al hogar | autenticado (sin permiso especial) |
 
 ### 3.3 Categorías
 
@@ -289,7 +289,7 @@ Un enlace de grupo es un **enlace reutilizable** para grupos de viaje o evento: 
 [{ "id": "d0000000-0000-4000-8000-000000000001", "creadoPor": "b0000000-0000-4000-8000-0000000000aa", "creadoEn": "2026-10-17T10:00:00+00:00", "caducaEn": null, "usos": 3, "estado": "activo" }]
 ```
 
-`POST /api/enlaces-grupo/unirse` (sin hogar actual; `nombre` salvo que se indique `miembroId`):
+`POST /api/enlaces-grupo/unirse` (sin hogar actual; `nombre` obligatorio):
 
 ```json
 { "token": "c2Vn...base64url...", "nombre": "Marta" }
@@ -298,7 +298,7 @@ Un enlace de grupo es un **enlace reutilizable** para grupos de viaje o evento: 
 { "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez" }
 ```
 
-Reglas: un enlace **revocado** o **caducado** no admite uniones (409, con `revocado` por encima de `caducado` si se dan los dos). Un usuario ya presente en el hogar recibe 409 aunque el enlace siga activo. Cada unión incrementa `usos` y no consume el enlace. Con `miembroId` se vincula el usuario a un **adulto existente sin cuenta** del hogar (sin crear otro miembro). Unirse no exige permiso, pero el enlace debe ser del hogar que se elige. Revocar y listar exigen el permiso `enlaces.gestionar`; las altas, revocaciones y uniones quedan en la auditoría como `enlace_grupo` (sin token ni hash). Unirse y revocar invalidan la caché de acceso como las invitaciones. Ninguna de estas operaciones puede dejar al hogar sin administrador: solo añaden miembros vinculados o los dejan intactos.
+Reglas: un enlace **revocado** o **caducado** no admite uniones (409, con `revocado` por encima de `caducado` si se dan los dos). Un usuario ya presente en el hogar recibe 409 aunque el enlace siga activo. Cada unión incrementa `usos` y no consume el enlace. Con `miembroId` se vincula el usuario a un **adulto existente sin cuenta** del hogar (sin crear otro miembro). Unirse no exige permiso, pero el enlace debe ser del hogar que se elige. Unirse siempre da de alta un miembro nuevo con el `nombre` indicado: el enlace nunca vincula un adulto existente sin cuenta, eso solo se hace por invitación con `miembroId` (`miembros.gestionar`). Crear, revocar y listar exigen el permiso `enlaces.gestionar`; crear y revocar quedan auditados como `enlace_grupo` con el id del enlace (sin token ni hash), y las uniones también quedan registradas como `enlace_grupo`. Unirse y revocar invalidan la caché de acceso como las invitaciones. Ninguna de estas operaciones puede dejar al hogar sin administrador: solo añaden miembros nuevos o dejan los existentes intactos.
 
 ### Categorías
 

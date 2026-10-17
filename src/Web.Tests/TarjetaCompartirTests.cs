@@ -16,11 +16,14 @@ public class TarjetaCompartirTests : BunitContext
         [new TransferenciaDto(_luis, _ana, 42.5m)],
         []);
 
-    private IRenderedComponent<TarjetaCompartir> Renderizar(bool puedeCompartir, bool copiadoOk = true)
+    private IRenderedComponent<TarjetaCompartir> Renderizar(
+        bool puedeCompartir, bool copiadoOk = true, bool compartidoOk = true, JSException? errorCompartir = null)
     {
         JSInterop.Setup<bool>("compartirResumen.puedeCompartir", _ => true).SetResult(puedeCompartir);
         JSInterop.Setup<bool>("compartirResumen.copiar", _ => true).SetResult(copiadoOk);
-        JSInterop.Setup<bool>("compartirResumen.compartir", _ => true).SetResult(true);
+        var compartir = JSInterop.Setup<bool>("compartirResumen.compartir", _ => true);
+        if (errorCompartir is null) compartir.SetResult(compartidoOk);
+        else compartir.SetException(errorCompartir);
         return Render<TarjetaCompartir>(p => p
             .Add(c => c.NombreHogar, "Piso")
             .Add(c => c.Mes, Octubre)
@@ -72,6 +75,32 @@ public class TarjetaCompartirTests : BunitContext
         Boton(cut, "Copiar texto").Click();
 
         cut.WaitForAssertion(() => Assert.Contains("No se pudo copiar", cut.Find("[role=status]").TextContent));
+    }
+
+    [Fact]
+    public void Si_la_persona_cancela_compartir_no_cambia_el_aviso_previo()
+    {
+        var cut = Renderizar(puedeCompartir: true, copiadoOk: true, compartidoOk: false);
+        Boton(cut, "Copiar texto").Click();
+        cut.WaitForAssertion(() => Assert.Contains("Texto copiado", cut.Find("[role=status]").TextContent));
+
+        Boton(cut, "Compartir").Click();
+
+        cut.WaitForAssertion(() => Assert.Single(JSInterop.Invocations["compartirResumen.compartir"]));
+        var aviso = cut.Find("[role=status]").TextContent;
+        Assert.Contains("Texto copiado", aviso);
+        Assert.DoesNotContain("Resumen enviado", aviso);
+        Assert.DoesNotContain("No se pudo compartir", aviso);
+    }
+
+    [Fact]
+    public void Si_el_navegador_falla_al_compartir_avisa_de_copiar_el_texto_sin_romper_la_pagina()
+    {
+        var cut = Renderizar(puedeCompartir: true, errorCompartir: new JSException("NotAllowedError"));
+
+        Boton(cut, "Compartir").Click();
+
+        cut.WaitForAssertion(() => Assert.Contains("No se pudo compartir. Copia el texto.", cut.Find("[role=status]").TextContent));
     }
 
     [Fact]

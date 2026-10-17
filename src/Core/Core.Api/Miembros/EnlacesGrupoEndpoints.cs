@@ -78,15 +78,15 @@ public static class EnlacesGrupoEndpoints
     }
 
     /// <summary>
-    /// POST /api/enlaces-grupo/unirse (sin hogar actual): une al usuario al hogar del enlace como miembro nuevo con <c>nombre</c>, o
-    /// vinculado a un adulto existente sin cuenta con <c>miembroId</c>. 400 sin token o sin nombre; 404 token desconocido o miembro
-    /// ajeno; 409 enlace revocado o caducado, usuario ya en el hogar o miembro no disponible. Devuelve el hogar.
+    /// POST /api/enlaces-grupo/unirse (sin hogar actual): une al usuario al hogar del enlace como miembro nuevo con <c>nombre</c>.
+    /// Un campo <c>miembroId</c> se ignora: vincular un adulto existente solo se hace por invitación. 400 sin token o sin nombre;
+    /// 404 token desconocido; 409 enlace revocado o caducado, o usuario ya en el hogar. Devuelve el hogar.
     /// </summary>
     private static async Task<IResult> UnirseAsync(
         UnirseEnlaceGrupoRequest req, HttpContext ctx, [FromServices] ServicioEnlacesGrupo servicio, CancellationToken ct)
     {
         if (!MiembrosEndpoints.TryUsuario(ctx, out var userId)) return Results.Unauthorized();
-        var r = await servicio.UnirseAsync(userId, req.Token, req.Nombre, req.MiembroId, ct);
+        var r = await servicio.UnirseAsync(userId, req.Token, req.Nombre, ct);
         if (r.Error is { } error) return MiembrosEndpoints.Error(error);
         var h = r.Valor!;
         return Results.Ok(h.ADto());

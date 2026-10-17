@@ -10,9 +10,6 @@ public enum ResultadoUsoEnlace
 
     /// <summary>Otra petición se adelantó: el enlace se revocó o caducó mientras tanto.</summary>
     EnlaceNoDisponible,
-
-    /// <summary>Otra petición se adelantó: el miembro elegido ya está vinculado o desactivado.</summary>
-    MiembroNoDisponible,
 }
 
 /// <summary>
@@ -37,9 +34,8 @@ public interface IRepositorioEnlacesGrupo
     Task<EnlaceGrupo?> PorHashAsync(string hash, CancellationToken ct);
 
     /// <summary>
-    /// Cuenta una unión con el enlace y vincula al usuario a <paramref name="miembroVinculado"/> o da de alta <paramref name="nuevo"/>,
-    /// de forma atómica y con rastro en la auditoría. Si otra petición se adelantó no cambia nada y lo indica.
+    /// Cuenta una unión con el enlace y da de alta <paramref name="nuevo"/>, de forma atómica y con rastro en la auditoría. Si otra
+    /// petición se adelantó (enlace revocado o caducado) no cambia nada y lo indica.
     /// </summary>
-    Task<ResultadoUsoEnlace> UsarAsync(
-        EnlaceGrupo enlace, Guid userId, Miembro? nuevo, Guid? miembroVinculado, DateTimeOffset ahora, CancellationToken ct);
+    Task<ResultadoUsoEnlace> UsarAsync(EnlaceGrupo enlace, Guid userId, Miembro nuevo, DateTimeOffset ahora, CancellationToken ct);
 }

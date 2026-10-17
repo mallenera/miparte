@@ -188,7 +188,7 @@ public static class RegistroAuditoria
 
     private static Guid IdDe(object entidad) => entidad switch
     {
-        Hogar x => x.Id, Miembro x => x.Id, InvitacionHogar x => x.Id, Gasto x => x.Id, GastoRecurrente x => x.Id,
+        Hogar x => x.Id, Miembro x => x.Id, InvitacionHogar x => x.Id, EnlaceGrupo x => x.Id, Gasto x => x.Id, GastoRecurrente x => x.Id,
         PagoLiquidacionRegistro x => x.Id, AportacionCuenta x => x.Id, ReembolsoCuenta x => x.Id,
         RetiradaAhorro x => x.Id, DepositoAhorro x => x.Id, MesCerrado x => x.Id, PerfilReparto x => x.Id, Categoria x => x.Id, _ => Guid.Empty,
     };

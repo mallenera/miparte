@@ -65,7 +65,17 @@
 
     private async Task CopiarAsync()
     {
-        var copiado = await JS.InvokeAsync<bool>("compartirResumen.copiar", IdArea, _texto);
+        // Si el propio JS falla (p. ej. el módulo no carga), se trata como una copia que no ha funcionado: se pide copiar a mano.
+        bool copiado;
+        try
+        {
+            copiado = await JS.InvokeAsync<bool>("compartirResumen.copiar", IdArea, _texto);
+        }
+        catch (JSException)
+        {
+            copiado = false;
+        }
+
         _aviso = copiado
             ? "Texto copiado."
             : "No se pudo copiar automáticamente. El texto está seleccionado: cópialo con Ctrl+C o con una pulsación larga.";
@@ -73,8 +83,15 @@
 
     private async Task CompartirAsync()
     {
-        // Si la persona cierra la hoja de compartir no hay nada que decir.
-        if (await JS.InvokeAsync<bool>("compartirResumen.compartir", TituloCorreo, _texto))
-            _aviso = "Resumen enviado.";
+        try
+        {
+            // Si la persona cierra la hoja de compartir no hay nada que decir: el aviso anterior se queda como está.
+            if (await JS.InvokeAsync<bool>("compartirResumen.compartir", TituloCorreo, _texto))
+                _aviso = "Resumen enviado.";
+        }
+        catch (JSException)
+        {
+            _aviso = "No se pudo compartir. Copia el texto.";
+        }
     }
 }

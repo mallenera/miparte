@@ -22,10 +22,9 @@ public record EnlaceGrupoCreado(Guid Id, string Token, DateTimeOffset? CaducaEn)
 public record EnlaceGrupoDto(Guid Id, Guid CreadoPor, DateTimeOffset CreadoEn, DateTimeOffset? CaducaEn, int Usos, string Estado);
 
 /// <summary>
-/// Unión a un grupo con un enlace. <paramref name="Nombre"/> es obligatorio salvo que se indique <paramref name="MiembroId"/>, un adulto
-/// existente sin cuenta al que se vincula quien se une.
+/// Unión a un grupo con un enlace. Crea un miembro nuevo con <paramref name="Nombre"/>, que es obligatorio. Vincular un adulto
+/// existente sin cuenta no se hace desde el enlace, sino por invitación nominal.
 /// </summary>
 /// <param name="Token">Token en claro del enlace.</param>
-/// <param name="Nombre">Nombre del nuevo miembro, si no se vincula a uno existente.</param>
-/// <param name="MiembroId">Adulto existente sin cuenta al que vincularse, en lugar de crear uno nuevo.</param>
-public record UnirseEnlaceGrupoRequest(string Token, string? Nombre = null, Guid? MiembroId = null);
+/// <param name="Nombre">Nombre del nuevo miembro que se da de alta al unirse.</param>
+public record UnirseEnlaceGrupoRequest(string Token, string? Nombre = null);

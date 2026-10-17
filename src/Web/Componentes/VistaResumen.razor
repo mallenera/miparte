@@ -130,6 +130,8 @@ else if (_m.Resumen is not null && _m.Liquidacion is not null)
         }
     </section>
 
+    <TarjetaCompartir NombreHogar="@(Hogar.HogarActual?.Nombre ?? "")" Mes="@_m.Mes" Liquidacion="@_m.Liquidacion" Miembros="@_m.Miembros" />
+
     @if (_m.Resumen.CuentaComun is { } cuenta)
     {
         <section class="card" aria-labelledby="t-cuenta-resumen">

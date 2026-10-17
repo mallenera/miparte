@@ -15,6 +15,12 @@ public class ComponentesTests : BunitContext
 
     private ServicioPermisos _permisos = null!;
 
+    public ComponentesTests()
+    {
+        // La tarjeta de compartir pregunta al navegador por Web Share: en estas pruebas basta con que no haya JS configurado.
+        JSInterop.Mode = Bunit.JSRuntimeMode.Loose;
+    }
+
     private void Registrar(ApiFalsa api, HogarResumen? hogarActual = null)
     {
         var cliente = new CoreApiClient(new HttpClient(api) { BaseAddress = new Uri("http://localhost:5001/") });

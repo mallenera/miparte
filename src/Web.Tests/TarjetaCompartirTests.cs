@@ -1,0 +1,87 @@
+using Bunit;
+using Microsoft.JSInterop;
+using MiParte.Contracts;
+using MiParte.Web.Componentes;
+
+namespace MiParte.Web.Tests;
+
+/// <summary>Tarjeta «Compartir el resumen»: botones según el navegador y acciones contra el JS de compartir.</summary>
+public class TarjetaCompartirTests : BunitContext
+{
+    private static readonly DateOnly Octubre = new(2026, 10, 15);
+    private readonly Guid _ana = Guid.NewGuid(), _luis = Guid.NewGuid();
+
+    private LiquidacionResponse ConTransferencia() => new("2026-10",
+        [new SaldoMiembroDto(_ana, "Ana", 42.5m), new SaldoMiembroDto(_luis, "Luis", -42.5m)],
+        [new TransferenciaDto(_luis, _ana, 42.5m)],
+        []);
+
+    private IRenderedComponent<TarjetaCompartir> Renderizar(bool puedeCompartir, bool copiadoOk = true)
+    {
+        JSInterop.Setup<bool>("compartirResumen.puedeCompartir", _ => true).SetResult(puedeCompartir);
+        JSInterop.Setup<bool>("compartirResumen.copiar", _ => true).SetResult(copiadoOk);
+        JSInterop.Setup<bool>("compartirResumen.compartir", _ => true).SetResult(true);
+        return Render<TarjetaCompartir>(p => p
+            .Add(c => c.NombreHogar, "Piso")
+            .Add(c => c.Mes, Octubre)
+            .Add(c => c.Liquidacion, ConTransferencia())
+            .Add(c => c.Miembros, new List<MiembroDto> { ApiFalsa.Miembro("Ana", id: _ana), ApiFalsa.Miembro("Luis", id: _luis) }));
+    }
+
+    private static AngleSharp.Dom.IElement Boton(IRenderedComponent<TarjetaCompartir> cut, string texto) =>
+        cut.FindAll("button").Single(b => b.TextContent.Trim() == texto);
+
+    [Fact]
+    public void Muestra_el_boton_compartir_solo_si_el_navegador_puede_compartir()
+    {
+        var con = Renderizar(puedeCompartir: true);
+        Assert.Contains("Compartir", con.FindAll("button").Select(b => b.TextContent.Trim()));
+
+        var sin = Renderizar(puedeCompartir: false);
+        Assert.DoesNotContain("Compartir", sin.FindAll("button").Select(b => b.TextContent.Trim()));
+        Assert.Contains("Copiar texto", sin.Markup);
+    }
+
+    [Fact]
+    public void El_texto_del_resumen_se_muestra_en_el_area_seleccionable()
+    {
+        var cut = Renderizar(puedeCompartir: false);
+
+        var area = cut.Find("textarea");
+        Assert.Equal("Resumen de Piso · octubre 2026\n\nLuis debe a Ana 42,50 €", area.GetAttribute("value") ?? area.TextContent);
+        Assert.NotNull(area.GetAttribute("readonly"));
+    }
+
+    [Fact]
+    public void Copiar_envia_el_texto_al_js_y_confirma_si_funciona()
+    {
+        var cut = Renderizar(puedeCompartir: false, copiadoOk: true);
+
+        Boton(cut, "Copiar texto").Click();
+
+        var llamada = JSInterop.Invocations["compartirResumen.copiar"].Single();
+        Assert.Equal("Resumen de Piso · octubre 2026\n\nLuis debe a Ana 42,50 €", llamada.Arguments[1]);
+        cut.WaitForAssertion(() => Assert.Contains("Texto copiado", cut.Find("[role=status]").TextContent));
+    }
+
+    [Fact]
+    public void Si_el_portapapeles_falla_avisa_de_copiar_a_mano()
+    {
+        var cut = Renderizar(puedeCompartir: false, copiadoOk: false);
+
+        Boton(cut, "Copiar texto").Click();
+
+        cut.WaitForAssertion(() => Assert.Contains("No se pudo copiar", cut.Find("[role=status]").TextContent));
+    }
+
+    [Fact]
+    public void Los_enlaces_de_whatsapp_y_correo_llevan_el_texto_y_se_ven_junto_a_el()
+    {
+        var cut = Renderizar(puedeCompartir: false);
+
+        var whatsapp = cut.Find("a[href^='https://wa.me/']");
+        Assert.Contains("Luis%20debe%20a%20Ana", whatsapp.GetAttribute("href"));
+        Assert.StartsWith("mailto:?subject=", cut.Find("a[href^='mailto:']").GetAttribute("href"));
+        Assert.NotNull(cut.Find("textarea"));
+    }
+}

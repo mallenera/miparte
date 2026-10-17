@@ -63,7 +63,7 @@ public sealed class RepositorioEnlacesGrupo(MiParteDbContext db) : IRepositorioE
         {
             await db.SaveChangesAsync(ct);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException { SqlState: "23505" })
+        catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException { SqlState: "23505", ConstraintName: "miembro_hogar_id_user_id_key" })
         {
             // Otra unión del mismo usuario se confirmó antes (miembro_hogar_id_user_id_key). Sin COMMIT la transacción se
             // deshace entera: el uso contado arriba tampoco queda y la auditoría no se escribe.

@@ -13,6 +13,11 @@ begin
     elsif tg_op = 'INSERT' then
         perform public.exigir_mes_abierto(new.hogar_id, array[new.fecha]);
     else
+        -- Reasignar la categoría o el perfil (al borrar una de ellas en uso) no toca importes ni liquidación, solo la estadística:
+        -- se permite aunque el mes esté cerrado.
+        if (to_jsonb(new) - 'categoria_id' - 'perfil_reparto_id') = (to_jsonb(old) - 'categoria_id' - 'perfil_reparto_id') then
+            return new;
+        end if;
         perform public.exigir_mes_abierto(new.hogar_id, array[old.fecha, new.fecha]);
     end if;
     return new;

@@ -131,6 +131,21 @@ public class ServidorDemoTests
         await Assert.ThrowsAsync<ApiException>(() => api.ActualizarMiembroAsync(yo.Id, new ActualizarMiembroRequest(Rol: "miembro")));
     }
 
+    [Fact]
+    public async Task Un_perfil_en_uso_se_borra_moviendo_su_uso_a_otro_perfil()
+    {
+        var api = Cliente();
+        var perfiles = await api.ListarPerfilesAsync();
+        var origen = perfiles.First(p => p.Modo == "partes");
+        var destino = perfiles.First(p => p.Modo != "cuenta_comun" && p.Id != origen.Id);
+
+        var enUso = await Assert.ThrowsAsync<ApiException>(() => api.EliminarPerfilAsync(origen.Id));
+        Assert.True(enUso.EnUso);
+
+        await api.EliminarPerfilAsync(origen.Id, destino.Id);
+        Assert.DoesNotContain(await api.ListarPerfilesAsync(), p => p.Id == origen.Id);
+    }
+
     [Theory]
     [InlineData("demo", "demo@miparte.example")]
     [InlineData(" DEMO ", "demo@miparte.example")]
@@ -166,5 +181,53 @@ public class ServidorDemoTests
 
         Assert.True(categoria.ACargoCuentaComun);
         Assert.Equal(cuenta.Id, categoria.PerfilRepartoId);
+    }
+
+    [Fact]
+    public async Task El_ahorro_de_la_demo_admite_depositos_y_retiradas_con_las_reglas_del_servidor()
+    {
+        var api = Cliente();
+        var ana = (await api.ListarMiembrosAsync()).First(m => m.EsYo);
+        var fecha = new DateOnly(2026, 10, 5);
+
+        var deposito = await api.CrearDepositoAhorroAsync(new CrearDepositoAhorroRequest(ana.Id, 200m, fecha, "Lotería"));
+        var tras = await api.ObtenerCuentaComunAsync("2026-10");
+        Assert.Equal(200m, tras.AhorroDisponible);
+
+        // Igual que Core.Api: no se retira más de lo que hay y, si se retira, no se puede quitar el ingreso que lo respalda.
+        var demasiado = await Assert.ThrowsAsync<ApiException>(
+            () => api.CrearRetiradaAhorroAsync(new CrearRetiradaAhorroRequest(ana.Id, 200.01m, fecha, null)));
+        Assert.Contains("ahorro disponible", demasiado.Message);
+
+        await api.CrearRetiradaAhorroAsync(new CrearRetiradaAhorroRequest(ana.Id, 150m, fecha, null));
+        var sinRespaldo = await Assert.ThrowsAsync<ApiException>(() => api.EliminarDepositoAhorroAsync(deposito.Id));
+        Assert.Contains("faltarían", sinRespaldo.Message);
+    }
+
+    [Fact]
+    public async Task Un_mes_cerrado_bloquea_los_gastos_y_se_puede_reabrir()
+    {
+        var api = Cliente();
+        await api.CerrarMesAsync("2026-09");
+        var gasto = (await api.ListarGastosAsync("2026-09")).First();
+
+        var e = await Assert.ThrowsAsync<ApiException>(() => api.EliminarGastoAsync(gasto.Id));
+        Assert.Contains("cerrado", e.Message);
+        Assert.Equal("Ana", Assert.Single(await api.ListarCierresMesAsync()).CerradoPor);
+
+        await api.ReabrirMesAsync("2026-09");
+        await api.EliminarGastoAsync(gasto.Id);
+        Assert.DoesNotContain(await api.ListarGastosAsync("2026-09"), g => g.Id == gasto.Id);
+    }
+
+    [Fact]
+    public async Task Las_invitaciones_se_crean_pero_no_se_pueden_aceptar_en_la_demo()
+    {
+        var api = Cliente();
+        var inv = await api.CrearInvitacionAsync(new CrearInvitacionRequest());
+
+        Assert.False(string.IsNullOrEmpty(inv.Token));
+        var marcos = (await api.ListarMiembrosAsync()).First(m => m.Nombre == "Marcos");
+        Assert.NotNull(await api.CrearInvitacionAsync(new CrearInvitacionRequest(marcos.Id)));
     }
 }

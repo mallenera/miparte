@@ -134,6 +134,50 @@ public class CuentaComunAgregadaTests
     }
 
     [Theory]
+    [InlineData("2026-02")]
+    [InlineData("2026-03")]
+    [InlineData("2026-05")]
+    public async Task El_extracto_con_saldo_inicial_guardado_coincide_con_calcular_sobre_todas_las_filas(string mes)
+    {
+        var d = await SembrarAsync();
+        using var _ = d.F;
+        var saldo = new SaldoInicialCuenta(D(2026, 2, 15), 900m);
+        using (var scope = d.F.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MiParteDbContext>();
+            var h = await db.Hogares.IgnoreQueryFilters().SingleAsync(x => x.Id == d.Hogar);
+            h.SaldoInicialFecha = saldo.Fecha;
+            h.SaldoInicialImporte = saldo.Importe;
+            await db.SaveChangesAsync();
+        }
+        var inicio = DateOnly.ParseExact(mes + "-01", "yyyy-MM-dd");
+        var fin = inicio.AddMonths(1);
+        var esperado = CuentaComun.Calcular(inicio, d.Aportaciones, d.Gastos, d.Reembolsos, d.Retiradas, d.Depositos, saldo);
+        var extracto = CuentaComun.Extracto(
+            inicio, d.Aportaciones, d.Gastos, d.Reembolsos.Where(r => r.Fecha >= inicio && r.Fecha < fin).ToList(), saldo, esperado);
+        var cliente = Cliente(d.F, Token(Hs256(), d.Usuario), d.Hogar);
+
+        var r = (await cliente.GetFromJsonAsync<CuentaComunResponse>($"/api/cuenta-comun?mes={mes}"))!;
+
+        Assert.Equal(esperado.Saldo, r.Saldo);
+        Assert.Equal(esperado.Efectivo, r.Efectivo);
+        Assert.Equal(saldo.Importe, r.SaldoInicial!.Importe);
+        Assert.Equal(saldo.Fecha, r.SaldoInicial.Fecha);
+        Assert.Equal(extracto.EfectivoInicial, r.Extracto!.EfectivoInicial);
+        Assert.Equal(extracto.EfectivoFinal, r.Extracto.EfectivoFinal);
+        Assert.Equal(extracto.Aportaciones, r.Extracto.Aportaciones);
+        Assert.Equal(extracto.SaldoInicialFijado, r.Extracto.SaldoInicialFijado);
+        Assert.Equal(extracto.GastosCuenta, r.Extracto.GastosCuenta);
+        Assert.Equal(extracto.GastosAdelantadosDelAhorro, r.Extracto.GastosAdelantadosDelAhorro);
+        Assert.Equal(extracto.Reembolsos, r.Extracto.Reembolsos);
+
+        // El resumen del mes usa el mismo saldo inicial que la pestaña de la cuenta.
+        var resumen = (await cliente.GetFromJsonAsync<ResumenMensualResponse>($"/api/resumen?mes={mes}"))!;
+        Assert.Equal(esperado.Saldo, resumen.CuentaComun!.Saldo);
+        Assert.Equal(esperado.Efectivo, resumen.CuentaComun.Efectivo);
+    }
+
+    [Theory]
     [InlineData("2026-03")]
     [InlineData("2026-05")]
     [InlineData("2026-12")]

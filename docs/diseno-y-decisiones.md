@@ -175,6 +175,10 @@ La cuenta común es un pagador más: los gastos que paga no entran en la deuda e
 - El ahorro disponible nunca queda en negativo: la API rechaza rebajar el ahorro de una aportación o eliminar un ingreso si ya se retiró o se gastó ese dinero.
 - Fuera de alcance por ahora: objetivos de ahorro (meta e importe objetivo) e intereses.
 
+**Extracto y saldo inicial** (decisión posterior): la pestaña muestra un extracto del mes como el de un banco (efectivo al inicio, aportaciones, gastos pagados por la cuenta, reembolsos y efectivo al final; el ahorro va aparte) y permite fijar un saldo inicial con su fecha.
+- El saldo inicial es dinero que ya había en la cuenta para gastos a esa fecha (`hogar.saldo_inicial_fecha/importe`, no negativo). Cuenta como un ingreso de esa fecha: suma al saldo y al efectivo desde su mes y lo reparten «su parte» en proporción a lo aportado. No borra ni excluye el histórico, y no toca el ahorro (el ahorro inicial se registra como ingreso de ahorro). La tarjeta «Cuenta común» del resumen mensual usa el mismo saldo.
+- El efectivo del extracto es el mismo que la pestaña ya llama «Efectivo»: el saldo más lo pendiente de reembolsar. El efectivo al inicio de un mes es el final del anterior por construcción, y así se comprueba en los tests.
+
 - **Aportaciones:** cada adulto aporta un importe fijo al mes, guardado por mes y persona. Es lo único que se guarda del dinero que entra en el hogar.
 - **Saldo:** aportaciones menos gastos pagados por la cuenta, acumulado mes a mes. El sobrante se queda en la cuenta.
 - **Su parte:** para cada persona, la suma de lo que le corresponde de los gastos de la cuenta según el reparto de cada gasto. La diferencia con lo que aporta indica si aporta de más o de menos.
@@ -223,6 +227,8 @@ El navegador solo habla con la app; la app lee y escribe en Supabase y, desde el
 | Aplicación | Docker en Render o Railway | Admiten dominio propio; Streamlit Community Cloud es gratis pero no lo permite |
 | Base de datos y login | Supabase (PostgreSQL y Auth) | Correo con contraseña y Google; el login con Google requiere credenciales OAuth gratuitas en Google Cloud Console |
 | Dominio | Cualquier registrador (.com o .es) | Coste anual bajo |
+
+> **Organización interna del código:** `Core.Domain` (reglas) → `Core.Application` (casos de uso) → `Core.Infrastructure` (datos) y `Core.Api` (HTTP); ver [arquitectura.md](arquitectura.md).
 
 Los planes cambian: antes de decidir hay que comprobar las condiciones vigentes. Los planes gratuitos suelen dormir la app o pausar la base de datos tras un tiempo sin uso, algo tolerable en uso familiar.
 

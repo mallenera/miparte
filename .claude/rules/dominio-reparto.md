@@ -12,5 +12,5 @@ Reglas de `docs/diseno-y-decisiones.md` (§ Reglas de reparto) que el código no
 - Quién **paga** y quién **asume** son datos distintos; la diferencia genera la deuda. Gastos de la cuenta común (cuando exista) no generan deuda entre personas.
 - Solo adultos activos pagan y reparten; los `a_cargo` se asignan a su responsable según el perfil.
 - Un gasto guardado **no se recalcula** al cambiar % o perfiles; solo con `PUT` del gasto.
-- `Core.Domain` no depende de nada (ni EF, ni ASP.NET). La lógica nueva va aquí con tests, no en los endpoints.
+- `Core.Domain` no depende de nada (ni EF, ni ASP.NET). La lógica nueva va aquí con tests, no en los endpoints. Lo que necesita leer o escribir se orquesta en un servicio de `Core.Application` a través de un puerto `IRepositorio*` (ver `docs/arquitectura.md`).
 - Todo cambio de reparto o liquidación lleva tests: modos, caso A=2X/B=X (900 € → 600/300), reparto 2:1, céntimo sobrante, y que un gasto guardado no cambie.

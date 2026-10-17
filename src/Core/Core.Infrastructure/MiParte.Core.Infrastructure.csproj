@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Core.Domain\MiParte.Core.Domain.csproj" />
+    <ProjectReference Include="..\Core.Application\MiParte.Core.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>

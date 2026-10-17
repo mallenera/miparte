@@ -1,5 +1,15 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using MiParte.Core.Application.CuentaComun;
+using MiParte.Core.Application.Auditoria;
+using MiParte.Core.Application.Categorias;
+using MiParte.Core.Application.Cierres;
+using MiParte.Core.Application.Gastos;
+using MiParte.Core.Application.Hogares;
+using MiParte.Core.Application.Liquidacion;
+using MiParte.Core.Application.Miembros;
+using MiParte.Core.Application.Perfiles;
+using MiParte.Core.Application.Recurrentes;
 using MiParte.Core.Infrastructure.Persistencia;
 
 namespace MiParte.Core.Infrastructure;
@@ -18,6 +28,26 @@ public static class DependencyInjection
         services.AddDbContext<MiParteDbContext>(o => o
             .UseNpgsql(connectionString)
             .UseSnakeCaseNamingConvention());
+        return services;
+    }
+
+    /// <summary>
+    /// Registra los repositorios (scoped). Van aparte de <see cref="AddPersistencia"/> porque dependen solo del
+    /// <see cref="MiParteDbContext"/>, que los tests sustituyen por uno en memoria.
+    /// </summary>
+    public static IServiceCollection AddRepositorios(this IServiceCollection services)
+    {
+        // Con fábrica: sin cadena de conexión no hay DbContext y la validación de DI no debe impedir arrancar (/health).
+        services.AddScoped<IRepositorioLiquidacion>(sp => new RepositorioLiquidacion(sp.GetRequiredService<MiParteDbContext>()));
+        services.AddScoped<IRepositorioGastos>(sp => new RepositorioGastos(sp.GetRequiredService<MiParteDbContext>()));
+        services.AddScoped<IRepositorioCuentaComun>(sp => new RepositorioCuentaComun(sp.GetRequiredService<MiParteDbContext>()));
+        services.AddScoped<IRepositorioMiembros>(sp => new RepositorioMiembros(sp.GetRequiredService<MiParteDbContext>()));
+        services.AddScoped<IRepositorioRecurrentes>(sp => new RepositorioRecurrentes(sp.GetRequiredService<MiParteDbContext>()));
+        services.AddScoped<IRepositorioPerfiles>(sp => new RepositorioPerfiles(sp.GetRequiredService<MiParteDbContext>()));
+        services.AddScoped<IRepositorioCategorias>(sp => new RepositorioCategorias(sp.GetRequiredService<MiParteDbContext>()));
+        services.AddScoped<IRepositorioCierres>(sp => new RepositorioCierres(sp.GetRequiredService<MiParteDbContext>()));
+        services.AddScoped<IRepositorioHogares>(sp => new RepositorioHogares(sp.GetRequiredService<MiParteDbContext>()));
+        services.AddScoped<IRepositorioAuditoria>(sp => new RepositorioAuditoria(sp.GetRequiredService<MiParteDbContext>()));
         return services;
     }
 }

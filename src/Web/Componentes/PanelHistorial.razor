@@ -6,7 +6,7 @@
         <h2 id="t-historial">Historial de cambios</h2>
         <label class="hist-filtro">
             <span class="sr">Filtrar por tipo</span>
-            <select @bind="Filtro" @bind:after="CargarAsync">
+            <select @bind="_m.Filtro" @bind:after="_m.CargarAsync">
                 <option value="">Todo</option>
                 @foreach (var (id, plural) in TextoAuditoria.Entidades)
                 {
@@ -17,27 +17,27 @@
     </div>
     <p class="muted">Cada cambio queda registrado en el momento en que se guarda, y no se puede editar ni borrar. Solo lo ven los administradores.</p>
 
-    @if (_cargando)
+    @if (_m.Cargando)
     {
         <div class="spinbox" role="status"><div class="spin"></div><span>Cargando historial…</span></div>
     }
-    else if (_error is not null)
+    else if (_m.Error is not null)
     {
         <div class="aviso err" role="alert">
-            @_error
-            <button class="linkbtn" type="button" @onclick="CargarAsync">Reintentar</button>
+            @_m.Error
+            <button class="linkbtn" type="button" @onclick="_m.CargarAsync">Reintentar</button>
         </div>
     }
-    else if (_eventos.Count == 0)
+    else if (_m.Eventos.Count == 0)
     {
-        <div class="empty">Todavía no hay cambios registrados@(string.IsNullOrEmpty(Filtro) ? "" : " de este tipo").</div>
+        <div class="empty">Todavía no hay cambios registrados@(string.IsNullOrEmpty(_m.Filtro) ? "" : " de este tipo").</div>
     }
     else
     {
         <ol class="hist" aria-label="Cambios del hogar">
-            @foreach (var e in _eventos)
+            @foreach (var e in _m.Eventos)
             {
-                var cambios = TextoAuditoria.Cambios(e, NombreMiembro);
+                var cambios = TextoAuditoria.Cambios(e, _m.NombreMiembro);
                 <li class="hist-item">
                     <div class="hist-linea">
                         <b>@(e.Autor ?? "Alguien")</b> @TextoAuditoria.Frase(e)
@@ -69,91 +69,29 @@
             }
         </ol>
 
-        @if (_errorMas is not null)
+        @if (_m.ErrorMas is not null)
         {
-            <div class="aviso err" role="alert">@_errorMas</div>
+            <div class="aviso err" role="alert">@_m.ErrorMas</div>
         }
 
-        @if (_hayMas)
+        @if (_m.HayMas)
         {
             <div class="hist-mas">
-                <button class="btn btn-ghost btn-sm" type="button" disabled="@_cargandoMas" @onclick="CargarMasAsync">@(_errorMas is null ? "Cargar más" : "Reintentar")</button>
+                <button class="btn btn-ghost btn-sm" type="button" disabled="@_m.CargandoMas" @onclick="_m.CargarMasAsync">@(_m.ErrorMas is null ? "Cargar más" : "Reintentar")</button>
             </div>
         }
     }
 </section>
 
+
 @code {
-    private const int PorPagina = 50;
     private static readonly CultureInfo Es = new("es-ES");
 
-    private string Filtro { get; set; } = "";
-    private readonly List<EventoAuditoriaDto> _eventos = [];
+    private ModeloHistorial _m = default!;
 
-    // Incluye a los desactivados: un cambio antiguo puede referirse a alguien que ya no está activo.
-    private List<MiembroDto> _miembros = [];
-    private bool _cargando = true, _cargandoMas, _hayMas;
-    private string? _error, _errorMas;
-
-    // Identifica la última carga iniciada: la respuesta de una anterior (otro filtro) se descarta.
-    private int _generacion;
-
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync()
     {
-        try
-        {
-            _miembros = await Api.ListarMiembrosAsync(incluirInactivos: true);
-        }
-        catch (ApiException)
-        {
-            // Sin nombres el detalle omite los campos que son personas, pero el historial sigue siendo útil.
-        }
-        await CargarAsync();
-    }
-
-    private string? NombreMiembro(Guid id) => _miembros.FirstOrDefault(m => m.Id == id)?.Nombre;
-
-    private string? FiltroONull => string.IsNullOrEmpty(Filtro) ? null : Filtro;
-
-    private async Task CargarAsync()
-    {
-        var generacion = ++_generacion;
-        _cargando = true;
-        _cargandoMas = false;
-        _error = _errorMas = null;
-        _eventos.Clear();
-        try
-        {
-            var pagina = await Api.ListarAuditoriaAsync(FiltroONull, PorPagina);
-            if (generacion != _generacion) return;
-            _eventos.AddRange(pagina);
-            _hayMas = pagina.Count == PorPagina;
-        }
-        catch (ApiException e) when (generacion == _generacion)
-        {
-            _error = e.Message;
-        }
-        if (generacion == _generacion) _cargando = false;
-    }
-
-    private async Task CargarMasAsync()
-    {
-        if (_eventos.Count == 0) return;
-        var generacion = _generacion;
-        var ultimo = _eventos[^1];
-        _cargandoMas = true;
-        _errorMas = null;
-        try
-        {
-            var pagina = await Api.ListarAuditoriaAsync(FiltroONull, PorPagina, ultimo.Cuando, ultimo.Id);
-            if (generacion != _generacion) return;
-            _eventos.AddRange(pagina);
-            _hayMas = pagina.Count == PorPagina;
-        }
-        catch (ApiException e) when (generacion == _generacion)
-        {
-            _errorMas = e.Message;
-        }
-        if (generacion == _generacion) _cargandoMas = false;
+        _m = new ModeloHistorial(Api);
+        return _m.IniciarAsync();
     }
 }

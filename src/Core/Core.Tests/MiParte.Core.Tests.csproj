@@ -28,6 +28,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Core.Domain\MiParte.Core.Domain.csproj" />
+    <ProjectReference Include="..\Core.Application\MiParte.Core.Application.csproj" />
     <ProjectReference Include="..\Core.Api\MiParte.Core.Api.csproj" />
     <ProjectReference Include="..\Core.Infrastructure\MiParte.Core.Infrastructure.csproj" />
   </ItemGroup>

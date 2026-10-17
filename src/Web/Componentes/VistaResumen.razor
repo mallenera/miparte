@@ -7,43 +7,43 @@
 
 <h1 class="sr">Resumen de @Hogar.HogarActual?.Nombre</h1>
 
-@if (_cargando)
+@if (_m.Cargando)
 {
     <div class="spinbox" role="status"><div class="spin"></div><span>Cargando el resumen…</span></div>
 }
-else if (_errorCarga is not null)
+else if (_m.ErrorCarga is not null)
 {
     <div class="aviso err" role="alert">
-        @_errorCarga
+        @_m.ErrorCarga
         <button class="linkbtn" type="button" @onclick="CargarAsync">Reintentar</button>
     </div>
 }
-else if (_resumen is not null && _liquidacion is not null)
+else if (_m.Resumen is not null && _m.Liquidacion is not null)
 {
     <div class="mesbar">
         <div class="mesnav">
-            <button class="linkbtn" type="button" aria-label="Mes anterior" @onclick="() => CambiarMesAsync(-1)"><Icono Nombre="chevron-left" /></button>
-            <span class="tag cur" aria-live="polite">@NombreMes</span>
-            <button class="linkbtn" type="button" aria-label="Mes siguiente" @onclick="() => CambiarMesAsync(1)"><Icono Nombre="chevron-right" /></button>
+            <button class="linkbtn" type="button" aria-label="Mes anterior" @onclick="() => _m.CambiarMesAsync(-1)"><Icono Nombre="chevron-left" /></button>
+            <span class="tag cur" aria-live="polite">@_m.NombreMes</span>
+            <button class="linkbtn" type="button" aria-label="Mes siguiente" @onclick="() => _m.CambiarMesAsync(1)"><Icono Nombre="chevron-right" /></button>
         </div>
     </div>
-    @if (_error is not null)
+    @if (_m.Error is not null)
     {
-        <div class="aviso err u-mt12" role="alert">@_error</div>
+        <div class="aviso err u-mt12" role="alert">@_m.Error</div>
     }
 
-    <TarjetaCierreMes Mes="_mes" Cierre="CierreDelMes" PuedeCerrar="Permisos.Tiene(Claves.MesCerrar)" PuedeReabrir="Permisos.Tiene(Claves.MesReabrir)" Cambiado="RecargarTrasCierreAsync" />
+    <TarjetaCierreMes Mes="_m.Mes" Cierre="_m.CierreDelMes" PuedeCerrar="Permisos.Tiene(Claves.MesCerrar)" PuedeReabrir="Permisos.Tiene(Claves.MesReabrir)" Cambiado="_m.RecargarTrasCierreAsync" />
 
     <section class="card" aria-labelledby="t-liquidacion">
         <div class="card-head"><h2 id="t-liquidacion">Liquidación</h2></div>
         <p class="muted">Quién debe a quién para quedar en paz este mes. Los pagos que registres, completos o parciales, se descuentan de los saldos.</p>
 
-        @if (_liquidacion.Saldos.Count > 1)
+        @if (_m.Liquidacion.Saldos.Count > 1)
         {
             <label class="filtro">Ver solo a
-                <select @bind="_filtroMiembro" aria-label="Filtrar la liquidación por miembro">
+                <select @bind="_m.FiltroMiembro" aria-label="Filtrar la liquidación por miembro">
                     <option value="">Todos</option>
-                    @foreach (var s in _liquidacion.Saldos)
+                    @foreach (var s in _m.Liquidacion.Saldos)
                     {
                         <option value="@s.MiembroId">@s.Nombre</option>
                     }
@@ -51,10 +51,10 @@ else if (_resumen is not null && _liquidacion is not null)
             </label>
         }
 
-        @foreach (var s in _liquidacion.Saldos.Where(s => FiltraMiembro(s.MiembroId)))
+        @foreach (var s in _m.Liquidacion.Saldos.Where(s => _m.FiltraMiembro(s.MiembroId)))
         {
             <div class="catrow">
-                <div class="c-name"><Avatar Nombre="@s.Nombre" Color="@ColorMiembro.De(s.MiembroId, _miembros)" Tamano="sm" /> @s.Nombre</div>
+                <div class="c-name"><Avatar Nombre="@s.Nombre" Color="@ColorMiembro.De(s.MiembroId, _m.Miembros)" Tamano="sm" /> @s.Nombre</div>
                 <div class="c-sel">
                     <b class="g-importe saldo @(s.Saldo > 0 ? "pos" : s.Saldo < 0 ? "neg" : "")">@Saldo(s.Saldo)</b>
                     <span>@(s.Saldo > 0 ? "le deben" : s.Saldo < 0 ? "debe" : "en paz")</span>
@@ -62,36 +62,36 @@ else if (_resumen is not null && _liquidacion is not null)
             </div>
         }
 
-        @if (_liquidacion.Transferencias.Count == 0)
+        @if (_m.Liquidacion.Transferencias.Count == 0)
         {
             <div class="aviso ok u-mt12" role="status">
-                @(_liquidacion.Saldos.Count == 0 ? "Todavía no hay nada que liquidar este mes." : "Este mes está saldado: nadie debe nada.")
+                @(_m.Liquidacion.Saldos.Count == 0 ? "Todavía no hay nada que liquidar este mes." : "Este mes está saldado: nadie debe nada.")
             </div>
         }
         else
         {
             <h3 class="u-sec">Transferencias sugeridas</h3>
             <p class="muted">Cambia el importe para registrar un pago parcial; lo que quede seguirá pendiente.</p>
-            @foreach (var t in _liquidacion.Transferencias.Where(t => FiltraMiembro(t.De) || FiltraMiembro(t.A)))
+            @foreach (var t in _m.Liquidacion.Transferencias.Where(t => _m.FiltraMiembro(t.De) || _m.FiltraMiembro(t.A)))
             {
                 <div class="gastorow">
                     <div class="g-main">
-                        <div class="g-concepto">@Formato.NombreMiembro(t.De, _miembros) paga a @Formato.NombreMiembro(t.A, _miembros)</div>
+                        <div class="g-concepto">@Formato.NombreMiembro(t.De, _m.Miembros) paga a @Formato.NombreMiembro(t.A, _m.Miembros)</div>
                         <div class="muted g-meta">Pendiente @Formato.Euros(t.Importe)</div>
-                        @if (!ImporteValido(t))
+                        @if (!_m.ImporteValido(t))
                         {
                             <div id="@IdError(t)" class="muted g-meta" role="status">Importe entre 0,01 y @Formato.Euros(t.Importe), con máximo 2 decimales.</div>
                         }
                     </div>
                     <div class="c-acc pagoimp">
-                        <label class="sr" for="@IdImporte(t)">Importe a pagar de @Formato.NombreMiembro(t.De, _miembros) a @Formato.NombreMiembro(t.A, _miembros)</label>
-                        <input id="@IdImporte(t)" class="g-importe" inputmode="decimal" value="@ImporteEscrito(t)"
-                               aria-invalid="@(ImporteValido(t) ? null : "true")" aria-describedby="@(ImporteValido(t) ? null : IdError(t))"
-                               @oninput="e => EscribirImporte(t, e.Value?.ToString())" />
+                        <label class="sr" for="@IdImporte(t)">Importe a pagar de @Formato.NombreMiembro(t.De, _m.Miembros) a @Formato.NombreMiembro(t.A, _m.Miembros)</label>
+                        <input id="@IdImporte(t)" class="g-importe" inputmode="decimal" value="@_m.ImporteEscrito(t)"
+                               aria-invalid="@(_m.ImporteValido(t) ? null : "true")" aria-describedby="@(_m.ImporteValido(t) ? null : IdError(t))"
+                               @oninput="e => _m.EscribirImporte(t, e.Value?.ToString())" />
                         @if (Permisos.Tiene(Claves.PagosRegistrar))
                         {
-                            <button class="btn" type="button" aria-label="Registrar el pago de @Formato.NombreMiembro(t.De, _miembros) a @Formato.NombreMiembro(t.A, _miembros)"
-                                    disabled="@(_guardando || !ImporteValido(t))" @onclick="() => RegistrarPagoAsync(t)">Registrar pago</button>
+                            <button class="btn" type="button" aria-label="Registrar el pago de @Formato.NombreMiembro(t.De, _m.Miembros) a @Formato.NombreMiembro(t.A, _m.Miembros)"
+                                    disabled="@(_m.Guardando || !_m.ImporteValido(t))" @onclick="() => RegistrarPagoAsync(t)">Registrar pago</button>
                         }
                         else
                         {
@@ -102,27 +102,27 @@ else if (_resumen is not null && _liquidacion is not null)
             }
         }
 
-        @if (_liquidacion.Pagos.Count > 0)
+        @if (_m.Liquidacion.Pagos.Count > 0)
         {
             <h3 class="u-sec">Pagos registrados</h3>
-            @foreach (var p in _liquidacion.Pagos.Where(p => FiltraMiembro(p.DeMiembroId) || FiltraMiembro(p.AMiembroId)).OrderByDescending(p => p.Fecha))
+            @foreach (var p in _m.Liquidacion.Pagos.Where(p => _m.FiltraMiembro(p.DeMiembroId) || _m.FiltraMiembro(p.AMiembroId)).OrderByDescending(p => p.Fecha))
             {
                 <div class="gastorow">
                     <div class="g-main">
-                        <div class="g-concepto">@Formato.NombreMiembro(p.DeMiembroId, _miembros) pagó a @Formato.NombreMiembro(p.AMiembroId, _miembros)</div>
+                        <div class="g-concepto">@Formato.NombreMiembro(p.DeMiembroId, _m.Miembros) pagó a @Formato.NombreMiembro(p.AMiembroId, _m.Miembros)</div>
                         <div class="muted g-meta">@p.Fecha.ToString("dd/MM/yyyy", Es)@(string.IsNullOrWhiteSpace(p.Concepto) ? "" : " · " + p.Concepto)</div>
                     </div>
                     <div class="g-importe">@Formato.Euros(p.Importe)</div>
                     <div class="c-acc">
-                        @if (_confirmandoEliminar == p.Id)
+                        @if (_m.ConfirmandoEliminar == p.Id)
                         {
                             <span class="muted">¿Eliminar?</span>
                             <button class="linkbtn danger" type="button" @onclick="() => EliminarPagoAsync(p)">Sí</button>
-                            <button class="linkbtn" type="button" @onclick="() => _confirmandoEliminar = null">No</button>
+                            <button class="linkbtn" type="button" @onclick="() => _m.ConfirmandoEliminar = null">No</button>
                         }
                         else if (Permisos.Tiene(Claves.PagosRegistrar))
                         {
-                            <button class="linkbtn danger" type="button" aria-label="Eliminar el pago de @Formato.NombreMiembro(p.DeMiembroId, _miembros) a @Formato.NombreMiembro(p.AMiembroId, _miembros)" @onclick="() => _confirmandoEliminar = p.Id">Eliminar</button>
+                            <button class="linkbtn danger" type="button" aria-label="Eliminar el pago de @Formato.NombreMiembro(p.DeMiembroId, _m.Miembros) a @Formato.NombreMiembro(p.AMiembroId, _m.Miembros)" @onclick="() => _m.ConfirmandoEliminar = p.Id">Eliminar</button>
                         }
                     </div>
                 </div>
@@ -130,11 +130,11 @@ else if (_resumen is not null && _liquidacion is not null)
         }
     </section>
 
-    @if (_resumen.CuentaComun is { } cuenta)
+    @if (_m.Resumen.CuentaComun is { } cuenta)
     {
         <section class="card" aria-labelledby="t-cuenta-resumen">
             <div class="card-head"><h2 id="t-cuenta-resumen">Cuenta común</h2></div>
-            <p class="muted">Saldos al final de @NombreMes. Los gastos a su cargo no entran en la liquidación entre personas.</p>
+            <p class="muted">Saldos al final de @_m.NombreMes. Los gastos a su cargo no entran en la liquidación entre personas.</p>
             <div class="u-fila-mt10">
                 <span class="chip">Saldo&nbsp;<b id="cuenta-saldo">@Formato.Euros(cuenta.Saldo)</b></span>
                 <span class="chip">Efectivo&nbsp;<b>@Formato.Euros(cuenta.Efectivo)</b></span>
@@ -157,16 +157,16 @@ else if (_resumen is not null && _liquidacion is not null)
     <section class="card" aria-labelledby="t-resumen">
         <div class="card-head"><h2 id="t-resumen">Resumen del mes</h2></div>
 
-        @if (_resumen.GastosTotales == 0)
+        @if (_m.Resumen.GastosTotales == 0)
         {
             <div class="empty">
-                <span>@(_resumen.GastosPersonales > 0 ? "No hay gastos del hogar" : "No hay gastos") en @NombreMes.</span>
+                <span>@(_m.Resumen.GastosPersonales > 0 ? "No hay gastos del hogar" : "No hay gastos") en @_m.NombreMes.</span>
                 <a class="btn" href="gastos">Añadir un gasto</a>
             </div>
-            @foreach (var m in _resumen.Miembros.Where(m => m.DebeCuentaComun > 0))
+            @foreach (var m in _m.Resumen.Miembros.Where(m => m.DebeCuentaComun > 0))
             {
                 <div class="catrow">
-                    <div class="c-name"><Avatar Nombre="@m.Nombre" Color="@ColorMiembro.De(m.MiembroId, _miembros)" Tamano="sm" /> @m.Nombre</div>
+                    <div class="c-name"><Avatar Nombre="@m.Nombre" Color="@ColorMiembro.De(m.MiembroId, _m.Miembros)" Tamano="sm" /> @m.Nombre</div>
                     <div class="c-sel"><span class="chip">La cuenta común le debe&nbsp;<b>@Formato.Euros(m.DebeCuentaComun)</b></span></div>
                 </div>
             }
@@ -174,14 +174,14 @@ else if (_resumen is not null && _liquidacion is not null)
         else
         {
             <div class="u-fila-mt10">
-                <span class="chip">Gastos del mes&nbsp;<b id="total">@Formato.Euros(_resumen.GastosTotales)</b></span>
+                <span class="chip">Gastos del mes&nbsp;<b id="total">@Formato.Euros(_m.Resumen.GastosTotales)</b></span>
             </div>
 
             <h3 class="u-sec">Por persona</h3>
-            @foreach (var m in _resumen.Miembros)
+            @foreach (var m in _m.Resumen.Miembros)
             {
                 <div class="catrow">
-                    <div class="c-name"><Avatar Nombre="@m.Nombre" Color="@ColorMiembro.De(m.MiembroId, _miembros)" Tamano="sm" /> @m.Nombre</div>
+                    <div class="c-name"><Avatar Nombre="@m.Nombre" Color="@ColorMiembro.De(m.MiembroId, _m.Miembros)" Tamano="sm" /> @m.Nombre</div>
                     <div class="c-sel">
                         Ha pagado @Formato.Euros(m.Pagado) · le corresponden @Formato.Euros(m.Asumido)
                         @if (m.DebeCuentaComun > 0)
@@ -193,7 +193,7 @@ else if (_resumen is not null && _liquidacion is not null)
             }
 
             <h3 class="u-sec">Por categoría</h3>
-            @foreach (var f in FilasCategorias())
+            @foreach (var f in _m.FilasCategorias())
             {
                 var n = f.Nodo;
                 var importe = f.Directo ? n.Propio : n.Total;
@@ -201,22 +201,22 @@ else if (_resumen is not null && _liquidacion is not null)
                     <div class="c-name @(f.Nivel > 0 ? "sub" : "")">
                         @if (!f.Directo && n.Hijos.Count > 0)
                         {
-                            var abierto = _abiertas.Contains(n.CategoriaId);
+                            var abierto = _m.EstaAbierta(n.CategoriaId);
                             <button class="linkbtn" type="button" aria-expanded="@(abierto ? "true" : "false")"
-                                    aria-label="@(abierto ? "Contraer" : "Desplegar") @n.Nombre" @onclick="() => Alternar(n.CategoriaId)">@(abierto ? "▾" : "▸")</button>
+                                    aria-label="@(abierto ? "Contraer" : "Desplegar") @n.Nombre" @onclick="() => _m.Alternar(n.CategoriaId)">@(abierto ? "▾" : "▸")</button>
                         }
                         @(f.Directo ? "Sin subcategoría" : n.Nombre)
                     </div>
                     <div class="c-sel">
-                        <b class="g-importe">@Formato.Euros(importe)</b> <span class="muted">@Porcentaje(importe) %</span>
-                        <progress class="barra" max="100" value="@Porcentaje(importe)" aria-label="@Porcentaje(importe) % del total del mes"></progress>
+                        <b class="g-importe">@Formato.Euros(importe)</b> <span class="muted">@_m.Porcentaje(importe) %</span>
+                        <progress class="barra" max="100" value="@_m.Porcentaje(importe)" aria-label="@_m.Porcentaje(importe) % del total del mes"></progress>
                         @if (!f.Directo && n.PorMiembro.Count > 0)
                         {
                             <span class="g-reparto">
                                 @foreach (var p in n.PorMiembro)
                                 {
                                     <span class="chip">
-                                        <Avatar Nombre="@Formato.NombreMiembro(p.MiembroId, _miembros)" Color="@ColorMiembro.De(p.MiembroId, _miembros)" Tamano="sm" />
+                                        <Avatar Nombre="@Formato.NombreMiembro(p.MiembroId, _m.Miembros)" Color="@ColorMiembro.De(p.MiembroId, _m.Miembros)" Tamano="sm" />
                                         @Formato.Euros(p.Importe)
                                     </span>
                                 }
@@ -227,14 +227,14 @@ else if (_resumen is not null && _liquidacion is not null)
             }
         }
 
-        @if (_resumen.GastosPersonales > 0)
+        @if (_m.Resumen.GastosPersonales > 0)
         {
             <h3 class="u-sec">Gastos personales</h3>
             <p class="muted">Cada uno es solo de quien lo paga: no entran en la liquidación ni en los totales de arriba.</p>
-            @foreach (var m in _resumen.Miembros.Where(m => m.Personal > 0))
+            @foreach (var m in _m.Resumen.Miembros.Where(m => m.Personal > 0))
             {
                 <div class="catrow">
-                    <div class="c-name"><Avatar Nombre="@m.Nombre" Color="@ColorMiembro.De(m.MiembroId, _miembros)" Tamano="sm" /> @m.Nombre</div>
+                    <div class="c-name"><Avatar Nombre="@m.Nombre" Color="@ColorMiembro.De(m.MiembroId, _m.Miembros)" Tamano="sm" /> @m.Nombre</div>
                     <div class="c-sel"><span class="tag admin">Personal</span> <b class="g-importe">@Formato.Euros(m.Personal)</b></div>
                 </div>
             }
@@ -243,201 +243,37 @@ else if (_resumen is not null && _liquidacion is not null)
 }
 
 @code {
-    /// <summary>Fila visible del árbol «Por categoría»; <c>Directo</c> es el gasto propio de una madre desplegada.</summary>
-    private sealed record FilaCat(NodoResumen Nodo, int Nivel, bool Directo);
-
-    /// <summary>Aplana el árbol según las madres desplegadas.</summary>
-    private IEnumerable<FilaCat> FilasCategorias()
-    {
-        IEnumerable<FilaCat> Recorrer(NodoResumen n, int nivel)
-        {
-            yield return new FilaCat(n, nivel, false);
-            if (n.Hijos.Count == 0 || !_abiertas.Contains(n.CategoriaId)) yield break;
-            if (n.Propio > 0) yield return new FilaCat(n, nivel + 1, true);
-            foreach (var h in n.Hijos)
-                foreach (var f in Recorrer(h, nivel + 1)) yield return f;
-        }
-
-        return ArbolCategorias.ResumenEnArbol(_categorias, _resumen!.Categorias).SelectMany(n => Recorrer(n, 0));
-    }
-
-    private string Porcentaje(decimal total) =>
-        (_resumen!.GastosTotales > 0 ? Math.Round(total / _resumen.GastosTotales * 100m, 0) : 0m).ToString("0", CultureInfo.InvariantCulture);
-
-    private readonly HashSet<Guid> _abiertas = [];
-
-    private void Alternar(Guid id)
-    {
-        if (!_abiertas.Remove(id)) _abiertas.Add(id);
-    }
-
     private static readonly CultureInfo Es = new("es-ES");
 
-    private ResumenMensualResponse? _resumen;
-    private LiquidacionResponse? _liquidacion;
-    private List<MiembroDto> _miembros = [];
-    private List<CategoriaDto> _categorias = [];
-    private bool _cargando = true, _guardando;
-    private string? _errorCarga, _error;
-    private DateOnly _mes = new(DateTime.Today.Year, DateTime.Today.Month, 1);
-    private Guid? _confirmandoEliminar;
-    private List<MesCerradoDto> _cierres = [];
+    private ModeloResumen _m = default!;
 
-    private MesCerradoDto? CierreDelMes => _cierres.FirstOrDefault(c => c.Mes == Formato.Mes(_mes));
-
-    private string _filtroMiembro = "";
-    private readonly Dictionary<(Guid, Guid), string> _importes = [];
-
-    private string NombreMes => _mes.ToString("MMMM yyyy", Es);
-
-    protected override Task OnInitializedAsync() => CargarAsync();
+    protected override Task OnInitializedAsync()
+    {
+        _m = new ModeloResumen(Api, DateOnly.FromDateTime(DateTime.Today));
+        return CargarAsync();
+    }
 
     private async Task CargarAsync()
     {
-        _cargando = true;
-        _errorCarga = null;
+        _m.IniciarCarga();
         await Permisos.AsegurarAsync();
-        try
-        {
-            // En paralelo: la latencia hacia la API se paga una vez y no cinco.
-            var miembros = Api.ListarMiembrosAsync();
-            // Solo sirven para mostrar la ruta de las subcategorías: sin ellas el resumen usa el nombre suelto.
-            var categorias = OVacia(Api.ListarCategoriasAsync());
-            var datos = RecargarAsync();
-            await Task.WhenAll(miembros, categorias, datos);
-            _miembros = miembros.Result;
-            _categorias = categorias.Result;
-        }
-        catch (ApiException e)
-        {
-            _errorCarga = e.Message;
-        }
-
-        _cargando = false;
+        await _m.CargarAsync();
     }
-
-    private async Task RecargarAsync()
-    {
-        // Resumen y liquidación llegan juntos: la API lee una sola vez los gastos y los miembros del mes.
-        var datos = Api.ObtenerResumenYLiquidacionAsync(Formato.Mes(_mes));
-        var cierres = OVacia(Api.ListarCierresMesAsync()); // el cierre es informativo aquí: sin él se sigue viendo el resumen
-        await Task.WhenAll(datos, cierres);
-        _resumen = datos.Result.Resumen;
-        _liquidacion = datos.Result.Liquidacion;
-        _cierres = cierres.Result;
-    }
-
-    /// <summary>Espera una lista opcional: si la API falla, la pantalla sigue con la lista vacía.</summary>
-    private static async Task<List<T>> OVacia<T>(Task<List<T>> carga)
-    {
-        try
-        {
-            return await carga;
-        }
-        catch (ApiException)
-        {
-            return [];
-        }
-    }
-
-    private async Task RecargarTrasCierreAsync()
-    {
-        try
-        {
-            await RecargarAsync();
-        }
-        catch (ApiException e)
-        {
-            _error = e.Message;
-        }
-    }
-
-    private async Task CambiarMesAsync(int delta)
-    {
-        _mes = _mes.AddMonths(delta);
-        _error = null;
-        _confirmandoEliminar = null;
-        _importes.Clear();
-        try
-        {
-            await RecargarAsync();
-        }
-        catch (ApiException e)
-        {
-            _error = e.Message;
-        }
-    }
-
-    /// <summary>Ruta «Padre › Hija» de la categoría del resumen; si no se pudo cargar el árbol, su nombre.</summary>
-    private string NombreCategoria(ResumenCategoriaDto c) =>
-        _categorias.Any(x => x.Id == c.CategoriaId) ? ArbolCategorias.Ruta(_categorias, c.CategoriaId) : c.Nombre;
 
     /// <summary>Saldo con signo explícito, para que no dependa solo del color.</summary>
     private static string Saldo(decimal saldo) => (saldo > 0 ? "+" : "") + Formato.Euros(saldo);
-
-    /// <summary>Sin filtro pasa todo; con filtro, solo lo que afecta al miembro elegido.</summary>
-    private bool FiltraMiembro(Guid id) => _filtroMiembro == "" || id.ToString() == _filtroMiembro;
-
-    private static (Guid, Guid) Clave(TransferenciaDto t) => (t.De, t.A);
 
     private static string IdImporte(TransferenciaDto t) => $"pago-{t.De}-{t.A}";
 
     private static string IdError(TransferenciaDto t) => $"pago-error-{t.De}-{t.A}";
 
-    /// <summary>Lo escrito por el usuario o, si aún no ha tocado el campo, el importe sugerido.</summary>
-    private string ImporteEscrito(TransferenciaDto t) =>
-        _importes.TryGetValue(Clave(t), out var texto) ? texto : t.Importe.ToString("0.00", Es);
+    private Task RegistrarPagoAsync(TransferenciaDto t) => Mostrar(_m.RegistrarPagoAsync(t));
 
-    /// <summary>Importe del pago: mayor que 0, con máximo 2 decimales y sin pasar de lo pendiente.</summary>
-    private bool TryImporte(TransferenciaDto t, out decimal valor)
+    private Task EliminarPagoAsync(PagoLiquidacionDto p) => Mostrar(_m.EliminarPagoAsync(p));
+
+    /// <summary>Espera la operación del modelo y, si salió bien, muestra su aviso.</summary>
+    private async Task Mostrar(Task<string?> operacion)
     {
-        var texto = ImporteEscrito(t).Trim().Replace(',', '.');
-        // Se mira el texto y no solo el valor: «1,230» vale lo mismo que «1,23» pero tiene tres decimales.
-        var decimales = texto.Contains('.') ? texto.Length - texto.IndexOf('.') - 1 : 0;
-        return decimal.TryParse(texto, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out valor)
-            && valor > 0 && valor <= t.Importe && decimales <= 2;
-    }
-
-    private void EscribirImporte(TransferenciaDto t, string? texto) => _importes[Clave(t)] = texto ?? "";
-
-    private bool ImporteValido(TransferenciaDto t) => TryImporte(t, out _);
-
-    private Task RegistrarPagoAsync(TransferenciaDto t) =>
-        EjecutarAsync(async () =>
-        {
-            if (!TryImporte(t, out var importe)) throw new ApiException(System.Net.HttpStatusCode.BadRequest, "Introduce un importe mayor que 0 con máximo 2 decimales y sin pasar de lo pendiente.");
-            await Api.CrearPagoLiquidacionAsync(new CrearPagoLiquidacionRequest(_mes, t.De, t.A, importe, null, null));
-            _importes.Remove(Clave(t));
-            return importe == t.Importe ? "Pago registrado" : "Pago parcial registrado";
-        });
-
-    private Task EliminarPagoAsync(PagoLiquidacionDto p) =>
-        EjecutarAsync(async () =>
-        {
-            await Api.EliminarPagoLiquidacionAsync(p.Id);
-            _confirmandoEliminar = null;
-            return "Pago eliminado";
-        });
-
-    /// <summary>Ejecuta una operación, recarga el mes y muestra el aviso; los errores de la API salen en pantalla.</summary>
-    private async Task EjecutarAsync(Func<Task<string>> accion)
-    {
-        _error = null;
-        _guardando = true;
-        try
-        {
-            var aviso = await accion();
-            await RecargarAsync();
-            Avisos.Mostrar(aviso);
-        }
-        catch (ApiException e)
-        {
-            _error = e.Message;
-            _confirmandoEliminar = null;
-        }
-        finally
-        {
-            _guardando = false;
-        }
+        if (await operacion is { } aviso) Avisos.Mostrar(aviso);
     }
 }

@@ -1,9 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using MiParte.Contracts;
 using MiParte.Core.Domain;
-using MiParte.Core.Infrastructure.Persistencia;
 
-namespace MiParte.Core.Api.Gastos;
+namespace MiParte.Core.Infrastructure.Persistencia;
 
 /// <summary>
 /// Lo que necesita el cálculo de la cuenta común (<see cref="CuentaComun.Calcular"/>), leído de la base de datos en una sola
@@ -12,7 +10,7 @@ namespace MiParte.Core.Api.Gastos;
 /// agrupado (un par de filas por miembro) y acotado al fin del mes pedido, que es lo único que el cálculo usa; solo el
 /// detalle del mes (<paramref name="detalleDelMes"/>) y las aportaciones, que son pocas, llegan fila a fila.
 /// </summary>
-internal sealed class HistoricoCuentaComun
+public sealed class HistoricoCuentaComun
 {
     private const int TipoAportacion = 0, TipoReembolsoMes = 1, TipoRetiradaMes = 2, TipoDepositoMes = 3, TipoReembolsos = 4,
         TipoGastos = 5, TipoGastosMes = 6, TipoRetiradas = 7, TipoDepositos = 8, TipoNombre = 9, TipoFunciones = 10;
@@ -46,11 +44,15 @@ internal sealed class HistoricoCuentaComun
     private readonly List<Fila> _filas;
     private readonly DateOnly _inicio;
 
-    private HistoricoCuentaComun(List<Fila> filas, DateOnly inicio)
+    private HistoricoCuentaComun(List<Fila> filas, DateOnly inicio, SaldoInicialCuenta? saldoInicial)
     {
         _filas = filas;
         _inicio = inicio;
+        SaldoInicial = saldoInicial;
     }
+
+    /// <summary>Saldo inicial fijado para la cuenta, o null; lo usan el estado de la cuenta y el resumen del mes.</summary>
+    public SaldoInicialCuenta? SaldoInicial { get; }
 
     /// <summary>
     /// Lee en una consulta lo necesario para calcular la cuenta al final del mes que empieza en <paramref name="inicio"/>.
@@ -73,12 +75,13 @@ internal sealed class HistoricoCuentaComun
                 Tipo = TipoGastos, Id = vacio, MiembroId = g.Key.PagadoPor ?? vacio, Fecha = inicio,
                 Importe = g.Sum(x => x.Importe), Ahorro = 0m, Marca = g.Key.PagadoDesdeAhorro, Marca2 = false, Texto = "",
             });
+        // Del mes, por pagador y origen: el extracto necesita separar lo que paga la cuenta, lo que adelanta alguien y lo que sale del ahorro.
         var gastosMes = db.Gastos.Where(g => g.ACargoCuentaComun && g.Fecha >= inicio && g.Fecha < fin)
-            .GroupBy(g => true)
+            .GroupBy(g => new { g.PagadoPor, g.PagadoDesdeAhorro })
             .Select(g => new Fila
             {
-                Tipo = TipoGastosMes, Id = vacio, MiembroId = vacio, Fecha = inicio,
-                Importe = g.Sum(x => x.Importe), Ahorro = 0m, Marca = false, Marca2 = false, Texto = "",
+                Tipo = TipoGastosMes, Id = vacio, MiembroId = g.Key.PagadoPor ?? vacio, Fecha = inicio,
+                Importe = g.Sum(x => x.Importe), Ahorro = 0m, Marca = g.Key.PagadoDesdeAhorro, Marca2 = false, Texto = "",
             });
         var reembolsos = db.ReembolsosCuenta.Where(r => r.Fecha < fin)
             .GroupBy(r => r.MiembroId)
@@ -140,7 +143,11 @@ internal sealed class HistoricoCuentaComun
                 }));
         }
 
-        return new HistoricoCuentaComun(await consulta.AsNoTracking().ToListAsync(ct), inicio);
+        var filas = await consulta.AsNoTracking().ToListAsync(ct);
+        var saldo = await db.Hogares.Select(x => new { x.SaldoInicialFecha, x.SaldoInicialImporte }).FirstOrDefaultAsync(ct);
+        var saldoInicial = saldo?.SaldoInicialFecha is { } fecha && saldo.SaldoInicialImporte is { } importe
+            ? new SaldoInicialCuenta(fecha, importe) : null;
+        return new HistoricoCuentaComun(filas, inicio, saldoInicial);
     }
 
     private IEnumerable<Fila> De(int tipo) => _filas.Where(f => f.Tipo == tipo);
@@ -168,6 +175,9 @@ internal sealed class HistoricoCuentaComun
     /// <summary>Total de los gastos a cargo de la cuenta con fecha dentro del mes (también los pagados desde el ahorro).</summary>
     public decimal GastadoMes => De(TipoGastosMes).Sum(f => f.Importe);
 
+    /// <summary>Gastos a cargo de la cuenta con fecha en el mes, agrupados por pagador y origen (una fila por grupo).</summary>
+    public List<GastoDeCuenta> GastosDelMes => De(TipoGastosMes).Select(f => new GastoDeCuenta(Nulo(f.MiembroId), _inicio, f.Importe, f.Marca)).ToList();
+
     /// <summary>Reembolsos hasta el fin del mes, agrupados por miembro.</summary>
     public List<ReembolsoDeCuenta> Reembolsos => De(TipoReembolsos).Select(f => new ReembolsoDeCuenta(f.MiembroId, _inicio, f.Importe)).ToList();
 
@@ -182,14 +192,14 @@ internal sealed class HistoricoCuentaComun
     public Dictionary<Guid, string> Nombres => De(TipoNombre).ToDictionary(f => f.Id, f => f.Texto);
 
     /// <summary>Reembolsos del mes, uno a uno.</summary>
-    public List<ReembolsoCuentaDto> ReembolsosDelMes => De(TipoReembolsoMes).OrderBy(f => f.Fecha).ThenBy(f => f.Id)
-        .Select(f => new ReembolsoCuentaDto(f.Id, f.MiembroId, f.Fecha, f.Importe, Texto(f))).ToList();
+    public List<MovimientoCuenta> ReembolsosDelMes => De(TipoReembolsoMes).OrderBy(f => f.Fecha).ThenBy(f => f.Id)
+        .Select(f => new MovimientoCuenta(f.Id, f.MiembroId, f.Fecha, f.Importe, Texto(f))).ToList();
 
     /// <summary>Retiradas de ahorro del mes, una a una.</summary>
-    public List<RetiradaAhorroDto> RetiradasDelMes => De(TipoRetiradaMes).OrderBy(f => f.Fecha).ThenBy(f => f.Id)
-        .Select(f => new RetiradaAhorroDto(f.Id, f.MiembroId, f.Fecha, f.Importe, Texto(f))).ToList();
+    public List<MovimientoCuenta> RetiradasDelMes => De(TipoRetiradaMes).OrderBy(f => f.Fecha).ThenBy(f => f.Id)
+        .Select(f => new MovimientoCuenta(f.Id, f.MiembroId, f.Fecha, f.Importe, Texto(f))).ToList();
 
     /// <summary>Depósitos de ahorro del mes, uno a uno.</summary>
-    public List<DepositoAhorroDto> DepositosDelMes => De(TipoDepositoMes).OrderBy(f => f.Fecha).ThenBy(f => f.Id)
-        .Select(f => new DepositoAhorroDto(f.Id, f.MiembroId, f.Fecha, f.Importe, Texto(f))).ToList();
+    public List<MovimientoCuenta> DepositosDelMes => De(TipoDepositoMes).OrderBy(f => f.Fecha).ThenBy(f => f.Id)
+        .Select(f => new MovimientoCuenta(f.Id, f.MiembroId, f.Fecha, f.Importe, Texto(f))).ToList();
 }

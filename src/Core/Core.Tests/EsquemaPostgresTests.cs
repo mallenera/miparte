@@ -254,6 +254,21 @@ public class EsquemaPostgresTests
     }
 
     [SkippableFact]
+    public async Task Indices_ParcialesDeCuentaComunYAhorro_ExistenYElRedundanteDeInvitacionesNo()
+    {
+        Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
+
+        await using var conn = await AbrirAsync();
+        const string existe = "select count(*) from pg_indexes where schemaname = 'public' and indexname = @n";
+        foreach (var (nombre, esperado) in new[] { ("gasto_cuenta_comun_idx", 1L), ("gasto_ahorro_idx", 1L), ("invitacion_hogar_idx", 0L) })
+        {
+            await using var cmd = new NpgsqlCommand(existe, conn);
+            cmd.Parameters.AddWithValue("n", nombre);
+            Assert.Equal(esperado, (long)(await cmd.ExecuteScalarAsync())!);
+        }
+    }
+
+    [SkippableFact]
     public async Task Permisos_SiguenLaPlantillaPorDefecto_YElCheckAdmiteElCatalogoEntero()
     {
         Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");

@@ -35,6 +35,45 @@ public class CuentaComunTests
     }
 
     [Fact]
+    public void Saldo_inicial_cuenta_desde_su_fecha_y_no_antes()
+    {
+        var ap = new[] { new AportacionVigente(Ana, D("2026-01-01"), 500) };
+        var inicial = new SaldoInicialCuenta(D("2026-02-10"), 1000m);
+
+        Assert.Equal(500m, CuentaComun.Calcular(D("2026-01-01"), ap, [], [], null, null, inicial).Saldo);
+        Assert.Equal(2000m, CuentaComun.Calcular(D("2026-02-01"), ap, [], [], null, null, inicial).Saldo);
+    }
+
+    [Fact]
+    public void Extracto_parte_del_efectivo_del_mes_anterior_y_recoge_cada_movimiento()
+    {
+        var ap = new[] { new AportacionVigente(Ana, D("2026-01-01"), 500, 100m), new AportacionVigente(Beto, D("2026-01-01"), 300) };
+        var gastos = new[]
+        {
+            new GastoDeCuenta(null, D("2026-02-05"), 200),         // lo paga la cuenta
+            new GastoDeCuenta(Ana, D("2026-02-06"), 150),          // lo adelanta Ana
+            new GastoDeCuenta(Beto, D("2026-02-07"), 80, true),    // lo adelanta Beto desde el ahorro
+            new GastoDeCuenta(null, D("2026-02-08"), 50, true),    // lo paga la cuenta desde el ahorro
+        };
+        var reembolsos = new[] { new ReembolsoDeCuenta(Ana, D("2026-02-20"), 100) };
+        var inicial = new SaldoInicialCuenta(D("2026-02-15"), 1000m);
+        var febrero = D("2026-02-01");
+        var estado = CuentaComun.Calcular(febrero, ap, gastos, reembolsos, null, null, inicial);
+
+        var x = CuentaComun.Extracto(febrero, ap, gastos, reembolsos, inicial, estado);
+
+        Assert.Equal(CuentaComun.Calcular(D("2026-01-01"), ap, gastos, reembolsos, null, null, inicial).Efectivo, x.EfectivoInicial);
+        Assert.Equal(700m, x.EfectivoInicial);
+        Assert.Equal(700m, x.Aportaciones);
+        Assert.Equal(1000m, x.SaldoInicialFijado);
+        Assert.Equal(200m, x.GastosCuenta);
+        Assert.Equal(80m, x.GastosAdelantadosDelAhorro);
+        Assert.Equal(100m, x.Reembolsos);
+        Assert.Equal(2180m, x.EfectivoFinal);
+        Assert.Equal(estado.Efectivo, x.EfectivoFinal);
+    }
+
+    [Fact]
     public void Saldo_NoCuentaGastosPosterioresAlMes()
     {
         var ap = new[] { new AportacionVigente(Ana, D("2026-01-01"), 1000) };

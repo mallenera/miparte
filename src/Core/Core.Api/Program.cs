@@ -10,6 +10,16 @@ using MiParte.Core.Api.Hogares;
 using MiParte.Core.Api.Miembros;
 using MiParte.Core.Api.Reparto;
 using MiParte.Core.Api.Seguridad;
+using MiParte.Core.Application.CuentaComun;
+using MiParte.Core.Application.Auditoria;
+using MiParte.Core.Application.Categorias;
+using MiParte.Core.Application.Cierres;
+using MiParte.Core.Application.Gastos;
+using MiParte.Core.Application.Hogares;
+using MiParte.Core.Application.Liquidacion;
+using MiParte.Core.Application.Miembros;
+using MiParte.Core.Application.Perfiles;
+using MiParte.Core.Application.Recurrentes;
 using MiParte.Core.Infrastructure;
 using MiParte.Core.Infrastructure.Persistencia;
 
@@ -30,6 +40,25 @@ if (!string.IsNullOrWhiteSpace(connectionString))
 {
     builder.Services.AddPersistencia(connectionString);
 }
+
+// Casos de uso y repositorios: fuera del if porque solo necesitan el MiParteDbContext, que los tests sustituyen.
+builder.Services.AddRepositorios();
+builder.Services.AddScoped(sp => new ServicioGastos(sp.GetRequiredService<IRepositorioGastos>()));
+builder.Services.AddScoped(sp => new ServicioPerfiles(sp.GetRequiredService<IRepositorioPerfiles>()));
+builder.Services.AddScoped(sp => new ServicioHogares(sp.GetRequiredService<IRepositorioHogares>()));
+builder.Services.AddScoped(sp => new ServicioAuditoria(sp.GetRequiredService<IRepositorioAuditoria>()));
+builder.Services.AddScoped(sp => new ServicioCategorias(
+    sp.GetRequiredService<IRepositorioCategorias>(), sp.GetRequiredService<IRepositorioGastos>()));
+builder.Services.AddScoped(sp => new ServicioCierres(
+    sp.GetRequiredService<IRepositorioCierres>(), sp.GetRequiredService<TimeProvider>()));
+builder.Services.AddScoped(sp => new ServicioRecurrentes(
+    sp.GetRequiredService<IRepositorioRecurrentes>(), sp.GetRequiredService<IRepositorioGastos>()));
+builder.Services.AddScoped(sp => new ServicioMiembros(
+    sp.GetRequiredService<IRepositorioMiembros>(), sp.GetRequiredService<TimeProvider>()));
+builder.Services.AddScoped(sp => new ServicioCuentaComun(
+    sp.GetRequiredService<IRepositorioCuentaComun>(), sp.GetRequiredService<TimeProvider>()));
+builder.Services.AddScoped(sp => new ServicioLiquidacion(
+    sp.GetRequiredService<IRepositorioLiquidacion>(), sp.GetRequiredService<TimeProvider>()));
 
 // CORS: orígenes en Cors:OrigenesPermitidos (env Cors__OrigenesPermitidos__0, ...).
 // Sin configuración no se permite ningún origen cruzado.

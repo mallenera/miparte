@@ -30,6 +30,8 @@
     <ProjectReference Include="..\Contracts\MiParte.Contracts.csproj" />
     <!-- Solo lógica pura (reparto, liquidación, cuenta común): el modo demo la reutiliza para calcular igual que Core.Api. -->
     <ProjectReference Include="..\Core\Core.Domain\MiParte.Core.Domain.csproj" />
+    <ProjectReference Include="..\Core\Core.Application\MiParte.Core.Application.csproj" />
+    <ProjectReference Include="..\Core\Core.Mapeo\MiParte.Core.Mapeo.csproj" />
   </ItemGroup>
 
 </Project>

@@ -79,6 +79,7 @@ public sealed partial class ServidorDemo
             ("hogar", 2, "DELETE") => Mal(HttpStatusCode.Conflict, "En el modo demo no se puede eliminar el hogar."),
             ("hogares", 2, "POST") => Mal(HttpStatusCode.Conflict, "En el modo demo no se pueden crear hogares."),
             ("invitaciones", 3, "POST") when subruta == "aceptar" => Mal(HttpStatusCode.Conflict, "En el modo demo no se pueden aceptar invitaciones."),
+            ("enlaces-grupo", 3, "POST") when subruta == "unirse" => Mal(HttpStatusCode.Conflict, "En el modo demo no se pueden usar enlaces de grupo."),
 
             ("miembros", 2, "GET") => Ok((await _miembros.ListarAsync(Consulta(uri, "incluirInactivos") == "true", ct))
                 .Select(m => m.ADto(IdUsuario)).ToList()),

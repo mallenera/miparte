@@ -65,4 +65,10 @@ public interface IRepositorioGastos
     /// escritura porque otra petición cerró el mes después de comprobarlo.
     /// </summary>
     Task<bool> GuardarAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Ejecuta <paramref name="operacion"/> bloqueando el hogar frente a los cierres de ciclo concurrentes: un gasto no puede
+    /// cambiar ni borrarse mientras otra petición lo incluye en un ciclo que se está cerrando.
+    /// </summary>
+    Task<T> EnExclusionAsync<T>(Func<Task<T>> operacion, CancellationToken ct);
 }

@@ -348,8 +348,8 @@ public sealed partial class ServidorDemo
     {
         if (string.IsNullOrWhiteSpace(r?.Modo) || !TextoModoLiquidacion.TryParse(r.Modo, out var modo))
             return Mal(HttpStatusCode.BadRequest, "El modo de liquidación debe ser «mensual» o «ciclos».");
-        var nuevo = await _liquidacion.CambiarModoAsync(modo, ct);
-        return Ok(new ModoLiquidacionResponse(TextoModoLiquidacion.ATexto(nuevo)));
+        var res = await _liquidacion.CambiarModoAsync(modo, ct);
+        return res.Error is { } e ? Error(e) : Ok(new ModoLiquidacionResponse(TextoModoLiquidacion.ATexto(res.Valor)));
     }
 
     private async Task<HttpResponseMessage> FijarFrecuencia(FijarFrecuenciaAportacionRequest r, CancellationToken ct)

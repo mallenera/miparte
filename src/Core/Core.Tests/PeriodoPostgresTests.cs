@@ -46,7 +46,9 @@ public class PeriodoPostgresTests
         Assert.Equal(HttpStatusCode.Conflict, (await c.PostAsync("/api/hogar/cerrar-periodo", null)).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await c.PostAsync("/api/hogar/reabrir-periodo", null)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await c.PostAsync("/api/hogar/reabrir-periodo", null)).StatusCode);
-        Assert.Equal(HttpStatusCode.NoContent, (await c.DeleteAsync($"/api/gastos/{gasto.Id}")).StatusCode);
+        // Reabrir no deshace la liquidación: el gasto sigue en el ciclo cerrado y no se puede borrar.
+        var borrarTrasReabrir = await c.DeleteAsync($"/api/gastos/{gasto.Id}");
+        Assert.Equal(HttpStatusCode.Conflict, borrarTrasReabrir.StatusCode);
     }
 
     /// <summary>Fija el periodo propio del hogar como abierto desde <paramref name="desde"/>; la API aún no lo expone.</summary>

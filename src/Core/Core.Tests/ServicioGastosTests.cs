@@ -196,4 +196,56 @@ public class ServicioGastosTests
         Assert.Null(r.Error);
         Assert.Empty(_repo.Gastos);
     }
+
+    [Fact]
+    public async Task Editar_GastoYaLiquidadoPorUnCiclo_EsConflictoYNoCambiaNada()
+    {
+        var creado = (await Servicio.CrearAsync(Hogar, Datos(900m), default)).Valor!;
+        creado.CicloLiquidacionId = Guid.NewGuid();
+        var repartoAntes = creado.Repartos.ToDictionary(x => x.MiembroId, x => x.ImporteAsumido);
+
+        var r = await Servicio.EditarAsync(creado.Id, Datos(300m), default);
+
+        Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
+        Assert.Equal(Mensajes.GastoEnCiclo, r.Error.Mensaje);
+        Assert.Equal(900m, creado.Importe);
+        Assert.Equal(repartoAntes, creado.Repartos.ToDictionary(x => x.MiembroId, x => x.ImporteAsumido));
+    }
+
+    [Fact]
+    public async Task Borrar_GastoYaLiquidadoPorUnCiclo_EsConflictoYConservaElGasto()
+    {
+        var creado = (await Servicio.CrearAsync(Hogar, Datos(), default)).Valor!;
+        creado.CicloLiquidacionId = Guid.NewGuid();
+
+        var r = await Servicio.BorrarAsync(creado.Id, default);
+
+        Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
+        Assert.Equal(Mensajes.GastoEnCiclo, r.Error.Mensaje);
+        Assert.Single(_repo.Gastos);
+    }
+
+    [Fact]
+    public async Task Editar_SeEjecutaBajoLaExclusionDelHogar()
+    {
+        var creado = (await Servicio.CrearAsync(Hogar, Datos(900m), default)).Valor!;
+        var antes = _repo.Exclusiones;
+
+        var r = await Servicio.EditarAsync(creado.Id, Datos(300m), default);
+
+        Assert.Null(r.Error);
+        Assert.Equal(antes + 1, _repo.Exclusiones);
+    }
+
+    [Fact]
+    public async Task Borrar_SeEjecutaBajoLaExclusionDelHogar()
+    {
+        var creado = (await Servicio.CrearAsync(Hogar, Datos(), default)).Valor!;
+        var antes = _repo.Exclusiones;
+
+        var r = await Servicio.BorrarAsync(creado.Id, default);
+
+        Assert.Null(r.Error);
+        Assert.Equal(antes + 1, _repo.Exclusiones);
+    }
 }

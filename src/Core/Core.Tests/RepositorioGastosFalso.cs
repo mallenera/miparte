@@ -17,6 +17,9 @@ internal sealed class RepositorioGastosFalso : IRepositorioGastos
     public DatosAhorro Ahorro { get; set; } = new([], [], 0m, 0m);
     public bool RechazarAlGuardar { get; set; }
 
+    /// <summary>Veces que se ha entrado en la exclusión del hogar.</summary>
+    public int Exclusiones { get; private set; }
+
     private readonly List<Gasto> _porAnadir = [];
     private readonly List<Gasto> _porEliminar = [];
 
@@ -64,5 +67,12 @@ internal sealed class RepositorioGastosFalso : IRepositorioGastos
         Gastos.AddRange(pendientesAnadir);
         foreach (var g in pendientesEliminar) Gastos.Remove(g);
         return Task.FromResult(true);
+    }
+
+    /// <summary>En memoria no hay concurrencia que serializar: solo cuenta la entrada y ejecuta la operación.</summary>
+    public Task<T> EnExclusionAsync<T>(Func<Task<T>> operacion, CancellationToken ct)
+    {
+        Exclusiones++;
+        return operacion();
     }
 }

@@ -65,6 +65,21 @@ public class ResumenCompartibleTests
     }
 
     [Fact]
+    public void Por_ciclos_el_titulo_no_lleva_mes_porque_las_transferencias_son_las_pendientes()
+    {
+        var liquidacion = new LiquidacionResponse("2026-10",
+            [new SaldoMiembroDto(_ana, "Ana", 5m), new SaldoMiembroDto(_luis, "Luis", -5m)],
+            [new TransferenciaDto(_luis, _ana, 5m)],
+            []);
+
+        var texto = ResumenCompartible.Generar("Piso", Octubre, liquidacion, [], porCiclos: true);
+
+        Assert.StartsWith("Resumen de Piso · gastos pendientes de liquidar\n", texto);
+        Assert.DoesNotContain("octubre", texto);
+        Assert.Contains("Luis debe a Ana 5,00 €", texto);
+    }
+
+    [Fact]
     public void No_muestra_identificadores_tecnicos()
     {
         var liquidacion = new LiquidacionResponse("2026-10",

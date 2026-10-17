@@ -191,7 +191,7 @@ else if (_m.Resumen is not null && _m.Liquidacion is not null)
         }
     </section>
 
-    <TarjetaCompartir NombreHogar="@(Hogar.HogarActual?.Nombre ?? "")" Mes="@_m.Mes" Liquidacion="@_m.Liquidacion" Miembros="@_m.Miembros" />
+    <TarjetaCompartir NombreHogar="@(Hogar.HogarActual?.Nombre ?? "")" Mes="@_m.Mes" Liquidacion="@_m.Liquidacion" Miembros="@_m.Miembros" PorCiclos="@_m.PorCiclos" />
 
     @if (_m.Resumen.CuentaComun is { } cuenta)
     {

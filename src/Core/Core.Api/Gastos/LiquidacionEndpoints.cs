@@ -33,7 +33,7 @@ public static class LiquidacionEndpoints
 
     /// <summary>
     /// PUT /api/hogar/liquidacion (permiso <c>hogar.funciones</c>): cambia el modo a "mensual" o "ciclos". No altera los gastos ni los
-    /// ciclos ya cerrados. 400 si el modo no es válido; 409 sin hogar; 200 con el modo resultante.
+    /// ciclos ya cerrados. 400 si el modo no es válido; 409 sin hogar o si se pasa a mensual con ciclos cerrados; 200 con el modo resultante.
     /// </summary>
     private static async Task<IResult> CambiarModoAsync(
         ModoLiquidacionRequest req, [FromServices] ServicioLiquidacion servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
@@ -43,7 +43,8 @@ public static class LiquidacionEndpoints
             return ApiComun.Invalido("El modo de liquidación debe ser «mensual» o «ciclos».");
 
         var resultado = await servicio.CambiarModoAsync(modo, ct);
-        return Results.Ok(new ModoLiquidacionResponse(TextoModoLiquidacion.ATexto(resultado)));
+        if (resultado.Error is { } error) return ApiComun.Respuesta(error);
+        return Results.Ok(new ModoLiquidacionResponse(TextoModoLiquidacion.ATexto(resultado.Valor)));
     }
 
     /// <summary>

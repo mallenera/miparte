@@ -126,24 +126,49 @@ public class LiquidacionCiclosTests
         Assert.Equal(TipoError.Conflicto, cierre.Error!.Tipo);
         Assert.Empty(_repo.Ciclos);
         Assert.Equal(-50m, liquidacion.Saldos.First(s => s.MiembroId == _marcos).Importe);
-        Assert.Equal(ModoLiquidacion.Mensual, await Servicio.CambiarModoAsync(ModoLiquidacion.Mensual, CancellationToken.None));
+        Assert.Null((await Servicio.CambiarModoAsync(ModoLiquidacion.Mensual, CancellationToken.None)).Error);
     }
 
     [Fact]
-    public async Task CambiarDeModo_NoTocaCiclosNiGastosYaCerrados()
+    public async Task CambiarAMensual_ConCiclosCerrados_EsConflictoYNoTocaNada()
     {
         var g = GastoDeAna(100);
         var ciclo = (await Servicio.CerrarCicloAsync(Yo, CancellationToken.None)).Valor!.Ciclo;
 
-        await Servicio.CambiarModoAsync(ModoLiquidacion.Mensual, CancellationToken.None);
-        var ciclos = await Servicio.ListarCiclosAsync(CancellationToken.None);
-        await Servicio.CambiarModoAsync(ModoLiquidacion.Ciclos, CancellationToken.None);
+        var r = await Servicio.CambiarModoAsync(ModoLiquidacion.Mensual, CancellationToken.None);
 
+        Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
+        Assert.Equal(Mensajes.CiclosCerradosSinMensual, r.Error.Mensaje);
+        Assert.Equal(ModoLiquidacion.Ciclos, _repo.Modo);
+        var ciclos = await Servicio.ListarCiclosAsync(CancellationToken.None);
         Assert.Single(ciclos);
         Assert.Equal(ciclo.Id, ciclos[0].Ciclo.Id);
         Assert.Equal(100m, ciclos[0].Ciclo.Total);
         Assert.Equal(ciclo.Id, g.CicloLiquidacionId);
-        Assert.Single(_repo.Ciclos);
+    }
+
+    [Fact]
+    public async Task CambiarAMensual_SinCiclosCerrados_SiEsPermitidoYVuelveAlCalculoMensual()
+    {
+        GastoDeAna(100);
+
+        var r = await Servicio.CambiarModoAsync(ModoLiquidacion.Mensual, CancellationToken.None);
+
+        Assert.Null(r.Error);
+        Assert.Equal(ModoLiquidacion.Mensual, r.Valor);
+        Assert.Equal(ModoLiquidacion.Mensual, _repo.Modo);
+    }
+
+    [Fact]
+    public async Task CambiarACiclos_ConCiclosCerrados_SigueSiendoPermitido()
+    {
+        GastoDeAna(100);
+        await Servicio.CerrarCicloAsync(Yo, CancellationToken.None);
+
+        var r = await Servicio.CambiarModoAsync(ModoLiquidacion.Ciclos, CancellationToken.None);
+
+        Assert.Null(r.Error);
+        Assert.Equal(ModoLiquidacion.Ciclos, _repo.Modo);
     }
 
     [Fact]

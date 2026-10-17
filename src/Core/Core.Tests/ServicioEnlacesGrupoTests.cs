@@ -279,6 +279,20 @@ public class ServicioEnlacesGrupoTests
         Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
     }
 
+    [Fact]
+    public async Task Unirse_SiElUsuarioYaFiguraEnElHogarAlConfirmar_EsConflictoConMensajeDeHogar()
+    {
+        AnadirEnlace("tok");
+        _enlaces.ResultadoUso = ResultadoUsoEnlace.UsuarioYaEnHogar;
+        var antes = _miembros.Miembros.Count;
+
+        var r = await Servicio.UnirseAsync(_userNuevo, "tok", "Laura", default);
+
+        Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
+        Assert.Equal("Ya perteneces a este hogar.", r.Error.Mensaje);
+        Assert.Equal(antes, _miembros.Miembros.Count);
+    }
+
     /// <summary>Reloj que avanza solo cuando el test lo pide.</summary>
     private sealed class RelojManual(DateTimeOffset ahora) : TimeProvider
     {

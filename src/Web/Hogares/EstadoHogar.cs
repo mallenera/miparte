@@ -91,6 +91,17 @@ public sealed class EstadoHogar
         Cambiado?.Invoke();
     }
 
+    /// <summary>Actualiza el modo de liquidación del hogar actual tras cambiarlo (mensual o ciclos), sin volver a pedir <c>/api/yo</c>.</summary>
+    /// <param name="liquidacionModo">Modo nuevo (ver <c>ModosLiquidacion</c>).</param>
+    public void ActualizarLiquidacion(string liquidacionModo)
+    {
+        if (HogarActual is not { } actual) return;
+        var nuevo = actual with { LiquidacionModo = liquidacionModo };
+        Hogares = Hogares.Select(h => h.Id == nuevo.Id ? nuevo : h).ToList();
+        HogarActual = nuevo;
+        Cambiado?.Invoke();
+    }
+
     /// <summary>Olvida hogares y elección (al cerrar sesión), para que otro usuario del mismo navegador no la herede.</summary>
     public async Task LimpiarAsync()
     {

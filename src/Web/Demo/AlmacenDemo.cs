@@ -43,6 +43,9 @@ internal sealed class AlmacenDemo
     /// <summary>Pagos de liquidación.</summary>
     public List<PagoLiquidacionRegistro> Pagos { get; } = [];
 
+    /// <summary>Ciclos de liquidación cerrados (modo por ciclos).</summary>
+    public List<CicloLiquidacion> Ciclos { get; } = [];
+
     /// <summary>Meses cerrados.</summary>
     public List<MesCerrado> Cierres { get; } = [];
 

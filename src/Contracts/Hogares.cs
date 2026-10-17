@@ -25,6 +25,16 @@ public static class TiposGrupo
     public const string Otro = "otro";
 }
 
+/// <summary>Modos de liquidación del hogar (texto de la API y de la base de datos).</summary>
+public static class ModosLiquidacion
+{
+    /// <summary>Un saldo por mes natural (por defecto).</summary>
+    public const string Mensual = "mensual";
+
+    /// <summary>Cada cierre liquida los gastos pendientes desde el cierre anterior.</summary>
+    public const string Ciclos = "ciclos";
+}
+
 /// <summary>Datos básicos de un hogar.</summary>
 /// <param name="Id">Identificador del hogar.</param>
 /// <param name="Nombre">Nombre del hogar.</param>
@@ -32,9 +42,10 @@ public static class TiposGrupo
 /// <param name="AhorroActivo">Si el hogar tiene activado el ahorro de la cuenta común.</param>
 /// <param name="Tipo">Tipo de grupo (ver <see cref="TiposGrupo"/>); "hogar" por defecto.</param>
 /// <param name="RecurrentesActivas">Si el hogar genera gastos recurrentes; con false no se crean plantillas ni se generan gastos.</param>
+/// <param name="LiquidacionModo">Cómo liquida el hogar (ver <see cref="ModosLiquidacion"/>); "mensual" por defecto.</param>
 public record HogarResumen(
     Guid Id, string Nombre, bool CuentaComunActiva = false, bool AhorroActivo = false, string Tipo = TiposGrupo.Hogar,
-    bool RecurrentesActivas = true);
+    bool RecurrentesActivas = true, string LiquidacionModo = ModosLiquidacion.Mensual);
 
 /// <summary>Respuesta de GET /api/yo: usuario, sus hogares y el hogar actual (null si no se puede determinar).</summary>
 /// <param name="UserId">Identificador del usuario (claim "sub" del JWT), o null si no consta.</param>

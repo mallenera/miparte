@@ -1049,6 +1049,63 @@ public class ComponentesTests : BunitContext
         Assert.Contains("\"ahorro\":0", api.Cuerpos["PUT /api/cuenta-comun/aportaciones"]);
     }
 
+    [Fact]
+    public async Task Configuracion_pasa_la_liquidacion_a_ciclos_desde_el_selector()
+    {
+        var api = ApiConHogar(soyAdmin: true)
+            .Responde("PUT /api/hogar/liquidacion", HttpStatusCode.OK, new ModoLiquidacionResponse(ModosLiquidacion.Ciclos));
+        var c = await ConfiguracionAsync(true, Casa, api);
+
+        var selector = c.FindAll("select").First(s => s.TextContent.Contains("Por ciclos"));
+        Assert.Equal("mensual", selector.QuerySelector("option[selected]")?.GetAttribute("value"));
+        selector.Change("ciclos");
+
+        Assert.Contains("\"modo\":\"ciclos\"", api.Cuerpos["PUT /api/hogar/liquidacion"]);
+        Assert.Contains("Por ciclos: cada vez que el grupo quiera cerrar", c.Markup);
+    }
+
+    [Fact]
+    public void Resumen_en_modo_ciclos_cierra_la_liquidacion_solo_tras_confirmarlo_y_no_ofrece_pagos()
+    {
+        var ciclo = new CicloLiquidacionDto(Guid.NewGuid(), 1, DateTimeOffset.UtcNow, AnaId, "Ana",
+            new DateOnly(2026, 10, 3), new DateOnly(2026, 10, 5), 150m);
+        var resumen = new ResumenMensualResponse("2026-10", 80m,
+            [new ResumenMiembroDto(AnaId, "Ana", 80m, 40m), new ResumenMiembroDto(LuisId, "Luis", 0m, 40m)], []);
+        var api = ApiResumen(resumen, Liquidacion(40m))
+            .Responde("GET /api/liquidacion/ciclos", HttpStatusCode.OK, new[] { ciclo })
+            .Responde("POST /api/liquidacion/ciclos", HttpStatusCode.Created, ciclo);
+        Registrar(api, new HogarResumen(Guid.NewGuid(), "Casa", LiquidacionModo: ModosLiquidacion.Ciclos));
+
+        var c = Render<VistaResumen>();
+
+        Assert.DoesNotContain("Registrar pago", c.Markup);
+        Assert.Contains("Liquidación n.º 1", c.Markup);
+        Assert.DoesNotContain("POST /api/liquidacion/ciclos", api.Recibidas);
+
+        // Primer clic: pide confirmación en la propia página, sin cerrar nada todavía.
+        c.FindAll("button").First(b => b.TextContent.Trim() == "Cerrar liquidación").Click();
+        Assert.Contains("¿Cerrar la liquidación?", c.Markup);
+        Assert.DoesNotContain("POST /api/liquidacion/ciclos", api.Recibidas);
+
+        c.FindAll("button").First(b => b.TextContent.Contains("Sí, cerrar")).Click();
+        Assert.Contains("POST /api/liquidacion/ciclos", api.Recibidas);
+    }
+
+    [Fact]
+    public void Resumen_en_modo_mensual_no_muestra_el_cierre_de_ciclos()
+    {
+        var resumen = new ResumenMensualResponse("2026-10", 80m,
+            [new ResumenMiembroDto(AnaId, "Ana", 80m, 40m), new ResumenMiembroDto(LuisId, "Luis", 0m, 40m)], []);
+        var api = ApiResumen(resumen, Liquidacion(40m));
+        Registrar(api, Casa);
+
+        var c = Render<VistaResumen>();
+
+        Assert.DoesNotContain("Cerrar liquidación", c.Markup);
+        Assert.DoesNotContain("GET /api/liquidacion/ciclos", api.Recibidas);
+        Assert.Contains("Registrar pago", c.Markup);
+    }
+
     private async Task<IRenderedComponent<VistaConfiguracionHogar>> ConfiguracionAsync(bool soyAdmin, HogarResumen hogar, ApiFalsa? api = null)
     {
         Registrar(api ?? ApiConHogar(soyAdmin));

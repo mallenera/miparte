@@ -33,8 +33,20 @@ public sealed class ServicioLiquidacion(IRepositorioLiquidacion repositorio, Tim
     public async Task<LiquidacionCalculada> LiquidacionAsync(DateOnly inicio, CancellationToken ct)
     {
         var delMes = await repositorio.GastosDelMesAsync(inicio, ct);
-        var pagos = await repositorio.PagosDelMesAsync(inicio, ct);
         var miembros = await repositorio.MiembrosAsync(ct);
+        return await LiquidarAsync(inicio, delMes, miembros, ct);
+    }
+
+    /// <summary>
+    /// Liquidación que ve el hogar según su modo. En mensual, la del mes con sus pagos. En ciclos, los gastos pendientes desde el
+    /// último cierre (el mes no importa) y sin pagos, porque en ciclos no se registran pagos (ver <see cref="RegistrarPagoAsync"/>).
+    /// </summary>
+    private async Task<LiquidacionCalculada> LiquidarAsync(
+        DateOnly inicio, IReadOnlyList<Gasto> delMes, IReadOnlyList<Miembro> miembros, CancellationToken ct)
+    {
+        if (await repositorio.ModoAsync(ct) == ModoLiquidacion.Ciclos)
+            return LiquidacionMes.Calcular(await repositorio.GastosPendientesAsync(ct), [], miembros);
+        var pagos = await repositorio.PagosDelMesAsync(inicio, ct);
         return LiquidacionMes.Calcular(delMes, pagos, miembros);
     }
 
@@ -48,10 +60,54 @@ public sealed class ServicioLiquidacion(IRepositorioLiquidacion repositorio, Tim
         var miembros = await repositorio.MiembrosAsync(ct);
         var categorias = await repositorio.NombresCategoriasAsync(ct);
         var historico = await repositorio.HistoricoCuentaAsync(inicio, ct);
-        var pagos = await repositorio.PagosDelMesAsync(inicio, ct);
         return new ResumenYLiquidacion(
             ResumenMes.Construir(inicio, delMes, miembros, categorias, historico),
-            LiquidacionMes.Calcular(delMes, pagos, miembros));
+            await LiquidarAsync(inicio, delMes, miembros, ct));
+    }
+
+    /// <summary>Cambia el modo de liquidación del hogar. No altera los gastos ni los ciclos ya cerrados.</summary>
+    public async Task<ModoLiquidacion> CambiarModoAsync(ModoLiquidacion modo, CancellationToken ct)
+    {
+        await repositorio.EstablecerModoAsync(modo, ct);
+        return modo;
+    }
+
+    /// <summary>Ciclos cerrados del hogar, del más reciente al más antiguo.</summary>
+    public Task<IReadOnlyList<CicloConAutor>> ListarCiclosAsync(CancellationToken ct) => repositorio.ListarCiclosAsync(ct);
+
+    /// <summary>
+    /// Cierra el ciclo actual: congela los gastos pendientes (los marca como liquidados) y guarda el ciclo con su total y fechas.
+    /// Cerrar no bloquea los gastos, que siguen consultables. El siguiente ciclo empieza con el primer gasto que se registre después.
+    /// Conflicto si el hogar liquida por meses o si no hay gastos pendientes.
+    /// </summary>
+    public async Task<Resultado<CicloConAutor>> CerrarCicloAsync(Miembro yo, CancellationToken ct)
+    {
+        try
+        {
+            return await repositorio.EnExclusionAsync(() => CerrarCicloBajoExclusionAsync(yo, ct), ct);
+        }
+        catch (CierreConcurrenteException)
+        {
+            return Resultado<CicloConAutor>.Conflicto(Mensajes.CierreConcurrente);
+        }
+    }
+
+    private async Task<Resultado<CicloConAutor>> CerrarCicloBajoExclusionAsync(Miembro yo, CancellationToken ct)
+    {
+        if (await repositorio.ModoAsync(ct) != ModoLiquidacion.Ciclos)
+            return Resultado<CicloConAutor>.Conflicto(Mensajes.HogarNoEsCiclos);
+
+        var pendientes = CalculoCiclo.Pendientes(await repositorio.GastosPendientesAsync(ct));
+        if (pendientes.Count == 0) return Resultado<CicloConAutor>.Conflicto(Mensajes.SinGastosPendientes);
+
+        var (total, desde, hasta) = CalculoCiclo.Resumir(pendientes);
+        var ciclo = new CicloLiquidacion
+        {
+            Id = Guid.NewGuid(), HogarId = yo.HogarId, Numero = await repositorio.UltimoNumeroCicloAsync(ct) + 1,
+            CerradoEn = reloj.GetUtcNow(), CerradoPor = yo.Id, DesdeGastoFecha = desde, HastaFecha = hasta, Total = total,
+        };
+        await repositorio.CerrarCicloAsync(ciclo, pendientes.Select(g => g.Id).ToList(), ct);
+        return Resultado<CicloConAutor>.Ok(new CicloConAutor(ciclo, yo.Nombre));
     }
 
     /// <summary>
@@ -61,6 +117,7 @@ public sealed class ServicioLiquidacion(IRepositorioLiquidacion repositorio, Tim
     /// </summary>
     public async Task<Resultado<PagoLiquidacionRegistro>> RegistrarPagoAsync(RegistrarPago pago, CancellationToken ct)
     {
+        if (await repositorio.ModoAsync(ct) == ModoLiquidacion.Ciclos) return Resultado<PagoLiquidacionRegistro>.Conflicto(Mensajes.PagosEnCiclos);
         if (pago.Mes.Day != 1) return Resultado<PagoLiquidacionRegistro>.Invalido("El mes del pago debe ser el día 1 del mes.");
         if (pago.De == pago.A) return Resultado<PagoLiquidacionRegistro>.Invalido("Quien paga y quien recibe deben ser distintos.");
         var errorCampos = ReglasMovimiento.ValidarImporte(pago.Importe) ?? ReglasMovimiento.ValidarConcepto(pago.Concepto);

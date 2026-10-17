@@ -42,7 +42,19 @@ public sealed class ModeloResumen(CoreApiClient api, DateOnly hoy)
     /// <summary>Meses cerrados.</summary>
     public List<MesCerradoDto> Cierres { get; private set; } = [];
 
+    /// <summary>Ciclos de liquidación cerrados, del más reciente al más antiguo (solo con el hogar en modo ciclos).</summary>
+    public List<CicloLiquidacionDto> Ciclos { get; private set; } = [];
+
+    /// <summary>
+    /// Si el hogar liquida por ciclos. Entonces la liquidación se cierra con «Cerrar liquidación» y no se registran pagos; lo fija la
+    /// pantalla antes de cargar.
+    /// </summary>
+    public bool PorCiclos { get; set; }
+
     // ───── Estado de pantalla ─────
+
+    /// <summary>Si la persona está confirmando el cierre de la liquidación.</summary>
+    public bool ConfirmandoCierre { get; set; }
 
     /// <summary>Si se están cargando los datos.</summary>
     public bool Cargando { get; private set; } = true;
@@ -161,9 +173,10 @@ public sealed class ModeloResumen(CoreApiClient api, DateOnly hoy)
         var version = ++_version;
         var datos = api.ObtenerResumenYLiquidacionAsync(Formato.Mes(_mes));
         var cierres = OVacia(api.ListarCierresMesAsync()); // el cierre es informativo aquí: sin él se sigue viendo el resumen
+        var ciclos = PorCiclos ? OVacia(api.ListarCiclosLiquidacionAsync()) : Task.FromResult<List<CicloLiquidacionDto>>([]);
         try
         {
-            await Task.WhenAll(datos, cierres);
+            await Task.WhenAll(datos, cierres, ciclos);
         }
         catch (ApiException) when (version != _version)
         {
@@ -174,7 +187,20 @@ public sealed class ModeloResumen(CoreApiClient api, DateOnly hoy)
         Resumen = datos.Result.Resumen;
         Liquidacion = datos.Result.Liquidacion;
         Cierres = cierres.Result;
+        Ciclos = ciclos.Result;
     }
+
+    /// <summary>
+    /// Cierra la liquidación por ciclos: liquida los gastos pendientes desde el cierre anterior. Devuelve el aviso, o null si falló (el
+    /// error queda en <see cref="Error"/>).
+    /// </summary>
+    public Task<string?> CerrarCicloAsync() =>
+        EjecutarAsync(async () =>
+        {
+            await api.CerrarCicloLiquidacionAsync();
+            ConfirmandoCierre = false;
+            return "Liquidación cerrada";
+        });
 
     /// <summary>Espera una lista opcional: si la API falla, la pantalla sigue con la lista vacía.</summary>
     private static async Task<List<T>> OVacia<T>(Task<List<T>> carga)

@@ -36,7 +36,14 @@ else if (_m.Resumen is not null && _m.Liquidacion is not null)
 
     <section class="card" aria-labelledby="t-liquidacion">
         <div class="card-head"><h2 id="t-liquidacion">Liquidación</h2></div>
-        <p class="muted">Quién debe a quién para quedar en paz este mes. Los pagos que registres, completos o parciales, se descuentan de los saldos.</p>
+        @if (_m.PorCiclos)
+        {
+            <p class="muted">Quién debe a quién desde el último cierre. Cuando el grupo haya saldado sus cuentas, cierra la liquidación: los gastos quedan liquidados y el cierre se guarda.</p>
+        }
+        else
+        {
+            <p class="muted">Quién debe a quién para quedar en paz este mes. Los pagos que registres, completos o parciales, se descuentan de los saldos.</p>
+        }
 
         @if (_m.Liquidacion.Saldos.Count > 1)
         {
@@ -65,13 +72,22 @@ else if (_m.Resumen is not null && _m.Liquidacion is not null)
         @if (_m.Liquidacion.Transferencias.Count == 0)
         {
             <div class="aviso ok u-mt12" role="status">
-                @(_m.Liquidacion.Saldos.Count == 0 ? "Todavía no hay nada que liquidar este mes." : "Este mes está saldado: nadie debe nada.")
+                @(_m.PorCiclos
+                    ? "No hay gastos pendientes desde el último cierre."
+                    : _m.Liquidacion.Saldos.Count == 0 ? "Todavía no hay nada que liquidar este mes." : "Este mes está saldado: nadie debe nada.")
             </div>
         }
         else
         {
             <h3 class="u-sec">Transferencias sugeridas</h3>
-            <p class="muted">Cambia el importe para registrar un pago parcial; lo que quede seguirá pendiente.</p>
+            @if (_m.PorCiclos)
+            {
+                <p class="muted">Lo que queda por pagar entre vosotros. En la liquidación por ciclos los pagos se hacen fuera de la app.</p>
+            }
+            else
+            {
+                <p class="muted">Cambia el importe para registrar un pago parcial; lo que quede seguirá pendiente.</p>
+            }
             @foreach (var t in _m.Liquidacion.Transferencias.Where(t => _m.FiltraMiembro(t.De) || _m.FiltraMiembro(t.A)))
             {
                 <div class="gastorow">
@@ -83,6 +99,8 @@ else if (_m.Resumen is not null && _m.Liquidacion is not null)
                             <div id="@IdError(t)" class="muted g-meta" role="status">Importe entre 0,01 y @Formato.Euros(t.Importe), con máximo 2 decimales.</div>
                         }
                     </div>
+                    @if (!_m.PorCiclos)
+                    {
                     <div class="c-acc pagoimp">
                         <label class="sr" for="@IdImporte(t)">Importe a pagar de @Formato.NombreMiembro(t.De, _m.Miembros) a @Formato.NombreMiembro(t.A, _m.Miembros)</label>
                         <input id="@IdImporte(t)" class="g-importe" inputmode="decimal" value="@_m.ImporteEscrito(t)"
@@ -98,7 +116,50 @@ else if (_m.Resumen is not null && _m.Liquidacion is not null)
                             <span class="muted">Sin permiso para registrar pagos</span>
                         }
                     </div>
+                    }
                 </div>
+            }
+        }
+
+        @if (_m.PorCiclos)
+        {
+            <h3 class="u-sec">Cerrar liquidación</h3>
+            @if (_m.ConfirmandoCierre)
+            {
+                <div class="aviso warn u-mt12" role="status">
+                    <p>¿Cerrar la liquidación? Se marcan como liquidados todos los gastos pendientes y el cierre queda guardado con su total. Los gastos siguen visibles.</p>
+                    <div class="u-fila-mt10">
+                        <button class="btn" type="button" disabled="@_m.Guardando" @onclick="CerrarCicloAsync">Sí, cerrar la liquidación</button>
+                        <button class="linkbtn" type="button" @onclick="() => _m.ConfirmandoCierre = false">Cancelar</button>
+                    </div>
+                </div>
+            }
+            else if (Permisos.Tiene(Claves.PagosRegistrar))
+            {
+                <p class="muted">Cuando el grupo haya saldado sus cuentas, cierra la liquidación.</p>
+                <button class="btn" type="button" disabled="@_m.Guardando" @onclick="() => _m.ConfirmandoCierre = true">Cerrar liquidación</button>
+            }
+            else
+            {
+                <span class="muted">Sin permiso para cerrar la liquidación</span>
+            }
+
+            @if (_m.Ciclos.Count > 0)
+            {
+                <h3 class="u-sec">Liquidaciones cerradas</h3>
+                @foreach (var c in _m.Ciclos)
+                {
+                    <div class="gastorow">
+                        <div class="g-main">
+                            <div class="g-concepto">Liquidación n.º @c.Numero</div>
+                            <div class="muted g-meta">
+                                @c.DesdeGastoFecha.ToString("dd/MM/yyyy", Es) a @c.HastaFecha.ToString("dd/MM/yyyy", Es)
+                                · cerrada el @c.CerradoEn.ToLocalTime().ToString("dd/MM/yyyy", Es)@(c.Autor is null ? "" : " por " + c.Autor)
+                            </div>
+                        </div>
+                        <div class="g-importe">@Formato.Euros(c.Total)</div>
+                    </div>
+                }
             }
         }
 
@@ -257,6 +318,7 @@ else if (_m.Resumen is not null && _m.Liquidacion is not null)
 
     private async Task CargarAsync()
     {
+        _m.PorCiclos = Hogar.HogarActual?.LiquidacionModo == ModosLiquidacion.Ciclos;
         _m.IniciarCarga();
         await Permisos.AsegurarAsync();
         await _m.CargarAsync();
@@ -272,6 +334,8 @@ else if (_m.Resumen is not null && _m.Liquidacion is not null)
     private Task RegistrarPagoAsync(TransferenciaDto t) => Mostrar(_m.RegistrarPagoAsync(t));
 
     private Task EliminarPagoAsync(PagoLiquidacionDto p) => Mostrar(_m.EliminarPagoAsync(p));
+
+    private Task CerrarCicloAsync() => Mostrar(_m.CerrarCicloAsync());
 
     /// <summary>Espera la operación del modelo y, si salió bien, muestra su aviso.</summary>
     private async Task Mostrar(Task<string?> operacion)

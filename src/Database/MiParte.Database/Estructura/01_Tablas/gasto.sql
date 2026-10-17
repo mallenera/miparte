@@ -15,6 +15,7 @@ CREATE TABLE public.gasto (
     a_cargo_cuenta_comun boolean DEFAULT false NOT NULL,
     pagado_desde_ahorro boolean DEFAULT false NOT NULL,
     es_personal boolean DEFAULT false NOT NULL,
+    ciclo_liquidacion_id uuid,
     CONSTRAINT gasto_es_personal_check CHECK (((NOT es_personal) OR ((pagado_por IS NOT NULL) AND (NOT a_cargo_cuenta_comun) AND (NOT pagado_desde_ahorro)))),
     CONSTRAINT gasto_importe_check CHECK ((importe > (0)::numeric)),
     CONSTRAINT gasto_pagado_desde_ahorro_check CHECK (((NOT pagado_desde_ahorro) OR ((pagado_por IS NULL) AND a_cargo_cuenta_comun))),

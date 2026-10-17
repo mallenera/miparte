@@ -1,6 +1,7 @@
 using MiParte.Contracts;
 using MiParte.Core.Application.Cierres;
 using MiParte.Core.Application.CuentaComun;
+using MiParte.Core.Application.Liquidacion;
 using MiParte.Core.Domain;
 using MiParte.Core.Domain.Entidades;
 
@@ -42,7 +43,12 @@ public static class Dtos
 
     /// <summary>Hogar con las funciones activadas y su tipo de grupo.</summary>
     public static HogarResumen ADto(this Hogar h)
-        => new(h.Id, h.Nombre, h.CuentaComunActiva, h.AhorroActivo, TextoTipoGrupo.ATexto(h.Tipo), h.RecurrentesActivas);
+        => new(h.Id, h.Nombre, h.CuentaComunActiva, h.AhorroActivo, TextoTipoGrupo.ATexto(h.Tipo), h.RecurrentesActivas,
+            TextoModoLiquidacion.ATexto(h.LiquidacionModo));
+
+    /// <summary>Ciclo de liquidación cerrado, con el nombre de quien lo cerró.</summary>
+    public static CicloLiquidacionDto ADto(this CicloConAutor c)
+        => new(c.Ciclo.Id, c.Ciclo.Numero, c.Ciclo.CerradoEn, c.Ciclo.CerradoPor, c.Autor, c.Ciclo.DesdeGastoFecha, c.Ciclo.HastaFecha, c.Ciclo.Total);
 
     /// <summary>Pago de liquidación.</summary>
     public static PagoLiquidacionDto ADto(this PagoLiquidacionRegistro p)

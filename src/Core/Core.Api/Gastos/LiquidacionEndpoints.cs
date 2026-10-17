@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using MiParte.Contracts;
+using MiParte.Core.Api.Hogares;
 using MiParte.Core.Api.Seguridad;
 using MiParte.Core.Application;
 using MiParte.Core.Application.Liquidacion;
@@ -24,7 +25,50 @@ public static class LiquidacionEndpoints
         app.MapGet("/api/resumen-liquidacion", ResumenYLiquidacionAsync).RequireAuthorization();
         app.MapPost("/api/pagos-liquidacion", CrearPagoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.PagosRegistrar);
         app.MapDelete("/api/pagos-liquidacion/{id:guid}", BorrarPagoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.PagosRegistrar);
+        app.MapPut("/api/hogar/liquidacion", CambiarModoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.HogarFunciones);
+        app.MapPost("/api/liquidacion/ciclos", CerrarCicloAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.PagosRegistrar);
+        app.MapGet("/api/liquidacion/ciclos", ListarCiclosAsync).RequireAuthorization();
         return app;
+    }
+
+    /// <summary>
+    /// PUT /api/hogar/liquidacion (permiso <c>hogar.funciones</c>): cambia el modo a "mensual" o "ciclos". No altera los gastos ni los
+    /// ciclos ya cerrados. 400 si el modo no es válido; 409 sin hogar; 200 con el modo resultante.
+    /// </summary>
+    private static async Task<IResult> CambiarModoAsync(
+        ModoLiquidacionRequest req, [FromServices] ServicioLiquidacion servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
+    {
+        if (hogar.HogarId is null) return ApiComun.SinHogar();
+        if (string.IsNullOrWhiteSpace(req?.Modo) || !TextoModoLiquidacion.TryParse(req.Modo, out var modo))
+            return ApiComun.Invalido("El modo de liquidación debe ser «mensual» o «ciclos».");
+
+        var resultado = await servicio.CambiarModoAsync(modo, ct);
+        return Results.Ok(new ModoLiquidacionResponse(TextoModoLiquidacion.ATexto(resultado)));
+    }
+
+    /// <summary>
+    /// POST /api/liquidacion/ciclos (permiso <c>pagos.registrar</c>): cierra el ciclo actual, que liquida los gastos pendientes desde el
+    /// cierre anterior. 403 sin permiso; 409 sin hogar, si el hogar liquida por meses, si no hay gastos sin liquidar o si otro cierre
+    /// acaba de hacerse; 201 con el ciclo creado.
+    /// </summary>
+    private static async Task<IResult> CerrarCicloAsync(
+        HttpContext ctx, [FromServices] ServicioLiquidacion servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
+    {
+        if (hogar.HogarId is null) return ApiComun.SinHogar();
+        if (!(ctx.Items.TryGetValue(HogarActualMiddleware.ClaveMiembro, out var resuelto) && resuelto is Miembro yo))
+            return Results.Json(new { error = Mensajes.SoloMiembroCierra }, statusCode: StatusCodes.Status403Forbidden);
+
+        var r = await servicio.CerrarCicloAsync(yo, ct);
+        if (r.Error is { } error) return ApiComun.Respuesta(error);
+        return Results.Created($"/api/liquidacion/ciclos/{r.Valor!.Ciclo.Id}", r.Valor.ADto());
+    }
+
+    /// <summary>GET /api/liquidacion/ciclos: ciclos cerrados del hogar, del más reciente al más antiguo, con su total y fechas. 409 sin hogar.</summary>
+    private static async Task<IResult> ListarCiclosAsync(
+        [FromServices] ServicioLiquidacion servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
+    {
+        if (hogar.HogarId is null) return ApiComun.SinHogar();
+        return Results.Ok((await servicio.ListarCiclosAsync(ct)).Select(c => c.ADto()).ToList());
     }
 
     /// <summary>GET /api/resumen?mes=YYYY-MM: gastos del mes, con totales pagados y asumidos por miembro y desglose por categoría. 409 sin hogar; 400 si el mes es inválido.</summary>

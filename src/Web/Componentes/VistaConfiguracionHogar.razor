@@ -54,6 +54,26 @@ else
             </label>
             <p class="muted">Crea cada mes los gastos de las plantillas (alquiler, suscripciones…). Desactivarlo deja las plantillas pausadas, sin borrarlas.</p>
         </div>
+        <div class="u-mt12">
+            <label class="filtro">Liquidación
+                <select @key="_m.ClaveLiquidacion" disabled="@(!PuedeFunciones || _m.GuardandoFunciones)"
+                        @onchange="e => CambiarLiquidacionAsync((string)e.Value!)">
+                    <option value="@ModosLiquidacion.Mensual" selected="@(_m.LiquidacionModo == ModosLiquidacion.Mensual)">Mensual</option>
+                    <option value="@ModosLiquidacion.Ciclos" selected="@(_m.LiquidacionModo == ModosLiquidacion.Ciclos)">Por ciclos</option>
+                </select>
+            </label>
+            <p class="muted">
+                @if (_m.LiquidacionModo == ModosLiquidacion.Ciclos)
+                {
+                    <span>Por ciclos: cada vez que el grupo quiera cerrar la liquidación (por ejemplo, al terminar un fin de semana) se liquidan los gastos pendientes desde el cierre anterior. Los gastos siguen visibles.</span>
+                }
+                else
+                {
+                    <span>Mensual: un saldo por mes natural, como hasta ahora.</span>
+                }
+                Cambiar de modo no altera los gastos ni los cierres ya hechos; los gastos que aún no se han liquidado por ciclos entrarán en el primer cierre.
+            </p>
+        </div>
         @if (!PuedeFunciones)
         {
             <p class="muted u-mt12">No tienes permiso para cambiar estas funciones. Pídeselo a un administrador del hogar.</p>
@@ -265,6 +285,8 @@ else
     private Task CambiarAhorroAsync(bool activo) => Mostrar(_m.CambiarAhorroAsync(activo));
 
     private Task CambiarRecurrentesAsync(bool activas) => Mostrar(_m.CambiarRecurrentesAsync(activas));
+
+    private Task CambiarLiquidacionAsync(string modo) => Mostrar(_m.CambiarLiquidacionAsync(modo));
 
     private void EmpezarRenombrar(MiembroDto m) => _m.EmpezarRenombrar(m);
 

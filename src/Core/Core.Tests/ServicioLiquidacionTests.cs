@@ -151,11 +151,39 @@ public class ServicioLiquidacionTests
     }
 
     /// <summary>Repositorio en memoria: cada lista es lo que «hay» en el hogar.</summary>
-    private sealed class RepositorioFalso : IRepositorioLiquidacion
+    internal sealed class RepositorioFalso : IRepositorioLiquidacion
     {
         public List<Gasto> Gastos { get; } = [];
         public List<Miembro> Miembros { get; } = [];
         public List<PagoLiquidacionRegistro> Pagos { get; } = [];
+        public List<CicloLiquidacion> Ciclos { get; } = [];
+        public ModoLiquidacion Modo { get; set; } = ModoLiquidacion.Mensual;
+
+        public Task<ModoLiquidacion> ModoAsync(CancellationToken ct) => Task.FromResult(Modo);
+
+        public Task EstablecerModoAsync(ModoLiquidacion modo, CancellationToken ct)
+        {
+            Modo = modo;
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<Gasto>> GastosPendientesAsync(CancellationToken ct)
+            => Task.FromResult<IReadOnlyList<Gasto>>(Gastos.Where(g => g.CicloLiquidacionId is null).ToList());
+
+        public Task<int> UltimoNumeroCicloAsync(CancellationToken ct) => Task.FromResult(Ciclos.Count == 0 ? 0 : Ciclos.Max(c => c.Numero));
+
+        public Task CerrarCicloAsync(CicloLiquidacion ciclo, IReadOnlyList<Guid> gastos, CancellationToken ct)
+        {
+            Ciclos.Add(ciclo);
+            foreach (var g in Gastos.Where(g => gastos.Contains(g.Id))) g.CicloLiquidacionId = ciclo.Id;
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<CicloConAutor>> ListarCiclosAsync(CancellationToken ct)
+            => Task.FromResult<IReadOnlyList<CicloConAutor>>(Ciclos.OrderByDescending(c => c.Numero).Select(c => new CicloConAutor(c, null)).ToList());
+
+        /// <summary>En memoria no hay concurrencia que serializar: la operación se ejecuta tal cual.</summary>
+        public Task<T> EnExclusionAsync<T>(Func<Task<T>> operacion, CancellationToken ct) => operacion();
 
         public Task<IReadOnlyList<Gasto>> GastosDelMesAsync(DateOnly inicio, CancellationToken ct)
             => Task.FromResult<IReadOnlyList<Gasto>>(Gastos.Where(g => g.Fecha >= inicio && g.Fecha < inicio.AddMonths(1)).ToList());

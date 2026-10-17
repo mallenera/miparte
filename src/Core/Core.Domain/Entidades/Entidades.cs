@@ -9,6 +9,19 @@ public enum ModoReparto { Porcentaje, Partes, CuentaComun, Individual }
 /// <summary>Rol de un miembro dentro del hogar.</summary>
 public enum RolMiembro { Admin, Miembro }
 
+/// <summary>
+/// Cómo liquida el hogar: <see cref="Mensual"/> (un saldo por mes natural, como siempre) o <see cref="Ciclos"/> (cada cierre
+/// liquida los gastos pendientes, cuando el grupo quiera).
+/// </summary>
+public enum ModoLiquidacion
+{
+    /// <summary>Liquidación por mes natural (valor por defecto).</summary>
+    Mensual,
+
+    /// <summary>Liquidación por ciclos: el saldo se calcula desde el último cierre.</summary>
+    Ciclos,
+}
+
 /// <summary>Tipo de grupo de gastos compartidos. Por defecto, un hogar.</summary>
 public enum TipoGrupo
 {
@@ -43,6 +56,8 @@ public class Hogar
     public bool AhorroActivo { get; set; }
     /// <summary>Si el hogar genera gastos recurrentes (alta de plantillas y generación del mes); desactivarlo deja las plantillas pausadas, sin borrarlas.</summary>
     public bool RecurrentesActivas { get; set; } = true;
+    /// <summary>Cómo liquida el hogar (mensual o por ciclos); cambiarlo no altera los gastos ni los ciclos ya cerrados.</summary>
+    public ModoLiquidacion LiquidacionModo { get; set; } = ModoLiquidacion.Mensual;
     /// <summary>Tipo de grupo; lo fija la creación y determina las categorías sembradas (ver <see cref="SemillaHogar"/>).</summary>
     public TipoGrupo Tipo { get; set; } = TipoGrupo.Hogar;
     /// <summary>Fecha del saldo inicial de la cuenta común (null si no se ha fijado); va con <see cref="SaldoInicialImporte"/>.</summary>
@@ -185,6 +200,30 @@ public class AportacionCuenta
     public decimal Importe { get; set; }
     /// <summary>Parte del importe mensual que va a ahorro (entre 0 e <see cref="Importe"/>); el resto queda para gastos.</summary>
     public decimal Ahorro { get; set; }
+}
+
+/// <summary>
+/// Liquidación por ciclos ya cerrada (tabla ciclo_liquidacion). Los gastos que liquida se marcan con
+/// <see cref="Gasto.CicloLiquidacionId"/> y dejan de contar como pendientes.
+/// </summary>
+public class CicloLiquidacion
+{
+    /// <summary>Identificador del ciclo.</summary>
+    public Guid Id { get; set; }
+    /// <summary>Hogar al que pertenece.</summary>
+    public Guid HogarId { get; set; }
+    /// <summary>Número correlativo del ciclo dentro del hogar, desde 1.</summary>
+    public int Numero { get; set; }
+    /// <summary>Instante en que se cerró.</summary>
+    public DateTimeOffset CerradoEn { get; set; }
+    /// <summary>Miembro que cerró el ciclo.</summary>
+    public Guid CerradoPor { get; set; }
+    /// <summary>Fecha más antigua de los gastos que liquida.</summary>
+    public DateOnly DesdeGastoFecha { get; set; }
+    /// <summary>Fecha más reciente de los gastos que liquida.</summary>
+    public DateOnly HastaFecha { get; set; }
+    /// <summary>Suma de los importes de los gastos que liquida.</summary>
+    public decimal Total { get; set; }
 }
 
 /// <summary>Mes cerrado por un admin (tabla mes_cerrado): sus gastos ya no se pueden crear, editar ni borrar. Reabrir = borrar la fila.</summary>
@@ -350,6 +389,8 @@ public class Gasto
     public bool PagadoDesdeAhorro { get; set; }
     /// <summary>Si es un gasto personal de quien lo paga: se asume al 100 % y queda fuera de la liquidación y de los totales del hogar.</summary>
     public bool EsPersonal { get; set; }
+    /// <summary>Ciclo de liquidación que ya saldó este gasto; null mientras está pendiente de liquidar por ciclos.</summary>
+    public Guid? CicloLiquidacionId { get; set; }
     /// <summary>Importe asumido por cada miembro.</summary>
     public List<GastoReparto> Repartos { get; set; } = [];
 }

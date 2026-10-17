@@ -152,8 +152,13 @@ Los gastos personales (§3.6) no entran en la liquidación ni en `gastosTotales`
 | `GET /api/resumen?mes=YYYY-MM` | Gastos del mes, por miembro y por categoría, y (si el hogar tiene la cuenta común activada) el bloque `cuentaComun` con los saldos al final del mes. `mes` obligatorio | - | `ResumenMensualResponse` 200 | 400 mes inválido; 409 sin hogar | miembro |
 | `GET /api/liquidacion?mes=YYYY-MM` | Saldos (ya descontando pagos), transferencias sugeridas y pagos registrados. `mes` obligatorio | - | `LiquidacionResponse` 200 | 400; 409 | miembro |
 | `GET /api/resumen-liquidacion?mes=YYYY-MM` | El resumen y la liquidación del mes en una sola respuesta: `{ resumen, liquidacion }`, con exactamente lo que devuelven `/api/resumen` y `/api/liquidacion`. Es lo que usa la pestaña Resumen (lee una vez los gastos y los miembros del mes en lugar de dos). `mes` obligatorio | - | `ResumenYLiquidacionResponse` 200 | 400; 409 | miembro |
-| `POST /api/pagos-liquidacion` | Registra un pago entre dos miembros del mes. El importe puede ser parcial o distinto del sugerido: cualquier valor > 0 (máx. 2 decimales) hasta la deuda pendiente del par; `GET /api/liquidacion` recalcula saldos y transferencias descontándolo, y se pueden registrar varios pagos hasta saldar | `CrearPagoLiquidacionRequest` | `PagoLiquidacionDto` 201 | 400 mes no es día 1, mismo miembro, importe (≤ 0 o más de 2 decimales), miembros fuera del hogar; 409 importe mayor que la deuda pendiente (`{ error, pendiente }`) o sin hogar | permiso `pagos.registrar` |
+| `POST /api/pagos-liquidacion` | Registra un pago entre dos miembros del mes (409 en modo `ciclos`, ver más abajo). El importe puede ser parcial o distinto del sugerido: cualquier valor > 0 (máx. 2 decimales) hasta la deuda pendiente del par; `GET /api/liquidacion` recalcula saldos y transferencias descontándolo, y se pueden registrar varios pagos hasta saldar | `CrearPagoLiquidacionRequest` | `PagoLiquidacionDto` 201 | 400 mes no es día 1, mismo miembro, importe (≤ 0 o más de 2 decimales), miembros fuera del hogar; 409 importe mayor que la deuda pendiente (`{ error, pendiente }`) o sin hogar | permiso `pagos.registrar` |
 | `DELETE /api/pagos-liquidacion/{id}` | Elimina un pago | - | 204 | 404; 409 sin hogar | permiso `pagos.registrar` |
+| `PUT /api/hogar/liquidacion` | **Permiso `hogar.funciones`.** Cambia el modo de liquidación del hogar: `{ "modo": "mensual" \| "ciclos" }` (`mensual` por defecto; los hogares existentes quedan en `mensual`). No altera gastos ni ciclos ya cerrados. Queda en el historial como `liquidacionModo` | `ModoLiquidacionRequest` | `{ "modo": "..." }` 200 | 400 modo inválido; 403 sin el permiso; 409 sin hogar | permiso `hogar.funciones` |
+| `POST /api/liquidacion/ciclos` | Cierra el **ciclo actual** (solo con `liquidacionModo` = `ciclos`): liquida los gastos pendientes —los que no tienen ciclo— y guarda el ciclo con su `total` (suma de sus importes) y `desdeGastoFecha` / `hastaFecha` (fechas extremas de esos gastos). Los marca como liquidados; **no bloquea los gastos**, que siguen consultables. El siguiente ciclo empieza con el primer gasto que se registre después. Sin cuerpo | - | `CicloLiquidacionDto` 201 | 409 sin hogar; hogar en modo `mensual`; «No hay gastos sin liquidar» si no hay pendientes; «Otra persona acaba de cerrar la liquidación…» si otro cierre se hace a la vez (todo o nada) | permiso `pagos.registrar` |
+| `GET /api/liquidacion/ciclos` | Ciclos cerrados del hogar, del más reciente al más antiguo: `numero`, `cerradoEn`, `cerradoPor` (miembro), `autor` (su nombre), `desdeGastoFecha`, `hastaFecha`, `total` | - | `CicloLiquidacionDto[]` 200 | 409 sin hogar | miembro |
+
+**Liquidación por ciclos.** Con `liquidacionModo` = `ciclos`, la liquidación no es mensual: `GET /api/liquidacion?mes=` (y el bloque `liquidacion` de `/api/resumen-liquidacion`) devuelve los saldos y transferencias de **los gastos pendientes desde el último cierre**, sin pagos (el parámetro `mes` se valida pero no filtra). Como los pagos se hacen fuera de la app, `POST /api/pagos-liquidacion` responde **409** con `"En la liquidación por ciclos no se registran pagos…"`. Cerrar un ciclo sin gastos pendientes responde 409, y cerrarlo en modo mensual también. `GET /api/resumen` no cambia: sigue siendo el resumen del mes. Cambiar el modo a `ciclos` con gastos anteriores aún sin ciclo hace que entren en el primer cierre.
 
 ### 3.9 Cuenta común
 
@@ -192,7 +197,7 @@ Un mes cerrado congela sus **gastos** y, con ellos, su reparto, su resumen y su 
 
 Cada cambio de gasto, gasto recurrente, pago de liquidación, aportación, reembolso, ingreso y retirada de ahorro, perfil, categoría, miembro, invitación y enlace de grupo queda registrado **en la misma transacción** que el cambio (no puede haber cambio sin rastro). `accion`: `crear` (solo `despues`), `editar` (solo los campos que cambian, en `antes` y `despues`), `borrar` (solo `antes`), `vincular` (un usuario queda ligado a un miembro al aceptar una invitación) y `usar` (invitación aceptada). El reparto de un gasto (`repartos`) y el detalle de un perfil (`detalle`) van dentro de su evento. Crear un hogar es un único evento (no se detalla la semilla). Nunca se registran el token de una invitación ni su hash. `autor` es el nombre del miembro vinculado al usuario; `usuarioId` sigue siendo válido aunque ese miembro se desactive.
 
-Total: 56 endpoints de negocio (5 hogares/yo, 10 miembros/invitaciones/enlaces de grupo, 4 categorías, 5 perfiles, 5 gastos, 6 recurrentes, 5 resumen/liquidación/pagos, 12 cuenta común, 3 cierre de mes, 1 auditoría) más `GET /health`.
+Total: 59 endpoints de negocio (5 hogares/yo, 10 miembros/invitaciones/enlaces de grupo, 4 categorías, 5 perfiles, 5 gastos, 6 recurrentes, 8 resumen/liquidación/pagos/ciclos, 12 cuenta común, 3 cierre de mes, 1 auditoría) más `GET /health`.
 
 ## 4. Ejemplos JSON
 
@@ -203,8 +208,8 @@ Total: 56 endpoints de negocio (5 hogares/yo, 10 miembros/invitaciones/enlaces d
 ```json
 {
   "userId": "7c1f6d3e-0b8a-4f55-9a53-1d2f6c1b9e10",
-  "hogares": [ { "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez", "cuentaComunActiva": false, "ahorroActivo": false, "tipo": "hogar", "recurrentesActivas": true } ],
-  "hogarActual": { "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez", "cuentaComunActiva": false, "ahorroActivo": false, "tipo": "hogar", "recurrentesActivas": true }
+  "hogares": [ { "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez", "cuentaComunActiva": false, "ahorroActivo": false, "tipo": "hogar", "recurrentesActivas": true, "liquidacionModo": "mensual" } ],
+  "hogarActual": { "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez", "cuentaComunActiva": false, "ahorroActivo": false, "tipo": "hogar", "recurrentesActivas": true, "liquidacionModo": "mensual" }
 }
 ```
 
@@ -214,7 +219,7 @@ Total: 56 endpoints de negocio (5 hogares/yo, 10 miembros/invitaciones/enlaces d
 { "nombreHogar": "Casa Pérez", "nombreMiembro": "Ana" }
 ```
 ```json
-{ "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez", "cuentaComunActiva": false, "ahorroActivo": false, "tipo": "hogar", "recurrentesActivas": true }
+{ "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez", "cuentaComunActiva": false, "ahorroActivo": false, "tipo": "hogar", "recurrentesActivas": true, "liquidacionModo": "mensual" }
 ```
 
 `POST /api/hogares` con tipo de grupo (`tipo` es opcional; sin él se crea un «hogar»):

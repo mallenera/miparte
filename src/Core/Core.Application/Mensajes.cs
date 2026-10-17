@@ -17,4 +17,16 @@ public static class Mensajes
 
     /// <summary>El hogar no ha activado el ahorro.</summary>
     public const string AhorroInactivo = "El ahorro no está activado en este hogar. Un administrador puede activarlo en la configuración del hogar.";
+
+    /// <summary>Se intenta cerrar un ciclo en un hogar que liquida por meses.</summary>
+    public const string HogarNoEsCiclos = "El hogar liquida por meses. Un administrador puede pasarlo a liquidación por ciclos en la configuración del hogar.";
+
+    /// <summary>Se intenta cerrar un ciclo sin gastos pendientes de liquidar.</summary>
+    public const string SinGastosPendientes = "No hay gastos sin liquidar";
+
+    /// <summary>Se intenta registrar un pago de liquidación en un hogar que liquida por ciclos.</summary>
+    public const string PagosEnCiclos = "En la liquidación por ciclos no se registran pagos: el grupo salda sus cuentas por su cuenta y después cierra la liquidación.";
+
+    /// <summary>Otro cierre de ciclo se ha completado a la vez; hay que volver a mirar los gastos pendientes.</summary>
+    public const string CierreConcurrente = "Otra persona acaba de cerrar la liquidación. Revisa los gastos pendientes y vuelve a intentarlo.";
 }

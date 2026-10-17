@@ -39,6 +39,9 @@ public sealed class ModeloConfiguracionHogar(CoreApiClient api, EstadoHogar hoga
     /// <summary>Si el hogar genera gastos recurrentes (plantillas y generación mensual).</summary>
     public bool RecurrentesActivas => hogar.HogarActual?.RecurrentesActivas ?? false;
 
+    /// <summary>Modo de liquidación del hogar: «mensual» o «ciclos».</summary>
+    public string LiquidacionModo => hogar.HogarActual?.LiquidacionModo ?? ModosLiquidacion.Mensual;
+
     /// <summary>Nombre del miembro, o «—» si no está.</summary>
     public string NombreDe(Guid id) => Miembros.FirstOrDefault(m => m.Id == id)?.Nombre ?? "—";
 
@@ -82,6 +85,9 @@ public sealed class ModeloConfiguracionHogar(CoreApiClient api, EstadoHogar hoga
 
     /// <summary>Clave de la casilla de recurrentes (cambia tras cada intento).</summary>
     public string ClaveRecurrentes => $"recurrentes-{_versionFunciones}";
+
+    /// <summary>Clave del selector de liquidación (cambia tras cada intento).</summary>
+    public string ClaveLiquidacion => $"liquidacion-{_versionFunciones}";
 
     // ───── Formularios ─────
 
@@ -167,6 +173,32 @@ public sealed class ModeloConfiguracionHogar(CoreApiClient api, EstadoHogar hoga
         EjecutarFuncionAsync(
             () => api.ActivarRecurrentesAsync(activas), CuentaComunActiva, AhorroActivo, activas,
             activas ? "Recurrentes activadas" : "Recurrentes desactivadas");
+
+    /// <summary>
+    /// Cambia el modo de liquidación («mensual» o «ciclos»). No altera los gastos ni los ciclos cerrados. Devuelve el aviso, o null si
+    /// la API lo rechazó.
+    /// </summary>
+    public async Task<string?> CambiarLiquidacionAsync(string modo)
+    {
+        ErrorFunciones = null;
+        GuardandoFunciones = true;
+        try
+        {
+            await api.ActivarLiquidacionAsync(modo);
+            hogar.ActualizarLiquidacion(modo);
+            return modo == ModosLiquidacion.Ciclos ? "Liquidación por ciclos" : "Liquidación mensual";
+        }
+        catch (ApiException e)
+        {
+            ErrorFunciones = e.Message;
+            return null;
+        }
+        finally
+        {
+            GuardandoFunciones = false;
+            _versionFunciones++;
+        }
+    }
 
     /// <summary>Aplica un cambio de funciones y, si la API lo acepta, lo refleja en el estado compartido (menú y pestañas).</summary>
     private async Task<string?> EjecutarFuncionAsync(Func<Task> accion, bool cuentaComun, bool ahorro, bool recurrentes, string aviso)

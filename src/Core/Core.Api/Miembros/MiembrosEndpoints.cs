@@ -140,6 +140,6 @@ public static class MiembrosEndpoints
         var r = await servicio.AceptarInvitacionAsync(userId, req.Token, req.Nombre, ct);
         if (r.Error is { } error) return Error(error);
         var h = r.Valor!;
-        return Results.Ok(new HogarResumen(h.Id, h.Nombre, h.CuentaComunActiva, h.AhorroActivo, TextoTipoGrupo.ATexto(h.Tipo), h.RecurrentesActivas));
+        return Results.Ok(h.ADto());
     }
 }

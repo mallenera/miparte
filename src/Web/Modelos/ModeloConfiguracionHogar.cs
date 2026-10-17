@@ -42,6 +42,18 @@ public sealed class ModeloConfiguracionHogar(CoreApiClient api, EstadoHogar hoga
     /// <summary>Modo de liquidación del hogar: «mensual» o «ciclos».</summary>
     public string LiquidacionModo => hogar.HogarActual?.LiquidacionModo ?? ModosLiquidacion.Mensual;
 
+    /// <summary>Con qué frecuencia aportan los miembros a la cuenta común (ver <c>FrecuenciasAportacion</c>); «mensual» por defecto.</summary>
+    public string AportacionFrecuencia => hogar.HogarActual?.AportacionFrecuencia ?? FrecuenciasAportacion.Mensual;
+
+    /// <summary>Periodo propio del hogar (viaje o evento), o null si el hogar usa meses.</summary>
+    public string? Periodo => hogar.HogarActual?.Periodo;
+
+    /// <summary>Si el periodo propio ya está cerrado: sus gastos no se pueden editar ni borrar.</summary>
+    public bool PeriodoCerrado => hogar.HogarActual?.PeriodoCerrado ?? false;
+
+    /// <summary>Si el hogar tiene un periodo propio que se puede cerrar.</summary>
+    public bool PuedeCerrarPeriodo => Periodo is not null && !PeriodoCerrado;
+
     /// <summary>Nombre del miembro, o «—» si no está.</summary>
     public string NombreDe(Guid id) => Miembros.FirstOrDefault(m => m.Id == id)?.Nombre ?? "—";
 
@@ -74,6 +86,15 @@ public sealed class ModeloConfiguracionHogar(CoreApiClient api, EstadoHogar hoga
     /// <summary>Si se está eliminando el hogar.</summary>
     public bool Eliminando { get; private set; }
 
+    /// <summary>Si se está cerrando el periodo propio del hogar.</summary>
+    public bool CerrandoPeriodo { get; private set; }
+
+    /// <summary>Error al cerrar el periodo propio.</summary>
+    public string? ErrorPeriodo { get; private set; }
+
+    /// <summary>Si la pantalla está pidiendo confirmación para cerrar el periodo (el cierre bloquea los gastos del periodo).</summary>
+    public bool ConfirmandoCierre { get; set; }
+
     // Cambia tras cada intento para recrear las casillas: si la API rechaza el cambio, el navegador no debe quedarse con la marca que puso la persona.
     private int _versionFunciones;
 
@@ -88,6 +109,9 @@ public sealed class ModeloConfiguracionHogar(CoreApiClient api, EstadoHogar hoga
 
     /// <summary>Clave del selector de liquidación (cambia tras cada intento).</summary>
     public string ClaveLiquidacion => $"liquidacion-{_versionFunciones}";
+
+    /// <summary>Clave del selector de frecuencia de aportaciones (cambia tras cada intento).</summary>
+    public string ClaveFrecuencia => $"frecuencia-{_versionFunciones}";
 
     // ───── Formularios ─────
 
@@ -197,6 +221,58 @@ public sealed class ModeloConfiguracionHogar(CoreApiClient api, EstadoHogar hoga
         {
             GuardandoFunciones = false;
             _versionFunciones++;
+        }
+    }
+
+    /// <summary>
+    /// Cambia con qué frecuencia aportan los miembros a la cuenta común. Devuelve el aviso, o null si la API lo rechazó (p. ej. si el
+    /// ahorro ya usado quedaría sin respaldo).
+    /// </summary>
+    public async Task<string?> CambiarFrecuenciaAsync(string frecuencia)
+    {
+        ErrorFunciones = null;
+        GuardandoFunciones = true;
+        try
+        {
+            await api.FijarFrecuenciaAportacionAsync(frecuencia);
+            hogar.ActualizarAportacionFrecuencia(frecuencia);
+            return "Frecuencia de aportaciones guardada";
+        }
+        catch (ApiException e)
+        {
+            ErrorFunciones = e.Message;
+            return null;
+        }
+        finally
+        {
+            GuardandoFunciones = false;
+            _versionFunciones++;
+        }
+    }
+
+    /// <summary>
+    /// Cierra el periodo propio del hogar (viaje o evento): congela sus gastos y genera la liquidación final. Devuelve el aviso, o null
+    /// si la API lo rechazó, con el motivo en <see cref="ErrorPeriodo"/>.
+    /// </summary>
+    public async Task<string?> CerrarPeriodoAsync()
+    {
+        ErrorPeriodo = null;
+        CerrandoPeriodo = true;
+        try
+        {
+            var cierre = await api.CerrarPeriodoAsync();
+            hogar.MarcarPeriodoCerrado();
+            ConfirmandoCierre = false;
+            return cierre.Ciclo is null ? "Viaje cerrado" : "Viaje cerrado y liquidación final creada";
+        }
+        catch (ApiException e)
+        {
+            ErrorPeriodo = e.Message;
+            return null;
+        }
+        finally
+        {
+            CerrandoPeriodo = false;
         }
     }
 

@@ -6,7 +6,8 @@ namespace MiParte.Core.Domain;
 public sealed record HistoricoCuenta(
     IReadOnlyList<AportacionVigente> Vigentes, IReadOnlyList<GastoDeCuenta> Gastos, IReadOnlyList<ReembolsoDeCuenta> Reembolsos,
     IReadOnlyList<RetiradaDeAhorro> Retiradas, IReadOnlyList<DepositoDeAhorro> Depositos, bool CuentaActiva, decimal GastadoMes,
-    IReadOnlyList<GastoDeCuenta>? GastosDelMes = null, SaldoInicialCuenta? SaldoInicial = null);
+    IReadOnlyList<GastoDeCuenta>? GastosDelMes = null, SaldoInicialCuenta? SaldoInicial = null,
+    FrecuenciaAportacion Frecuencia = FrecuenciaAportacion.Mensual);
 
 /// <summary>Importe asociado a un miembro.</summary>
 public sealed record ImporteMiembro(Guid MiembroId, decimal Importe);

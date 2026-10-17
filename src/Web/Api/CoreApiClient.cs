@@ -275,6 +275,20 @@ public sealed class CoreApiClient
     public Task<ModoLiquidacionResponse> ActivarLiquidacionAsync(string modo, CancellationToken ct = default) =>
         EnviarAsync<ModoLiquidacionResponse>(HttpMethod.Put, "api/hogar/liquidacion", new ModoLiquidacionRequest(modo), ct);
 
+    /// <summary>Fija con qué frecuencia aportan los miembros a la cuenta común (<c>PUT /api/hogar/aportaciones</c>, permiso <c>hogar.funciones</c>).</summary>
+    /// <param name="frecuencia">Una de las frecuencias de <c>FrecuenciasAportacion</c>.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<FrecuenciaAportacionResponse> FijarFrecuenciaAportacionAsync(string frecuencia, CancellationToken ct = default) =>
+        EnviarAsync<FrecuenciaAportacionResponse>(HttpMethod.Put, "api/hogar/aportaciones", new FijarFrecuenciaAportacionRequest(frecuencia), ct);
+
+    /// <summary>
+    /// Cierra el periodo propio del hogar (viaje o evento): congela sus gastos y genera la liquidación final (<c>POST /api/hogar/cerrar-periodo</c>,
+    /// permiso <c>mes.cerrar</c>).
+    /// </summary>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<CierrePeriodoResponse> CerrarPeriodoAsync(CancellationToken ct = default) =>
+        EnviarAsync<CierrePeriodoResponse>(HttpMethod.Post, "api/hogar/cerrar-periodo", null, ct);
+
     /// <summary>Cierra el ciclo de liquidación actual: marca los gastos pendientes como liquidados (<c>POST /api/liquidacion/ciclos</c>, permiso <c>pagos.registrar</c>).</summary>
     /// <param name="ct">Token de cancelación.</param>
     public Task<CicloLiquidacionDto> CerrarCicloLiquidacionAsync(CancellationToken ct = default) =>

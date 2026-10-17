@@ -3,8 +3,10 @@ namespace MiParte.Core.Domain;
 /// <summary>
 /// Aportación fija mensual de un miembro a la cuenta común, vigente desde el primer día de <paramref name="Desde"/>.
 /// De <paramref name="Importe"/>, <paramref name="Ahorro"/> va a ahorro y el resto queda para gastos.
+/// <paramref name="Frecuencia"/> es la del hogar y decide en qué meses cobra (ver <see cref="ReglasFrecuenciaAportacion"/>).
 /// </summary>
-public sealed record AportacionVigente(Guid MiembroId, DateOnly Desde, decimal Importe, decimal Ahorro = 0m);
+public sealed record AportacionVigente(
+    Guid MiembroId, DateOnly Desde, decimal Importe, decimal Ahorro = 0m, FrecuenciaAportacion Frecuencia = FrecuenciaAportacion.Mensual);
 
 /// <summary>
 /// Gasto cargado a la cuenta común, adelantado por <paramref name="PagadoPor"/> o pagado directamente por la cuenta si es null (sin reembolso pendiente).
@@ -78,13 +80,23 @@ public static class CuentaComun
     private static AportacionVigente? Vigente(Guid miembroId, DateOnly mes, IEnumerable<AportacionVigente> aportaciones)
         => aportaciones.Where(a => a.MiembroId == miembroId && a.Desde <= mes).OrderByDescending(a => a.Desde).FirstOrDefault();
 
-    /// <summary>Importe que aporta un miembro en <paramref name="mes"/>: el de su aportación vigente más reciente (0 si no tiene).</summary>
-    public static decimal AportacionDelMes(Guid miembroId, DateOnly mes, IEnumerable<AportacionVigente> aportaciones)
-        => Vigente(miembroId, mes, aportaciones)?.Importe ?? 0m;
+    /// <summary>
+    /// Aportación que cobra un miembro en <paramref name="mes"/>: la vigente, si ese mes es de cobro según su frecuencia;
+    /// null si no cobra ese mes (o no tiene aportación vigente).
+    /// </summary>
+    private static AportacionVigente? Cobro(Guid miembroId, DateOnly mes, IEnumerable<AportacionVigente> aportaciones)
+    {
+        var vigente = Vigente(miembroId, mes, aportaciones);
+        return vigente is not null && ReglasFrecuenciaAportacion.EsMesDeCobro(vigente.Frecuencia, vigente.Desde, mes) ? vigente : null;
+    }
 
-    /// <summary>Parte de la aportación de un miembro en <paramref name="mes"/> que va a ahorro (0 si no tiene aportación).</summary>
+    /// <summary>Importe que aporta un miembro en <paramref name="mes"/>: lo que cobra ese mes (0 si no cobra).</summary>
+    public static decimal AportacionDelMes(Guid miembroId, DateOnly mes, IEnumerable<AportacionVigente> aportaciones)
+        => Cobro(miembroId, mes, aportaciones)?.Importe ?? 0m;
+
+    /// <summary>Parte de lo que cobra un miembro en <paramref name="mes"/> que va a ahorro (0 si no cobra).</summary>
     public static decimal AhorroDelMes(Guid miembroId, DateOnly mes, IEnumerable<AportacionVigente> aportaciones)
-        => Vigente(miembroId, mes, aportaciones)?.Ahorro ?? 0m;
+        => Cobro(miembroId, mes, aportaciones)?.Ahorro ?? 0m;
 
     /// <summary>
     /// Estado de la cuenta al terminar <paramref name="mes"/> (primer día). Las aportaciones se suman mes a mes
@@ -106,13 +118,13 @@ public static class CuentaComun
             var primera = aportaciones.Where(a => a.MiembroId == m).Min(a => a.Desde);
             for (var d = primera; d <= mes; d = d.AddMonths(1))
             {
-                var vigente = Vigente(m, d, aportaciones)!;
-                aportado += vigente.Importe;
-                ahorro += vigente.Ahorro;
+                if (Cobro(m, d, aportaciones) is not { } cobro) continue;
+                aportado += cobro.Importe;
+                ahorro += cobro.Ahorro;
                 if (d == mes)
                 {
-                    aportadoMes += vigente.Importe;
-                    ahorroMes += vigente.Ahorro;
+                    aportadoMes += cobro.Importe;
+                    ahorroMes += cobro.Ahorro;
                 }
             }
         }
@@ -186,11 +198,13 @@ public static class CuentaComun
         foreach (var m in aportaciones.Select(a => a.MiembroId).Distinct())
         {
             var primera = aportaciones.Where(a => a.MiembroId == m).Min(a => a.Desde);
+            aportado.TryAdd(m, 0m);
+            ahorrado.TryAdd(m, 0m);
             for (var d = primera; d <= mes; d = d.AddMonths(1))
             {
-                var vigente = Vigente(m, d, aportaciones)!;
-                aportado[m] = aportado.GetValueOrDefault(m) + vigente.Importe - vigente.Ahorro;
-                ahorrado[m] = ahorrado.GetValueOrDefault(m) + vigente.Ahorro;
+                if (Cobro(m, d, aportaciones) is not { } cobro) continue;
+                aportado[m] += cobro.Importe - cobro.Ahorro;
+                ahorrado[m] += cobro.Ahorro;
             }
         }
 

@@ -18,6 +18,7 @@ using MiParte.Core.Application.Gastos;
 using MiParte.Core.Application.Hogares;
 using MiParte.Core.Application.Liquidacion;
 using MiParte.Core.Application.Miembros;
+using MiParte.Core.Application.Periodos;
 using MiParte.Core.Application.Perfiles;
 using MiParte.Core.Application.Recurrentes;
 using MiParte.Core.Infrastructure;
@@ -49,6 +50,8 @@ builder.Services.AddScoped(sp => new ServicioHogares(sp.GetRequiredService<IRepo
 builder.Services.AddScoped(sp => new ServicioAuditoria(sp.GetRequiredService<IRepositorioAuditoria>()));
 builder.Services.AddScoped(sp => new ServicioCategorias(
     sp.GetRequiredService<IRepositorioCategorias>(), sp.GetRequiredService<IRepositorioGastos>()));
+builder.Services.AddScoped(sp => new ServicioPeriodos(
+    sp.GetRequiredService<IRepositorioPeriodos>(), sp.GetRequiredService<IRepositorioLiquidacion>(), sp.GetRequiredService<TimeProvider>()));
 builder.Services.AddScoped(sp => new ServicioCierres(
     sp.GetRequiredService<IRepositorioCierres>(), sp.GetRequiredService<TimeProvider>()));
 builder.Services.AddScoped(sp => new ServicioRecurrentes(
@@ -120,6 +123,7 @@ app.MapMiembros();
 app.MapEnlacesGrupo();
 app.MapAuditoria();
 app.MapCierresMes();
+app.MapCierresPeriodo();
 
 app.Run();
 

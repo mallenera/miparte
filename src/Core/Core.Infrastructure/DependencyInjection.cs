@@ -8,6 +8,7 @@ using MiParte.Core.Application.Gastos;
 using MiParte.Core.Application.Hogares;
 using MiParte.Core.Application.Liquidacion;
 using MiParte.Core.Application.Miembros;
+using MiParte.Core.Application.Periodos;
 using MiParte.Core.Application.Perfiles;
 using MiParte.Core.Application.Recurrentes;
 using MiParte.Core.Infrastructure.Persistencia;
@@ -49,6 +50,7 @@ public static class DependencyInjection
         services.AddScoped<IRepositorioCierres>(sp => new RepositorioCierres(sp.GetRequiredService<MiParteDbContext>()));
         services.AddScoped<IRepositorioHogares>(sp => new RepositorioHogares(sp.GetRequiredService<MiParteDbContext>()));
         services.AddScoped<IRepositorioAuditoria>(sp => new RepositorioAuditoria(sp.GetRequiredService<MiParteDbContext>()));
+        services.AddScoped<IRepositorioPeriodos>(sp => new RepositorioPeriodos(sp.GetRequiredService<MiParteDbContext>()));
         return services;
     }
 }

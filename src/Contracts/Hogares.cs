@@ -43,9 +43,49 @@ public static class ModosLiquidacion
 /// <param name="Tipo">Tipo de grupo (ver <see cref="TiposGrupo"/>); "hogar" por defecto.</param>
 /// <param name="RecurrentesActivas">Si el hogar genera gastos recurrentes; con false no se crean plantillas ni se generan gastos.</param>
 /// <param name="LiquidacionModo">Cómo liquida el hogar (ver <see cref="ModosLiquidacion"/>); "mensual" por defecto.</param>
+/// <param name="Periodo">Periodo propio del hogar («YYYY-MM-DD/YYYY-MM-DD» o «YYYY-MM-DD/» si está abierto); null si usa meses.</param>
+/// <param name="PeriodoCerrado">Si el periodo propio está cerrado: sus gastos no se pueden editar ni borrar.</param>
+/// <param name="AportacionFrecuencia">Con qué frecuencia aportan a la cuenta común (ver <see cref="FrecuenciasAportacion"/>); "mensual" por defecto.</param>
 public record HogarResumen(
     Guid Id, string Nombre, bool CuentaComunActiva = false, bool AhorroActivo = false, string Tipo = TiposGrupo.Hogar,
-    bool RecurrentesActivas = true, string LiquidacionModo = ModosLiquidacion.Mensual);
+    bool RecurrentesActivas = true, string LiquidacionModo = ModosLiquidacion.Mensual,
+    string? Periodo = null, bool PeriodoCerrado = false, string AportacionFrecuencia = FrecuenciasAportacion.Mensual);
+
+/// <summary>Frecuencias de aportación a la cuenta común, tal como viajan por la API.</summary>
+public static class FrecuenciasAportacion
+{
+    /// <summary>Una sola aportación por persona, sin periodo.</summary>
+    public const string Unica = "unica";
+
+    /// <summary>Cada mes (por defecto; el comportamiento de los hogares existentes).</summary>
+    public const string Mensual = "mensual";
+
+    /// <summary>Cada dos meses.</summary>
+    public const string Bimestral = "bimestral";
+
+    /// <summary>Cada tres meses.</summary>
+    public const string Trimestral = "trimestral";
+
+    /// <summary>Cada seis meses.</summary>
+    public const string Semestral = "semestral";
+
+    /// <summary>Cada doce meses.</summary>
+    public const string Anual = "anual";
+}
+
+/// <summary>PUT /api/hogar/aportaciones: con qué frecuencia aportan los miembros a la cuenta común. Permiso hogar.funciones.</summary>
+/// <param name="Frecuencia">Una de las de <see cref="FrecuenciasAportacion"/>.</param>
+public record FijarFrecuenciaAportacionRequest(string? Frecuencia);
+
+/// <summary>Respuesta de PUT /api/hogar/aportaciones.</summary>
+/// <param name="Frecuencia">Frecuencia guardada.</param>
+public record FrecuenciaAportacionResponse(string Frecuencia);
+
+/// <summary>Respuesta de POST /api/hogar/cerrar-periodo: el periodo ya congelado y la liquidación final, si había gastos pendientes.</summary>
+/// <param name="Periodo">Periodo tras el cierre («YYYY-MM-DD/YYYY-MM-DD»).</param>
+/// <param name="CerradoEn">Momento del cierre.</param>
+/// <param name="Ciclo">Liquidación final; null si no quedaban gastos pendientes.</param>
+public record CierrePeriodoResponse(string Periodo, DateTimeOffset CerradoEn, CicloLiquidacionDto? Ciclo);
 
 /// <summary>Respuesta de GET /api/yo: usuario, sus hogares y el hogar actual (null si no se puede determinar).</summary>
 /// <param name="UserId">Identificador del usuario (claim "sub" del JWT), o null si no consta.</param>

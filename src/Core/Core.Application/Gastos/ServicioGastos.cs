@@ -78,6 +78,7 @@ public sealed class ServicioGastos(IRepositorioGastos repositorio)
         var gasto = await repositorio.ObtenerParaEditarAsync(id, ct);
         if (gasto is null) return Resultado<bool>.NoEncontrado();
         if (await repositorio.MesCerradoAsync(gasto.Fecha, ct)) return Resultado<bool>.Conflicto(Mensajes.MesCerrado);
+        if (await repositorio.FechaEnPeriodoCerradoAsync(gasto.Fecha, ct)) return Resultado<bool>.Conflicto(Mensajes.PeriodoCerrado);
 
         repositorio.Eliminar(gasto);
         return await repositorio.GuardarAsync(ct) ? Resultado<bool>.Ok(true) : Resultado<bool>.Conflicto(Mensajes.MesCerrado);
@@ -125,7 +126,10 @@ public sealed class ServicioGastos(IRepositorioGastos repositorio)
         if (cuentaComun && !await repositorio.CuentaComunActivaAsync(ct))
             return Resultado<Gasto>.Conflicto(Mensajes.CuentaInactiva);
         foreach (var f in fechas.Distinct())
+        {
             if (await repositorio.MesCerradoAsync(f, ct)) return Resultado<Gasto>.Conflicto(Mensajes.MesCerrado);
+            if (await repositorio.FechaEnPeriodoCerradoAsync(f, ct)) return Resultado<Gasto>.Conflicto(Mensajes.PeriodoCerrado);
+        }
 
         if (!d.PagadoDesdeAhorro) return null;
         if (!await repositorio.CuentaComunActivaAsync(ct)) return Resultado<Gasto>.Conflicto(Mensajes.CuentaInactiva);

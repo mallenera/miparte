@@ -41,10 +41,11 @@ public sealed class ServicioHogares(IRepositorioHogares repositorio)
         => (await repositorio.DelUsuarioAsync(userId, ct)).FirstOrDefault(h => h.Id == id);
 
     /// <summary>
-    /// Crea un hogar y a su creador como miembro adulto y admin, con la semilla por defecto. Inválido si faltan nombres o pasan de
-    /// la longitud máxima; conflicto si el usuario ya está en <see cref="MaxHogaresPorUsuario"/> hogares.
+    /// Crea un hogar de tipo <paramref name="tipo"/> y a su creador como miembro adulto y admin, con la semilla por defecto. Inválido si
+    /// faltan nombres o pasan de la longitud máxima; conflicto si el usuario ya está en <see cref="MaxHogaresPorUsuario"/> hogares.
     /// </summary>
-    public async Task<Resultado<Hogar>> CrearAsync(Guid userId, string? nombreHogar, string? nombreMiembro, CancellationToken ct)
+    public async Task<Resultado<Hogar>> CrearAsync(
+        Guid userId, string? nombreHogar, string? nombreMiembro, TipoGrupo tipo, CancellationToken ct)
     {
         var hogarNombre = nombreHogar?.Trim();
         var miembroNombre = nombreMiembro?.Trim();
@@ -55,7 +56,7 @@ public sealed class ServicioHogares(IRepositorioHogares repositorio)
         if (await repositorio.ContarPertenenciasAsync(userId, ct) >= MaxHogaresPorUsuario)
             return Resultado<Hogar>.Conflicto($"Has alcanzado el máximo de {MaxHogaresPorUsuario} hogares.");
 
-        var hogar = new Hogar { Id = Guid.NewGuid(), Nombre = hogarNombre };
+        var hogar = new Hogar { Id = Guid.NewGuid(), Nombre = hogarNombre, Tipo = tipo };
         var creador = new Miembro
         {
             Id = Guid.NewGuid(), HogarId = hogar.Id, Nombre = miembroNombre, Tipo = TipoMiembro.Adulto,

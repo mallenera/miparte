@@ -116,17 +116,17 @@ public static class HogaresEndpoints
     /// POST /api/hogares: crea un hogar y a su creador como miembro adulto y admin, con la semilla por
     /// defecto, todo en una transacción. 400 si faltan nombres o superan la longitud máxima; 409 si el
     /// usuario ya está en <see cref="MaxHogaresPorUsuario"/> hogares; 201 con el resumen del hogar.
-    /// Un <c>Tipo</c> omitido es «hogar»; uno desconocido da 400. De momento el tipo no se guarda (fase 2 de grupos).
+    /// Un <c>Tipo</c> omitido es «hogar»; uno desconocido da 400. El tipo se guarda y determina las categorías sembradas.
     /// </summary>
     private static async Task<IResult> CrearAsync(
         CrearHogarRequest req, HttpContext ctx, [FromServices] ServicioHogares servicio, CancellationToken ct)
     {
         if (!TryUsuario(ctx, out var userId)) return Results.Unauthorized();
-        if (!TextoTipoGrupo.TryParse(req.Tipo, out _)) return ApiComun.Invalido("El tipo de grupo no es válido.");
+        if (!TextoTipoGrupo.TryParse(req.Tipo, out var tipo)) return ApiComun.Invalido("El tipo de grupo no es válido.");
 
-        var r = await servicio.CrearAsync(userId, req.NombreHogar, req.NombreMiembro, ct);
+        var r = await servicio.CrearAsync(userId, req.NombreHogar, req.NombreMiembro, tipo, ct);
         if (r.Error is { } error) return ApiComun.Respuesta(error);
-        return Results.Created($"/api/hogares/{r.Valor!.Id}", new HogarResumen(r.Valor.Id, r.Valor.Nombre));
+        return Results.Created($"/api/hogares/{r.Valor!.Id}", r.Valor.ADto());
     }
 
     /// <summary>Obtiene el id del usuario autenticado del claim "sub"; false si falta o no es un GUID.</summary>

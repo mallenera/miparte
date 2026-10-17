@@ -58,9 +58,10 @@ public class HogaresTests
         Assert.Equal(HttpStatusCode.Created, anterior.StatusCode);
         Assert.Equal(TiposGrupo.Hogar, (await anterior.Content.ReadFromJsonAsync<HogarResumen>(Web))!.Tipo);
 
-        // Un tipo válido se acepta; de momento se devuelve como hogar porque aún no se guarda (fase 2).
+        // Un tipo válido se acepta y se devuelve tal cual.
         var valido = await c.PostAsJsonAsync("/api/hogares", new CrearHogarRequest("Piso", "Ana", TiposGrupo.PisoCompartido));
         Assert.Equal(HttpStatusCode.Created, valido.StatusCode);
+        Assert.Equal(TiposGrupo.PisoCompartido, (await valido.Content.ReadFromJsonAsync<HogarResumen>(Web))!.Tipo);
 
         var invalido = await c.PostAsJsonAsync("/api/hogares", new CrearHogarRequest("Otro", "Ana", "condominio"));
         Assert.Equal(HttpStatusCode.BadRequest, invalido.StatusCode);
@@ -89,7 +90,7 @@ public class HogaresTests
 
         var categorias = await db.Categorias.IgnoreQueryFilters().Where(x => x.HogarId == creado!.Id).ToListAsync();
         Assert.Equal(6, categorias.Count);
-        foreach (var (nombre, perfil) in SemillaHogar.Categorias)
+        foreach (var (nombre, perfil) in SemillaHogar.CategoriasDe(TipoGrupo.Hogar))
             Assert.Equal(porNombre[perfil].Id, categorias.Single(x => x.Nombre == nombre).PerfilRepartoId);
         Assert.Equal(5, categorias.Count(x => x.PerfilRepartoId == porNombre[SemillaHogar.PerfilPartes].Id));
 
@@ -98,6 +99,49 @@ public class HogaresTests
         Assert.All(detalles, d => Assert.Equal(miembro.Id, d.MiembroId));
         Assert.Equal(1m, detalles.Single(d => d.PerfilId == porNombre[SemillaHogar.PerfilPartes].Id).Valor);
         Assert.Equal(100m, detalles.Single(d => d.PerfilId == porNombre[SemillaHogar.PerfilPorcentaje].Id).Valor);
+    }
+
+    [Theory]
+    [InlineData(TiposGrupo.Hogar, 6)]
+    [InlineData(TiposGrupo.PisoCompartido, 6)]
+    [InlineData(TiposGrupo.Viaje, 6)]
+    [InlineData(TiposGrupo.Evento, 4)]
+    [InlineData(TiposGrupo.Otro, 1)]
+    public async Task CrearHogar_GuardaElTipo_YSiembraSusCategorias(string tipo, int numCategorias)
+    {
+        using var f = Crear(Secreto);
+        var c = ConToken(f, Guid.NewGuid());
+        var creado = await (await c.PostAsJsonAsync("/api/hogares", new CrearHogarRequest("Grupo", "Ana", tipo)))
+            .Content.ReadFromJsonAsync<HogarResumen>(Web);
+        Assert.Equal(tipo, creado!.Tipo);
+
+        using var scope = f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MiParteDbContext>();
+        var guardado = await db.Hogares.IgnoreQueryFilters().SingleAsync(h => h.Id == creado.Id);
+        Assert.Equal(tipo, TextoTipoGrupo.ATexto(guardado.Tipo));
+
+        var nombres = await db.Categorias.IgnoreQueryFilters().Where(x => x.HogarId == creado.Id).Select(x => x.Nombre).ToListAsync();
+        Assert.Equal(numCategorias, nombres.Count);
+        Assert.Equal(
+            SemillaHogar.CategoriasDe(guardado.Tipo).Select(x => x.Categoria).OrderBy(x => x),
+            nombres.OrderBy(x => x));
+    }
+
+    [Fact]
+    public async Task CrearHogar_SinTipo_SiembraLasSeisCategoriasDeSiempre()
+    {
+        using var f = Crear(Secreto);
+        var c = ConToken(f, Guid.NewGuid());
+        var creado = await (await c.PostAsJsonAsync("/api/hogares", new CrearHogarRequest("Casa", "Ana")))
+            .Content.ReadFromJsonAsync<HogarResumen>(Web);
+
+        Assert.Equal(TiposGrupo.Hogar, creado!.Tipo);
+        using var scope = f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MiParteDbContext>();
+        Assert.Equal(
+            new[] { "Alimentación", "Gastos varios de casa", "Hijo", "Hipoteca/Alquiler", "Ocio personal", "Suministros" },
+            (await db.Categorias.IgnoreQueryFilters().Where(x => x.HogarId == creado.Id).Select(x => x.Nombre).ToListAsync())
+                .OrderBy(x => x).ToArray());
     }
 
     [Fact]

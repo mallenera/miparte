@@ -17,9 +17,10 @@ public sealed class RepositorioHogares(MiParteDbContext db) : IRepositorioHogare
         => (await db.Hogares.IgnoreQueryFilters()
                 .Where(h => db.Miembros.IgnoreQueryFilters().Any(m => m.HogarId == h.Id && m.UserId == userId && m.Activo))
                 .OrderBy(h => h.Nombre)
-                .Select(h => new { h.Id, h.Nombre, h.CuentaComunActiva, h.AhorroActivo })
+                .Select(h => new { h.Id, h.Nombre, h.CuentaComunActiva, h.AhorroActivo, h.Tipo })
                 .ToListAsync(ct))
-            .Select(h => new Hogar { Id = h.Id, Nombre = h.Nombre, CuentaComunActiva = h.CuentaComunActiva, AhorroActivo = h.AhorroActivo })
+            .Select(h => new Hogar
+                { Id = h.Id, Nombre = h.Nombre, CuentaComunActiva = h.CuentaComunActiva, AhorroActivo = h.AhorroActivo, Tipo = h.Tipo })
             .ToList();
 
     /// <inheritdoc />
@@ -40,7 +41,7 @@ public sealed class RepositorioHogares(MiParteDbContext db) : IRepositorioHogare
         await db.SaveChangesAsync(ct);
         db.Miembros.Add(creador);
         await db.SaveChangesAsync(ct);
-        await SembrarAsync(hogar.Id, creador.Id, ct);
+        await SembrarAsync(hogar.Id, hogar.Tipo, creador.Id, ct);
         db.AuditoriaActiva = true;
         db.Auditoria.Add(RegistroAuditoria.Manual(
             hogar.Id, userId, RegistroAuditoria.Crear, "hogar", hogar.Id, despues: new { nombre = hogar.Nombre }));
@@ -48,8 +49,8 @@ public sealed class RepositorioHogares(MiParteDbContext db) : IRepositorioHogare
         if (tx is not null) await tx.CommitAsync(ct);
     }
 
-    /// <summary>Crea los 4 perfiles, los detalles del creador y las categorías de ejemplo, guardando por etapas.</summary>
-    private async Task SembrarAsync(Guid hogarId, Guid creadorId, CancellationToken ct)
+    /// <summary>Crea los 4 perfiles, los detalles del creador y las categorías de ejemplo del tipo, guardando por etapas.</summary>
+    private async Task SembrarAsync(Guid hogarId, TipoGrupo tipo, Guid creadorId, CancellationToken ct)
     {
         PerfilReparto Perfil(string nombre, ModoReparto modo)
         {
@@ -71,7 +72,7 @@ public sealed class RepositorioHogares(MiParteDbContext db) : IRepositorioHogare
             { Id = Guid.NewGuid(), HogarId = hogarId, PerfilId = porNombre[SemillaHogar.PerfilPartes].Id, MiembroId = creadorId, Valor = 1 });
         db.PerfilesRepartoDetalle.Add(new PerfilRepartoDetalle
             { Id = Guid.NewGuid(), HogarId = hogarId, PerfilId = porNombre[SemillaHogar.PerfilPorcentaje].Id, MiembroId = creadorId, Valor = 100 });
-        foreach (var (nombre, perfil) in SemillaHogar.Categorias)
+        foreach (var (nombre, perfil) in SemillaHogar.CategoriasDe(tipo))
             db.Categorias.Add(new Categoria
                 { Id = Guid.NewGuid(), HogarId = hogarId, Nombre = nombre, PerfilRepartoId = porNombre[perfil].Id });
         await db.SaveChangesAsync(ct);

@@ -199,6 +199,25 @@ public class EsquemaPostgresTests
     }
 
     [SkippableFact]
+    public async Task HogarNuevo_TipoPorDefectoEsHogar_YLaBaseTieneLaRestriccionDeValores()
+    {
+        Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
+
+        await using var conn = await AbrirAsync();
+        var user = await CrearUsuarioAsync(conn);
+        await using var tx = await conn.BeginTransactionAsync();
+
+        var hogar = (Guid)(await EscalarComoAsync(conn, tx, user,
+            "select public.crear_hogar('Casa tipo', 'Ana')"))!;
+
+        Assert.Equal("hogar", await EscalarComoAsync(conn, tx, user,
+            "select tipo from public.hogar where id = @h", ("h", hogar)));
+        Assert.Equal(1L, await EscalarComoAsync(conn, tx, user,
+            "select count(*) from pg_constraint where conname = 'hogar_tipo_check' and conrelid = 'public.hogar'::regclass"));
+        await tx.RollbackAsync();
+    }
+
+    [SkippableFact]
     public async Task RolesDeCliente_NoPuedenEscribirNiLlamarARpcDeAlta()
     {
         Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");

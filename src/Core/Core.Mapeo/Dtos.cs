@@ -40,11 +40,9 @@ public static class Dtos
     public static GastoRecurrenteResponse ADto(this GastoRecurrente r)
         => new(r.Id, r.Importe, r.CategoriaId, r.PagadoPor, r.PerfilRepartoId, r.DiaMes, r.Concepto, r.Activo);
 
-    /// <summary>
-    /// Hogar con las funciones activadas. El tipo sale siempre «hogar» hasta que la base de datos guarde el tipo de grupo
-    /// (fase 2 de grupos); el campo <c>Tipo</c> de la entidad todavía no existe.
-    /// </summary>
-    public static HogarResumen ADto(this Hogar h) => new(h.Id, h.Nombre, h.CuentaComunActiva, h.AhorroActivo, TiposGrupo.Hogar);
+    /// <summary>Hogar con las funciones activadas y su tipo de grupo.</summary>
+    public static HogarResumen ADto(this Hogar h)
+        => new(h.Id, h.Nombre, h.CuentaComunActiva, h.AhorroActivo, TextoTipoGrupo.ATexto(h.Tipo));
 
     /// <summary>Pago de liquidación.</summary>
     public static PagoLiquidacionDto ADto(this PagoLiquidacionRegistro p)

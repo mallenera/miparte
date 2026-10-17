@@ -218,7 +218,7 @@ Total: 52 endpoints de negocio (5 hogares/yo, 6 miembros/invitaciones, 4 categor
 { "nombreHogar": "Piso de la playa", "nombreMiembro": "Ana", "tipo": "viaje" }
 ```
 
-**Tipo de grupo (`tipo`).** `HogarResumen` y `CrearHogarRequest` llevan un campo de texto `tipo` con los valores `hogar` (por defecto: si se omite en la creación, o si el hogar es anterior a este campo), `piso_compartido`, `viaje`, `evento` y `otro`. Cualquier otro valor da 400. Hasta que la base de datos guarde el tipo (fase 2 de grupos), la creación valida el valor pero el hogar se guarda y se devuelve siempre como `hogar`.
+**Tipo de grupo (`tipo`).** `HogarResumen` y `CrearHogarRequest` llevan un campo de texto `tipo` con los valores `hogar` (por defecto: si se omite en la creación, o si el hogar es anterior a este campo), `piso_compartido`, `viaje`, `evento` y `otro`. Cualquier otro valor da 400. El tipo se guarda en `hogar.tipo` y determina las categorías sembradas al crear el hogar (`hogar` mantiene las 6 de siempre; los demás tipos siembran sus categorías con perfil «Por partes»). El tipo no se cambia después.
 
 ### Miembros
 

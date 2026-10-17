@@ -61,4 +61,28 @@ public class TipoGrupoTests
             new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
         Assert.Equal(TiposGrupo.Hogar, json!.Tipo);
     }
+
+    [Fact]
+    public void Hogar_SembrarCategorias_ConservaLasSeisDeSiempre()
+    {
+        var categorias = SemillaHogar.CategoriasDe(TipoGrupo.Hogar);
+
+        Assert.Equal(
+            new[] { "Hipoteca/Alquiler", "Alimentación", "Suministros", "Gastos varios de casa", "Hijo", "Ocio personal" },
+            categorias.Select(c => c.Categoria).ToArray());
+        Assert.Equal(SemillaHogar.PerfilIndividual, categorias.Single(c => c.Categoria == "Ocio personal").Perfil);
+    }
+
+    [Theory]
+    [InlineData(TipoGrupo.PisoCompartido, "Alquiler", "Suministros", "Compra común", "Internet y móvil", "Limpieza y mantenimiento", "Otros")]
+    [InlineData(TipoGrupo.Viaje, "Transporte", "Alojamiento", "Comida", "Ocio", "Compras", "Otros")]
+    [InlineData(TipoGrupo.Evento, "Proveedores", "Regalos colectivos", "Comida y bebida", "Otros")]
+    [InlineData(TipoGrupo.Otro, "General")]
+    public void CadaTipo_SiembraSusCategoriasConPerfilPorPartes(TipoGrupo tipo, params string[] esperadas)
+    {
+        var categorias = SemillaHogar.CategoriasDe(tipo);
+
+        Assert.Equal(esperadas, categorias.Select(c => c.Categoria).ToArray());
+        Assert.All(categorias, c => Assert.Equal(SemillaHogar.PerfilPartes, c.Perfil));
+    }
 }

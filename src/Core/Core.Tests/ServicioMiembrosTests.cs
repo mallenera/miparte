@@ -25,6 +25,14 @@ public class ServicioMiembrosTests
 
     private ServicioMiembros Servicio => new(_repo, _reloj);
 
+    /// <summary>Añade al hogar un adulto sin cuenta (sin usuario vinculado).</summary>
+    private Miembro Sin(string nombre)
+    {
+        var m = new Miembro { Id = Guid.NewGuid(), HogarId = Hogar, Nombre = nombre, Tipo = TipoMiembro.Adulto };
+        _repo.Miembros.Add(m);
+        return m;
+    }
+
     private static CambiosMiembro Cambios(
         string? nombre = null, bool? activo = null, string? rol = null, IReadOnlyList<string>? permisos = null, Guid? responsable = null)
         => new(nombre, activo, responsable, rol, permisos);
@@ -197,6 +205,109 @@ public class ServicioMiembrosTests
         var r = await Servicio.AceptarInvitacionAsync(Guid.NewGuid(), token, "Nuevo", default);
 
         Assert.Equal("La invitación ha caducado.", r.Error!.Mensaje);
+    }
+
+    [Fact]
+    public async Task Actualizar_RolAdminAUnAdultoSinCuenta_EsInvalido()
+    {
+        var sinCuenta = Sin("Pepe");
+
+        var r = await Servicio.ActualizarAsync(_userAdmin, sinCuenta.Id, Cambios(rol: "admin"), default);
+
+        Assert.Equal(TipoError.Invalido, r.Error!.Tipo);
+        Assert.Equal(RolMiembro.Miembro, sinCuenta.Rol);
+    }
+
+    [Fact]
+    public async Task Actualizar_AdminSinCuentaHeredado_NoCuentaComoAdminVinculado()
+    {
+        // Dato anterior a la regla: un adulto sin cuenta con rol admin no es un administrador vinculado. Marcos sí puede
+        // gestionar permisos, así que el bloqueo que se comprueba es el del administrador.
+        Sin("Pepe").Rol = RolMiembro.Admin;
+        _normal.Permisos = [CatalogoPermisos.PermisosGestionar];
+
+        var r = await Servicio.ActualizarAsync(_userAdmin, _admin.Id, Cambios(rol: "miembro"), default);
+
+        Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
+        Assert.Equal("El hogar debe conservar al menos un administrador.", r.Error.Mensaje);
+        Assert.Equal(RolMiembro.Admin, _admin.Rol);
+    }
+
+    [Fact]
+    public async Task CrearInvitacion_ParaAdultoSinCuenta_SinMiembrosGestionar_EsProhibido()
+    {
+        var sinCuenta = Sin("Pepe");
+        _normal.Permisos = [CatalogoPermisos.InvitacionesCrear];
+
+        var r = await Servicio.CrearInvitacionAsync(_userNormal, Hogar, sinCuenta.Id, default);
+
+        Assert.Equal(TipoError.Prohibido, r.Error!.Tipo);
+        Assert.Empty(_repo.Invitaciones);
+    }
+
+    [Fact]
+    public async Task CrearInvitacion_ParaACargo_EsConflicto()
+    {
+        var r = await Servicio.CrearInvitacionAsync(_userAdmin, Hogar, _aCargo.Id, default);
+
+        Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
+    }
+
+    [Fact]
+    public async Task Vincular_AdultoSinCuenta_QuedaLigadoAlUsuarioQueAcepta()
+    {
+        var sinCuenta = Sin("Pepe");
+        var token = (await Servicio.CrearInvitacionAsync(_userAdmin, Hogar, sinCuenta.Id, default)).Valor!.Token;
+        var usuario = Guid.NewGuid();
+
+        var r = await Servicio.AceptarInvitacionAsync(usuario, token, null, default);
+
+        Assert.Null(r.Error);
+        Assert.Equal(usuario, sinCuenta.UserId);
+        Assert.NotNull(_repo.Invitaciones.Single().UsadaEn);
+    }
+
+    [Fact]
+    public async Task Vincular_UsuarioQueYaEstaEnElHogar_EsConflicto()
+    {
+        var sinCuenta = Sin("Pepe");
+        var token = (await Servicio.CrearInvitacionAsync(_userAdmin, Hogar, sinCuenta.Id, default)).Valor!.Token;
+
+        var r = await Servicio.AceptarInvitacionAsync(_userNormal, token, null, default);
+
+        Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
+        Assert.Null(sinCuenta.UserId);
+    }
+
+    [Fact]
+    public async Task Vincular_MiembroYaVinculado_RechazaLaSegundaInvitacion()
+    {
+        var sinCuenta = Sin("Pepe");
+        var primera = (await Servicio.CrearInvitacionAsync(_userAdmin, Hogar, sinCuenta.Id, default)).Valor!.Token;
+        var segunda = (await Servicio.CrearInvitacionAsync(_userAdmin, Hogar, sinCuenta.Id, default)).Valor!.Token;
+        Assert.Null((await Servicio.AceptarInvitacionAsync(Guid.NewGuid(), primera, null, default)).Error);
+
+        var r = await Servicio.AceptarInvitacionAsync(Guid.NewGuid(), segunda, null, default);
+
+        Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
+        Assert.Equal("El miembro de la invitación ya está vinculado a un usuario.", r.Error.Mensaje);
+    }
+
+    [Fact]
+    public async Task Aceptar_InvitacionAntiguaDeACargo_EsConflicto()
+    {
+        // Una invitación creada antes de la regla no puede vincular a un miembro a cargo.
+        const string token = "antigua";
+        _repo.Invitaciones.Add(new InvitacionHogar
+        {
+            Id = Guid.NewGuid(), HogarId = Hogar, MiembroId = _aCargo.Id, TokenHash = TokenInvitacion.Hash(token),
+            CaducaEn = _reloj.GetUtcNow() + TokenInvitacion.Vigencia,
+        });
+
+        var r = await Servicio.AceptarInvitacionAsync(Guid.NewGuid(), token, null, default);
+
+        Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
+        Assert.Null(_aCargo.UserId);
     }
 
     [Fact]

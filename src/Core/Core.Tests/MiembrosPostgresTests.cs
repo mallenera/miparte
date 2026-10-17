@@ -80,4 +80,27 @@ public class MiembrosPostgresTests
         Assert.Equal(HttpStatusCode.OK, (await e.Cliente(ganador, hogar.Id).GetAsync("/api/miembros")).StatusCode);
         Assert.NotEqual(HttpStatusCode.OK, (await e.Cliente(perdedor, hogar.Id).GetAsync("/api/miembros")).StatusCode);
     }
+
+    [SkippableFact]
+    public async Task VincularAdultoSinCuenta_RegistraAuditoriaVincular_EnPostgres()
+    {
+        Skip.If(string.IsNullOrEmpty(ApiPostgresTests.Cadena), "MIPARTE_TEST_DB no definida");
+        await using var e = new Entorno();
+        var admin = await e.CrearUsuarioAsync();
+        var pepe = await e.CrearUsuarioAsync();
+        var hogar = await CrearHogar(e.Cliente(admin), "Casa vincular", "Ana");
+        var ca = e.Cliente(admin, hogar.Id);
+
+        // Un adulto sin cuenta que luego se vincula por invitación: el vínculo queda en el historial con accion «vincular».
+        var miembro = await Leer<MiembroDto>(
+            await ca.PostAsJsonAsync("/api/miembros", new CrearMiembroRequest("Pepe", "adulto")), HttpStatusCode.Created);
+        var inv = await Leer<InvitacionCreada>(
+            await ca.PostAsJsonAsync("/api/invitaciones", new CrearInvitacionRequest(miembro.Id)), HttpStatusCode.Created);
+        await Leer<HogarResumen>(await e.Cliente(pepe).PostAsJsonAsync("/api/invitaciones/aceptar", new AceptarInvitacionRequest(inv.Token)));
+
+        var eventos = await Leer<List<EventoAuditoriaDto>>(await ca.GetAsync("/api/auditoria"));
+        Assert.Contains(eventos, x => x.Accion == "vincular" && x.Entidad == "miembro" && x.EntidadId == miembro.Id && x.UsuarioId == pepe);
+        var lista = await Leer<List<MiembroDto>>(await ca.GetAsync("/api/miembros"));
+        Assert.True(lista.Single(m => m.Id == miembro.Id).Vinculado);
+    }
 }

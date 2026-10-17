@@ -108,6 +108,9 @@ public sealed class ServicioMiembros(IRepositorioMiembros repositorio, TimeProvi
                 _ => null,
             };
             if (nuevoRol is null) return Resultado<Miembro>.Invalido("El rol debe ser 'admin' o 'miembro'.");
+            // Un administrador es un adulto con cuenta: si un miembro sin cuenta guardara el rol, al vincularse heredaría acceso total.
+            if (nuevoRol == RolMiembro.Admin && m.UserId is null)
+                return Resultado<Miembro>.Invalido("Solo un adulto con cuenta puede ser administrador.");
         }
 
         List<string>? nuevosPermisos = null;
@@ -174,8 +177,9 @@ public sealed class ServicioMiembros(IRepositorioMiembros repositorio, TimeProvi
         => ActualizarAsync(userId, id, new CambiosMiembro(null, false, null, null, null), ct);
 
     /// <summary>
-    /// Crea una invitación (permiso <c>invitaciones.crear</c>), opcionalmente para vincular un miembro existente sin usuario.
-    /// El token en claro solo se devuelve aquí; en base de datos queda su hash.
+    /// Crea una invitación (permiso <c>invitaciones.crear</c>), opcionalmente para vincular un adulto sin cuenta del hogar. Vincular
+    /// da acceso a la cuenta, así que además exige <c>miembros.gestionar</c>. El token en claro solo se devuelve aquí; en base de
+    /// datos queda su hash.
     /// </summary>
     public async Task<Resultado<InvitacionEmitida>> CrearInvitacionAsync(
         Guid userId, Guid hogarId, Guid? miembroId, CancellationToken ct)
@@ -186,10 +190,13 @@ public sealed class ServicioMiembros(IRepositorioMiembros repositorio, TimeProvi
 
         if (miembroId is { } destino)
         {
+            if (!CatalogoPermisos.Efectivos(yo).Contains(CatalogoPermisos.MiembrosGestionar))
+                return Resultado<InvitacionEmitida>.Prohibido("Para vincular a un miembro existente hace falta el permiso «miembros.gestionar».");
             var m = await repositorio.ObtenerAsync(destino, ct);
             if (m is null) return Resultado<InvitacionEmitida>.NoEncontrado("El miembro no existe en este hogar.");
             if (!m.Activo) return Resultado<InvitacionEmitida>.Conflicto("El miembro está desactivado.");
             if (m.UserId is not null) return Resultado<InvitacionEmitida>.Conflicto("El miembro ya está vinculado a un usuario.");
+            if (m.Tipo != TipoMiembro.Adulto) return Resultado<InvitacionEmitida>.Conflicto("Solo se puede vincular a un adulto sin cuenta.");
         }
 
         var token = TokenInvitacion.Generar();
@@ -225,7 +232,8 @@ public sealed class ServicioMiembros(IRepositorioMiembros repositorio, TimeProvi
         if (inv.MiembroId is { } existente)
         {
             var m = await repositorio.MiembroDeHogarAsync(inv.HogarId, existente, ct);
-            if (m is null || !m.Activo) return Resultado<Hogar>.Conflicto("El miembro de la invitación ya no está disponible.");
+            if (m is null || !m.Activo || m.Tipo != TipoMiembro.Adulto)
+                return Resultado<Hogar>.Conflicto("El miembro de la invitación ya no está disponible.");
             if (m.UserId is not null) return Resultado<Hogar>.Conflicto("El miembro de la invitación ya está vinculado a un usuario.");
         }
         else

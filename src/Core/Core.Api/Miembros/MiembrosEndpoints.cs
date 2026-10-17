@@ -47,11 +47,11 @@ public static class MiembrosEndpoints
     public static string HashToken(string token) => TokenInvitacion.Hash(token);
 
     /// <summary>Obtiene el id del usuario autenticado del claim "sub"; false si falta o no es un GUID.</summary>
-    private static bool TryUsuario(HttpContext ctx, out Guid userId)
+    internal static bool TryUsuario(HttpContext ctx, out Guid userId)
         => Guid.TryParse(ctx.User.FindFirst("sub")?.Value, out userId);
 
     /// <summary>Traduce el fallo de un caso de uso a una respuesta JSON <c>{ error }</c> con su código HTTP.</summary>
-    private static IResult Error(ErrorAplicacion error) => Results.Json(
+    internal static IResult Error(ErrorAplicacion error) => Results.Json(
         new { error = error.Mensaje },
         statusCode: error.Tipo switch
         {

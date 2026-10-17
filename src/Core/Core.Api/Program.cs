@@ -55,6 +55,8 @@ builder.Services.AddScoped(sp => new ServicioRecurrentes(
     sp.GetRequiredService<IRepositorioRecurrentes>(), sp.GetRequiredService<IRepositorioGastos>()));
 builder.Services.AddScoped(sp => new ServicioMiembros(
     sp.GetRequiredService<IRepositorioMiembros>(), sp.GetRequiredService<TimeProvider>()));
+builder.Services.AddScoped(sp => new ServicioEnlacesGrupo(
+    sp.GetRequiredService<IRepositorioEnlacesGrupo>(), sp.GetRequiredService<IRepositorioMiembros>(), sp.GetRequiredService<TimeProvider>()));
 builder.Services.AddScoped(sp => new ServicioCuentaComun(
     sp.GetRequiredService<IRepositorioCuentaComun>(), sp.GetRequiredService<TimeProvider>()));
 builder.Services.AddScoped(sp => new ServicioLiquidacion(
@@ -115,6 +117,7 @@ app.MapCuentaComun();
 app.MapCategorias();
 app.MapPerfiles();
 app.MapMiembros();
+app.MapEnlacesGrupo();
 app.MapAuditoria();
 app.MapCierresMes();
 

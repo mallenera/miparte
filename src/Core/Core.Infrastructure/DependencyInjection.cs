@@ -42,6 +42,7 @@ public static class DependencyInjection
         services.AddScoped<IRepositorioGastos>(sp => new RepositorioGastos(sp.GetRequiredService<MiParteDbContext>()));
         services.AddScoped<IRepositorioCuentaComun>(sp => new RepositorioCuentaComun(sp.GetRequiredService<MiParteDbContext>()));
         services.AddScoped<IRepositorioMiembros>(sp => new RepositorioMiembros(sp.GetRequiredService<MiParteDbContext>()));
+        services.AddScoped<IRepositorioEnlacesGrupo>(sp => new RepositorioEnlacesGrupo(sp.GetRequiredService<MiParteDbContext>()));
         services.AddScoped<IRepositorioRecurrentes>(sp => new RepositorioRecurrentes(sp.GetRequiredService<MiParteDbContext>()));
         services.AddScoped<IRepositorioPerfiles>(sp => new RepositorioPerfiles(sp.GetRequiredService<MiParteDbContext>()));
         services.AddScoped<IRepositorioCategorias>(sp => new RepositorioCategorias(sp.GetRequiredService<MiParteDbContext>()));

@@ -26,7 +26,7 @@ public static class RegistroAuditoria
     public const string Usar = "usar";
 
     /// <summary>Propiedades que nunca van al rastro: la clave ya es la entidad, el hogar es la columna y el hash del token es un secreto.</summary>
-    private static readonly HashSet<string> Excluidas = ["Id", "HogarId", nameof(InvitacionHogar.TokenHash)];
+    private static readonly HashSet<string> Excluidas = ["Id", "HogarId", nameof(InvitacionHogar.TokenHash), nameof(EnlaceGrupo.TokenHash)];
 
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -196,7 +196,7 @@ public static class RegistroAuditoria
     /// <summary>Nombre con el que se registra el tipo de entidad, o null si no se audita.</summary>
     private static string? Nombre(object entidad) => entidad switch
     {
-        Hogar => "hogar", Miembro => "miembro", InvitacionHogar => "invitacion", Gasto => "gasto",
+        Hogar => "hogar", Miembro => "miembro", InvitacionHogar => "invitacion", EnlaceGrupo => "enlace_grupo", Gasto => "gasto",
         GastoRecurrente => "gasto_recurrente", PagoLiquidacionRegistro => "pago_liquidacion",
         AportacionCuenta => "aportacion_cuenta", ReembolsoCuenta => "reembolso_cuenta",
         RetiradaAhorro => "retirada_ahorro", MesCerrado => "mes_cerrado", DepositoAhorro => "deposito_ahorro", PerfilReparto => "perfil_reparto", Categoria => "categoria", _ => null,

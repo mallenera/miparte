@@ -89,6 +89,10 @@ Permisos: "miembro" = cualquier miembro activo del hogar (incluye admin). "admin
 | `DELETE /api/miembros/{id}` | Borrado lógico (= PUT `activo=false`, mismas reglas) | - | `MiembroDto` 200 | igual que PUT | permiso `miembros.gestionar` |
 | `POST /api/invitaciones` | Crea invitación. `miembroId` opcional: vincula a un miembro existente sin usuario; sin él, quien acepte entra como nuevo adulto | `CrearInvitacionRequest` (cuerpo opcional) | `InvitacionCreada` 201 | 403 sin el permiso `invitaciones.crear`; 404 miembro; 409 miembro desactivado o ya vinculado | permiso `invitaciones.crear` |
 | `POST /api/invitaciones/aceptar` | Acepta con el token; devuelve el hogar al que se une (SinHogarActual) | `AceptarInvitacionRequest` | `HogarResumen` 200 | 400 token vacío, o nombre obligatorio si la invitación no apunta a un miembro (máx. 100); 404 token no válido; 409 usada, caducada, ya perteneces al hogar, miembro no disponible o ya vinculado | autenticado |
+| `GET /api/enlaces-grupo` | Lista los enlaces de grupo del hogar (activos, revocados y caducados), sin token | - | `EnlaceGrupoDto[]` 200 | 403 sin el permiso; 409 sin hogar | permiso `enlaces.gestionar` |
+| `POST /api/enlaces-grupo` | Crea un enlace reutilizable. `caducaEn` opcional (sin él, no caduca). El token en claro solo se devuelve aquí | `CrearEnlaceGrupoRequest` (cuerpo opcional) | `EnlaceGrupoCreado` 201 | 400 `caducaEn` ya pasada; 403 sin el permiso; 409 sin hogar | permiso `enlaces.gestionar` |
+| `DELETE /api/enlaces-grupo/{id}` | Revoca el enlace: deja de admitir uniones, pero se conserva (`activo` = false). Revocar uno ya revocado no hace nada | - | 204 | 403 sin el permiso; 404 no es de este hogar; 409 sin hogar | permiso `enlaces.gestionar` |
+| `POST /api/enlaces-grupo/unirse` | Une al usuario al hogar del enlace (SinHogarActual). Con `nombre` entra como adulto nuevo; con `miembroId` se vincula a un adulto existente sin cuenta | `UnirseEnlaceGrupoRequest` | `HogarResumen` 200 | 400 token vacío o nombre obligatorio (máx. 100); 404 token no válido o miembro de otro hogar; 409 enlace revocado o caducado, ya perteneces al hogar, miembro desactivado, a cargo o ya vinculado | autenticado (sin permiso especial) |
 
 ### 3.3 Categorías
 
@@ -185,9 +189,9 @@ Un mes cerrado congela sus **gastos** y, con ellos, su reparto, su resumen y su 
 |---|---|---|---|---|---|
 | `GET /api/auditoria?entidad=&entidadId=&limite=&hasta=&despuesDeId=` | Historial de cambios del hogar, del más reciente al más antiguo (empates por `id`). `limite` 1-200 (50 por defecto). Se pagina con el `cuando` y el `id` del último evento recibido, enviados como `hasta` (ISO 8601) y `despuesDeId`; con solo `hasta` se perderían los eventos de un mismo guardado, que comparten `cuando` | - | `EventoAuditoriaDto[]` 200 | 400 límite fuera de 1-200; 403 sin el permiso `historial.ver`; 409 sin hogar | permiso `historial.ver` |
 
-Cada cambio de gasto, gasto recurrente, pago de liquidación, aportación, reembolso, ingreso y retirada de ahorro, perfil, categoría, miembro e invitación queda registrado **en la misma transacción** que el cambio (no puede haber cambio sin rastro). `accion`: `crear` (solo `despues`), `editar` (solo los campos que cambian, en `antes` y `despues`), `borrar` (solo `antes`), `vincular` (un usuario queda ligado a un miembro al aceptar una invitación) y `usar` (invitación aceptada). El reparto de un gasto (`repartos`) y el detalle de un perfil (`detalle`) van dentro de su evento. Crear un hogar es un único evento (no se detalla la semilla). Nunca se registran el token de una invitación ni su hash. `autor` es el nombre del miembro vinculado al usuario; `usuarioId` sigue siendo válido aunque ese miembro se desactive.
+Cada cambio de gasto, gasto recurrente, pago de liquidación, aportación, reembolso, ingreso y retirada de ahorro, perfil, categoría, miembro, invitación y enlace de grupo queda registrado **en la misma transacción** que el cambio (no puede haber cambio sin rastro). `accion`: `crear` (solo `despues`), `editar` (solo los campos que cambian, en `antes` y `despues`), `borrar` (solo `antes`), `vincular` (un usuario queda ligado a un miembro al aceptar una invitación) y `usar` (invitación aceptada). El reparto de un gasto (`repartos`) y el detalle de un perfil (`detalle`) van dentro de su evento. Crear un hogar es un único evento (no se detalla la semilla). Nunca se registran el token de una invitación ni su hash. `autor` es el nombre del miembro vinculado al usuario; `usuarioId` sigue siendo válido aunque ese miembro se desactive.
 
-Total: 52 endpoints de negocio (5 hogares/yo, 6 miembros/invitaciones, 4 categorías, 5 perfiles, 5 gastos, 6 recurrentes, 5 resumen/liquidación/pagos, 12 cuenta común, 3 cierre de mes, 1 auditoría) más `GET /health`.
+Total: 56 endpoints de negocio (5 hogares/yo, 10 miembros/invitaciones/enlaces de grupo, 4 categorías, 5 perfiles, 5 gastos, 6 recurrentes, 5 resumen/liquidación/pagos, 12 cuenta común, 3 cierre de mes, 1 auditoría) más `GET /health`.
 
 ## 4. Ejemplos JSON
 
@@ -259,6 +263,36 @@ Total: 52 endpoints de negocio (5 hogares/yo, 6 miembros/invitaciones, 4 categor
 ```json
 { "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez" }
 ```
+
+### Enlaces de grupo
+
+Un enlace de grupo es un **enlace reutilizable** para grupos de viaje o evento: quien lo abre se une al hogar sin invitación nominal, tantas veces como haga falta (la invitación de arriba es de un solo uso). Igual que el token de invitación, el token en claro solo se devuelve al crearlo y en base de datos queda su hash SHA-256. La API no genera enlaces: el front arma `<web>/unirse#token=<token>`, como con las invitaciones.
+
+`POST /api/enlaces-grupo` (cuerpo opcional; sin `caducaEn` no caduca):
+
+```json
+{ "caducaEn": "2026-11-30T23:59:59+01:00" }
+```
+```json
+{ "id": "d0000000-0000-4000-8000-000000000001", "token": "c2Vn...base64url...", "caducaEn": "2026-11-30T22:59:59+00:00" }
+```
+
+`GET /api/enlaces-grupo` devuelve cada enlace con `estado` (`activo`, `revocado` o `caducado`), `usos` (uniones hechas, informativo) y `creadoPor` (id del miembro), sin token:
+
+```json
+[{ "id": "d0000000-0000-4000-8000-000000000001", "creadoPor": "b0000000-0000-4000-8000-0000000000aa", "creadoEn": "2026-10-17T10:00:00+00:00", "caducaEn": null, "usos": 3, "estado": "activo" }]
+```
+
+`POST /api/enlaces-grupo/unirse` (sin hogar actual; `nombre` salvo que se indique `miembroId`):
+
+```json
+{ "token": "c2Vn...base64url...", "nombre": "Marta" }
+```
+```json
+{ "id": "a1b2c3d4-0000-4000-8000-000000000001", "nombre": "Casa Pérez" }
+```
+
+Reglas: un enlace **revocado** o **caducado** no admite uniones (409, con `revocado` por encima de `caducado` si se dan los dos). Un usuario ya presente en el hogar recibe 409 aunque el enlace siga activo. Cada unión incrementa `usos` y no consume el enlace. Con `miembroId` se vincula el usuario a un **adulto existente sin cuenta** del hogar (sin crear otro miembro). Unirse no exige permiso, pero el enlace debe ser del hogar que se elige. Revocar y listar exigen el permiso `enlaces.gestionar`; las altas, revocaciones y uniones quedan en la auditoría como `enlace_grupo` (sin token ni hash). Unirse y revocar invalidan la caché de acceso como las invitaciones. Ninguna de estas operaciones puede dejar al hogar sin administrador: solo añaden miembros vinculados o los dejan intactos.
 
 ### Categorías
 
@@ -437,7 +471,7 @@ Error típico si se pasa de la deuda (409): `{ "error": "El importe supera la de
 - **Semilla al crear hogar**: 4 perfiles para cualquier tipo (`Cuenta común`, `Por partes`, `Porcentaje fijo`, `Individual`; el creador queda con 1 parte en "Por partes" y 100 % en "Porcentaje fijo"). Las 6 categorías estándar (Hipoteca/Alquiler, Alimentación, Suministros, Gastos varios de casa e Hijo con "Por partes"; Ocio personal con "Individual") solo aplican al tipo `hogar`; `piso_compartido`, `viaje`, `evento` y `otro` siembran sus categorías propias con "Por partes" (ver «Tipo de grupo» en §4). El creador es admin y adulto.
 - **Quién soy**: `MiembroDto.esYo` es `true` en el miembro vinculado al usuario autenticado (en `GET /api/miembros`, `PUT` y `DELETE`; el alta siempre devuelve `false`). El front lo usa para saber si mostrar los controles de admin y cuál es "su" miembro.
 - **Roles y permisos**: el rol (`admin` / `miembro`) solo decide la plantilla de permisos de quien no tiene lista propia; el hogar siempre conserva al menos un admin activo y vinculado (409). Un adulto responsable de miembros a cargo activos no se puede desactivar (409).
-- **Permisos por miembro** (`miembro.permisos`, nulo = sin lista propia). `MiembroDto.permisos` devuelve los **efectivos**: la lista propia si existe; si no, la plantilla del rol (admin todos, miembro los marcados «defecto»); los adultos sin cuenta y los a cargo, ninguno. Cualquier adulto con cuenta, **admins incluidos**, puede tener cualquier combinación. Sin el permiso la API responde 403 `{ "error": "No tienes permiso para ..." }`; las lecturas siguen abiertas a cualquier miembro. Un miembro con `permisos.gestionar` los cambia con `PUT /api/miembros/{id}` y `permisos` (lista completa de claves; 400 clave desconocida; 409 si el destino no es un adulto con cuenta). Cambiar el `rol` sin enviar `permisos` devuelve al miembro a la plantilla del rol nuevo. **Invariante**: siempre queda al menos un adulto activo con cuenta con `permisos.gestionar` (409 si el cambio lo impide). Catálogo (17): `gastos.crear`, `gastos.editar`, `gastos.borrar`, `recurrentes.gestionar` (también `POST /api/gastos-recurrentes/generar`), `pagos.registrar` (crear y borrar pagos de liquidación), `mes.cerrar`, `cuenta.movimientos` (aportaciones y reembolsos), `ahorro.movimientos` (ingresos y retiradas), `categorias.gestionar`, `perfiles.gestionar` (todos «defecto»); `mes.reabrir`, `historial.ver`, `miembros.gestionar` (añadir, renombrar a otros, desactivar, responsable), `invitaciones.crear`, `hogar.funciones` (cuenta común y ahorro) `permisos.gestionar` y `hogar.eliminar` (eliminar el hogar; sin «defecto»). Cualquiera puede renombrarse a sí mismo. Plantillas para la web (`CatalogoPermisos.Plantillas`): Solo lectura, Colaborador (defecto), Gestor (todo salvo `hogar.funciones`, `permisos.gestionar` y `hogar.eliminar`) y Administrador (todo).
+- **Permisos por miembro** (`miembro.permisos`, nulo = sin lista propia). `MiembroDto.permisos` devuelve los **efectivos**: la lista propia si existe; si no, la plantilla del rol (admin todos, miembro los marcados «defecto»); los adultos sin cuenta y los a cargo, ninguno. Cualquier adulto con cuenta, **admins incluidos**, puede tener cualquier combinación. Sin el permiso la API responde 403 `{ "error": "No tienes permiso para ..." }`; las lecturas siguen abiertas a cualquier miembro. Un miembro con `permisos.gestionar` los cambia con `PUT /api/miembros/{id}` y `permisos` (lista completa de claves; 400 clave desconocida; 409 si el destino no es un adulto con cuenta). Cambiar el `rol` sin enviar `permisos` devuelve al miembro a la plantilla del rol nuevo. **Invariante**: siempre queda al menos un adulto activo con cuenta con `permisos.gestionar` (409 si el cambio lo impide). Catálogo (18): `gastos.crear`, `gastos.editar`, `gastos.borrar`, `recurrentes.gestionar` (también `POST /api/gastos-recurrentes/generar`), `pagos.registrar` (crear y borrar pagos de liquidación), `mes.cerrar`, `cuenta.movimientos` (aportaciones y reembolsos), `ahorro.movimientos` (ingresos y retiradas), `categorias.gestionar`, `perfiles.gestionar` (todos «defecto»); `mes.reabrir`, `historial.ver`, `miembros.gestionar` (añadir, renombrar a otros, desactivar, responsable), `invitaciones.crear`, `enlaces.gestionar` (crear, listar y revocar enlaces de grupo), `hogar.funciones` (cuenta común y ahorro) `permisos.gestionar` y `hogar.eliminar` (eliminar el hogar; sin «defecto»). Cualquiera puede renombrarse a sí mismo. Plantillas para la web (`CatalogoPermisos.Plantillas`): Solo lectura, Colaborador (defecto), Gestor (todo salvo `hogar.funciones`, `permisos.gestionar` y `hogar.eliminar`) y Administrador (todo).
 - **Invitaciones**: el `token` en claro solo se devuelve en la respuesta de `POST /api/invitaciones` (en base de datos solo se guarda su hash): mostrarlo o copiarlo en ese momento. El front lo ofrece como enlace `<web>/unirse#token=<token>` (en el fragmento, que el navegador no envía al servidor); la API solo conoce el token y no genera enlaces. Caduca a los 7 días (`caducaEn`) y es de un solo uso. Quien acepta no necesita hogar previo. Si la invitación apunta a un `miembroId`, ese miembro queda vinculado al usuario; si no, hay que enviar `nombre` y entra como adulto con rol `miembro`.
 - **Cierre de mes**: `GET /api/cierres-mes` dice qué meses están cerrados; en ellos la UI debe ocultar o desactivar alta, edición y borrado de gastos y la generación de recurrentes (el servidor los rechaza con 409). Cierra un mes quien tenga el permiso `mes.cerrar` y lo reabre quien tenga `mes.reabrir` (por defecto, cualquier miembro puede cerrar y solo un admin puede reabrir).
 - **Eliminaciones**: categorías y perfiles en uso devuelven 409; los miembros se desactivan, no se borran.

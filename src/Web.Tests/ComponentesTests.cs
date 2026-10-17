@@ -1245,7 +1245,7 @@ public class ComponentesTests : BunitContext
         var c = Render<PanelPermisos>(p => p.Add(x => x.Miembros, new List<MiembroDto> { ana, luis }).Add(x => x.Puede, true));
 
         Assert.Contains("Todos los permisos", c.Markup); // Ana
-        Assert.Contains("1 de 17 permisos", c.Markup); // Luis
+        Assert.Contains("1 de 18 permisos", c.Markup); // Luis
         c.Find("button[aria-label='Permisos de Luis']").Click();
         var historial = c.FindAll(".permisos .chk").First(l => l.TextContent.Contains("Ver el historial")).QuerySelector("input")!;
         historial.Change(true);
@@ -1279,7 +1279,7 @@ public class ComponentesTests : BunitContext
         var c = Render<PanelPermisos>(p => p.Add(x => x.Miembros, new List<MiembroDto> { ana, luis }).Add(x => x.Puede, true));
 
         c.Find("button[aria-label='Permisos de Luis']").Click();
-        Assert.Equal(17, c.FindAll(".permisos .chk input").Count(i => i.HasAttribute("checked"))); // un admin parte con todos
+        Assert.Equal(18, c.FindAll(".permisos .chk input").Count(i => i.HasAttribute("checked"))); // un admin parte con todos
 
         c.FindAll(".plantillas button").First(b => b.TextContent.Trim() == "Solo lectura").Click();
         Assert.Equal(0, c.FindAll(".permisos .chk input").Count(i => i.HasAttribute("checked")));

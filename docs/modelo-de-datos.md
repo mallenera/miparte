@@ -12,6 +12,7 @@ erDiagram
     hogar ||--o{ gasto : registra
     hogar ||--o{ gasto_recurrente : programa
     hogar ||--o{ invitacion_hogar : emite
+    hogar ||--o{ enlace_grupo : "emite (reutilizable)"
     hogar ||--o{ pago_liquidacion : anota
     hogar ||--o{ aportacion_cuenta : "aporta a la cuenta común"
     hogar ||--o{ reembolso_cuenta : "reembolsa de la cuenta común"
@@ -49,6 +50,7 @@ erDiagram
 | `gasto_reparto` | **Resultado del reparto congelado al crear el gasto**: `importe_asumido` por miembro. No se recalcula salvo con `PUT` del gasto. La suma de las filas = importe del gasto. |
 | `gasto_recurrente` | Plantilla mensual, `dia_mes` 1-28, `activo`. Índice único evita duplicar la generación de un mes (idempotente). |
 | `invitacion_hogar` | Solo se guarda el **hash SHA-256** del token; caduca a 7 días; un solo uso (`usada_en`/`usada_por`). |
+| `enlace_grupo` | Enlace de grupo **reutilizable** (viajes, eventos): solo el **hash SHA-256** del token; `activo` (falso = revocado, la fila se conserva); `caduca_en` opcional (nulo = no caduca, y si existe debe ser posterior a `creado_en`); `creado_por` es el miembro que lo creó (FK compuesta a `miembro`); `usos` es un contador informativo que no limita nada. Varios enlaces activos a la vez son válidos: cada grupo puede tener el suyo y se revocan por separado. |
 | `pago_liquidacion` | Transferencia real `de_miembro_id` → `a_miembro_id` en un `mes` (primer día del mes) para saldar la liquidación. |
 | `auditoria` | Historial **de solo añadir** (un trigger rechaza `UPDATE`, `DELETE` y `TRUNCATE`, también al propietario; solo se permite el borrado en cascada al eliminar el hogar). `usuario_id` sin FK (el rastro sobrevive a la cuenta), `accion`, `entidad`, `entidad_id`, `antes`/`despues` en `jsonb`. La escribe solo Core.Api, dentro de la transacción del cambio; la lee un admin vía RLS (`es_admin_hogar`). |
 | `aportacion_cuenta` | Importe fijo mensual de un adulto a la cuenta común, vigente `desde` un mes (día 1); único por miembro y mes. El importe de un mes es el de la fila más reciente que no lo supere; 0 = deja de aportar. `ahorro` (0 ≤ ahorro ≤ importe, por `check`) es la parte que se aparta para ahorro; el resto queda para gastos. |

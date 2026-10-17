@@ -50,6 +50,8 @@ public static class CatalogoPermisos
     public const string MiembrosGestionar = "miembros.gestionar";
     /// <summary>Crear invitaciones.</summary>
     public const string InvitacionesCrear = "invitaciones.crear";
+    /// <summary>Crear, consultar, revocar enlaces de grupo reutilizables.</summary>
+    public const string EnlacesGestionar = "enlaces.gestionar";
     /// <summary>Habilitar o deshabilitar la cuenta común y el ahorro del hogar.</summary>
     public const string HogarFunciones = "hogar.funciones";
     /// <summary>Cambiar los permisos de los miembros.</summary>
@@ -74,6 +76,7 @@ public static class CatalogoPermisos
         new(HistorialVer, "Ver el historial de cambios", "Hogar", false),
         new(MiembrosGestionar, "Añadir, renombrar y desactivar miembros", "Hogar", false),
         new(InvitacionesCrear, "Crear invitaciones", "Hogar", false),
+        new(EnlacesGestionar, "Crear y revocar enlaces de grupo", "Hogar", false),
         new(HogarFunciones, "Habilitar la cuenta común y el ahorro", "Hogar", false),
         new(PermisosGestionar, "Cambiar los permisos de los miembros", "Hogar", false),
         new(HogarEliminar, "Eliminar el hogar definitivamente", "Hogar", false),

@@ -247,7 +247,7 @@ public class ServicioMiembrosTests
     }
 
     /// <summary>Repositorio en memoria: cada colección es lo que «hay» en la base de datos.</summary>
-    private sealed class RepositorioFalso : IRepositorioMiembros
+    internal sealed class RepositorioFalso : IRepositorioMiembros
     {
         public List<Miembro> Miembros { get; } = [];
         public List<InvitacionHogar> Invitaciones { get; } = [];

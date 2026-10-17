@@ -44,6 +44,9 @@ internal sealed class RepositorioGastosFalso : IRepositorioGastos
 
     public Task<DatosAhorro> DatosAhorroAsync(Guid? excluirGasto, CancellationToken ct) => Task.FromResult(Ahorro);
 
+    /// <summary>Sin periodo propio cerrado: los tests de gastos que lo necesitan usan el HTTP en memoria (PeriodoHttpTests).</summary>
+    public Task<bool> FechaEnPeriodoCerradoAsync(DateOnly fecha, CancellationToken ct) => Task.FromResult(false);
+
     public Task<bool> MesCerradoAsync(DateOnly fecha, CancellationToken ct)
         => Task.FromResult(MesesCerrados.Contains(new DateOnly(fecha.Year, fecha.Month, 1)));
 

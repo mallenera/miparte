@@ -101,6 +101,9 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
                 .HasConversion(v => TextoModoLiquidacion.ATexto(v), v => TextoAModoLiquidacion(v));
             e.Ignore(x => x.PeriodoPropio); // se deriva de periodo_desde y periodo_hasta (ver Hogar.PeriodoPropio)
             e.Property(x => x.RecurrentesActivas).HasColumnName("recurrentes_activas"); // EF siempre envía el valor; el DEFAULT de la columna solo cubre inserciones ajenas
+            e.Property(x => x.AportacionFrecuencia).HasColumnName("aportacion_frecuencia")
+                .HasConversion(v => TextoFrecuenciaAportacion.ATexto(v), v => TextoAFrecuencia(v));
+            e.Property(x => x.PeriodoCerradoEn).HasColumnName("periodo_cerrado_en");
             e.HasQueryFilter(x => x.Id == HogarId);
         });
 
@@ -271,4 +274,8 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
     /// <summary>Convierte el texto de la columna <c>hogar.liquidacion_modo</c> al modo; falla si el valor es desconocido (la base lo impide).</summary>
     private static ModoLiquidacion TextoAModoLiquidacion(string t)
         => TextoModoLiquidacion.TryParse(t, out var modo) ? modo : throw new InvalidOperationException($"Modo de liquidación desconocido: {t}");
+
+    /// <summary>Convierte el texto de la columna <c>hogar.aportacion_frecuencia</c> a la frecuencia; falla si el valor es desconocido (la base lo impide).</summary>
+    private static FrecuenciaAportacion TextoAFrecuencia(string t)
+        => TextoFrecuenciaAportacion.TryParse(t, out var f) ? f : throw new InvalidOperationException($"Frecuencia de aportación desconocida: {t}");
 }

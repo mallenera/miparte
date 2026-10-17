@@ -17,8 +17,9 @@
 --         Scripts/ 20261020120000, 20261021120000 y 20261022120000 contienen lo mismo en forma de migración; este delta es
 --         la versión para Supabase, sin journal.
 -- Filas existentes: periodo_desde y periodo_hasta quedan a null (el hogar usa meses como hasta ahora), recurrentes_activas
---         a true (los hogares que ya generaban sus recurrentes siguen igual), liquidacion_modo a 'mensual' y los gastos
---         existentes con ciclo_liquidacion_id a null. No hay que rellenar datos.
+--         a true (los hogares que ya generaban sus recurrentes siguen igual), liquidacion_modo y aportacion_frecuencia a
+--         'mensual' (su comportamiento de siempre), periodo_cerrado_en a null y los gastos existentes con ciclo_liquidacion_id
+--         a null. No hay que rellenar datos.
 -- =====================================================================================================================
 
 begin;
@@ -41,6 +42,25 @@ do $$
 begin
     if not exists (select 1 from pg_constraint where conname = 'hogar_liquidacion_modo_check' and conrelid = 'public.hogar'::regclass) then
         alter table public.hogar add constraint hogar_liquidacion_modo_check check ((liquidacion_modo = any (array['mensual'::text, 'ciclos'::text])));
+    end if;
+end $$;
+
+-- 1b) hogar: frecuencia de las aportaciones a la cuenta común y cierre del periodo propio (Scripts/20261023120000) -----------
+
+alter table public.hogar add column if not exists aportacion_frecuencia text default 'mensual'::text not null;
+alter table public.hogar add column if not exists periodo_cerrado_en timestamp with time zone;
+
+do $$
+begin
+    if not exists (select 1 from pg_constraint where conname = 'hogar_aportacion_frecuencia_check' and conrelid = 'public.hogar'::regclass) then
+        alter table public.hogar add constraint hogar_aportacion_frecuencia_check check ((aportacion_frecuencia = any (array['unica'::text, 'mensual'::text, 'bimestral'::text, 'trimestral'::text, 'semestral'::text, 'anual'::text])));
+    end if;
+end $$;
+
+do $$
+begin
+    if not exists (select 1 from pg_constraint where conname = 'hogar_periodo_cerrado_check' and conrelid = 'public.hogar'::regclass) then
+        alter table public.hogar add constraint hogar_periodo_cerrado_check check ((periodo_cerrado_en is null) or ((periodo_desde is not null) and (periodo_hasta is not null)));
     end if;
 end $$;
 

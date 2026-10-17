@@ -235,4 +235,51 @@ public class ModeloConfiguracionHogarTests
         Assert.Equal(DestinoArranque.SinHogar, r.Destino);
         Assert.False(m.Eliminando);
     }
+
+    [Fact]
+    public async Task Cambiar_la_frecuencia_de_aportaciones_la_guarda_en_el_hogar()
+    {
+        var (m, api, hogar) = Crear(cuenta: true);
+        api.Responde("PUT /api/hogar/aportaciones", HttpStatusCode.OK, new FrecuenciaAportacionResponse("bimestral"));
+        await m.CargarAsync();
+        var clave = m.ClaveFrecuencia;
+
+        var aviso = await m.CambiarFrecuenciaAsync("bimestral");
+
+        Assert.Equal("Frecuencia de aportaciones guardada", aviso);
+        Assert.Equal("bimestral", hogar.HogarActual!.AportacionFrecuencia);
+        Assert.NotEqual(clave, m.ClaveFrecuencia);
+    }
+
+    [Fact]
+    public async Task Cerrar_el_viaje_marca_el_periodo_como_cerrado_y_sale_de_la_confirmacion()
+    {
+        var (m, api, hogar) = Crear();
+        var actual = hogar.HogarActual! with { Periodo = "2026-03-01/" };
+        await hogar.AplicarAsync(new YoResponse(actual.Id.ToString(), [actual], actual));
+        api.Responde("POST /api/hogar/cerrar-periodo", HttpStatusCode.OK, new CierrePeriodoResponse("2026-03-01/2026-03-15", DateTimeOffset.UtcNow, null));
+        m.ConfirmandoCierre = true;
+
+        var aviso = await m.CerrarPeriodoAsync();
+
+        Assert.Equal("Viaje cerrado", aviso);
+        Assert.True(m.PeriodoCerrado);
+        Assert.False(m.PuedeCerrarPeriodo);
+        Assert.False(m.ConfirmandoCierre);
+    }
+
+    [Fact]
+    public async Task Si_la_api_rechaza_el_cierre_del_viaje_el_motivo_queda_en_ErrorPeriodo()
+    {
+        var (m, api, hogar) = Crear();
+        var actual = hogar.HogarActual! with { Periodo = "2026-03-01/" };
+        await hogar.AplicarAsync(new YoResponse(actual.Id.ToString(), [actual], actual));
+        api.Error("POST /api/hogar/cerrar-periodo", HttpStatusCode.Conflict, "El periodo ya está cerrado.");
+
+        var aviso = await m.CerrarPeriodoAsync();
+
+        Assert.Null(aviso);
+        Assert.Contains("ya está cerrado", m.ErrorPeriodo);
+        Assert.False(hogar.HogarActual!.PeriodoCerrado);
+    }
 }

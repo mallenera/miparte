@@ -68,6 +68,10 @@ public class Hogar
     public DateOnly? PeriodoDesde { get; set; }
     /// <summary>Último día del periodo propio (columna <c>periodo_hasta</c>); null con <see cref="PeriodoDesde"/> informado = periodo abierto.</summary>
     public DateOnly? PeriodoHasta { get; set; }
+    /// <summary>Cuándo se cerró el periodo propio (columna <c>periodo_cerrado_en</c>); null si está abierto o nunca se cerró. Cerrado, los gastos de su rango no se pueden editar ni borrar.</summary>
+    public DateTimeOffset? PeriodoCerradoEn { get; set; }
+    /// <summary>Con qué frecuencia aportan los miembros a la cuenta común (columna <c>aportacion_frecuencia</c>); mensual en los hogares existentes.</summary>
+    public FrecuenciaAportacion AportacionFrecuencia { get; set; } = FrecuenciaAportacion.Mensual;
 
     /// <summary>
     /// Periodo propio del hogar como value object, a partir de <see cref="PeriodoDesde"/> y <see cref="PeriodoHasta"/>.

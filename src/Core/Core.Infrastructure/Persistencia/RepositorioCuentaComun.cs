@@ -55,7 +55,7 @@ public sealed class RepositorioCuentaComun(MiParteDbContext db) : IRepositorioCu
         // Todo lo que necesita el cálculo en una sola consulta y ya agrupado: el histórico no se trae fila a fila.
         var h = await HistoricoCuentaComun.LeerAsync(db, inicio, detalleDelMes: true, ct);
         return new HistoricoCuentaDetallado(
-            new HistoricoCuenta(h.Vigentes, h.Gastos, h.Reembolsos, h.Retiradas, h.Depositos, h.CuentaActiva, h.GastadoMes, h.GastosDelMes, h.SaldoInicial),
+            new HistoricoCuenta(h.Vigentes, h.Gastos, h.Reembolsos, h.Retiradas, h.Depositos, h.CuentaActiva, h.GastadoMes, h.GastosDelMes, h.SaldoInicial, h.Frecuencia),
             h.AhorroActivo,
             h.Aportaciones.Select(a => new AportacionRegistrada(a.Id, a.MiembroId, a.Fecha, a.Importe, a.Ahorro)).ToList(),
             h.ReembolsosDelMes, h.RetiradasDelMes, h.DepositosDelMes, h.Nombres);
@@ -70,8 +70,23 @@ public sealed class RepositorioCuentaComun(MiParteDbContext db) : IRepositorioCu
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<AportacionVigente>> AportacionesAsync(CancellationToken ct)
-        => await db.AportacionesCuenta.AsNoTracking()
-            .Select(a => new AportacionVigente(a.MiembroId, a.Desde, a.Importe, a.Ahorro)).ToListAsync(ct);
+    {
+        var frecuencia = await FrecuenciaAsync(ct);
+        return (await db.AportacionesCuenta.AsNoTracking().ToListAsync(ct))
+            .Select(a => new AportacionVigente(a.MiembroId, a.Desde, a.Importe, a.Ahorro, frecuencia)).ToList();
+    }
+
+    /// <inheritdoc />
+    public Task<FrecuenciaAportacion> FrecuenciaAsync(CancellationToken ct)
+        => db.Hogares.Select(h => h.AportacionFrecuencia).SingleAsync(ct);
+
+    /// <inheritdoc />
+    public async Task EstablecerFrecuenciaAsync(FrecuenciaAportacion frecuencia, CancellationToken ct)
+    {
+        var h = await db.Hogares.FirstAsync(ct);
+        h.AportacionFrecuencia = frecuencia;
+        await db.SaveChangesAsync(ct);
+    }
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<DepositoDeAhorro>> DepositosAsync(Guid? excluir, CancellationToken ct)
@@ -174,8 +189,9 @@ internal static class ConsultasAhorro
     /// <summary>Aportaciones, depósitos y lo ya usado desde el ahorro; <paramref name="excluirGasto"/> deja fuera un gasto que se edita.</summary>
     public static async Task<DatosAhorro> LeerAsync(MiParteDbContext db, Guid? excluirGasto, CancellationToken ct)
     {
-        var aportaciones = await db.AportacionesCuenta
-            .Select(a => new AportacionVigente(a.MiembroId, a.Desde, a.Importe, a.Ahorro)).ToListAsync(ct);
+        var frecuencia = await db.Hogares.Select(h => h.AportacionFrecuencia).SingleAsync(ct);
+        var aportaciones = (await db.AportacionesCuenta.ToListAsync(ct))
+            .Select(a => new AportacionVigente(a.MiembroId, a.Desde, a.Importe, a.Ahorro, frecuencia)).ToList();
         var depositos = await db.DepositosAhorro.Select(d => new DepositoDeAhorro(d.Fecha, d.Importe)).ToListAsync(ct);
         var retirado = await db.RetiradasAhorro.SumAsync(r => r.Importe, ct);
         var gastado = await db.Gastos.Where(g => g.PagadoDesdeAhorro && g.Id != excluirGasto).SumAsync(g => g.Importe, ct);

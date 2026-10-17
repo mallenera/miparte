@@ -119,7 +119,8 @@ public record CuentaComunResponse(
     IReadOnlyList<RetiradaAhorroDto>? RetiradasAhorro = null,
     decimal AhorroDepositado = 0m, IReadOnlyList<DepositoAhorroDto>? DepositosAhorro = null,
     decimal AhorroGastado = 0m, bool Activa = true, IReadOnlyList<PartePersonaDto>? Partes = null,
-    bool AhorroActivo = true, ExtractoCuentaComunDto? Extracto = null, SaldoInicialDto? SaldoInicial = null);
+    bool AhorroActivo = true, ExtractoCuentaComunDto? Extracto = null, SaldoInicialDto? SaldoInicial = null,
+    string AportacionFrecuencia = FrecuenciasAportacion.Mensual);
 
 /// <summary>
 /// Extracto del mes de la cuenta común: el efectivo al inicio, lo que entra y sale, y el efectivo al final. Los importes llevan su signo

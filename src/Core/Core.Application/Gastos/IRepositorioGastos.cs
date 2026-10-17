@@ -39,6 +39,9 @@ public interface IRepositorioGastos
     /// <summary>Adultos activos del hogar, ordenados por nombre y id.</summary>
     Task<IReadOnlyList<Miembro>> AdultosActivosAsync(CancellationToken ct);
 
+    /// <summary>Si la fecha cae dentro del periodo propio del hogar, y ese periodo está cerrado.</summary>
+    Task<bool> FechaEnPeriodoCerradoAsync(DateOnly fecha, CancellationToken ct);
+
     /// <summary>Si el hogar tiene activada la cuenta común.</summary>
     Task<bool> CuentaComunActivaAsync(CancellationToken ct);
 

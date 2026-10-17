@@ -55,6 +55,11 @@ public sealed class RepositorioGastos(MiParteDbContext db) : IRepositorioGastos
             .OrderBy(m => m.Nombre).ThenBy(m => m.Id).ToListAsync(ct);
 
     /// <inheritdoc />
+    public Task<bool> FechaEnPeriodoCerradoAsync(DateOnly fecha, CancellationToken ct)
+        => db.Hogares.AnyAsync(h => h.PeriodoCerradoEn != null && h.PeriodoDesde != null && h.PeriodoHasta != null
+            && h.PeriodoDesde <= fecha && fecha <= h.PeriodoHasta, ct);
+
+    /// <inheritdoc />
     public Task<bool> CuentaComunActivaAsync(CancellationToken ct) => db.Hogares.AnyAsync(h => h.CuentaComunActiva, ct);
 
     /// <inheritdoc />

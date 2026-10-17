@@ -273,11 +273,21 @@ public class ServicioCuentaComunTests
         public Task<bool> EsAdultoActivoAsync(Guid id, CancellationToken ct)
             => Task.FromResult(Miembros.Any(m => m.Id == id && m.Activo && m.Tipo == TipoMiembro.Adulto));
 
+        public FrecuenciaAportacion Frecuencia { get; set; } = FrecuenciaAportacion.Mensual;
+
         private List<AportacionVigente> Vigentes()
-            => Aportaciones.Select(a => new AportacionVigente(a.MiembroId, a.Desde, a.Importe, a.Ahorro)).ToList();
+            => Aportaciones.Select(a => new AportacionVigente(a.MiembroId, a.Desde, a.Importe, a.Ahorro, Frecuencia)).ToList();
 
         public Task<IReadOnlyList<AportacionVigente>> AportacionesAsync(CancellationToken ct)
             => Task.FromResult<IReadOnlyList<AportacionVigente>>(Vigentes());
+
+        public Task<FrecuenciaAportacion> FrecuenciaAsync(CancellationToken ct) => Task.FromResult(Frecuencia);
+
+        public Task EstablecerFrecuenciaAsync(FrecuenciaAportacion frecuencia, CancellationToken ct)
+        {
+            Frecuencia = frecuencia;
+            return Task.CompletedTask;
+        }
 
         public Task<IReadOnlyList<DepositoDeAhorro>> DepositosAsync(Guid? excluir, CancellationToken ct)
             => Task.FromResult<IReadOnlyList<DepositoDeAhorro>>(

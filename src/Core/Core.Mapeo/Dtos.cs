@@ -44,7 +44,8 @@ public static class Dtos
     /// <summary>Hogar con las funciones activadas y su tipo de grupo.</summary>
     public static HogarResumen ADto(this Hogar h)
         => new(h.Id, h.Nombre, h.CuentaComunActiva, h.AhorroActivo, TextoTipoGrupo.ATexto(h.Tipo), h.RecurrentesActivas,
-            TextoModoLiquidacion.ATexto(h.LiquidacionModo));
+            TextoModoLiquidacion.ATexto(h.LiquidacionModo), h.PeriodoPropio?.ATexto(), h.PeriodoCerradoEn is not null,
+            TextoFrecuenciaAportacion.ATexto(h.AportacionFrecuencia));
 
     /// <summary>Ciclo de liquidación cerrado, con el nombre de quien lo cerró.</summary>
     public static CicloLiquidacionDto ADto(this CicloConAutor c)
@@ -106,7 +107,8 @@ public static class Dtos
             s.Partes.Select(p => new PartePersonaDto(
                 p.MiembroId, nombres.GetValueOrDefault(p.MiembroId, ""), p.Aportado, p.Ahorrado, p.PorcentajeGastos, p.PorcentajeAhorro,
                 p.ParteSaldo, p.ParteAhorro, p.Pendiente)).ToList(),
-            d.AhorroActivo, ADto(s.Extracto), s.SaldoInicial is { } si ? new SaldoInicialDto(si.Fecha, si.Importe) : null);
+            d.AhorroActivo, ADto(s.Extracto), s.SaldoInicial is { } si ? new SaldoInicialDto(si.Fecha, si.Importe) : null,
+            TextoFrecuenciaAportacion.ATexto(d.Historico.Frecuencia));
     }
 
     /// <summary>Extracto del mes en la forma que devuelve la API.</summary>

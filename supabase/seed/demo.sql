@@ -1,4 +1,4 @@
--- Cuenta demo real: usuario «demo» / contraseña «demo» (la app traduce «demo» a demo@miparte.example) y un hogar
+-- Cuenta demo real: usuario «demo» / contraseña «9c88aaffa6d7e9e4» (la app traduce «demo» a demo@miparte.example) y un hogar
 -- de ejemplo con dos adultos, una hija a cargo, los cuatro perfiles de siempre y dos meses de gastos.
 --
 -- Es una SEMILLA, no una migración: no está en supabase/migrations y CI no la aplica. Define la función
@@ -6,7 +6,7 @@
 -- nuevos fechados respecto a hoy, así que sirve también para RESTABLECER la demo después de que alguien la haya
 -- modificado. demo_cron.sql la programa cada día con pg_cron.
 --
--- La contraseña «demo» es pública a propósito. Es más corta que el mínimo de Supabase para registrarse, pero el
+-- La contraseña de la demo es pública a propósito (cambiada para salir de las listas de contraseñas comprometidas). No cumple el mínimo de registro de Supabase, pero el
 -- inicio de sesión no la valida, por lo que se escribe aquí directamente su hash. La cuenta solo ve el hogar demo:
 -- la RLS y el filtro por hogar de Core.Api la aíslan del resto de datos.
 --
@@ -63,7 +63,7 @@ begin
         email_change_token_current, phone_change, phone_change_token, reauthentication_token)
     values (
         '00000000-0000-0000-0000-000000000000', v_user, 'authenticated', 'authenticated', v_email,
-        crypt('demo', gen_salt('bf')), now(),
+        crypt('9c88aaffa6d7e9e4', gen_salt('bf')), now(),
         '{"provider":"email","providers":["email"]}', '{"email_verified":true}', now(), now(),
         '', '', '', '', '', '', '', '');
     insert into auth.identities (provider_id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at)

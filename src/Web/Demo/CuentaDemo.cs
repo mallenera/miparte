@@ -2,7 +2,7 @@ namespace MiParte.Web.Demo;
 
 /// <summary>
 /// Constantes de las dos formas de probar la aplicación sin registrarse: el <b>modo demo local</b> (botón «Probar la demo»,
-/// datos en memoria sin tocar ningún servidor) y la <b>cuenta demo real</b> (usuario <c>demo</c>, contraseña <c>demo</c>,
+/// datos en memoria sin tocar ningún servidor) y la <b>cuenta demo real</b> (usuario <c>demo</c>, contraseña <c>9c88aaffa6d7e9e4</c>,
 /// que entra por Supabase y Core.Api con un hogar de ejemplo sembrado por <c>supabase/seed/demo.sql</c>).
 /// </summary>
 public static class CuentaDemo
@@ -11,7 +11,7 @@ public static class CuentaDemo
     public const string Usuario = "demo";
 
     /// <summary>Contraseña de la cuenta demo real. Es pública a propósito: la cuenta solo contiene datos de ejemplo.</summary>
-    public const string Contrasena = "demo";
+    public const string Contrasena = "9c88aaffa6d7e9e4";
 
     /// <summary>Correo con el que existe la cuenta demo real en Supabase Auth (el dominio <c>.example</c> está reservado y no recibe correo).</summary>
     public const string Correo = "demo@miparte.example";

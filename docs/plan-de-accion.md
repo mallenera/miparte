@@ -1,21 +1,22 @@
 # Plan de acción
 
-Estado a 2026-10-17. Este documento recoge lo que ya está hecho, lo que falta y en qué orden atacarlo. El detalle de cada tema (diseño frente a código) está en la tabla de [README.md](README.md); aquí solo se resume y se ordena.
+Estado a 2026-10-18. Este documento recoge lo que ya está hecho, lo que falta y en qué orden atacarlo. El detalle de cada tema (diseño frente a código) está en la tabla de [README.md](README.md); aquí solo se resume y se ordena.
 
 ## 1. Estado actual
 
-- **Ramas**: todas las ramas de funcionalidad, seguridad, demo, arquitectura y documentación están fusionadas en `master` (PR #6 a #40). No hay ramas sin fusionar. Las ramas locales `feature/*`, `fix/*` y `refactor/*` que ya aparecen como fusionadas pueden borrarse.
+- **Ramas**: todas las ramas de funcionalidad, seguridad, demo, arquitectura y documentación están fusionadas en `master` (PR #6 a #48). No hay ramas sin fusionar. Las ramas locales ya fusionadas pueden borrarse.
 - **Hecho** (resumen; detalle en el README):
-  - Reparto y liquidación: individual, porcentajes, partes y cuenta común; subcategorías; pagos parciales y personalizados; filtros de gastos; gastos personales fuera de la liquidación.
+  - Reparto y liquidación: individual, porcentajes, partes y cuenta común; subcategorías; pagos parciales y personalizados; filtros de gastos; gastos personales fuera de la liquidación; liquidación por ciclos y periodo de viaje.
   - Cuenta común completa: aportaciones, reembolsos, ahorro, extracto mensual, saldo inicial, activación por hogar y por categoría, «su parte» y tarjeta en el resumen.
   - Cierre de mes con concurrencia controlada; gastos recurrentes; dashboard de gastos con filtro cruzado.
   - Permisos por miembro (17 permisos asignables), historial de cambios (auditoría), eliminar hogar, invitaciones por enlace.
   - Seguridad: escritura directa cerrada, límite de peticiones, cabeceras y CSP, contenedores sin privilegios, errores en ProblemDetails.
-  - Login y registro con verificación por correo, acceso con Google (PKCE), modo demo local y cuenta demo real.
+  - Login y registro con verificación por correo, modo demo local y cuenta demo real.
   - Arquitectura por capas en Core (`Core.Application` y repositorios), base de datos gestionada con DbUp (`MiParte.Database`).
-  - Chatbot con cinco funciones de solo lectura (`Assistant.Api`).
+  - Chatbot con cinco funciones de solo lectura (`Assistant.Api`), con el proveedor de pago actual pendiente de sustituir (ver fase 1, punto 3).
   - PWA con aviso de actualización y reintentos ante arranques lentos de Render.
-- **Pendiente de verificación en entornos reales**: nada de lo anterior se ha probado todavía en Supabase real, Render, Docker ni con la API real de Anthropic (ver fase 1).
+  - Core.Api y Assistant.Api desplegados en Render (fase 1, punto 1).
+- **Pendiente de verificación en entornos reales**: Docker, Supabase real, la cuenta demo real y la RLS (fase 1).
 
 ## 2. Plan de acción
 
@@ -23,38 +24,66 @@ Las fases van en orden de prioridad. Cada ítem indica su criterio de hecho.
 
 ### Fase 1 · Puesta en producción verificada (prioridad alta)
 
-1. **Desplegar Core.Api y Assistant.Api en Render.** Configurar `ConnectionStrings__Default`, `Supabase__Url`, `Supabase__JwtSecret`, `Cors__OrigenesPermitidos__N`, `ProxyInverso__*` y `ANTHROPIC_API_KEY` (solo en Assistant). Hecho cuando `/health` responde 200 y `/api/yo` acepta un token real.
-2. **Verificar el despliegue con Docker.** Levantar `docker compose up --build` (web :8080, core :5001, assistant :5002) y comprobar nginx sin privilegios. Hecho cuando la web carga, inicia sesión y no hay violaciones de CSP en la consola.
-3. **Probar el chatbot con la API real de Anthropic.** Las cinco funciones con datos de un hogar real, y los límites de historial, bucle y preguntas por minuto. Hecho cuando las respuestas cuadran con las cifras de Resumen y `docs/asistente.md` refleja lo probado.
+1. ~~**Desplegar Core.Api y Assistant.Api en Render.**~~ **Hecho** (2026-10-18). Pendiente solo confirmar que `/api/yo` acepta un token real en ambos (ya cubierto por el punto 4).
+2. **Verificar el despliegue con Docker.** Levantar `docker compose up --build` (web :8080, core :5001, assistant :5002). Hecho cuando la web carga, inicia sesión y no hay violaciones de CSP en la consola.
+   - **Bloqueado**: Docker Desktop muestra un aviso de «inseguro» al construir o arrancar. Hace falta el texto exacto del aviso (y en qué paso aparece) para decidir si es un ajuste local, una advertencia de la imagen base o un fallo real de los Dockerfiles. Sin ese dato no se toca nada.
+3. **Sustituir el proveedor de pago del chatbot por una alternativa gratuita.** `Assistant.Api` ya abstrae el modelo tras `IClienteModelo`, así que basta una implementación nueva y un selector de proveedor (`Asistente__Proveedor`), sin tocar las funciones de consulta ni el contrato HTTP.
+   - Opciones con plan gratuito (límites y condiciones se verifican antes de elegir; cambian con frecuencia):
+     - **Groq** (recomendado para empezar): API compatible con OpenAI, modelos Llama de código abierto con llamadas a funciones, sin tarjeta. Límites bajos por minuto y por día.
+     - **Google Gemini** (plan gratuito de la API de Gemini): buena calidad y ventana amplia de límites, pero en el plan gratuito Google puede usar lo enviado para mejorar sus productos. Revisar esa política antes de mandar datos reales del hogar.
+     - **OpenRouter** con modelos `:free`: acceso a varios modelos con un solo endpoint; disponibilidad y límites variables.
+     - **Ollama en local** (modelo abierto en el propio equipo): coste cero y datos fuera de terceros, pero no sirve para el despliegue en Render. Válido para desarrollo y para la demo en la defensa.
+   - Recomendación: Groq para el despliegue, Ollama como alternativa local. Antes de elegir, confirmar límites y política de datos en la web del proveedor.
+   - Hecho cuando las cinco funciones responden con llamadas a herramientas reales sobre un hogar, `docs/asistente.md` describe el nuevo proveedor y su configuración, y los tests siguen usando el modelo falso.
 4. **Configurar Supabase real.**
    - Aplicar el esquema con `migrar` y revisar `pendientes`.
    - SMTP propio, `enable_confirmations` y la plantilla `supabase/templates/confirmacion.html`.
-   - Proveedor Google (Client ID/Secret) y Redirect URLs.
-   - Hecho cuando un registro nuevo recibe el código por correo y el acceso con Google completa el flujo.
+   - Redirect URLs de la web (sin el proveedor Google, ver fase 2).
+   - Hecho cuando un registro nuevo recibe el código por correo.
 5. **Cuenta demo real.** Ejecutar `supabase/seed/demo.sql` y `demo_cron.sql` (pg_cron, diario 04:00 UTC) y probar el workflow manual `restablecer-demo.yml`. Hecho cuando el restablecimiento deja la cuenta como la semilla.
-6. **Comprobar la RLS en Supabase real.** Con dos hogares de prueba, confirmar que un usuario no lee ni escribe datos del otro (riesgo recogido en `docs/diseno-y-decisiones.md`). Hecho cuando el resultado queda anotado en la memoria o en `docs/`.
+   - **Qué hace falta**: las migraciones ya aplicadas en Supabase (la semilla escribe en las tablas del hogar); crear la cuenta `demo` con su contraseña, o dejar que la semilla la cree (la semilla borra y recrea el usuario de Auth).
+   - **Dónde**: SQL Editor de Supabase (pegar `demo.sql`, después `demo_cron.sql`) o `psql "$DEMO_DB_URL" -f` con la cadena del Session pooler (puerto 5432) en una variable de entorno.
+   - **Extensión**: activar `pg_cron` en Database → Extensions antes de `demo_cron.sql`.
+   - **Comprobar**: `select * from cron.job where jobname = 'restablecer-demo'` y `cron.job_run_details`; entrar en la web con `demo`/`demo` y ver el hogar «Casa de Ana y Marcos».
+   - **Workflow manual**: crear el entorno `demo` en GitHub y el secreto `DEMO_DB_URL` (opcional; el restablecimiento diario ya funciona sin él).
+   - **Riesgo a tener en cuenta**: restablecer recrea el usuario de Auth, así que quien esté dentro tiene que volver a entrar. Un proyecto pausado por inactividad no ejecuta el cron.
+6. **Comprobar la RLS en Supabase real.** Con dos hogares de prueba, confirmar que un usuario no lee ni escribe datos del otro (riesgo recogido en `docs/diseno-y-decisiones.md`). Hecho cuando el resultado queda anotado en `docs/`.
+   - **Qué hace falta**: dos cuentas reales (A y B) con un hogar cada una, creadas por el registro de la web.
+   - **Pruebas**:
+     - Con el JWT de A, `GET /rest/v1/gasto?hogar_id=eq.<hogar de B>` debe devolver `[]`, y no debe poder insertar ni borrar en tablas de B (PostgREST).
+     - Con el JWT de A, `GET /api/gastos` de Core.Api con `X-Hogar-Id` de B debe responder 403.
+     - Con el JWT de A y `X-Hogar-Id` de B en Assistant.Api, la respuesta debe ser 403 y el modelo no debe llamarse.
+   - Anotar las respuestas (no los tokens) en este documento.
 
-### Fase 2 · Seguridad residual (prioridad media)
+### Fase 2 · Seguridad y limpieza de acceso (prioridad media)
 
-7. **Límites y cabeceras en Assistant.Api.** Añadir `ForwardedHeaders` y límite de peticiones como en Core.Api (`LimitacionPeticiones`). Hecho cuando hay tests y el contrato 429 está en `docs/asistente.md`.
-8. **Quitar Google Fonts de la CSP.** Servir Fraunces y Manrope desde el propio sitio y retirar el dominio externo de `default.conf.template`. Hecho cuando la CSP no lista hosts de fuentes.
-9. **Revisar `HogarId!` en Core.Api.** Sustituir el operador de supresión por una comprobación explícita o documentar por qué es seguro. Hecho cuando no quedan supresiones sin justificar.
+7. ~~**Quitar de momento el acceso con Google.**~~ **Hecho** (2026-10-18): interruptor `FuncionesAcceso.GoogleActivo = false` (`src/Web/Autenticacion/FuncionesAcceso.cs`) que oculta el botón en Login y Registro; el flujo PKCE, `ServicioSesion.CompletarGoogleAsync` y la configuración se mantienen para reactivarlo poniendo el interruptor a `true`. `dotnet test src/Web.Tests`: 450 correctas. Hecho cuando la pantalla de acceso no muestra el botón y la fila de Google del README dice «oculto de momento».
+8. **Límites y cabeceras en Assistant.Api.** Añadir `ForwardedHeaders` y límite de peticiones como en Core.Api (`LimitacionPeticiones`). Hecho cuando hay tests y el contrato 429 está en `docs/asistente.md`.
+9. **Quitar Google Fonts de la CSP.** Servir Fraunces y Manrope desde el propio sitio y retirar el dominio externo de `default.conf.template`. Hecho cuando la CSP no lista hosts de fuentes.
+10. **Revisar `HogarId!` en Core.Api.** Sustituir el operador de supresión por una comprobación explícita o documentar por qué es seguro. Hecho cuando no quedan supresiones sin justificar.
 
 ### Fase 3 · Decisiones de producto (las toma la pareja, no el código)
 
-10. **Cerrar D1 (alojamiento) y D2 (base de datos y login).** En la práctica ya son Render y Supabase; falta marcarlas como decididas en `docs/diseno-y-decisiones.md`.
-11. **Cerrar D3 y D4 (reparto del hijo y de la alimentación).** El perfil propio ya permite cualquier reparto; basta con que la pareja fije sus perfiles y se anote.
-12. **Cerrar D7 (coste y dominio).** Decidir presupuesto de la API de Anthropic y dominio. Comprobar en la OEPM que la marca y el dominio están libres (pendiente desde `diseno-y-decisiones.md`).
+11. **Cerrar D1 (alojamiento) y D2 (base de datos y login).** En la práctica ya son Render y Supabase; falta marcarlas como decididas en `docs/diseno-y-decisiones.md`.
+12. **Cerrar D3 y D4 (reparto del hijo y de la alimentación).** El perfil propio ya permite cualquier reparto; basta con que la pareja fije sus perfiles y se anote.
+13. **Cerrar D7 (coste y dominio) y unificar la numeración.** `docs/README.md` marca D7 como resuelto (modelo de lenguaje) y este plan lo usaba para coste y dominio. Decidir presupuesto del chatbot (ahora gratuito, ver fase 1) y dominio; comprobar en la OEPM que la marca y el dominio están libres.
 
 ### Fase 4 · Funcionalidad pendiente (por utilidad)
 
-13. **Recurrentes que generen gastos personales** (pendiente en la fila de gastos personales).
-14. **Asistente**: streaming de respuestas y chat en la cuenta demo.
-15. **Extras del diseño**: presupuestos con alertas y exportación a Excel o PDF; categorización automática de gastos (D6, extra).
-16. **Mejoras «Posterior»** del diseño, cada una con su propio análisis antes de empezar:
+14. **Notificaciones push del navegador.** Opt-in por usuario desde la PWA. Avisos cuando alguien agrega un gasto (a los demás miembros) y cuando se cierra una liquidación (ciclo o periodo), y al registrar un pago de liquidación. Diseño:
+    - Tabla `suscripcion_push` (miembro, endpoint y claves) en `Estructura/`, con RLS y filtro por hogar.
+    - `POST`/`DELETE /api/notificaciones/suscripcion` en Core.Api.
+    - Envío desde Core.Application en segundo plano, sin hacer fallar la petición; claves VAPID en variables de entorno; librería WebPush de .NET.
+    - Manejador `push` y clic en el service worker. Sin cambios de CSP.
+    - Límite: en iOS solo con la PWA instalada. La cuenta demo no envía avisos.
+    - Hecho cuando un gasto nuevo llega como notificación a otro miembro, y el aviso se puede activar y desactivar.
+15. **Recurrentes que generen gastos personales** (pendiente en la fila de gastos personales).
+16. **Asistente**: streaming de respuestas y chat en la cuenta demo.
+17. **Extras del diseño**: presupuestos con alertas y exportación a Excel o PDF; categorización automática de gastos (D6, extra).
+18. **Mejoras «Posterior»** del diseño, cada una con su propio análisis antes de empezar:
+    - Avisos por correo (resumen mensual y recibos próximos).
     - Reembolsos y devoluciones ligados a un gasto.
     - Copia de seguridad y exportación completa.
-    - Avisos por correo (resumen mensual y recibos próximos).
     - Resumen anual.
     - Previsión de gasto fijo.
     - Foto del ticket adjunta (sin lectura automática).
@@ -62,15 +91,16 @@ Las fases van en orden de prioridad. Cada ítem indica su criterio de hecho.
     - Alta de gastos por chat, con confirmación antes de guardar.
     - Explicación del cambio de balance entre meses.
     - Simulador de reparto.
+    - Reactivar el acceso con Google (fase 2, punto 7) cuando haya tiempo para revisarlo.
 
 Fuera de alcance declarado: objetivos de ahorro e intereses.
 
 ### Fase 5 · Entrega del proyecto fin de máster
 
-17. **Memoria**: incluir arquitectura por capas, decisiones D1-D7, pruebas (unitarias, PostgreSQL real, bUnit) y las líneas futuras de la fase 4.
-18. **Reproducibilidad**: README de despliegue y de arranque local (`docs/despliegue.md`, `docs/demo.md`) revisado contra lo que se haya probado en la fase 1.
-19. **Calidad final**: `dotnet test` completo y revisión de los comentarios XML de producción según `.claude/rules/idioma-y-documentacion.md`.
+19. **Memoria**: incluir arquitectura por capas, decisiones D1-D7, pruebas (unitarias, PostgreSQL real, bUnit) y las líneas futuras de la fase 4.
+20. **Reproducibilidad**: README de despliegue y de arranque local (`docs/despliegue.md`, `docs/demo.md`) revisado contra lo que se haya probado en la fase 1.
+21. **Calidad final**: `dotnet test` completo y revisión de los comentarios XML de producción según `.claude/rules/idioma-y-documentacion.md`.
 
 ## 3. Orden sugerido
 
-Fase 1 (sobre todo 1, 4 y 5, que bloquean la demo) → fase 3 en paralelo, porque son decisiones y no dependen del código → fase 2 → fase 4 según tiempo → fase 5 al final.
+Fase 1 (los puntos 2 a 6 en el orden en que se desbloqueen; el 5 y el 6 necesitan Supabase real) → fase 3 en paralelo, porque son decisiones y no dependen del código → fase 2 → fase 4 según tiempo → fase 5 al final.

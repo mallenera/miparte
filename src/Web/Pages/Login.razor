@@ -46,7 +46,10 @@
             </button>
         </EditForm>
 
-        <BotonGoogle Deshabilitado="@(_enviando || !Opciones.EstaConfigurada)" />
+        @if (FuncionesAcceso.GoogleActivo)
+        {
+            <BotonGoogle Deshabilitado="@(_enviando || !Opciones.EstaConfigurada)" />
+        }
 
         <div class="separador" aria-hidden="true">o</div>
         <button type="button" class="btn btn-ghost btn-block" disabled="@_enviando" @onclick="EntrarEnDemoAsync">

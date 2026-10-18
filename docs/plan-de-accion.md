@@ -58,9 +58,9 @@ Las fases van en orden de prioridad. Cada ítem indica su criterio de hecho.
 ### Fase 2 · Seguridad y limpieza de acceso (prioridad media)
 
 7. ~~**Quitar de momento el acceso con Google.**~~ **Hecho** (2026-10-18): interruptor `FuncionesAcceso.GoogleActivo = false` (`src/Web/Autenticacion/FuncionesAcceso.cs`) que oculta el botón en Login y Registro; el flujo PKCE, `ServicioSesion.CompletarGoogleAsync` y la configuración se mantienen para reactivarlo poniendo el interruptor a `true`. `dotnet test src/Web.Tests`: 450 correctas. Hecho cuando la pantalla de acceso no muestra el botón y la fila de Google del README dice «oculto de momento».
-8. **Límites y cabeceras en Assistant.Api.** Añadir `ForwardedHeaders` y límite de peticiones como en Core.Api (`LimitacionPeticiones`). Hecho cuando hay tests y el contrato 429 está en `docs/asistente.md`.
+8. ~~**Límites y cabeceras en Assistant.Api.**~~ **Hecho** (2026-10-18, `feature/fase2-seguridad-residual`): `ReenvioCabeceras` pasa a `src/BuildingBlocks/Seguridad` (`MiParte.Seguridad`) y Assistant.Api lo usa con `ProxyInverso__*`. El límite por minuto y por usuario ya existía; `ProxyInversoTests` cubre el arranque. Añadir `ForwardedHeaders` y límite de peticiones como en Core.Api (`LimitacionPeticiones`). Hecho cuando hay tests y el contrato 429 está en `docs/asistente.md`.
 9. **Quitar Google Fonts de la CSP.** Servir Fraunces y Manrope desde el propio sitio y retirar el dominio externo de `default.conf.template`. Hecho cuando la CSP no lista hosts de fuentes.
-10. **Revisar `HogarId!` en Core.Api.** Sustituir el operador de supresión por una comprobación explícita o documentar por qué es seguro. Hecho cuando no quedan supresiones sin justificar.
+10. ~~**Revisar `HogarId!` en Core.Api.**~~ **Hecho** (2026-10-18): los cinco endpoints de escritura comprueban `HogarId` y responden 409 «No hay hogar seleccionado.» sin supresión. `dotnet test src/Core/Core.Tests`: 565 correctas, 42 omitidas (pruebas con PostgreSQL sin `MIPARTE_TEST_DB`). Sustituir el operador de supresión por una comprobación explícita o documentar por qué es seguro. Hecho cuando no quedan supresiones sin justificar.
 
 ### Fase 3 · Decisiones de producto (las toma la pareja, no el código)
 

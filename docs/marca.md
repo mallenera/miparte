@@ -46,7 +46,7 @@ Cada miembro tiene color + inicial (`--m0..--m7`): burdeos, naranja, verde azula
 ## Tipografía
 - **Fraunces** (serif): solo logotipo y titulares grandes. La cursiva naranja de «tu parte» es exclusiva del logotipo.
 - **Manrope**: toda la interfaz, importes incluidos (cifras tabulares `font-variant-numeric: tabular-nums`).
-- Se cargan desde Google Fonts (`Fraunces` 400-600 + cursiva, `Manrope` 400-700).
+- Se sirven desde el propio sitio (`wwwroot/fonts`, licencia SIL OFL 1.1; `Fraunces` con peso variable y cursiva, `Manrope` con peso variable), sin Google Fonts ni hosts externos en la CSP.
 
 ## Iconos de app y PWA
 Símbolo blanco/crema sobre burdeos con esquinas redondeadas (`rx` ≈ 22 %). Ya generados en `src/Web/wwwroot/` (`favicon.*`, `apple-touch-icon.png`, `icon-192/512.png`, `icon-maskable-512.png`).

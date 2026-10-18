@@ -1,3 +1,7 @@
+/* Fraunces y Manrope servidas desde el propio sitio (licencia SIL OFL 1.1, en wwwroot/fonts). Latín, eje de peso variable. */
+@font-face { font-family: "Fraunces"; font-style: normal; font-weight: 100 900; font-display: swap; src: url("../fonts/fraunces-latin-wght-normal.woff2") format("woff2-variations"); }
+@font-face { font-family: "Fraunces"; font-style: italic; font-weight: 100 900; font-display: swap; src: url("../fonts/fraunces-latin-wght-italic.woff2") format("woff2-variations"); }
+@font-face { font-family: "Manrope"; font-style: normal; font-weight: 200 800; font-display: swap; src: url("../fonts/manrope-latin-wght-normal.woff2") format("woff2-variations"); }
 /*
   Identidad "Mi parte, tu parte" (v3b): neutros cálidos de marca, superficies planas (sin degradados ni sombras en reposo),
   rejilla asimétrica y una única llamada a la acción por pantalla (--cta, burdeos en los temas de marca). Cada tema redefine los MISMOS tokens: --wine es el color

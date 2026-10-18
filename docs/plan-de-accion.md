@@ -64,25 +64,27 @@ Las fases van en orden de prioridad. Cada ítem indica su criterio de hecho.
 9. ~~**Quitar Google Fonts de la CSP.**~~ **Hecho** (2026-10-18): Fraunces (normal e itálica) y Manrope, en `src/Web/wwwroot/fonts` (latín, peso variable, licencia OFL), declaradas en `app.css`; sin hosts de fuentes en `index.html`, CSP ni `_headers`. Los `.woff2` se añaden al caché sin conexión del service worker. Pendiente: comprobar la pantalla en el navegador con el publish. Servir Fraunces y Manrope desde el propio sitio y retirar el dominio externo de `default.conf.template`. Hecho cuando la CSP no lista hosts de fuentes.
 10. ~~**Revisar `HogarId!` en Core.Api.**~~ **Hecho** (2026-10-18): los cinco endpoints de escritura comprueban `HogarId` y responden 409 «No hay hogar seleccionado.» sin supresión. `dotnet test src/Core/Core.Tests`: 565 correctas, 42 omitidas (pruebas con PostgreSQL sin `MIPARTE_TEST_DB`). Sustituir el operador de supresión por una comprobación explícita o documentar por qué es seguro. Hecho cuando no quedan supresiones sin justificar.
 
+11. **Comprobar contraseñas filtradas sin plan Pro.** Leaked Password Protection de Supabase exige plan Pro, así que se hace en la app: al registrarse y al cambiar la contraseña, consulta a la API de Pwned Passwords con solo los cinco primeros caracteres del hash SHA-1 (k-anonymity) y rechaza las contraseñas filtradas. Requiere añadir ese host a `connect-src` de `default.conf.template` y `_headers.template`, y tests con un manejador falso. Si la API no responde, se permite la contraseña y se avisa en el log (no se bloquea el registro por un fallo externo). Hecho cuando una contraseña de la lista se rechaza con mensaje en español y el resto pasan.
+
 ### Fase 3 · Decisiones de producto (las toma la pareja, no el código)
 
-11. **Cerrar D1 (alojamiento) y D2 (base de datos y login).** En la práctica ya son Render y Supabase; falta marcarlas como decididas en `docs/diseno-y-decisiones.md`.
-12. **Cerrar D3 y D4 (reparto del hijo y de la alimentación).** El perfil propio ya permite cualquier reparto; basta con que la pareja fije sus perfiles y se anote.
-13. **Cerrar D7 (coste y dominio) y unificar la numeración.** `docs/README.md` marca D7 como resuelto (modelo de lenguaje) y este plan lo usaba para coste y dominio. Decidir presupuesto del chatbot (ahora gratuito, ver fase 1) y dominio; comprobar en la OEPM que la marca y el dominio están libres.
+12. **Cerrar D1 (alojamiento) y D2 (base de datos y login).** En la práctica ya son Render y Supabase; falta marcarlas como decididas en `docs/diseno-y-decisiones.md`.
+13. **Cerrar D3 y D4 (reparto del hijo y de la alimentación).** El perfil propio ya permite cualquier reparto; basta con que la pareja fije sus perfiles y se anote.
+14. **Cerrar D7 (coste y dominio) y unificar la numeración.** `docs/README.md` marca D7 como resuelto (modelo de lenguaje) y este plan lo usaba para coste y dominio. Decidir presupuesto del chatbot (ahora gratuito, ver fase 1) y dominio; comprobar en la OEPM que la marca y el dominio están libres.
 
 ### Fase 4 · Funcionalidad pendiente (por utilidad)
 
-14. **Notificaciones push del navegador.** Opt-in por usuario desde la PWA. Avisos cuando alguien agrega un gasto (a los demás miembros) y cuando se cierra una liquidación (ciclo o periodo), y al registrar un pago de liquidación. Diseño:
+15. **Notificaciones push del navegador.** Opt-in por usuario desde la PWA. Avisos cuando alguien agrega un gasto (a los demás miembros) y cuando se cierra una liquidación (ciclo o periodo), y al registrar un pago de liquidación. Diseño:
     - Tabla `suscripcion_push` (miembro, endpoint y claves) en `Estructura/`, con RLS y filtro por hogar.
     - `POST`/`DELETE /api/notificaciones/suscripcion` en Core.Api.
     - Envío desde Core.Application en segundo plano, sin hacer fallar la petición; claves VAPID en variables de entorno; librería WebPush de .NET.
     - Manejador `push` y clic en el service worker. Sin cambios de CSP.
     - Límite: en iOS solo con la PWA instalada. La cuenta demo no envía avisos.
     - Hecho cuando un gasto nuevo llega como notificación a otro miembro, y el aviso se puede activar y desactivar.
-15. **Recurrentes que generen gastos personales** (pendiente en la fila de gastos personales).
-16. **Asistente**: streaming de respuestas y chat en la cuenta demo.
-17. **Extras del diseño**: presupuestos con alertas y exportación a Excel o PDF; categorización automática de gastos (D6, extra).
-18. **Mejoras «Posterior»** del diseño, cada una con su propio análisis antes de empezar:
+16. **Recurrentes que generen gastos personales** (pendiente en la fila de gastos personales).
+17. **Asistente**: streaming de respuestas y chat en la cuenta demo.
+18. **Extras del diseño**: presupuestos con alertas y exportación a Excel o PDF; categorización automática de gastos (D6, extra).
+19. **Mejoras «Posterior»** del diseño, cada una con su propio análisis antes de empezar:
     - Avisos por correo (resumen mensual y recibos próximos).
     - Reembolsos y devoluciones ligados a un gasto.
     - Copia de seguridad y exportación completa.
@@ -99,9 +101,9 @@ Fuera de alcance declarado: objetivos de ahorro e intereses.
 
 ### Fase 5 · Entrega del proyecto fin de máster
 
-19. **Memoria**: incluir arquitectura por capas, decisiones D1-D7, pruebas (unitarias, PostgreSQL real, bUnit) y las líneas futuras de la fase 4.
-20. **Reproducibilidad**: README de despliegue y de arranque local (`docs/despliegue.md`, `docs/demo.md`) revisado contra lo que se haya probado en la fase 1.
-21. **Calidad final**: `dotnet test` completo y revisión de los comentarios XML de producción según `.claude/rules/idioma-y-documentacion.md`.
+20. **Memoria**: incluir arquitectura por capas, decisiones D1-D7, pruebas (unitarias, PostgreSQL real, bUnit) y las líneas futuras de la fase 4.
+21. **Reproducibilidad**: README de despliegue y de arranque local (`docs/despliegue.md`, `docs/demo.md`) revisado contra lo que se haya probado en la fase 1.
+22. **Calidad final**: `dotnet test` completo y revisión de los comentarios XML de producción según `.claude/rules/idioma-y-documentacion.md`.
 
 ## 3. Orden sugerido
 

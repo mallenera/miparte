@@ -40,7 +40,7 @@ Las fases van en orden de prioridad. Cada ítem indica su criterio de hecho.
    - SMTP propio, `enable_confirmations` y la plantilla `supabase/templates/confirmacion.html`.
    - Redirect URLs de la web (sin el proveedor Google, ver fase 2).
    - Hecho cuando un registro nuevo recibe el código por correo.
-5. **Cuenta demo real.** Ejecutar `supabase/seed/demo.sql` y `demo_cron.sql` (pg_cron, diario 04:00 UTC) y probar el workflow manual `restablecer-demo.yml`. Hecho cuando el restablecimiento deja la cuenta como la semilla.
+5. ~~**Cuenta demo real.**~~ **Hecho** (2026-10-18): en el proyecto real existe el hogar «Casa de Ana y Marcos» (id fijo), la tarea `restablecer-demo` (diaria, 04:00 UTC) está activa con las últimas ejecuciones correctas y la cuenta entra con la contraseña nueva (`b0db25c`). Pendiente opcional: el workflow manual con `DEMO_DB_URL`. Ejecutar `supabase/seed/demo.sql` y `demo_cron.sql` (pg_cron, diario 04:00 UTC) y probar el workflow manual `restablecer-demo.yml`. Hecho cuando el restablecimiento deja la cuenta como la semilla.
    - **Qué hace falta**: las migraciones ya aplicadas en Supabase (la semilla escribe en las tablas del hogar); crear la cuenta `demo` con su contraseña, o dejar que la semilla la cree (la semilla borra y recrea el usuario de Auth).
    - **Dónde**: SQL Editor de Supabase (pegar `demo.sql`, después `demo_cron.sql`) o `psql "$DEMO_DB_URL" -f` con la cadena del Session pooler (puerto 5432) en una variable de entorno.
    - **Extensión**: activar `pg_cron` en Database → Extensions antes de `demo_cron.sql`.

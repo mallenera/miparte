@@ -38,7 +38,8 @@ public static class CategoriasEndpoints
     private static async Task<IResult> CrearAsync(
         GuardarCategoriaRequest req, [FromServices] ServicioCategorias servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
-        var r = await servicio.CrearAsync(hogar.HogarId!.Value, Datos(req), ct);
+        if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
+        var r = await servicio.CrearAsync(hogarId, Datos(req), ct);
         if (r.Error is { } error) return ApiComun.Respuesta(error);
         return Results.Created($"/api/categorias/{r.Valor!.Id}", r.Valor.ADto());
     }

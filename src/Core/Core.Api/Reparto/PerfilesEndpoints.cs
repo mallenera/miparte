@@ -46,7 +46,8 @@ public static class PerfilesEndpoints
     private static async Task<IResult> CrearAsync(
         GuardarPerfilRequest req, [FromServices] ServicioPerfiles servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
-        var r = await servicio.CrearAsync(hogar.HogarId!.Value, req.Nombre, req.Modo, Valores(req), ct);
+        if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
+        var r = await servicio.CrearAsync(hogarId, req.Nombre, req.Modo, Valores(req), ct);
         if (r.Error is { } error) return ApiComun.Respuesta(error);
         return Results.Created($"/api/perfiles/{r.Valor!.Id}", r.Valor.ADto());
     }

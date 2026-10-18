@@ -23,6 +23,7 @@ using MiParte.Core.Application.Perfiles;
 using MiParte.Core.Application.Recurrentes;
 using MiParte.Core.Infrastructure;
 using MiParte.Core.Infrastructure.Persistencia;
+using MiParte.Seguridad;
 
 var builder = WebApplication.CreateBuilder(args);
 

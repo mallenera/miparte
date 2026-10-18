@@ -1,7 +1,9 @@
 using System.Net;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.Configuration;
 
-namespace MiParte.Core.Api.Seguridad;
+namespace MiParte.Seguridad;
 
 /// <summary>
 /// Configuración de <c>X-Forwarded-For</c>/<c>X-Forwarded-Proto</c> tras un proxy inverso. Sin ella

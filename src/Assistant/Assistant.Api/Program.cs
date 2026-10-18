@@ -6,6 +6,7 @@ using MiParte.Assistant.Api.Hogar;
 using MiParte.Assistant.Api.Modelo;
 using MiParte.Assistant.Api.Seguridad;
 using MiParte.Auth;
+using MiParte.Seguridad;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -49,6 +50,10 @@ app.Logger.LogInformation(
     supabase.EmisorEfectivo ?? "(sin configurar: ningún token será válido)",
     opciones.Modelo,
     string.IsNullOrWhiteSpace(app.Configuration["ANTHROPIC_API_KEY"]) ? "NO configurada" : "configurada");
+
+// Detrás de un proxy (Render) la IP del limitador es la del cliente solo si se reenvía X-Forwarded-For de confianza.
+var reenviadas = ReenvioCabeceras.Crear(app.Configuration);
+if (reenviadas is not null) app.UseForwardedHeaders(reenviadas);
 
 app.UseCabecerasSeguridad();
 app.UseCors();

@@ -34,7 +34,7 @@ Reglas del diseño que se cumplen en código: si falta el año se asume el en cu
 - **Superficie mínima.** El modelo solo dispone de cinco funciones de lectura sobre el hogar de la persona; aunque una inyección tuviera éxito, no hay nada que modificar ni otro hogar al que llegar.
 - **El historial del cliente es de la persona.** Solo se aceptan roles `user` y `assistant` (otro rol da 400), con máximo `Asistente__MaxMensajes` (20) mensajes de `Asistente__MaxCaracteresMensaje` (1500) caracteres; el último debe ser de `user`.
 - **Bucle acotado.** Máximo 5 vueltas y 8 llamadas a funciones por pregunta (`Asistente__MaxIteraciones`, `Asistente__MaxLlamadasHerramienta`); `max_tokens` 1024 por turno.
-- **Coste.** Límite de `Asistente__MensajesPorMinuto` (10) preguntas por usuario y de 60 peticiones por minuto en total (429 con `Retry-After`); cuerpo máximo 64 KB.
+- **Coste.** Límite de `Asistente__MensajesPorMinuto` (10) preguntas por usuario y de 60 peticiones por minuto en total (429 con `Retry-After`); cuerpo máximo 64 KB. Las peticiones sin sesión se cuentan por IP, que tras el proxy de Render es la del cliente solo con `ProxyInverso__*` configurado (ver Configuración).
 - **Secretos.** `ANTHROPIC_API_KEY` solo se lee del entorno (nunca de `appsettings` ni del repo); no se registra en logs ni en errores. Los fallos del proveedor llegan a la persona como un 503 genérico.
 - **Front.** Las respuestas se pintan como texto (Blazor escapa; no hay `MarkupString`), la CSP sigue sin scripts en línea y solo añade el origen del asistente a `connect-src` (`ASSISTANT_URL`).
 
@@ -85,6 +85,8 @@ DTOs en `src/Contracts/Asistente.cs` (`ChatRequest`, `MensajeChatDto`, `ChatResp
 | `Asistente__MensajesPorMinuto` | 10 | Por usuario |
 | `Supabase__Url`, `Supabase__JwtSecret` | | Igual que Core.Api |
 | `Cors__OrigenesPermitidos__0` | | Origen del front |
+| `ProxyInverso__Proxies__N` / `ProxyInverso__Redes__N` | (vacío) | IPs o redes CIDR de los proxies de confianza. Una IP inválida impide arrancar. Mismo criterio que Core.Api (`MiParte.Seguridad.ReenvioCabeceras`) |
+| `ProxyInverso__Confiar` | `false` | `true` acepta cualquier remitente directo; solo en Render, donde el contenedor únicamente es alcanzable por el proxy |
 
 Front: `Api:AssistantUrl` en `wwwroot/appsettings.json` (público, sin secretos) y, para la CSP, `ASSISTANT_URL` (nginx) o la variable de repositorio `ASSISTANT_URL` (Cloudflare). Si falta, el asistente flotante avisa de que no está configurada.
 
@@ -109,4 +111,4 @@ Sin clave se puede ver el asistente flotante y comprobar el 503; el modo demo de
 - Herramientas de escritura con confirmación explícita (hoy fuera del diseño).
 - Memoria de la conversación entre sesiones (hoy vive en la página).
 - Pruebas manuales con el modelo real, evaluación de calidad de las respuestas y ajuste del prompt.
-- Límite diario de coste por hogar y ForwardedHeaders tras proxy (como en Core.Api).
+- Límite diario de coste por hogar.

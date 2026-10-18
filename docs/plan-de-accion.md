@@ -35,7 +35,9 @@ Las fases van en orden de prioridad. Cada ítem indica su criterio de hecho.
      - **Ollama en local** (modelo abierto en el propio equipo): coste cero y datos fuera de terceros, pero no sirve para el despliegue en Render. Válido para desarrollo y para la demo en la defensa.
    - Recomendación: Groq para el despliegue, Ollama como alternativa local. Antes de elegir, confirmar límites y política de datos en la web del proveedor.
    - Hecho cuando las cinco funciones responden con llamadas a herramientas reales sobre un hogar, `docs/asistente.md` describe el nuevo proveedor y su configuración, y los tests siguen usando el modelo falso.
-4. **Configurar Supabase real.**
+4. **Configurar Supabase real.** En curso (2026-10-18):
+   - Estado: `pendientes` indica 9 scripts sin aplicar (el journal `miparte_migraciones` no existe en el proyecto, aunque las columnas de esos scripts ya están). `migrar` contra el proyecto real fue bloqueado por el clasificador de permisos; respaldo previo en la carpeta temporal de sesión (`miparte-antes-de-migrar.dump`, pg_dump custom).
+   - Advisors de seguridad: Leaked Password Protection desactivada (activarla en Auth); `rls_auto_enable()` ejecutable por `anon` y `authenticated` (revocar); `es_admin_hogar`, `hogar_tiene_otro_admin` y `mis_hogares` son SECURITY DEFINER para `authenticated` (intencionado por RLS; revisar que `anon` no las tenga).
    - Aplicar el esquema con `migrar` y revisar `pendientes`.
    - SMTP propio, `enable_confirmations` y la plantilla `supabase/templates/confirmacion.html`.
    - Redirect URLs de la web (sin el proveedor Google, ver fase 2).

@@ -28,6 +28,10 @@ services:
       Asistente__Modelo: ${Asistente__Modelo:-claude-sonnet-5-5}
       # Solo por entorno (nunca en el repo). Sin ella el chat responde 503.
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Proveedor del modelo: anthropic (por defecto) o cloudflare (Workers AI, cuota gratuita). El token de Cloudflare solo por entorno.
+      Asistente__Proveedor: ${Asistente__Proveedor:-anthropic}
+      Asistente__CloudflareCuenta: ${Asistente__CloudflareCuenta:-}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
     depends_on: [core]
   web:
     build:

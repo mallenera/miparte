@@ -13,7 +13,7 @@ Front (Blazor) ──JWT + X-Hogar-Id──▶ Assistant.Api ──JWT + X-Hogar
 - **Sin acceso propio a la base de datos.** Assistant.Api no tiene cadena de conexión: consulta `GET /api/miembros`, `/api/categorias`, `/api/gastos`, `/api/resumen` y `/api/liquidacion` de Core.Api reenviando el JWT de la persona y su `X-Hogar-Id`. La multitenencia (RLS y filtro global por `hogar_id`) la sigue aplicando Core.Api; el asistente nunca ve datos de otro hogar aunque el modelo lo pidiera.
 - **Autenticación.** `MiParte.Auth` valida el JWT de Supabase igual que en Core.Api (`Supabase__Url`, `Supabase__JwtSecret`).
 - **Hogar.** La cabecera `X-Hogar-Id` es obligatoria. Antes de llamar al modelo se hace una consulta a Core.Api con ese hogar: si la persona no es miembro activo, 403 y el modelo no se invoca.
-- **Cliente del modelo.** `IClienteModelo` abstrae el proveedor; `ClienteAnthropic` usa el SDK oficial (`Anthropic` en NuGet). Modelo por defecto `claude-sonnet-5-5`, configurable con `Asistente__Modelo`. Sin streaming de momento (pendiente).
+- **Cliente del modelo.** `IClienteModelo` abstrae el proveedor. `Asistente__Proveedor` elige `ClienteAnthropic` (SDK oficial, `Anthropic` en NuGet, por defecto) o `ClienteWorkersAi` (Cloudflare Workers AI, REST `/ai/run/{modelo}`, cuota gratuita diaria; Cloudflare dice no usar el contenido para entrenar ni conservarlo más allá de la petición). Modelo por defecto `claude-sonnet-5-5`, configurable con `Asistente__Modelo`. Sin streaming de momento (pendiente).
 - **Solo lectura.** Las cinco funciones del diseño no modifican nada. No hay herramientas de escritura porque el diseño no las contempla («solo lee datos del hogar»); si se añadieran, tendrían que pedir confirmación explícita antes de ejecutarse (propuesta de la herramienta, botón «Confirmar» en el front y una segunda llamada).
 
 ## Funciones de consulta
@@ -77,6 +77,10 @@ DTOs en `src/Contracts/Asistente.cs` (`ChatRequest`, `MensajeChatDto`, `ChatResp
 | Variable | Valor por defecto | Notas |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | (vacío) | Secreto. Sin ella el chat responde 503 |
+| `Asistente__Proveedor` | `anthropic` | `anthropic` o `cloudflare` (Workers AI, cuota gratuita diaria). Con `cloudflare` no se usa la clave de Anthropic |
+| `CLOUDFLARE_API_TOKEN` | (vacío) | Secreto: token de la API de Cloudflare con permiso Workers AI. Sin él el chat responde 503 |
+| `Asistente__CloudflareCuenta` | (vacío) | Identificador de la cuenta de Cloudflare (no es secreto) |
+| `Asistente__CloudflareModelo` | `@cf/zai-org/glm-4.7-flash` | Modelo de Workers AI con llamadas a herramientas (comprobar en el catálogo) |
 | `Asistente__Modelo` | `claude-sonnet-5-5` | Cualquier modelo de la Messages API con tool use |
 | `Asistente__CoreUrl` | `http://localhost:5001` | En docker compose, `http://core:8080` |
 | `Asistente__MaxTokens` | 1024 | Salida por turno |

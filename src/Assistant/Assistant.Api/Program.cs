@@ -28,7 +28,15 @@ builder.Services.AddSingleton<IFabricaDatosHogar, FabricaDatosHogarCore>();
 
 // Modelo: la clave ANTHROPIC_API_KEY se lee solo del entorno.
 builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddSingleton<IClienteModelo, ClienteAnthropic>();
+if (string.Equals(opciones.Proveedor, "cloudflare", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddHttpClient(ClienteWorkersAi.NombreCliente, c => c.Timeout = TimeSpan.FromSeconds(60));
+    builder.Services.AddSingleton<IClienteModelo, ClienteWorkersAi>();
+}
+else
+{
+    builder.Services.AddSingleton<IClienteModelo, ClienteAnthropic>();
+}
 builder.Services.AddScoped<ServicioChat>();
 
 // CORS: orígenes en Cors:OrigenesPermitidos (env Cors__OrigenesPermitidos__0, ...). Sin configuración, ninguno.

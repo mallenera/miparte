@@ -64,7 +64,7 @@ public class ClienteWorkersAiTests
     [Fact]
     public async Task RespuestaDeTexto_SeDevuelveComoBloqueYTerminaElTurno()
     {
-        var manejador = new Manejador(HttpStatusCode.OK, """{"success":true,"result":{"response":"En junio gastaste 412,30 €."}}""");
+        var manejador = new Manejador(HttpStatusCode.OK, """{"success":true,"result":{"choices":[{"message":{"content":"En junio gastaste 412,30 €.","tool_calls":[]}}]}}""");
 
         var r = await Crear(manejador).CrearAsync(Solicitud(MensajeModelo.DeTexto(RolModelo.Usuario, "¿Cuánto?")), default);
 
@@ -77,7 +77,7 @@ public class ClienteWorkersAiTests
     public async Task LlamadaAHerramienta_ConArgumentosComoCadena_SeNormalizaAObjeto()
     {
         var manejador = new Manejador(HttpStatusCode.OK, """
-            {"success":true,"result":{"tool_calls":[{"name":"gasto_total","arguments":"{\"mes\":\"2026-06\"}"}]}}
+            {"success":true,"result":{"choices":[{"message":{"content":null,"tool_calls":[{"id":"call_1","type":"function","function":{"name":"gasto_total","arguments":"{\"mes\":\"2026-06\"}"}}]}}]}}
             """);
 
         var r = await Crear(manejador).CrearAsync(Solicitud(MensajeModelo.DeTexto(RolModelo.Usuario, "¿Cuánto?")), default);
@@ -92,21 +92,21 @@ public class ClienteWorkersAiTests
     [Fact]
     public async Task PeticionIncluyeCuentaModeloTokenYHerramientasEnFormatoPlano()
     {
-        var manejador = new Manejador(HttpStatusCode.OK, """{"success":true,"result":{"response":"ok"}}""");
+        var manejador = new Manejador(HttpStatusCode.OK, """{"success":true,"result":{"choices":[{"message":{"content":"ok"}}]}}""");
 
         await Crear(manejador).CrearAsync(Solicitud(MensajeModelo.DeTexto(RolModelo.Usuario, "hola")), default);
 
         Assert.Equal($"/client/v4/accounts/{Cuenta}/ai/run/@cf/zai-org/glm-4.7-flash", manejador.Peticion!.RequestUri!.AbsolutePath);
         Assert.Equal(new AuthenticationHeaderValue("Bearer", "token-de-prueba"), manejador.Peticion.Headers.Authorization);
         using var cuerpo = JsonDocument.Parse(manejador.CuerpoPeticion!);
-        Assert.Equal("gasto_total", cuerpo.RootElement.GetProperty("tools")[0].GetProperty("name").GetString());
+        Assert.Equal("gasto_total", cuerpo.RootElement.GetProperty("tools")[0].GetProperty("function").GetProperty("name").GetString());
         Assert.Equal("system", cuerpo.RootElement.GetProperty("messages")[0].GetProperty("role").GetString());
     }
 
     [Fact]
-    public async Task ResultadoDeHerramienta_ViajaConElNombreDeLaFuncion()
+    public async Task ResultadoDeHerramienta_ViajaConElIdDeLaLlamada()
     {
-        var manejador = new Manejador(HttpStatusCode.OK, """{"success":true,"result":{"response":"Son 412 €."}}""");
+        var manejador = new Manejador(HttpStatusCode.OK, """{"success":true,"result":{"choices":[{"message":{"content":"Son 412 €."}}]}}""");
         var historial = Solicitud(
             MensajeModelo.DeTexto(RolModelo.Usuario, "¿Cuánto?"),
             new MensajeModelo(RolModelo.Asistente, [new BloqueUsoHerramienta("u1", "gasto_total", JsonDocument.Parse("""{"mes":"2026-06"}""").RootElement.Clone())]),
@@ -118,7 +118,7 @@ public class ClienteWorkersAiTests
         var mensajes = cuerpo.RootElement.GetProperty("messages");
         var resultado = mensajes[mensajes.GetArrayLength() - 1];
         Assert.Equal("tool", resultado.GetProperty("role").GetString());
-        Assert.Equal("gasto_total", resultado.GetProperty("name").GetString());
+        Assert.Equal("u1", resultado.GetProperty("tool_call_id").GetString());
     }
 
     [Fact]

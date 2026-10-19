@@ -1,4 +1,3 @@
-using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -9,9 +8,10 @@ namespace MiParte.Assistant.Api.Modelo;
 
 /// <summary>
 /// <see cref="IClienteModelo"/> sobre Cloudflare Workers AI (<c>POST /accounts/{cuenta}/ai/run/{modelo}</c>), con
-/// cuota gratuita diaria. Cloudflare afirma que no usa el contenido procesado por Workers AI para entrenar modelos
-/// y que no lo conserva más allá de la petición. El token sale solo de <c>CLOUDFLARE_API_TOKEN</c> (nunca del repo ni de
-/// <c>appsettings</c>); sin él o sin la cuenta, cada llamada falla con <see cref="ModeloNoDisponibleException"/>.
+/// cuota gratuita diaria. Usa el formato de chat completions de OpenAI que devuelve el endpoint. Cloudflare afirma que
+/// no usa el contenido procesado por Workers AI para entrenar modelos y que no lo conserva más allá de la petición.
+/// El token sale solo de <c>CLOUDFLARE_API_TOKEN</c> (nunca del repo ni de <c>appsettings</c>); sin él o sin la cuenta,
+/// cada llamada falla con <see cref="ModeloNoDisponibleException"/>.
 /// </summary>
 public sealed class ClienteWorkersAi : IClienteModelo
 {
@@ -70,54 +70,55 @@ public sealed class ClienteWorkersAi : IClienteModelo
 
             var sobre = await respuesta.Content.ReadFromJsonAsync<SobreCloudflare>(ct)
                 ?? throw new ModeloNoDisponibleException("Cloudflare Workers AI devolvió una respuesta vacía.");
-            if (!sobre.Success || sobre.Resultado is null)
-                throw new ModeloNoDisponibleException("Cloudflare Workers AI devolvió un error.");
-            return DeResultado(sobre.Resultado);
+            var mensaje = sobre.Resultado?.Opciones?.FirstOrDefault()?.Mensaje
+                ?? throw new ModeloNoDisponibleException("Cloudflare Workers AI no devolvió ninguna respuesta.");
+            return DeMensaje(mensaje);
         }
     }
 
-    private static RespuestaModelo DeResultado(ResultadoCloudflare r)
+    private static RespuestaModelo DeMensaje(MensajeRecibido m)
     {
         var bloques = new List<BloqueModelo>();
-        if (!string.IsNullOrWhiteSpace(r.Respuesta))
-            bloques.Add(new BloqueTexto(r.Respuesta));
+        if (!string.IsNullOrWhiteSpace(m.Contenido))
+            bloques.Add(new BloqueTexto(m.Contenido));
 
-        var llamadas = r.LlamadasHerramienta ?? [];
-        for (var i = 0; i < llamadas.Count; i++)
+        var llamadas = m.LlamadasHerramienta ?? [];
+        foreach (var llamada in llamadas)
         {
-            var llamada = llamadas[i];
-            // Los modelos no siempre dan id: se genera uno estable por posición para enlazar el resultado.
-            var id = string.IsNullOrWhiteSpace(llamada.Id) ? $"cf-{i}-{Guid.NewGuid():N}" : llamada.Id;
-            bloques.Add(new BloqueUsoHerramienta(id, llamada.Nombre, ArgumentosComoJson(llamada.Argumentos)));
+            // Si el modelo no da id, se genera uno: el resultado de la herramienta lo necesita para enlazarse.
+            var id = string.IsNullOrWhiteSpace(llamada.Id) ? $"cf-{Guid.NewGuid():N}" : llamada.Id;
+            bloques.Add(new BloqueUsoHerramienta(id, llamada.Funcion.Nombre, ArgumentosComoJson(llamada.Funcion.Argumentos)));
         }
 
         var motivo = llamadas.Count > 0 ? MotivoParada.UsoDeHerramienta : MotivoParada.FinDeTurno;
         return new RespuestaModelo(bloques, motivo);
     }
 
-    /// <summary>Los argumentos llegan como objeto o como cadena JSON según el modelo; se normalizan a objeto.</summary>
+    /// <summary>Los argumentos llegan como cadena JSON (formato OpenAI) o como objeto; se normalizan a objeto.</summary>
     private static JsonElement ArgumentosComoJson(JsonElement argumentos)
     {
-        if (argumentos.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(argumentos.GetString()))
+        if (argumentos.ValueKind == JsonValueKind.String)
         {
+            var texto = argumentos.GetString();
+            if (string.IsNullOrWhiteSpace(texto)) return Vacio();
             try
             {
-                return JsonDocument.Parse(argumentos.GetString()!).RootElement.Clone();
+                return JsonDocument.Parse(texto).RootElement.Clone();
             }
             catch (JsonException)
             {
                 // Argumentos no válidos: se pasan vacíos y la validación del servicio responderá al modelo.
-                return JsonDocument.Parse("{}").RootElement.Clone();
+                return Vacio();
             }
         }
-        return argumentos.ValueKind == JsonValueKind.Undefined ? JsonDocument.Parse("{}").RootElement.Clone() : argumentos.Clone();
+        return argumentos.ValueKind == JsonValueKind.Undefined ? Vacio() : argumentos.Clone();
+
+        static JsonElement Vacio() => JsonDocument.Parse("{}").RootElement.Clone();
     }
 
     private static List<MensajeCf> ADeMensajes(SolicitudModelo solicitud)
     {
         var mensajes = new List<MensajeCf> { new("system", solicitud.Sistema) };
-        // Nombre de cada herramienta por id: el resultado debe indicar a qué función responde.
-        var nombres = new Dictionary<string, string>();
 
         foreach (var m in solicitud.Mensajes)
         {
@@ -129,17 +130,13 @@ public sealed class ClienteWorkersAi : IClienteModelo
                         mensajes.Add(new MensajeCf(m.Rol == RolModelo.Usuario ? "user" : "assistant", t.Texto));
                         break;
                     case BloqueUsoHerramienta u:
-                        nombres[u.Id] = u.Nombre;
                         mensajes.Add(new MensajeCf("assistant", null)
                         {
-                            ToolCalls = [new LlamadaCf(u.Nombre, u.Entrada)],
+                            LlamadasHerramienta = [new LlamadaCf(u.Id, "function", new FuncionCf(u.Nombre, u.Entrada.GetRawText()))],
                         });
                         break;
                     case BloqueResultadoHerramienta r:
-                        mensajes.Add(new MensajeCf("tool", r.Contenido)
-                        {
-                            Name = nombres.GetValueOrDefault(r.IdUso, "herramienta"),
-                        });
+                        mensajes.Add(new MensajeCf("tool", r.Contenido) { IdLlamada = r.IdUso });
                         break;
                     // El razonamiento del proveedor de Anthropic no tiene equivalente aquí y se omite.
                 }
@@ -148,7 +145,8 @@ public sealed class ClienteWorkersAi : IClienteModelo
         return mensajes;
     }
 
-    private static HerramientaCf AHerramienta(DefinicionHerramienta h) => new(h.Nombre, h.Descripcion, h.EsquemaEntrada);
+    private static HerramientaCf AHerramienta(DefinicionHerramienta h) =>
+        new("function", new FuncionDefinicionCf(h.Nombre, h.Descripcion, h.EsquemaEntrada));
 
     private sealed record PeticionCloudflare(
         [property: JsonPropertyName("messages")] List<MensajeCf> Mensajes,
@@ -159,18 +157,27 @@ public sealed class ClienteWorkersAi : IClienteModelo
         [property: JsonPropertyName("role")] string Rol,
         [property: JsonPropertyName("content")] string? Contenido)
     {
-        [JsonPropertyName("name")]
-        public string? Name { get; init; }
+        [JsonPropertyName("tool_calls"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<LlamadaCf>? LlamadasHerramienta { get; init; }
 
-        [JsonPropertyName("tool_calls")]
-        public List<LlamadaCf>? ToolCalls { get; init; }
+        [JsonPropertyName("tool_call_id"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? IdLlamada { get; init; }
     }
 
     private sealed record LlamadaCf(
+        [property: JsonPropertyName("id")] string Id,
+        [property: JsonPropertyName("type")] string Tipo,
+        [property: JsonPropertyName("function")] FuncionCf Funcion);
+
+    private sealed record FuncionCf(
         [property: JsonPropertyName("name")] string Nombre,
-        [property: JsonPropertyName("arguments")] JsonElement Argumentos);
+        [property: JsonPropertyName("arguments")] string Argumentos);
 
     private sealed record HerramientaCf(
+        [property: JsonPropertyName("type")] string Tipo,
+        [property: JsonPropertyName("function")] FuncionDefinicionCf Funcion);
+
+    private sealed record FuncionDefinicionCf(
         [property: JsonPropertyName("name")] string Nombre,
         [property: JsonPropertyName("description")] string Descripcion,
         [property: JsonPropertyName("parameters")] JsonElement Parametros);
@@ -186,8 +193,20 @@ public sealed class ClienteWorkersAi : IClienteModelo
 
     private sealed class ResultadoCloudflare
     {
-        [JsonPropertyName("response")]
-        public string? Respuesta { get; set; }
+        [JsonPropertyName("choices")]
+        public List<OpcionRecibida>? Opciones { get; set; }
+    }
+
+    private sealed class OpcionRecibida
+    {
+        [JsonPropertyName("message")]
+        public MensajeRecibido Mensaje { get; set; } = new();
+    }
+
+    private sealed class MensajeRecibido
+    {
+        [JsonPropertyName("content")]
+        public string? Contenido { get; set; }
 
         [JsonPropertyName("tool_calls")]
         public List<LlamadaRecibida>? LlamadasHerramienta { get; set; }
@@ -198,6 +217,12 @@ public sealed class ClienteWorkersAi : IClienteModelo
         [JsonPropertyName("id")]
         public string? Id { get; set; }
 
+        [JsonPropertyName("function")]
+        public FuncionRecibida Funcion { get; set; } = new();
+    }
+
+    private sealed class FuncionRecibida
+    {
         [JsonPropertyName("name")]
         public string Nombre { get; set; } = "";
 

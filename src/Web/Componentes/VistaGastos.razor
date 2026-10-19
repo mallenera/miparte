@@ -149,7 +149,7 @@ else
                             @foreach (var r in g.Repartos)
                             {
                                 <span class="chip"><Avatar Nombre="@Formato.NombreMiembro(r.MiembroId, _m.Miembros)" Color="@_m.ColorDe(r.MiembroId)" Tamano="sm" />@Formato.Euros(r.ImporteAsumido)</span>
-                                @foreach (var a in g.RepartosACargo.Where(x => x.ResponsableId == r.MiembroId))
+                                @foreach (var a in (g.RepartosACargo ?? []).Where(x => x.ResponsableId == r.MiembroId))
                                 {
                                     <span class="chip"><Avatar Nombre="@Formato.NombreMiembro(a.MiembroId, _m.Miembros)" Color="@_m.ColorDe(a.MiembroId)" Tamano="sm" />@Formato.NombreMiembro(a.MiembroId, _m.Miembros) (a cargo de @Formato.NombreMiembro(a.ResponsableId, _m.Miembros)) @Formato.Euros(a.ImporteAsumido)</span>
                                 }

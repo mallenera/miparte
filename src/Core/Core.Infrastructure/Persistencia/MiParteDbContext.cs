@@ -33,6 +33,9 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
     /// <summary>Conjunto de <see cref="GastoReparto"/> del hogar actual.</summary>
     public DbSet<GastoReparto> GastosReparto => Set<GastoReparto>();
 
+    /// <summary>Conjunto de <see cref="GastoRepartoACargo"/> del hogar actual (partes de miembros a cargo).</summary>
+    public DbSet<GastoRepartoACargo> GastosRepartoACargo => Set<GastoRepartoACargo>();
+
     /// <summary>Conjunto de <see cref="InvitacionHogar"/> del hogar actual.</summary>
     public DbSet<InvitacionHogar> Invitaciones => Set<InvitacionHogar>();
     /// <summary>Conjunto de <see cref="EnlaceGrupo"/> del hogar actual.</summary>
@@ -235,12 +238,21 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
             e.ToTable("gasto");
             e.Property(x => x.Importe).HasPrecision(12, 2);
             e.HasMany(x => x.Repartos).WithOne().HasForeignKey(x => x.GastoId);
+            e.HasMany(x => x.RepartosACargo).WithOne().HasForeignKey(x => x.GastoId);
             e.HasQueryFilter(x => x.HogarId == HogarId);
         });
 
         b.Entity<GastoReparto>(e =>
         {
             e.ToTable("gasto_reparto");
+            e.HasKey(x => new { x.GastoId, x.MiembroId });
+            e.Property(x => x.ImporteAsumido).HasPrecision(12, 2);
+            e.HasQueryFilter(x => x.HogarId == HogarId);
+        });
+
+        b.Entity<GastoRepartoACargo>(e =>
+        {
+            e.ToTable("gasto_reparto_a_cargo");
             e.HasKey(x => new { x.GastoId, x.MiembroId });
             e.Property(x => x.ImporteAsumido).HasPrecision(12, 2);
             e.HasQueryFilter(x => x.HogarId == HogarId);

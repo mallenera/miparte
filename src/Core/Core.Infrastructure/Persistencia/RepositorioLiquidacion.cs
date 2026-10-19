@@ -15,7 +15,7 @@ public sealed class RepositorioLiquidacion(MiParteDbContext db) : IRepositorioLi
     public async Task<IReadOnlyList<Gasto>> GastosDelMesAsync(DateOnly inicio, CancellationToken ct)
     {
         var fin = inicio.AddMonths(1);
-        return await db.Gastos.AsNoTracking().Include(g => g.Repartos).Where(g => g.Fecha >= inicio && g.Fecha < fin).ToListAsync(ct);
+        return await db.Gastos.AsNoTracking().Include(g => g.Repartos).Include(g => g.RepartosACargo).Where(g => g.Fecha >= inicio && g.Fecha < fin).ToListAsync(ct);
     }
 
     /// <inheritdoc />
@@ -73,7 +73,7 @@ public sealed class RepositorioLiquidacion(MiParteDbContext db) : IRepositorioLi
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<Gasto>> GastosPendientesAsync(CancellationToken ct)
-        => await db.Gastos.AsNoTracking().Include(g => g.Repartos).Where(g => g.CicloLiquidacionId == null).ToListAsync(ct);
+        => await db.Gastos.AsNoTracking().Include(g => g.Repartos).Include(g => g.RepartosACargo).Where(g => g.CicloLiquidacionId == null).ToListAsync(ct);
 
     /// <inheritdoc />
     public async Task<int> UltimoNumeroCicloAsync(CancellationToken ct)

@@ -17,7 +17,7 @@ public sealed class RepositorioGastos(MiParteDbContext db) : IRepositorioGastos
     /// <inheritdoc />
     public async Task<IReadOnlyList<Gasto>> ListarAsync(FiltroGastos filtro, CancellationToken ct)
     {
-        var q = db.Gastos.AsNoTracking().Include(g => g.Repartos).AsQueryable();
+        var q = db.Gastos.AsNoTracking().Include(g => g.Repartos).Include(g => g.RepartosACargo).AsQueryable();
         if (filtro.Desde is { } desde) q = q.Where(g => g.Fecha >= desde);
         if (filtro.Hasta is { } hasta) q = q.Where(g => g.Fecha <= hasta);
         if (filtro.CategoriaId is { } c) q = q.Where(g => g.CategoriaId == c);
@@ -32,11 +32,11 @@ public sealed class RepositorioGastos(MiParteDbContext db) : IRepositorioGastos
 
     /// <inheritdoc />
     public Task<Gasto?> ObtenerAsync(Guid id, CancellationToken ct)
-        => db.Gastos.AsNoTracking().Include(g => g.Repartos).FirstOrDefaultAsync(g => g.Id == id, ct);
+        => db.Gastos.AsNoTracking().Include(g => g.Repartos).Include(g => g.RepartosACargo).FirstOrDefaultAsync(g => g.Id == id, ct);
 
     /// <inheritdoc />
     public Task<Gasto?> ObtenerParaEditarAsync(Guid id, CancellationToken ct)
-        => db.Gastos.Include(g => g.Repartos).FirstOrDefaultAsync(g => g.Id == id, ct);
+        => db.Gastos.Include(g => g.Repartos).Include(g => g.RepartosACargo).FirstOrDefaultAsync(g => g.Id == id, ct);
 
     /// <inheritdoc />
     public Task<bool> CategoriaExisteAsync(Guid id, CancellationToken ct) => db.Categorias.AnyAsync(c => c.Id == id, ct);
@@ -52,6 +52,11 @@ public sealed class RepositorioGastos(MiParteDbContext db) : IRepositorioGastos
     /// <inheritdoc />
     public async Task<IReadOnlyList<Miembro>> AdultosActivosAsync(CancellationToken ct)
         => await db.Miembros.Where(m => m.Activo && m.Tipo == TipoMiembro.Adulto)
+            .OrderBy(m => m.Nombre).ThenBy(m => m.Id).ToListAsync(ct);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Miembro>> MiembrosActivosAsync(CancellationToken ct)
+        => await db.Miembros.Where(m => m.Activo)
             .OrderBy(m => m.Nombre).ThenBy(m => m.Id).ToListAsync(ct);
 
     /// <inheritdoc />
@@ -82,6 +87,7 @@ public sealed class RepositorioGastos(MiParteDbContext db) : IRepositorioGastos
     public void Eliminar(Gasto gasto)
     {
         db.GastosReparto.RemoveRange(gasto.Repartos);
+        db.GastosRepartoACargo.RemoveRange(gasto.RepartosACargo);
         db.Gastos.Remove(gasto);
     }
 

@@ -132,7 +132,7 @@ public class CategoriasPerfilesTests
     }
 
     [Fact]
-    public async Task Perfil_DetalleConMiembroACargo_400()
+    public async Task Perfil_DetalleConMiembroACargoDeUnAdulto_201()
     {
         using var x = await Preparar();
         Guid nino;
@@ -148,10 +148,9 @@ public class CategoriasPerfilesTests
             nino = m.Id;
         }
 
-        // El reparto solo cuenta adultos: el peso de un a_cargo se ignoraría, así que se rechaza.
+        // Un a cargo con responsable adulto activo puede llevar peso: su parte la asume el responsable.
         var r = await CrearPerfil(x.C, "Con niño", "partes", new PerfilDetalleDto(x.MiembroId, 1), new PerfilDetalleDto(nino, 1));
-        Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
-        Assert.Contains("adultos activos", await r.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.Created, r.StatusCode);
     }
 
     [Fact]

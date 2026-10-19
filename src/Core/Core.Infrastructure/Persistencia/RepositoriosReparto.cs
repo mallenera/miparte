@@ -24,8 +24,13 @@ public sealed class RepositorioPerfiles(MiParteDbContext db) : IRepositorioPerfi
     public Task<PerfilReparto?> ObtenerParaEditarAsync(Guid id, CancellationToken ct) => ObtenerAsync(id, ct);
 
     /// <inheritdoc />
-    public Task<int> ContarAdultosActivosAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct)
-        => db.Miembros.Where(m => m.Activo && m.Tipo == TipoMiembro.Adulto && ids.Contains(m.Id)).CountAsync(ct);
+    public async Task<int> ContarParticipantesAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct)
+    {
+        var activos = await db.Miembros.Where(m => m.Activo).Select(m => new { m.Id, m.Tipo, m.ResponsableId }).ToListAsync(ct);
+        var adultos = activos.Where(m => m.Tipo == TipoMiembro.Adulto).Select(m => m.Id).ToHashSet();
+        return activos.Count(m => ids.Contains(m.Id)
+            && (m.Tipo == TipoMiembro.Adulto || (m.ResponsableId is { } r && adultos.Contains(r))));
+    }
 
     /// <inheritdoc />
     public Task<bool> NombreEnUsoAsync(string nombre, Guid? excluirId, CancellationToken ct)

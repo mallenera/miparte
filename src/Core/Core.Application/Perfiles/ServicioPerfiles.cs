@@ -101,8 +101,8 @@ public sealed class ServicioPerfiles(IRepositorioPerfiles repositorio)
         if (detalle.Count > 0)
         {
             var ids = detalle.Select(d => d.MiembroId).ToList();
-            if (await repositorio.ContarAdultosActivosAsync(ids, ct) != ids.Count)
-                return Mal("El detalle solo puede incluir adultos activos del hogar.");
+            if (await repositorio.ContarParticipantesAsync(ids, ct) != ids.Count)
+                return Mal("El detalle solo puede incluir adultos activos o miembros a cargo de un adulto activo.");
         }
 
         if (ReglasPerfil.ValidarValores(modo, detalle) is { } valores) return Mal(valores);

@@ -113,7 +113,7 @@ Permisos: "miembro" = cualquier miembro activo del hogar (incluye admin). "admin
 | `PUT /api/perfiles/{id}` | Reemplaza nombre, modo y detalle | `GuardarPerfilRequest` | `PerfilRepartoDto` 200 | 400, 404, 409 | permiso `perfiles.gestionar` |
 | `DELETE /api/perfiles/{id}?moverA={id}` | Elimina. Si está en uso hay que indicar `moverA`: sus categorías, gastos y recurrentes pasan a ese perfil (debe ser de cuenta común si el borrado lo es, y no serlo si no) | - | 204 | 400 destino inexistente, el mismo o de otra naturaleza; 404; 409 en uso sin `moverA` (el cuerpo lleva `enUso: true`) | permiso `perfiles.gestionar` |
 
-Validación de perfiles (400): nombre obligatorio (≤ 100); `modo` en `porcentaje|partes|cuenta_comun|individual`; `cuenta_comun` e `individual` no llevan detalle; `porcentaje` y `partes` exigen detalle sin miembros repetidos, solo adultos activos (los miembros a cargo no reparten), valores ≥ 0; `porcentaje` debe sumar 100 (tolerancia 0,0001); `partes` necesita alguna parte > 0.
+Validación de perfiles (400): nombre obligatorio (≤ 100); `modo` en `porcentaje|partes|cuenta_comun|individual`; `cuenta_comun` e `individual` no llevan detalle; `porcentaje` y `partes` exigen detalle sin miembros repetidos, adultos activos o miembros a cargo con responsable adulto activo, valores ≥ 0; `porcentaje` debe sumar 100 (tolerancia 0,0001); `partes` necesita alguna parte > 0.
 
 ### 3.5 Ingresos
 

@@ -83,8 +83,10 @@ Las fases van en orden de prioridad. Cada ítem indica su criterio de hecho.
     - Hecho cuando un gasto nuevo llega como notificación a otro miembro, y el aviso se puede activar y desactivar.
 16. **Recurrentes que generen gastos personales** (pendiente en la fila de gastos personales).
 17. **Asistente**: streaming de respuestas y chat en la cuenta demo.
-18. **Extras del diseño**: presupuestos con alertas y exportación a Excel o PDF; categorización automática de gastos (D6, extra).
-19. **Mejoras «Posterior»** del diseño, cada una con su propio análisis antes de empezar:
+
+18. **Alta de gastos por chat, con confirmación.** Herramienta de escritura en `Assistant.Api` que propone un gasto (concepto, importe, fecha, categoría, pagador y reparto) y solo lo guarda tras una confirmación explícita de la persona (segunda llamada con botón «Confirmar»). Usa el JWT y el hogar de la persona, así que Core.Api aplica sus permisos. El modelo no fija el importe ni el reparto definitivos: los muestra y los confirma la persona. Decisiones antes de empezar: campos mínimos que pide el chat, si el reparto sale del perfil de la categoría, y si la auditoría registra el alta como hecha por el asistente. Hecho cuando «apunta 12 € de café» deja un borrador, no guarda nada sin «Confirmar» y el gasto aparece en Gastos con el autor correcto.
+19. **Extras del diseño**: presupuestos con alertas y exportación a Excel o PDF; categorización automática de gastos (D6, extra).
+20. **Mejoras «Posterior»** del diseño, cada una con su propio análisis antes de empezar:
     - Avisos por correo (resumen mensual y recibos próximos).
     - Reembolsos y devoluciones ligados a un gasto.
     - Copia de seguridad y exportación completa.
@@ -101,9 +103,9 @@ Fuera de alcance declarado: objetivos de ahorro e intereses.
 
 ### Fase 5 · Entrega del proyecto fin de máster
 
-20. **Memoria**: incluir arquitectura por capas, decisiones D1-D7, pruebas (unitarias, PostgreSQL real, bUnit) y las líneas futuras de la fase 4.
-21. **Reproducibilidad**: README de despliegue y de arranque local (`docs/despliegue.md`, `docs/demo.md`) revisado contra lo que se haya probado en la fase 1.
-22. **Calidad final**: `dotnet test` completo y revisión de los comentarios XML de producción según `.claude/rules/idioma-y-documentacion.md`.
+21. **Memoria**: incluir arquitectura por capas, decisiones D1-D7, pruebas (unitarias, PostgreSQL real, bUnit) y las líneas futuras de la fase 4.
+22. **Reproducibilidad**: README de despliegue y de arranque local (`docs/despliegue.md`, `docs/demo.md`) revisado contra lo que se haya probado en la fase 1.
+23. **Calidad final**: `dotnet test` completo y revisión de los comentarios XML de producción según `.claude/rules/idioma-y-documentacion.md`.
 
 ## 3. Orden sugerido
 

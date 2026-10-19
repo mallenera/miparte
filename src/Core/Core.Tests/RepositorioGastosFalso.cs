@@ -41,6 +41,9 @@ internal sealed class RepositorioGastosFalso : IRepositorioGastos
     public Task<IReadOnlyList<Miembro>> AdultosActivosAsync(CancellationToken ct)
         => Task.FromResult<IReadOnlyList<Miembro>>(Miembros.OrderBy(m => m.Nombre).ThenBy(m => m.Id).ToList());
 
+    public Task<IReadOnlyList<Miembro>> MiembrosActivosAsync(CancellationToken ct)
+        => Task.FromResult<IReadOnlyList<Miembro>>(Miembros.Where(m => m.Activo).OrderBy(m => m.Nombre).ThenBy(m => m.Id).ToList());
+
     public Task<bool> CuentaComunActivaAsync(CancellationToken ct) => Task.FromResult(CuentaActiva);
 
     public Task<bool> AhorroActivoAsync(CancellationToken ct) => Task.FromResult(AhorroOn);

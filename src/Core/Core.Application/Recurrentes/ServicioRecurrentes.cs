@@ -109,7 +109,7 @@ public sealed class ServicioRecurrentes(IRepositorioRecurrentes recurrentes, IRe
 
             if (pendientes.Count > 0)
             {
-                var adultos = await gastos.AdultosActivosAsync(ct);
+                var miembros = await gastos.MiembrosActivosAsync(ct);
                 var perfiles = await recurrentes.PerfilesAsync(ct);
 
                 // Una plantilla a cargo de la cuenta común no genera gastos mientras el hogar no la tenga activada.
@@ -120,7 +120,7 @@ public sealed class ServicioRecurrentes(IRepositorioRecurrentes recurrentes, IRe
                 var generados = new List<Gasto>(pendientes.Count);
                 foreach (var p in pendientes)
                 {
-                    var gasto = GeneracionRecurrente.CrearGasto(p, inicio, perfiles[p.PerfilRepartoId], adultos, out var error);
+                    var gasto = GeneracionRecurrente.CrearGasto(p, inicio, perfiles[p.PerfilRepartoId], miembros, out var error);
                     if (gasto is null) // nada se guarda: o se generan todos o ninguno
                         return Resultado<GeneracionDelMes>.Invalido(
                             $"No se puede repartir el gasto recurrente '{p.Concepto ?? p.Id.ToString()}': {error}");

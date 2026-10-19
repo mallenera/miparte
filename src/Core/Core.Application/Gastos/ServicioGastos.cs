@@ -90,7 +90,7 @@ public sealed class ServicioGastos(IRepositorioGastos repositorio)
         }, ct);
 
     /// <summary>Resultado de validar los datos: el reparto y si va a cargo de la cuenta común, o el mensaje de error.</summary>
-    private sealed record Preparado(IReadOnlyList<ParteAsumida>? Partes, string? Error, bool CuentaComun);
+    private sealed record Preparado(ResultadoReparto? Partes, string? Error, bool CuentaComun);
 
     /// <summary>
     /// Valida los datos y calcula el reparto: vacío y marcado a cargo de la cuenta común si el perfil es de cuenta común;
@@ -114,10 +114,10 @@ public sealed class ServicioGastos(IRepositorioGastos repositorio)
             return new(null, "La cuenta común solo paga gastos con el perfil de cuenta común.", false);
 
         // Un gasto personal lo asume íntegro quien lo paga, sea cual sea el modo del perfil, y no es de la cuenta común.
-        if (d.Personal) return new([new ParteAsumida(d.PagadoPor!.Value, d.Importe)], null, false);
+        if (d.Personal) return new(new ResultadoReparto([new ParteAsumida(d.PagadoPor!.Value, d.Importe)], []), null, false);
 
-        var adultos = await repositorio.AdultosActivosAsync(ct);
-        var partes = RepartoGasto.Repartir(perfil, adultos, d.Importe, d.PagadoPor ?? Guid.Empty, out var error);
+        var miembros = await repositorio.MiembrosActivosAsync(ct);
+        var partes = RepartoGasto.RepartirConDependientes(perfil, miembros, d.Importe, d.PagadoPor ?? Guid.Empty, out var error);
         return new(partes, error, perfil.Modo == ModoReparto.CuentaComun);
     }
 

@@ -39,6 +39,9 @@ public interface IRepositorioGastos
     /// <summary>Adultos activos del hogar, ordenados por nombre y id.</summary>
     Task<IReadOnlyList<Miembro>> AdultosActivosAsync(CancellationToken ct);
 
+    /// <summary>Miembros activos del hogar, adultos y a cargo, ordenados por nombre y id. Los a cargo cuentan en el reparto con su peso.</summary>
+    Task<IReadOnlyList<Miembro>> MiembrosActivosAsync(CancellationToken ct);
+
     /// <summary>Si la fecha cae dentro del periodo propio del hogar, y ese periodo está cerrado.</summary>
     Task<bool> FechaEnPeriodoCerradoAsync(DateOnly fecha, CancellationToken ct);
 

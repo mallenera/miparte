@@ -34,6 +34,26 @@ public class ServicioGastosTests
         fecha ?? Hoy, importe, _categoria, cuentaPaga || ahorro ? null : pagadoPor ?? _ana, (perfil ?? _partes).Id, null, ahorro, personal);
 
     [Fact]
+    public async Task Crear_ConDependiente_SumaSuParteASuResponsableYLaDesglosa()
+    {
+        var lorien = Guid.NewGuid();
+        _repo.Miembros.Add(new Miembro { Id = lorien, HogarId = Hogar, Nombre = "Lorien", Tipo = TipoMiembro.ACargo, ResponsableId = _marcos });
+        _partes.Detalles.Add(new PerfilRepartoDetalle { Id = Guid.NewGuid(), HogarId = Hogar, PerfilId = _partes.Id, MiembroId = lorien, Valor = 1m });
+
+        var r = await Servicio.CrearAsync(Hogar, Datos(900m), default);
+
+        Assert.Null(r.Error);
+        var gasto = r.Valor!;
+        var partes = gasto.Repartos.ToDictionary(x => x.MiembroId, x => x.ImporteAsumido);
+        Assert.Equal(450m, partes[_ana]);
+        Assert.Equal(450m, partes[_marcos]); // su parte (225) más la de Lorien (225)
+        var dependiente = Assert.Single(gasto.RepartosACargo);
+        Assert.Equal(lorien, dependiente.MiembroId);
+        Assert.Equal(_marcos, dependiente.ResponsableId);
+        Assert.Equal(225m, dependiente.ImporteAsumido);
+    }
+
+    [Fact]
     public async Task Crear_ConPartes2a1_RepartePorPesosYElUltimoAbsorbeElCentimo()
     {
         var r = await Servicio.CrearAsync(Hogar, Datos(900m), default);

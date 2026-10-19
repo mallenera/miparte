@@ -54,8 +54,8 @@ public class ServicioPerfilesTests
         => Assert.Equal(TipoError.Invalido, (await Crear("x", "partes", (_ana, 1m), (_ana, 2m))).Error!.Tipo);
 
     [Fact]
-    public async Task Crear_ConUnMiembroACargo_EsInvalido()
-        => Assert.Equal(TipoError.Invalido, (await Crear("x", "partes", (_ana, 1m), (_lucia, 1m))).Error!.Tipo);
+    public async Task Crear_ConUnMiembroACargoDeUnAdulto_EsValido()
+        => Assert.Null((await Crear("x", "partes", (_ana, 1m), (_lucia, 1m))).Error);
 
     [Theory]
     [InlineData("cuenta_comun")]
@@ -154,8 +154,12 @@ public class ServicioPerfilesTests
 
         public Task<PerfilReparto?> ObtenerParaEditarAsync(Guid id, CancellationToken ct) => ObtenerAsync(id, ct);
 
-        public Task<int> ContarAdultosActivosAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct)
-            => Task.FromResult(Miembros.Count(m => ids.Contains(m.Id) && m.Activo && m.Tipo == TipoMiembro.Adulto));
+        public Task<int> ContarParticipantesAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct)
+        {
+            var adultos = Miembros.Where(m => m.Activo && m.Tipo == TipoMiembro.Adulto).Select(m => m.Id).ToHashSet();
+            return Task.FromResult(Miembros.Count(m => ids.Contains(m.Id) && m.Activo
+                && (m.Tipo == TipoMiembro.Adulto || (m.ResponsableId is { } r && adultos.Contains(r)))));
+        }
 
         public Task<bool> NombreEnUsoAsync(string nombre, Guid? excluirId, CancellationToken ct)
             => Task.FromResult(Perfiles.Any(p => p.Nombre == nombre && p.Id != excluirId));

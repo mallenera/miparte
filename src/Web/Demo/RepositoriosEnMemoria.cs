@@ -419,8 +419,12 @@ internal sealed class RepositorioPerfilesEnMemoria(AlmacenDemo a) : IRepositorio
 
     public Task<PerfilReparto?> ObtenerParaEditarAsync(Guid id, CancellationToken ct) => ObtenerAsync(id, ct);
 
-    public Task<int> ContarAdultosActivosAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct)
-        => Task.FromResult(a.Miembros.Count(m => m.Activo && m.Tipo == TipoMiembro.Adulto && ids.Contains(m.Id)));
+    public Task<int> ContarParticipantesAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct)
+    {
+        var adultos = a.Miembros.Where(m => m.Activo && m.Tipo == TipoMiembro.Adulto).Select(m => m.Id).ToHashSet();
+        return Task.FromResult(a.Miembros.Count(m => m.Activo && ids.Contains(m.Id)
+            && (m.Tipo == TipoMiembro.Adulto || (m.ResponsableId is { } r && adultos.Contains(r)))));
+    }
 
     public Task<bool> NombreEnUsoAsync(string nombre, Guid? excluirId, CancellationToken ct)
         => Task.FromResult(a.Perfiles.Any(p => p.Nombre == nombre && p.Id != excluirId));

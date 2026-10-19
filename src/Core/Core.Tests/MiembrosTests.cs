@@ -140,7 +140,7 @@ public class MiembrosTests
     }
 
     [Fact]
-    public async Task Perfil_ConDetalleDeACargo_400()
+    public async Task Perfil_ConDetalleDeACargoDeUnAdulto_201()
     {
         var s = await Crear();
         using var _ = s.F;
@@ -148,7 +148,7 @@ public class MiembrosTests
 
         var r = await s.ComoAna.PostAsJsonAsync("/api/perfiles", new GuardarPerfilRequest("Con niño", "porcentaje",
             [new PerfilDetalleDto(s.AnaId, 50), new PerfilDetalleDto(nino, 50)]));
-        Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, r.StatusCode);
     }
 
     // ---- Actualización ----

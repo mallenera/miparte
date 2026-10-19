@@ -5,6 +5,22 @@ namespace MiParte.Core.Tests;
 public class RepartoTests
 {
     [Fact]
+    public void PesoCero_AlFinal_NoRecibeCentimo()
+    {
+        // 1 + 1 + 0: el céntimo sobrante va al último con peso, nunca al de peso cero.
+        var r = Reparto.Dividir(10m, [1m, 1m, 0m]);
+        Assert.Equal(0m, r[2]);
+        Assert.Equal(10m, r.Sum());
+    }
+
+    [Fact]
+    public void PesoCeroEnMedio_NoRecibeNada()
+    {
+        var r = Reparto.Dividir(100m, [1m, 0m, 2m]);
+        Assert.Equal(0m, r[1]);
+        Assert.Equal(100m, r.Sum());
+    }
+    [Fact]
     public void ProporcionalAIngresos_A2X_B1X_900Euros()
     {
         var r = Reparto.Dividir(900m, [2m, 1m]);

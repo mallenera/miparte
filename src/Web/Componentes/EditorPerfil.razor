@@ -28,11 +28,11 @@
     else
     {
         <div class="fields">
-            @foreach (var a in _adultos)
+            @foreach (var a in _participantes)
             {
                 var id = a.Id;
                 <label>
-                    <span class="who"><Avatar Nombre="@a.Nombre" Color="@ColorMiembro.De(id, Miembros)" Tamano="sm" />@a.Nombre @(_edicion.Modo == ModosReparto.Porcentaje ? "(%)" : "(partes)")</span>
+                    <span class="who"><Avatar Nombre="@a.Nombre" Color="@ColorMiembro.De(id, Miembros)" Tamano="sm" />@a.Nombre @(a.Tipo == TiposMiembro.ACargo ? "(a cargo de " + Miembros.First(x => x.Id == a.ResponsableId).Nombre + ")" : "") @(_edicion.Modo == ModosReparto.Porcentaje ? "(%)" : "(partes)")</span>
                     <input type="number" inputmode="decimal" min="0" step="any" value="@Texto(id)"
                            @oninput="e => Poner(id, e.Value?.ToString())" />
                 </label>
@@ -107,7 +107,7 @@
     [Parameter] public EventCallback OnCancelar { get; set; }
 
     private EdicionPerfil _edicion = new([]);
-    private List<MiembroDto> _adultos = [];
+    private List<MiembroDto> _participantes = [];
     private string? _error;
     private bool _enviando, _confirmando, _moviendo;
     private string _destino = "";
@@ -118,8 +118,10 @@
 
     protected override void OnInitialized()
     {
-        _adultos = Miembros.Where(m => m.Tipo == TiposMiembro.Adulto && m.Activo).OrderBy(m => m.Nombre).ToList();
-        var ids = _adultos.Select(a => a.Id);
+        _participantes = Miembros
+            .Where(m => m.Activo && (m.Tipo == TiposMiembro.Adulto || (m.ResponsableId is { } r && Miembros.Any(a => a.Id == r && a.Activo && a.Tipo == TiposMiembro.Adulto))))
+            .OrderBy(m => m.Nombre).ToList();
+        var ids = _participantes.Select(a => a.Id);
         _edicion = Perfil is null ? new EdicionPerfil(ids) : EdicionPerfil.Desde(Perfil, ids);
     }
 

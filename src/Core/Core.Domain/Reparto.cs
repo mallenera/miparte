@@ -4,9 +4,9 @@ namespace MiParte.Core.Domain;
 public static class Reparto
 {
     /// <summary>
-    /// Reparte un importe según pesos (porcentajes o partes). Redondea a 2 decimales
-    /// y el último miembro absorbe el céntimo sobrante, de modo que la suma siempre
-    /// es igual al importe.
+    /// Reparte un importe según pesos (porcentajes o partes). Redondea a 2 decimales y el último miembro con peso
+    /// positivo absorbe el céntimo sobrante, de modo que la suma siempre es igual al importe. Quien tiene peso cero
+    /// no recibe nada, ni siquiera un céntimo de redondeo.
     /// </summary>
     public static IReadOnlyList<decimal> Dividir(decimal importe, IReadOnlyList<decimal> pesos)
     {
@@ -17,14 +17,18 @@ public static class Reparto
         var total = pesos.Sum();
         if (total <= 0) throw new ArgumentException("La suma de pesos debe ser positiva.", nameof(pesos));
 
+        var ultimo = pesos.Count - 1;
+        while (pesos[ultimo] == 0) ultimo--; // el último con peso positivo absorbe el céntimo sobrante
+
         var resultado = new decimal[pesos.Count];
         var acumulado = 0m;
-        for (var i = 0; i < pesos.Count - 1; i++)
+        for (var i = 0; i < pesos.Count; i++)
         {
+            if (i == ultimo || pesos[i] == 0) continue;
             resultado[i] = Math.Round(importe * pesos[i] / total, 2, MidpointRounding.AwayFromZero);
             acumulado += resultado[i];
         }
-        resultado[^1] = importe - acumulado;
+        resultado[ultimo] = importe - acumulado;
         return resultado;
     }
 }

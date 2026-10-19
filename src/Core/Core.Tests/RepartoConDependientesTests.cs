@@ -103,6 +103,18 @@ public class RepartoConDependientesTests
     }
 
     [Fact]
+    public void DependienteDeOtroDependiente_NoEsResponsableValido()
+    {
+        var miembros = new[] { Adulto(Ana, "Ana"), ACargo(Lorien, "Lorien", Ana), ACargo(Truca, "Truca", Lorien) };
+        var perfil = Perfil(ModoReparto.Partes, (Ana, 1m), (Lorien, 1m), (Truca, 1m));
+
+        var r = RepartoGasto.RepartirConDependientes(perfil, miembros, 30m, Ana, out var error);
+
+        Assert.Null(r);
+        Assert.Contains("responsable adulto", error);
+    }
+
+    [Fact]
     public void RepartirClasico_SigueDandoSoloAdultos()
     {
         var adultos = new[] { Adulto(Ana, "Ana"), Adulto(Nuria, "Nuria") };

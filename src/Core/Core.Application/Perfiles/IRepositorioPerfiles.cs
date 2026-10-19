@@ -14,8 +14,8 @@ public interface IRepositorioPerfiles
     /// <summary>Un perfil con su detalle para modificarlo con <see cref="GuardarAsync"/>; null si no existe en el hogar.</summary>
     Task<PerfilReparto?> ObtenerParaEditarAsync(Guid id, CancellationToken ct);
 
-    /// <summary>Cuántos de los miembros dados son adultos activos del hogar.</summary>
-    Task<int> ContarAdultosActivosAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct);
+    /// <summary>Cuántos de los miembros dados pueden llevar parte en un perfil: adultos activos, o a cargo activos de un adulto activo.</summary>
+    Task<int> ContarParticipantesAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct);
 
     /// <summary>Si otro perfil (distinto de <paramref name="excluirId"/>) tiene ese nombre.</summary>
     Task<bool> NombreEnUsoAsync(string nombre, Guid? excluirId, CancellationToken ct);

@@ -17,7 +17,8 @@ public static class Dtos
     public static GastoResponse ADto(this Gasto g) => new(
         g.Id, g.Fecha, g.Importe, g.CategoriaId, g.PagadoPor, g.PerfilRepartoId, g.Concepto, g.GastoRecurrenteId,
         g.Repartos.OrderBy(r => r.MiembroId).Select(r => new RepartoGastoDto(r.MiembroId, r.ImporteAsumido)).ToList(),
-        g.ACargoCuentaComun, g.PagadoDesdeAhorro, g.EsPersonal);
+        g.ACargoCuentaComun, g.PagadoDesdeAhorro, g.EsPersonal,
+        g.RepartosACargo.OrderBy(r => r.MiembroId).Select(r => new ParteACargoDto(r.MiembroId, r.ResponsableId, r.ImporteAsumido)).ToList());
 
     /// <summary>
     /// Miembro con tipo «adulto»/«a_cargo», rol «admin»/«miembro», si está vinculado a un usuario, si es el usuario autenticado

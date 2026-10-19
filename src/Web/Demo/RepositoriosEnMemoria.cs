@@ -136,6 +136,9 @@ internal sealed class RepositorioGastosEnMemoria(AlmacenDemo a) : IRepositorioGa
 
     public Task<IReadOnlyList<Miembro>> AdultosActivosAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<Miembro>>(a.AdultosActivos());
 
+    public Task<IReadOnlyList<Miembro>> MiembrosActivosAsync(CancellationToken ct)
+        => Task.FromResult<IReadOnlyList<Miembro>>(a.Miembros.Where(m => m.Activo).OrderBy(m => m.Nombre).ThenBy(m => m.Id).ToList());
+
     public Task<bool> CuentaComunActivaAsync(CancellationToken ct) => Task.FromResult(a.Hogar.CuentaComunActiva);
 
     public Task<bool> AhorroActivoAsync(CancellationToken ct) => Task.FromResult(a.Hogar.AhorroActivo);

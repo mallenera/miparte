@@ -18,6 +18,12 @@ public record GastoRequest(
 /// <param name="ImporteAsumido">Importe del gasto que le corresponde, calculado por el servidor.</param>
 public record RepartoGastoDto(Guid MiembroId, decimal ImporteAsumido);
 
+/// <summary>Parte de un miembro a cargo, ya sumada en la de su responsable.</summary>
+/// <param name="MiembroId">Miembro a cargo.</param>
+/// <param name="ResponsableId">Adulto que asume la parte.</param>
+/// <param name="ImporteAsumido">Importe de la parte del miembro a cargo.</param>
+public record ParteACargoDto(Guid MiembroId, Guid ResponsableId, decimal ImporteAsumido);
+
 /// <summary>Gasto guardado junto con su reparto.</summary>
 /// <param name="Id">Identificador del gasto.</param>
 /// <param name="Fecha">Fecha del gasto.</param>
@@ -31,10 +37,11 @@ public record RepartoGastoDto(Guid MiembroId, decimal ImporteAsumido);
 /// <param name="ACargoCuentaComun">Si lo asume la cuenta común (perfil «cuenta común»): sin reparto entre personas ni deuda.</param>
 /// <param name="PagadoDesdeAhorro">Si se pagó con el ahorro de la cuenta común.</param>
 /// <param name="Personal">Si es un gasto personal de quien lo pagó: fuera de la liquidación y de los totales del hogar.</param>
+/// <param name="RepartosACargo">Partes de los miembros a cargo; cada una ya está incluida en la de su responsable.</param>
 public record GastoResponse(
     Guid Id, DateOnly Fecha, decimal Importe, Guid CategoriaId, Guid? PagadoPor, Guid PerfilRepartoId,
     string? Concepto, Guid? GastoRecurrenteId, IReadOnlyList<RepartoGastoDto> Repartos, bool ACargoCuentaComun = false,
-    bool PagadoDesdeAhorro = false, bool Personal = false);
+    bool PagadoDesdeAhorro = false, bool Personal = false, IReadOnlyList<ParteACargoDto>? RepartosACargo = null);
 
 /// <summary>Plantilla de gasto mensual. DiaMes entre 1 y 28.</summary>
 /// <param name="Importe">Importe del gasto que se generará cada mes.</param>

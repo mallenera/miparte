@@ -9,8 +9,17 @@ public sealed class OpcionesAsistente
     /// <summary>Nombre de la sección de configuración.</summary>
     public const string Seccion = "Asistente";
 
+    /// <summary>Proveedor del modelo: <c>anthropic</c> (por defecto) o <c>cloudflare</c> (Workers AI, cuota gratuita).</summary>
+    public string Proveedor { get; set; } = "anthropic";
+
     /// <summary>Modelo de Anthropic. Configurable para cambiarlo sin recompilar.</summary>
     public string Modelo { get; set; } = "claude-sonnet-5-5";
+
+    /// <summary>Identificador de cuenta de Cloudflare (no es secreto; el token va en <c>CLOUDFLARE_API_TOKEN</c>).</summary>
+    public string CloudflareCuenta { get; set; } = "";
+
+    /// <summary>Modelo de Workers AI. Debe admitir herramientas en el catálogo de Cloudflare.</summary>
+    public string CloudflareModelo { get; set; } = "@cf/zai-org/glm-4.7-flash";
 
     /// <summary>URL base de Core.Api, de la que se consultan los datos del hogar con el JWT de la persona.</summary>
     public string CoreUrl { get; set; } = "http://localhost:5001";

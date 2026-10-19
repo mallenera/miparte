@@ -93,6 +93,25 @@ public sealed class ServicioSesion
     /// <param name="email">Correo.</param>
     public async Task ReenviarCodigoAsync(string email) => await _auth.ReenviarCodigoAsync(email);
 
+    /// <summary>Envía el código para recuperar la contraseña. No revela si el correo tiene cuenta.</summary>
+    /// <param name="email">Correo de la cuenta.</param>
+    public async Task SolicitarRecuperacionAsync(string email)
+    {
+        await InicializarAsync();
+        await _auth.SolicitarRecuperacionAsync(email);
+    }
+
+    /// <summary>Fija la contraseña nueva con el código del correo y deja la sesión iniciada.</summary>
+    /// <param name="email">Correo de la cuenta.</param>
+    /// <param name="codigo">Código recibido por correo.</param>
+    /// <param name="nuevaContrasena">Contraseña nueva.</param>
+    /// <exception cref="AuthException">Código incorrecto o caducado, o contraseña no válida.</exception>
+    public async Task RecuperarContrasenaAsync(string email, string codigo, string nuevaContrasena)
+    {
+        await InicializarAsync();
+        await EstablecerAsync(await _auth.RecuperarContrasenaAsync(email, codigo, nuevaContrasena));
+    }
+
     /// <summary>
     /// Prepara el login con Google (PKCE): guarda en este navegador un verificador aleatorio y devuelve la URL de Supabase
     /// con su <c>code_challenge</c>. Así el retorno solo se acepta en el navegador que inició el flujo (evita el CSRF de login).

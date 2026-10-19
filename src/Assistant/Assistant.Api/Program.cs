@@ -6,6 +6,7 @@ using MiParte.Assistant.Api.Hogar;
 using MiParte.Assistant.Api.Modelo;
 using MiParte.Assistant.Api.Seguridad;
 using MiParte.Auth;
+using MiParte.Seguridad;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,7 +28,15 @@ builder.Services.AddSingleton<IFabricaDatosHogar, FabricaDatosHogarCore>();
 
 // Modelo: la clave ANTHROPIC_API_KEY se lee solo del entorno.
 builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddSingleton<IClienteModelo, ClienteAnthropic>();
+if (string.Equals(opciones.Proveedor, "cloudflare", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddHttpClient(ClienteWorkersAi.NombreCliente, c => c.Timeout = TimeSpan.FromSeconds(60));
+    builder.Services.AddSingleton<IClienteModelo, ClienteWorkersAi>();
+}
+else
+{
+    builder.Services.AddSingleton<IClienteModelo, ClienteAnthropic>();
+}
 builder.Services.AddScoped<ServicioChat>();
 
 // CORS: orígenes en Cors:OrigenesPermitidos (env Cors__OrigenesPermitidos__0, ...). Sin configuración, ninguno.
@@ -49,6 +58,10 @@ app.Logger.LogInformation(
     supabase.EmisorEfectivo ?? "(sin configurar: ningún token será válido)",
     opciones.Modelo,
     string.IsNullOrWhiteSpace(app.Configuration["ANTHROPIC_API_KEY"]) ? "NO configurada" : "configurada");
+
+// Detrás de un proxy (Render) la IP del limitador es la del cliente solo si se reenvía X-Forwarded-For de confianza.
+var reenviadas = ReenvioCabeceras.Crear(app.Configuration);
+if (reenviadas is not null) app.UseForwardedHeaders(reenviadas);
 
 app.UseCabecerasSeguridad();
 app.UseCors();

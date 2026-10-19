@@ -13,7 +13,7 @@ Front (Blazor) ──JWT + X-Hogar-Id──▶ Assistant.Api ──JWT + X-Hogar
 - **Sin acceso propio a la base de datos.** Assistant.Api no tiene cadena de conexión: consulta `GET /api/miembros`, `/api/categorias`, `/api/gastos`, `/api/resumen` y `/api/liquidacion` de Core.Api reenviando el JWT de la persona y su `X-Hogar-Id`. La multitenencia (RLS y filtro global por `hogar_id`) la sigue aplicando Core.Api; el asistente nunca ve datos de otro hogar aunque el modelo lo pidiera.
 - **Autenticación.** `MiParte.Auth` valida el JWT de Supabase igual que en Core.Api (`Supabase__Url`, `Supabase__JwtSecret`).
 - **Hogar.** La cabecera `X-Hogar-Id` es obligatoria. Antes de llamar al modelo se hace una consulta a Core.Api con ese hogar: si la persona no es miembro activo, 403 y el modelo no se invoca.
-- **Cliente del modelo.** `IClienteModelo` abstrae el proveedor; `ClienteAnthropic` usa el SDK oficial (`Anthropic` en NuGet). Modelo por defecto `claude-sonnet-5-5`, configurable con `Asistente__Modelo`. Sin streaming de momento (pendiente).
+- **Cliente del modelo.** `IClienteModelo` abstrae el proveedor. `Asistente__Proveedor` elige `ClienteAnthropic` (SDK oficial, `Anthropic` en NuGet, por defecto) o `ClienteWorkersAi` (Cloudflare Workers AI, REST `/ai/run/{modelo}`, cuota gratuita diaria; Cloudflare dice no usar el contenido para entrenar ni conservarlo más allá de la petición). Modelo por defecto `claude-sonnet-5-5`, configurable con `Asistente__Modelo`. Sin streaming de momento (pendiente).
 - **Solo lectura.** Las cinco funciones del diseño no modifican nada. No hay herramientas de escritura porque el diseño no las contempla («solo lee datos del hogar»); si se añadieran, tendrían que pedir confirmación explícita antes de ejecutarse (propuesta de la herramienta, botón «Confirmar» en el front y una segunda llamada).
 
 ## Funciones de consulta
@@ -34,7 +34,7 @@ Reglas del diseño que se cumplen en código: si falta el año se asume el en cu
 - **Superficie mínima.** El modelo solo dispone de cinco funciones de lectura sobre el hogar de la persona; aunque una inyección tuviera éxito, no hay nada que modificar ni otro hogar al que llegar.
 - **El historial del cliente es de la persona.** Solo se aceptan roles `user` y `assistant` (otro rol da 400), con máximo `Asistente__MaxMensajes` (20) mensajes de `Asistente__MaxCaracteresMensaje` (1500) caracteres; el último debe ser de `user`.
 - **Bucle acotado.** Máximo 5 vueltas y 8 llamadas a funciones por pregunta (`Asistente__MaxIteraciones`, `Asistente__MaxLlamadasHerramienta`); `max_tokens` 1024 por turno.
-- **Coste.** Límite de `Asistente__MensajesPorMinuto` (10) preguntas por usuario y de 60 peticiones por minuto en total (429 con `Retry-After`); cuerpo máximo 64 KB.
+- **Coste.** Límite de `Asistente__MensajesPorMinuto` (10) preguntas por usuario y de 60 peticiones por minuto en total (429 con `Retry-After`); cuerpo máximo 64 KB. Las peticiones sin sesión se cuentan por IP, que tras el proxy de Render es la del cliente solo con `ProxyInverso__*` configurado (ver Configuración).
 - **Secretos.** `ANTHROPIC_API_KEY` solo se lee del entorno (nunca de `appsettings` ni del repo); no se registra en logs ni en errores. Los fallos del proveedor llegan a la persona como un 503 genérico.
 - **Front.** Las respuestas se pintan como texto (Blazor escapa; no hay `MarkupString`), la CSP sigue sin scripts en línea y solo añade el origen del asistente a `connect-src` (`ASSISTANT_URL`).
 
@@ -77,6 +77,10 @@ DTOs en `src/Contracts/Asistente.cs` (`ChatRequest`, `MensajeChatDto`, `ChatResp
 | Variable | Valor por defecto | Notas |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | (vacío) | Secreto. Sin ella el chat responde 503 |
+| `Asistente__Proveedor` | `anthropic` | `anthropic` o `cloudflare` (Workers AI, cuota gratuita diaria). Con `cloudflare` no se usa la clave de Anthropic |
+| `CLOUDFLARE_API_TOKEN` | (vacío) | Secreto: token de la API de Cloudflare con permiso Workers AI. Sin él el chat responde 503 |
+| `Asistente__CloudflareCuenta` | (vacío) | Identificador de la cuenta de Cloudflare (no es secreto) |
+| `Asistente__CloudflareModelo` | `@cf/zai-org/glm-4.7-flash` | Modelo de Workers AI con llamadas a herramientas (comprobar en el catálogo) |
 | `Asistente__Modelo` | `claude-sonnet-5-5` | Cualquier modelo de la Messages API con tool use |
 | `Asistente__CoreUrl` | `http://localhost:5001` | En docker compose, `http://core:8080` |
 | `Asistente__MaxTokens` | 1024 | Salida por turno |
@@ -85,6 +89,8 @@ DTOs en `src/Contracts/Asistente.cs` (`ChatRequest`, `MensajeChatDto`, `ChatResp
 | `Asistente__MensajesPorMinuto` | 10 | Por usuario |
 | `Supabase__Url`, `Supabase__JwtSecret` | | Igual que Core.Api |
 | `Cors__OrigenesPermitidos__0` | | Origen del front |
+| `ProxyInverso__Proxies__N` / `ProxyInverso__Redes__N` | (vacío) | IPs o redes CIDR de los proxies de confianza. Una IP inválida impide arrancar. Mismo criterio que Core.Api (`MiParte.Seguridad.ReenvioCabeceras`) |
+| `ProxyInverso__Confiar` | `false` | `true` acepta cualquier remitente directo; solo en Render, donde el contenedor únicamente es alcanzable por el proxy |
 
 Front: `Api:AssistantUrl` en `wwwroot/appsettings.json` (público, sin secretos) y, para la CSP, `ASSISTANT_URL` (nginx) o la variable de repositorio `ASSISTANT_URL` (Cloudflare). Si falta, el asistente flotante avisa de que no está configurada.
 
@@ -109,4 +115,4 @@ Sin clave se puede ver el asistente flotante y comprobar el 503; el modo demo de
 - Herramientas de escritura con confirmación explícita (hoy fuera del diseño).
 - Memoria de la conversación entre sesiones (hoy vive en la página).
 - Pruebas manuales con el modelo real, evaluación de calidad de las respuestas y ajuste del prompt.
-- Límite diario de coste por hogar y ForwardedHeaders tras proxy (como en Core.Api).
+- Límite diario de coste por hogar.

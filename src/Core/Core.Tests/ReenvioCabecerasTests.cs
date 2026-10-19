@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using MiParte.Core.Api.Seguridad;
+using MiParte.Seguridad;
 using static MiParte.Core.Tests.AutenticacionTests;
 
 namespace MiParte.Core.Tests;

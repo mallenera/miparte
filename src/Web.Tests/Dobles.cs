@@ -32,6 +32,9 @@ internal sealed class ManejadorFalso : HttpMessageHandler
 
     public List<HttpRequestMessage> Peticiones { get; } = new();
 
+    /// <summary>Cuerpo de cada petición, leído antes de que el cliente libere su contenido.</summary>
+    public List<string> Cuerpos { get; } = new();
+
     public ManejadorFalso(Func<HttpRequestMessage, HttpResponseMessage> responder) => _responder = responder;
 
     public static ManejadorFalso Json(HttpStatusCode codigo, string json) => new(_ => RespuestaJson(codigo, json));
@@ -39,10 +42,11 @@ internal sealed class ManejadorFalso : HttpMessageHandler
     public static HttpResponseMessage RespuestaJson(HttpStatusCode codigo, string json) =>
         new(codigo) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
 
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         Peticiones.Add(request);
-        return Task.FromResult(_responder(request));
+        Cuerpos.Add(request.Content is null ? "" : await request.Content.ReadAsStringAsync(cancellationToken));
+        return _responder(request);
     }
 }
 

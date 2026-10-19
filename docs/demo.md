@@ -12,7 +12,7 @@ Es una **semilla manual, no una migración**: CI no la aplica. La función solo 
 
 ## Paso a paso (proyecto Supabase real)
 
-Prerrequisito: las migraciones de `supabase/migrations` ya aplicadas (`supabase db push`), porque la semilla escribe en las tablas del hogar.
+Prerrequisito: el esquema ya migrado con `migrar` del proyecto `MiParte.Database` (ver [despliegue.md](despliegue.md)), porque la semilla escribe en las tablas del hogar.
 
 1. **Ejecutar la semilla una vez.** Supabase → SQL Editor → pega el contenido de `supabase/seed/demo.sql` → Run. O desde una terminal, con la cadena del **Session pooler** (puerto 5432, ver `.env.example`) en una variable de entorno, sin escribirla en ningún fichero del repo:
    ```bash

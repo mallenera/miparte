@@ -261,13 +261,13 @@ Siete decisiones condicionan el desarrollo; la D3 es la única que depende de un
 
 | # | Decisión | Opciones | Recomendación | Estado |
 |---|---|---|---|---|
-| D1 | Dónde se aloja la app | Render o Railway con Docker; Streamlit Community Cloud (gratis, pero sin dominio propio) | Render o Railway con Docker, porque admiten dominio propio | Pendiente |
-| D2 | Base de datos y login | Supabase (PostgreSQL + login con correo y Google); SQLite local con login propio | Supabase: incluye ambos logins y plan gratuito | Pendiente |
+| D1 | Dónde se aloja la app | Render o Railway con Docker; Streamlit Community Cloud (gratis, pero sin dominio propio) | Render o Railway con Docker, porque admiten dominio propio | **Decidida**: Render con Docker para Core.Api y Assistant.Api, Cloudflare Pages para el front (ver [despliegue.md](despliegue.md)) |
+| D2 | Base de datos y login | Supabase (PostgreSQL + login con correo y Google); SQLite local con login propio | Supabase: incluye ambos logins y plan gratuito | **Decidida**: Supabase (PostgreSQL y Auth con correo; el acceso con Google está oculto de momento) |
 | D3 | Cómo se reparten los gastos del hijo | 100 % B; proporcional a ingresos (A asume 2/3); perfil propio (por ejemplo 50/50 o 70/30) | Perfil propio configurable; el porcentaje lo acordáis vosotros | Pendiente |
 | D4 | Reparto de la alimentación | Proporcional a ingresos; por partes 2:1 contando al hijo | Por decidir según si el hijo cuenta como una parte | Pendiente |
 | D5 | Interfaz | Streamlit; FastAPI con frontend web instalable (PWA) | Streamlit para el MVP; migrar después reutilizando lógica y base de datos | **Superada**: se optó por Blazor WASM (PWA) + minimal API .NET + Supabase |
 | D6 | Alcance de la IA | Solo chatbot; chatbot más categorización automática de gastos | Chatbot en el MVP; categorización como extra si da tiempo | Chatbot hecho; categorización pendiente |
-| D7 | Modelo de lenguaje del chatbot y dominio | Proveedor, modelo y coste por definir; registrador del dominio por elegir | Comprobar requisitos del máster y precios actuales antes de decidir | Proveedor Anthropic, `claude-sonnet-5-5` por defecto y configurable (`Asistente__Modelo`); coste y dominio pendientes |
+| D7 | Modelo de lenguaje del chatbot y dominio | Proveedor, modelo y coste por definir; registrador del dominio por elegir | Comprobar requisitos del máster y precios actuales antes de decidir | Proveedor actual: Cloudflare Workers AI (`Asistente__Proveedor=cloudflare`, cuota gratuita), con Anthropic como alternativa (`claude-sonnet-5-5` por defecto, configurable con `Asistente__Modelo`); dominio y presupuesto pendientes |
 
 ## Plan por fases, riesgos y calidad
 

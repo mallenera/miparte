@@ -397,6 +397,8 @@ public class Gasto
     public Guid? CicloLiquidacionId { get; set; }
     /// <summary>Importe asumido por cada miembro.</summary>
     public List<GastoReparto> Repartos { get; set; } = [];
+    /// <summary>Partes de los miembros a cargo; cada una ya está sumada en la de su responsable.</summary>
+    public List<GastoRepartoACargo> RepartosACargo { get; set; } = [];
 }
 
 /// <summary>Importe asumido por cada miembro, calculado al registrar el gasto.</summary>
@@ -409,6 +411,21 @@ public class GastoReparto
     /// <summary>Hogar al que pertenece (para el filtro por hogar).</summary>
     public Guid HogarId { get; set; }
     /// <summary>Importe que asume el miembro.</summary>
+    public decimal ImporteAsumido { get; set; }
+}
+
+/// <summary>Parte de un miembro a cargo en un gasto: la asume su responsable (tabla gasto_reparto_a_cargo).</summary>
+public class GastoRepartoACargo
+{
+    /// <summary>Gasto al que pertenece la parte.</summary>
+    public Guid GastoId { get; set; }
+    /// <summary>Miembro a cargo que tiene la parte.</summary>
+    public Guid MiembroId { get; set; }
+    /// <summary>Adulto que asume la parte en su total.</summary>
+    public Guid ResponsableId { get; set; }
+    /// <summary>Hogar al que pertenece (para el filtro por hogar).</summary>
+    public Guid HogarId { get; set; }
+    /// <summary>Importe de la parte del miembro a cargo.</summary>
     public decimal ImporteAsumido { get; set; }
 }
 

@@ -54,4 +54,4 @@ supabase stop
 
 ## Cuenta demo (semilla)
 
-`seed/demo.sql` crea el usuario `demo` (correo `demo@miparte.example`, contraseña `demo`) con un hogar de ejemplo y dos meses de gastos. No es una migración: CI no la aplica; se ejecuta a mano en el SQL Editor del proyecto (o `psql -f supabase/seed/demo.sql`, o `semilla-demo` del proyecto de base de datos) y es idempotente, así que volver a ejecutarla **restablece** la demo. La contraseña es pública a propósito; la cuenta solo ve el hogar demo.
+`seed/demo.sql` crea el usuario `demo` (correo `demo@miparte.example`, contraseña `9c88aaffa6d7e9e4`, distinta de `demo` a propósito) con un hogar de ejemplo y dos meses de gastos. No es una migración: CI no la aplica; se ejecuta a mano en el SQL Editor del proyecto (o `psql -f supabase/seed/demo.sql`, o `semilla-demo` del proyecto de base de datos) y es idempotente, así que volver a ejecutarla **restablece** la demo. La contraseña es pública a propósito; la cuenta solo ve el hogar demo.

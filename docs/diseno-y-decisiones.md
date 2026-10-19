@@ -267,7 +267,7 @@ Siete decisiones condicionan el desarrollo; la D3 es la única que depende de un
 | D4 | Reparto de la alimentación | Proporcional a ingresos; por partes 2:1 contando al hijo | Por decidir según si el hijo cuenta como una parte | Pendiente |
 | D5 | Interfaz | Streamlit; FastAPI con frontend web instalable (PWA) | Streamlit para el MVP; migrar después reutilizando lógica y base de datos | **Superada**: se optó por Blazor WASM (PWA) + minimal API .NET + Supabase |
 | D6 | Alcance de la IA | Solo chatbot; chatbot más categorización automática de gastos | Chatbot en el MVP; categorización como extra si da tiempo | Chatbot hecho; categorización pendiente |
-| D7 | Modelo de lenguaje del chatbot y dominio | Proveedor, modelo y coste por definir; registrador del dominio por elegir | Comprobar requisitos del máster y precios actuales antes de decidir | Proveedor actual: Cloudflare Workers AI (`Asistente__Proveedor=cloudflare`, cuota gratuita), con Anthropic como alternativa (`claude-sonnet-5-5` por defecto, configurable con `Asistente__Modelo`); dominio y presupuesto pendientes |
+| D7 | Modelo de lenguaje del chatbot y dominio | Proveedor, modelo y coste por definir; registrador del dominio por elegir | Comprobar requisitos del máster y precios actuales antes de decidir | **Decidido de momento**: Cloudflare Workers AI en el plan gratuito (`Asistente__Proveedor=cloudflare`, sin coste); Anthropic queda como alternativa de pago (`claude-sonnet-5-5`, configurable con `Asistente__Modelo`). Dominio pendiente |
 
 ## Plan por fases, riesgos y calidad
 

@@ -46,7 +46,10 @@
             </button>
         </EditForm>
 
-        <BotonGoogle Deshabilitado="@(_enviando || !Opciones.EstaConfigurada)" />
+        @if (FuncionesAcceso.GoogleActivo)
+        {
+            <BotonGoogle Deshabilitado="@(_enviando || !Opciones.EstaConfigurada)" />
+        }
 
         <div class="separador" aria-hidden="true">o</div>
         <button type="button" class="btn btn-ghost btn-block" disabled="@_enviando" @onclick="EntrarEnDemoAsync">
@@ -55,6 +58,8 @@
         <p class="muted">
             La demo local no necesita cuenta ni conexión y no guarda nada.
         </p>
+
+        <p class="muted"><a href="recuperar">¿Has olvidado la contraseña?</a></p>
 
         <p class="muted">¿No tienes cuenta? <a href="@InvitacionPendiente.ConFragmento("registro", _tokenUrl)">Regístrate</a></p>
     </div>

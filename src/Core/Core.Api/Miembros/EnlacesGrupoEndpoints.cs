@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using MiParte.Contracts;
+using MiParte.Core.Api.Gastos;
 using MiParte.Core.Api.Hogares;
 using MiParte.Core.Api.Seguridad;
 using MiParte.Core.Application.Miembros;
@@ -60,7 +61,8 @@ public static class EnlacesGrupoEndpoints
         [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (!MiembrosEndpoints.TryUsuario(ctx, out var userId)) return Results.Unauthorized();
-        var r = await servicio.CrearAsync(userId, hogar.HogarId!.Value, req?.CaducaEn, ct);
+        if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
+        var r = await servicio.CrearAsync(userId, hogarId, req?.CaducaEn, ct);
         if (r.Error is { } error) return MiembrosEndpoints.Error(error);
         var e = r.Valor!;
         return Results.Created($"/api/enlaces-grupo/{e.Id}", new EnlaceGrupoCreado(e.Id, e.Token, e.CaducaEn));

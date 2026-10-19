@@ -49,6 +49,10 @@ max_frequency = "60s"
 subject = "Tu código de confirmación de Mi parte, tu parte"
 content_path = "./supabase/templates/confirmacion.html"
 
+[auth.email.template.recovery]
+subject = "Tu código para recuperar la contraseña de Mi parte, tu parte"
+content_path = "./supabase/templates/recuperacion.html"
+
 # Google es opcional: se activa con credenciales OAuth propias (Google Cloud Console).
 [auth.external.google]
 enabled = false

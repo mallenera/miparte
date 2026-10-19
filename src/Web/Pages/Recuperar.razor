@@ -1,0 +1,166 @@
+@page "/recuperar"
+@using System.ComponentModel.DataAnnotations
+@using MiParte.Web.Autenticacion
+@using MiParte.Web.Configuracion
+@inject ServicioSesion Sesion
+@inject ComprobadorContrasenas Comprobador
+@inject OpcionesWeb Opciones
+@inject NavigationManager Navegacion
+
+<PageTitle>Recuperar contraseña · Mi parte, tu parte</PageTitle>
+
+<div class="acceso">
+    <PanelBienvenida />
+    <div class="auth">
+        <h1 class="page-title">Recuperar contraseña</h1>
+
+        @if (_error is not null)
+        {
+            <div class="aviso err" role="alert">@_error</div>
+        }
+        @if (_info is not null)
+        {
+            <div class="aviso ok" role="status">@_info</div>
+        }
+
+        @if (!_codigoEnviado)
+        {
+            <p class="muted">Te enviaremos un código de 8 dígitos al correo de tu cuenta.</p>
+            <EditForm Model="_modelo" OnValidSubmit="SolicitarAsync">
+                <DataAnnotationsValidator />
+                <div class="fieldrow">
+                    <label for="email">Correo</label>
+                    <InputText id="email" type="email" autocomplete="email" @bind-Value="_modelo.Email" />
+                    <ValidationMessage For="() => _modelo.Email" />
+                </div>
+                <button class="btn btn-block" type="submit" disabled="@(_enviando || !Opciones.EstaConfigurada)">
+                    @(_enviando ? "Enviando…" : "Enviar código")
+                </button>
+            </EditForm>
+        }
+        else
+        {
+            <EditForm Model="_nueva" OnValidSubmit="CambiarAsync">
+                <DataAnnotationsValidator />
+                <div class="fieldrow">
+                    <label for="codigo">Código del correo</label>
+                    <InputText id="codigo" inputmode="numeric" autocomplete="one-time-code" @bind-Value="_nueva.Codigo" />
+                    <ValidationMessage For="() => _nueva.Codigo" />
+                </div>
+                <div class="fieldrow">
+                    <label for="nueva">Contraseña nueva</label>
+                    <CampoContrasena Id="nueva" Autocomplete="new-password" @bind-Value="_nueva.Password" />
+                    <ValidationMessage For="() => _nueva.Password" />
+                </div>
+                <div class="fieldrow">
+                    <label for="repetir">Repite la contraseña</label>
+                    <CampoContrasena Id="repetir" Autocomplete="new-password" @bind-Value="_nueva.Repetir" />
+                    <ValidationMessage For="() => _nueva.Repetir" />
+                </div>
+                <button class="btn btn-block" type="submit" disabled="@(_enviando || !Opciones.EstaConfigurada)">
+                    @(_enviando ? "Guardando…" : "Cambiar contraseña")
+                </button>
+            </EditForm>
+            <p class="muted"><a href="#" @onclick="SolicitarOtraVez" @onclick:preventDefault>Enviar otro código</a></p>
+        }
+
+        <p class="muted"><a href="login">Volver a iniciar sesión</a></p>
+    </div>
+</div>
+
+@code {
+    private readonly Modelo _modelo = new();
+    private readonly Nueva _nueva = new();
+    private bool _codigoEnviado;
+    private bool _enviando;
+    private string? _error;
+    private string? _info;
+
+    private async Task SolicitarAsync()
+    {
+        _enviando = true;
+        _error = null;
+        try
+        {
+            await Sesion.SolicitarRecuperacionAsync(_modelo.Email.Trim());
+            _nueva.Email = _modelo.Email.Trim();
+            _codigoEnviado = true;
+            // Respuesta genérica: Supabase la da también si el correo no tiene cuenta.
+            _info = "Si el correo tiene una cuenta, te hemos enviado el código.";
+        }
+        catch (AuthException e)
+        {
+            _error = e.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _error = "No se pudo conectar con Supabase. Comprueba tu conexión.";
+        }
+        finally
+        {
+            _enviando = false;
+        }
+    }
+
+    private async Task CambiarAsync()
+    {
+        _enviando = true;
+        _error = null;
+        _info = null;
+        try
+        {
+            if (await Comprobador.EstaFiltradaAsync(_nueva.Password) == true)
+            {
+                _error = "Esa contraseña aparece en filtraciones conocidas de otros servicios. Elige otra.";
+                return;
+            }
+            await Sesion.RecuperarContrasenaAsync(_nueva.Email, _nueva.Codigo.Trim(), _nueva.Password);
+            Navegacion.NavigateTo("", replace: true);
+        }
+        catch (AuthException e)
+        {
+            _error = e.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _error = "No se pudo conectar con Supabase. Comprueba tu conexión.";
+        }
+        finally
+        {
+            _enviando = false;
+        }
+    }
+
+    private void SolicitarOtraVez()
+    {
+        _codigoEnviado = false;
+        _nueva.Codigo = "";
+        _info = null;
+        _error = null;
+    }
+
+    private sealed class Modelo
+    {
+        [Required(ErrorMessage = "Indica tu correo.")]
+        [EmailAddress(ErrorMessage = "El correo no es válido.")]
+        public string Email { get; set; } = "";
+    }
+
+    private sealed class Nueva
+    {
+        public string Email { get; set; } = "";
+
+        [Required(ErrorMessage = "Indica el código del correo.")]
+        [RegularExpression(@"^\s*\d{8}\s*$", ErrorMessage = "El código tiene 8 dígitos.")]
+        public string Codigo { get; set; } = "";
+
+        [Required(ErrorMessage = "Indica una contraseña.")]
+        [MinLength(8, ErrorMessage = "Mínimo 8 caracteres.")]
+        [RegularExpression(@"^(?=.*\p{L})(?=.*\d).+$", ErrorMessage = "Incluye al menos una letra y un número.")]
+        public string Password { get; set; } = "";
+
+        [Required(ErrorMessage = "Repite la contraseña.")]
+        [Compare(nameof(Password), ErrorMessage = "Las contraseñas no coinciden.")]
+        public string Repetir { get; set; } = "";
+    }
+}

@@ -52,6 +52,30 @@ public sealed class SupabaseAuthClient
         return LeerSesion(json) ?? throw new AuthException("Respuesta de autenticación no válida.", 502);
     }
 
+    /// <summary>Pide a Supabase el correo de recuperación. Responde igual exista o no la cuenta, para no revelar qué correos están registrados.</summary>
+    /// <param name="email">Correo de la cuenta.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    /// <exception cref="AuthException">Demasiados intentos u otro error.</exception>
+    public async Task SolicitarRecuperacionAsync(string email, CancellationToken ct = default) =>
+        await EnviarAsync("recover", new { email }, null, ct);
+
+    /// <summary>
+    /// Canjea el código del correo de recuperación y fija la nueva contraseña. El código inicia una sesión temporal con la
+    /// que se actualiza el usuario; al terminar, la persona queda con sesión iniciada.
+    /// </summary>
+    /// <param name="email">Correo de la cuenta.</param>
+    /// <param name="codigo">Código recibido por correo.</param>
+    /// <param name="nuevaContrasena">Contraseña nueva.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    /// <exception cref="AuthException">Código incorrecto o caducado, o contraseña no válida.</exception>
+    public async Task<SesionSupabase> RecuperarContrasenaAsync(string email, string codigo, string nuevaContrasena, CancellationToken ct = default)
+    {
+        var sesion = LeerSesion(await EnviarAsync("verify", new { type = "recovery", email, token = codigo }, null, ct))
+            ?? throw new AuthException("Respuesta de autenticación no válida.", 502);
+        await EnviarAsync("user", new { password = nuevaContrasena }, sesion.AccessToken, ct, HttpMethod.Put);
+        return sesion;
+    }
+
     /// <summary>Reenvía el correo con el código de confirmación.</summary>
     /// <param name="email">Correo con el que se registró.</param>
     /// <param name="ct">Token de cancelación.</param>
@@ -101,9 +125,9 @@ public sealed class SupabaseAuthClient
         }
     }
 
-    private async Task<JsonElement> EnviarAsync(string ruta, object cuerpo, string? bearer, CancellationToken ct)
+    private async Task<JsonElement> EnviarAsync(string ruta, object cuerpo, string? bearer, CancellationToken ct, HttpMethod? metodo = null)
     {
-        using var peticion = new HttpRequestMessage(HttpMethod.Post, ruta) { Content = JsonContent.Create(cuerpo) };
+        using var peticion = new HttpRequestMessage(metodo ?? HttpMethod.Post, ruta) { Content = JsonContent.Create(cuerpo) };
         if (bearer is not null) peticion.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearer);
         using var respuesta = await _http.SendAsync(peticion, ct);
         var texto = await respuesta.Content.ReadAsStringAsync(ct);
@@ -154,6 +178,7 @@ public sealed class SupabaseAuthClient
             "weak_password" => "La contraseña es demasiado débil: mínimo 8 caracteres, con al menos una letra y un número.",
             "over_request_rate_limit" or "over_email_send_rate_limit" => "Demasiados intentos. Espera un momento.",
             "signup_disabled" => "El registro está desactivado.",
+            "same_password" => "La nueva contraseña debe ser distinta de la anterior.",
             _ => mensaje ?? "No se pudo completar la operación de autenticación.",
         };
     }

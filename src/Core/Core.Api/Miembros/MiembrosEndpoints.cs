@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using MiParte.Contracts;
+using MiParte.Core.Api.Gastos;
 using MiParte.Core.Api.Hogares;
 using MiParte.Core.Api.Seguridad;
 using MiParte.Core.Application;
@@ -83,7 +84,8 @@ public static class MiembrosEndpoints
         [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (!TryUsuario(ctx, out var userId)) return Results.Unauthorized();
-        var r = await servicio.CrearAsync(userId, hogar.HogarId!.Value, new NuevoMiembro(req.Nombre, req.Tipo, req.ResponsableId), ct);
+        if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
+        var r = await servicio.CrearAsync(userId, hogarId, new NuevoMiembro(req.Nombre, req.Tipo, req.ResponsableId), ct);
         if (r.Error is { } error) return Error(error);
         return Results.Created($"/api/miembros/{r.Valor!.Id}", r.Valor.ADto());
     }
@@ -122,7 +124,8 @@ public static class MiembrosEndpoints
         [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (!TryUsuario(ctx, out var userId)) return Results.Unauthorized();
-        var r = await servicio.CrearInvitacionAsync(userId, hogar.HogarId!.Value, req?.MiembroId, ct);
+        if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
+        var r = await servicio.CrearInvitacionAsync(userId, hogarId, req?.MiembroId, ct);
         if (r.Error is { } error) return Error(error);
         var inv = r.Valor!;
         return Results.Created($"/api/invitaciones/{inv.Id}", new InvitacionCreada(inv.Id, inv.Token, inv.CaducaEn));

@@ -7,6 +7,7 @@
     <ProjectReference Include="..\Core.Mapeo\MiParte.Core.Mapeo.csproj" />
     <ProjectReference Include="..\Core.Infrastructure\MiParte.Core.Infrastructure.csproj" />
     <ProjectReference Include="..\..\BuildingBlocks\Auth\MiParte.Auth.csproj" />
+    <ProjectReference Include="..\..\BuildingBlocks\Seguridad\MiParte.Seguridad.csproj" />
   </ItemGroup>
 
   <ItemGroup>

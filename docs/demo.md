@@ -18,7 +18,7 @@ Prerrequisito: las migraciones de `supabase/migrations` ya aplicadas (`supabase 
    ```bash
    psql "$DEMO_DB_URL" -v ON_ERROR_STOP=1 -f supabase/seed/demo.sql
    ```
-2. **Comprobar.** En la web, usuario `demo` y contraseña `demo`: debe entrar al hogar «Casa de Ana y Marcos» con gastos del mes anterior y del actual.
+2. **Comprobar.** En la web, usuario `demo` y contraseña `9c88aaffa6d7e9e4`: debe entrar al hogar «Casa de Ana y Marcos» con gastos del mes anterior y del actual.
 3. **Programar el restablecimiento.** SQL Editor → pega `supabase/seed/demo_cron.sql` → Run (si prefieres, activa antes la extensión en Database → Extensions → `pg_cron`). Comprueba con:
    ```sql
    select jobid, jobname, schedule, active from cron.job where jobname = 'restablecer-demo';
@@ -31,4 +31,4 @@ Prerrequisito: las migraciones de `supabase/migrations` ya aplicadas (`supabase 
 
 - Restablecer recrea el usuario de Auth con el mismo id: se pierden sus tokens de renovación, así que quien esté dentro tendrá que volver a iniciar sesión cuando caduque su token de acceso, y verá los datos reiniciados. A las 04:00 UTC es lo menos molesto.
 - `pg_cron` ejecuta la función como propietario de la base; el plan gratuito de Supabase lo incluye, pero un proyecto pausado por inactividad no corre tareas hasta que se reactive.
-- Verificado en local contra PostgreSQL 18 (esquema de CI más un stub ampliado de `auth.users`/`auth.identities` y `pgcrypto`): doble ejecución estable, recuperación tras modificar o borrar datos del hogar demo, desvinculación de la cuenta de hogares ajenos (sin borrarlos; este último caso aún no repetido tras el último cambio), reparto cuadrando con cada importe y contraseña `demo` válida contra el hash. `pg_cron` y el workflow **no** se han podido probar sin el proyecto real.
+- Verificado en local contra PostgreSQL 18 (esquema de CI más un stub ampliado de `auth.users`/`auth.identities` y `pgcrypto`): doble ejecución estable, recuperación tras modificar o borrar datos del hogar demo, desvinculación de la cuenta de hogares ajenos (sin borrarlos; este último caso aún no repetido tras el último cambio), reparto cuadrando con cada importe y la contraseña de la semilla válida contra el hash. `pg_cron` y el workflow **no** se han podido probar sin el proyecto real.

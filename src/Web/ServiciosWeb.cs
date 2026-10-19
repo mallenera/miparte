@@ -48,6 +48,11 @@ public static class ServiciosWeb
             .AddHttpMessageHandler<ManejadorCoreApi>()
             .AddHttpMessageHandler<ManejadorDemo>();
 
+        servicios.AddHttpClient<ComprobadorContrasenas>(http =>
+        {
+            http.BaseAddress = new Uri("https://api.pwnedpasswords.com/");
+            http.Timeout = TimeSpan.FromSeconds(5);
+        });
         servicios.AddHttpClient<AsistenteApiClient>(http => http.BaseAddress = Base(opciones.AssistantUrl, "/"))
             .AddHttpMessageHandler<ManejadorCoreApi>()
             .AddHttpMessageHandler<ManejadorDemo>();

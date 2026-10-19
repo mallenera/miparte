@@ -40,6 +40,7 @@ public class InvitacionEnlaceTests : BunitContext
         Services.AddSingleton(new CoreApiClient(new HttpClient(api) { BaseAddress = new Uri("http://localhost:5001/") }));
         Services.AddSingleton(new EstadoHogar(new AlmacenMemoria()));
         Services.AddScoped<ServicioArranque>();
+        Services.AddSingleton(new ComprobadorContrasenas(new HttpClient(new System.Net.Http.HttpClientHandler()) { BaseAddress = new Uri("https://api.pwnedpasswords.com/") }));
     }
 
     [Fact]

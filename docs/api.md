@@ -202,7 +202,19 @@ Un mes cerrado congela sus **gastos** y, con ellos, su reparto, su resumen y su 
 
 Cada cambio de gasto, gasto recurrente, pago de liquidación, aportación, reembolso, ingreso y retirada de ahorro, perfil, categoría, miembro, invitación y enlace de grupo queda registrado **en la misma transacción** que el cambio (no puede haber cambio sin rastro). `accion`: `crear` (solo `despues`), `editar` (solo los campos que cambian, en `antes` y `despues`), `borrar` (solo `antes`), `vincular` (un usuario queda ligado a un miembro al aceptar una invitación) y `usar` (invitación aceptada). El reparto de un gasto (`repartos`) y el detalle de un perfil (`detalle`) van dentro de su evento. Crear un hogar es un único evento (no se detalla la semilla). Nunca se registran el token de una invitación ni su hash. `autor` es el nombre del miembro vinculado al usuario; `usuarioId` sigue siendo válido aunque ese miembro se desactive.
 
-Total: 62 endpoints de negocio (5 hogares/yo, 10 miembros/invitaciones/enlaces de grupo, 4 categorías, 5 perfiles, 5 gastos, 6 recurrentes, 8 resumen/liquidación/pagos/ciclos, 13 cuenta común, 5 cierre de mes, 1 auditoría) más `GET /health`.
+### 3.12 Avisos del navegador
+
+Avisos push a los miembros del hogar cuando alguien anota un gasto nuevo que no es personal. Cada miembro activa los avisos en su propio dispositivo; no hace falta permiso, es una preferencia personal. La suscripción la guarda el miembro activo del usuario en el hogar actual.
+
+| Método y ruta | Descripción | Request | Response | Errores | Permisos |
+|---|---|---|---|---|---|
+| `GET /api/notificaciones/clave-publica` | Clave pública VAPID con la que el navegador se suscribe | - | `ClavePublicaPushResponse` 200 | 401 sin token; 404 si el servidor no tiene las claves configuradas | - |
+| `POST /api/notificaciones/suscripcion` | Registra la suscripción de este dispositivo. Si el mismo endpoint estaba registrado (quizá con otro miembro), lo sustituye | `SuscripcionPushRequest` | 204 | 400 endpoint que no es https o claves vacías; 403 no eres miembro activo; 409 sin hogar | - |
+| `DELETE /api/notificaciones/suscripcion` | Quita la suscripción de este dispositivo. Idempotente: 204 también si ya no existía | `BajaSuscripcionPushRequest` | 204 | 400 sin endpoint; 403 no eres miembro activo; 409 sin hogar | - |
+
+Un gasto nuevo no personal avisa a las suscripciones del hogar salvo a la del pagador (`PagadoPor`). El aviso sale en segundo plano: la respuesta de `POST /api/gastos` no espera al servicio push, y si la cola interna se llena o faltan las claves, el aviso se descarta sin fallar el gasto. Una suscripción que el servicio push da por caducada (404 o 410) se borra. El contenido del aviso es JSON `{ "titulo", "cuerpo", "ruta" }`. Si cambian las claves VAPID, las suscripciones existentes dejan de servir y hay que volver a activar los avisos.
+
+Total: 65 endpoints de negocio (5 hogares/yo, 10 miembros/invitaciones/enlaces de grupo, 4 categorías, 5 perfiles, 5 gastos, 6 recurrentes, 8 resumen/liquidación/pagos/ciclos, 13 cuenta común, 5 cierre de mes, 1 auditoría, 3 avisos del navegador) más `GET /health`.
 
 ## 4. Ejemplos JSON
 

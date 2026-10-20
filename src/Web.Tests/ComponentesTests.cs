@@ -3,6 +3,7 @@ using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using MiParte.Contracts;
 using MiParte.Web.Api;
+using MiParte.Web.Autenticacion;
 using MiParte.Web.Componentes;
 using MiParte.Web.Hogares;
 
@@ -32,7 +33,12 @@ public class ComponentesTests : BunitContext
         _permisos = PermisosDePrueba.Registrar(Services, cliente, hogar);
         Services.AddScoped<ServicioArranque>();
         Services.AddSingleton<ServicioAvisos>();
-        Services.AddSingleton<TimeProvider>(new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 10, 7, 10, 0, 0, TimeSpan.Zero)));
+        var reloj = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 10, 7, 10, 0, 0, TimeSpan.Zero));
+        Services.AddSingleton<TimeProvider>(reloj);
+        // La tarjeta de avisos del navegador consulta la sesión para ocultarse en la cuenta demo.
+        var auth = new SupabaseAuthClient(
+            new HttpClient(ManejadorFalso.Json(HttpStatusCode.OK, "{}")) { BaseAddress = new Uri("https://x.supabase.co/auth/v1/") }, reloj);
+        Services.AddSingleton(new ServicioSesion(auth, new AlmacenMemoria(), reloj));
     }
 
     private static ApiFalsa ApiConHogar(bool soyAdmin)

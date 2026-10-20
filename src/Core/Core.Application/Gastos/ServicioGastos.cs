@@ -1,3 +1,5 @@
+using System.Globalization;
+using MiParte.Core.Application.Notificaciones;
 using MiParte.Core.Domain;
 using MiParte.Core.Domain.Entidades;
 
@@ -17,7 +19,7 @@ public sealed record DatosGasto(
     bool PagadoDesdeAhorro, bool Personal);
 
 /// <summary>Casos de uso de los gastos: cada gasto guarda su reparto calculado al crearlo o editarlo, y solo entonces.</summary>
-public sealed class ServicioGastos(IRepositorioGastos repositorio)
+public sealed class ServicioGastos(IRepositorioGastos repositorio, IPublicadorNotificaciones? notificaciones = null)
 {
     /// <summary>Gastos que cumplen el filtro, del más reciente al más antiguo.</summary>
     public Task<IReadOnlyList<Gasto>> ListarAsync(FiltroGastos filtro, CancellationToken ct)
@@ -29,7 +31,8 @@ public sealed class ServicioGastos(IRepositorioGastos repositorio)
     /// <summary>
     /// Crea el gasto y guarda su reparto en la misma transacción. Es inválido si los datos o el reparto no valen; es un
     /// conflicto si el mes está cerrado, si va a cargo de la cuenta común y el hogar no la ha activado, o si se paga desde el
-    /// ahorro y este no alcanza.
+    /// ahorro y este no alcanza. Tras guardarlo avisa a los demás miembros (salvo el pagador, que es quien normalmente lo anota;
+    /// los gastos personales no avisan).
     /// </summary>
     public async Task<Resultado<Gasto>> CrearAsync(Guid hogarId, DatosGasto datos, CancellationToken ct)
     {
@@ -46,7 +49,18 @@ public sealed class ServicioGastos(IRepositorioGastos repositorio)
         };
         RepartoGasto.Aplicar(gasto, preparado.Partes!);
         repositorio.Anadir(gasto);
-        return await repositorio.GuardarAsync(ct) ? Resultado<Gasto>.Ok(gasto) : Resultado<Gasto>.Conflicto(Mensajes.MesCerrado);
+        if (!await repositorio.GuardarAsync(ct)) return Resultado<Gasto>.Conflicto(Mensajes.MesCerrado);
+
+        if (!gasto.EsPersonal) notificaciones?.Publicar(AvisoGastoNuevo(gasto, datos.PagadoPor));
+        return Resultado<Gasto>.Ok(gasto);
+    }
+
+    /// <summary>Aviso de un gasto nuevo: concepto e importe, sin el pagador (ya lo sabe quien lo anotó).</summary>
+    private static NotificacionPush AvisoGastoNuevo(Gasto gasto, Guid? pagadoPor)
+    {
+        var concepto = string.IsNullOrWhiteSpace(gasto.Concepto) ? "Gasto sin concepto" : gasto.Concepto;
+        var importe = gasto.Importe.ToString("N2", CultureInfo.GetCultureInfo("es-ES"));
+        return new NotificacionPush(gasto.HogarId, pagadoPor, "Nuevo gasto", $"{concepto} · {importe} €", "/gastos");
     }
 
     /// <summary>Actualiza el gasto y recalcula solo su reparto, sin tocar el resto del histórico. No encontrado si no existe.</summary>

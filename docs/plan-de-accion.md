@@ -76,13 +76,12 @@ Las fases van en orden de prioridad. Cada ítem indica su criterio de hecho.
 
 ### Fase 4 · Funcionalidad pendiente (por utilidad)
 
-15. **Notificaciones push del navegador.** *No iniciado* (no hay código: ni `suscripcion_push` ni WebPush). Opt-in por usuario desde la PWA. Avisos cuando alguien agrega un gasto (a los demás miembros) y cuando se cierra una liquidación (ciclo o periodo), y al registrar un pago de liquidación. Diseño:
-    - Tabla `suscripcion_push` (miembro, endpoint y claves) en `Estructura/`, con RLS y filtro por hogar.
-    - `POST`/`DELETE /api/notificaciones/suscripcion` en Core.Api.
-    - Envío desde Core.Application en segundo plano, sin hacer fallar la petición; claves VAPID en variables de entorno; librería WebPush de .NET.
-    - Manejador `push` y clic en el service worker. Sin cambios de CSP.
-    - Límite: en iOS solo con la PWA instalada. La cuenta demo no envía avisos.
-    - Hecho cuando un gasto nuevo llega como notificación a otro miembro, y el aviso se puede activar y desactivar.
+15. **Notificaciones push del navegador.** *Implementado* (rama `feature/avisos-push`, 2026-10-20), pendiente de desplegar y de comprobar con claves reales. Alcance hecho: aviso al anotar un gasto nuevo (no personal), a los demás miembros con suscripción. **Pendiente del punto:** avisos al cerrar una liquidación (ciclo o periodo) y al registrar un pago; prueba end-to-end con un navegador real y las claves VAPID en Render (ver [despliegue.md](despliegue.md#avisos-del-navegador-claves-vapid)). Diseño y decisiones:
+    - Tabla `suscripcion_push` en `Estructura/` (RLS sin acceso para `anon` y `authenticated`), `POST`/`DELETE /api/notificaciones/suscripcion` y `GET /api/notificaciones/clave-publica` en Core.Api, ver [api.md](api.md#312-avisos-del-navegador).
+    - El caso de uso encola el aviso (`IPublicadorNotificaciones`, sin esperar); el envío es un servicio en segundo plano de Core.Api con la librería `WebPush`. Claves VAPID solo por entorno.
+    - El aviso no va al pagador: la API no sabe quién anota el gasto, así que se excluye a quien lo paga. Si lo anota otra persona, el pagador no se entera.
+    - Manejador `push` y clic en el service worker (`service-worker.published.js`); el script `js/avisos-push.js` no añade scripts en línea ni cambios de CSP.
+    - Límite: en iOS solo con la PWA instalada. La cuenta demo no ve la tarjeta de avisos (`ServicioSesion.EsDemo`), pero un gasto de la demo sí avisaría a otros miembros suscritos de ese hogar.
 16. **Recurrentes que generen gastos personales.** *Pendiente*: los gastos personales ya están hechos (`20261022140000_gasto_personal.sql`); falta que las plantillas recurrentes los generen.
 17. **Asistente**: streaming de respuestas y chat en la cuenta demo. *No iniciado* (sin streaming en `Assistant.Api`; el chat en la demo no está comprobado).
 

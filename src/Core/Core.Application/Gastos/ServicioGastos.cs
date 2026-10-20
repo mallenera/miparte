@@ -34,8 +34,9 @@ public sealed class ServicioGastos(IRepositorioGastos repositorio, IPublicadorNo
     /// ahorro y este no alcanza. Tras guardarlo avisa a los demás miembros (salvo el pagador, que es quien normalmente lo anota;
     /// los gastos personales no avisan).
     /// </summary>
-    public async Task<Resultado<Gasto>> CrearAsync(Guid hogarId, DatosGasto datos, CancellationToken ct)
+    public async Task<Resultado<Gasto>> CrearAsync(Guid hogarId, DatosGasto datos, CancellationToken ct, Guid? quien = null)
     {
+        if (AjenoAlPersonal(datos, quien)) return Resultado<Gasto>.Invalido(PersonalDeOtro);
         var preparado = await PrepararAsync(datos, ct);
         if (preparado.Error is { } invalido) return Resultado<Gasto>.Invalido(invalido);
         if (await ComprobarAsync(datos, preparado.CuentaComun, excluir: null, [datos.Fecha], ct) is { } fallo) return fallo;
@@ -63,12 +64,23 @@ public sealed class ServicioGastos(IRepositorioGastos repositorio, IPublicadorNo
         return new NotificacionPush(gasto.HogarId, pagadoPor, "Nuevo gasto", $"{concepto} · {importe} €", "/gastos");
     }
 
-    /// <summary>Actualiza el gasto y recalcula solo su reparto, sin tocar el resto del histórico. No encontrado si no existe.</summary>
-    public Task<Resultado<Gasto>> EditarAsync(Guid id, DatosGasto datos, CancellationToken ct)
+    /// <summary>
+    /// Un gasto personal lo anota y lo cambia solo quien lo paga. <paramref name="quien"/> es el miembro de la petición; null lo usa
+    /// el propio sistema (sin control, p. ej. la demo interna) y la API siempre lo informa.
+    /// </summary>
+    private static bool AjenoAlPersonal(DatosGasto datos, Guid? quien)
+        => datos.Personal && quien is { } yo && datos.PagadoPor != yo;
+
+    /// <summary>Mensaje cuando alguien intenta anotar o cambiar un gasto personal que no es suyo.</summary>
+    public const string PersonalDeOtro = "Un gasto personal solo puede anotarlo y cambiarlo quien lo paga.";
+
+    /// <summary>Actualiza el gasto y recalcula solo su reparto, sin tocar el resto del histórico. No encontrado si no existe o es un personal ajeno.</summary>
+    public Task<Resultado<Gasto>> EditarAsync(Guid id, DatosGasto datos, CancellationToken ct, Guid? quien = null)
         => repositorio.EnExclusionAsync(async () =>
         {
             var gasto = await repositorio.ObtenerParaEditarAsync(id, ct);
             if (gasto is null) return Resultado<Gasto>.NoEncontrado();
+            if (AjenoAlPersonal(datos, quien)) return Resultado<Gasto>.Invalido(PersonalDeOtro);
             // Un gasto ya liquidado por un ciclo cerrado no cambia: el cierre ya lo dio por bueno con su importe y reparto.
             if (gasto.CicloLiquidacionId is not null) return Resultado<Gasto>.Conflicto(Mensajes.GastoEnCiclo);
             var preparado = await PrepararAsync(datos, ct);

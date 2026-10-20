@@ -487,6 +487,8 @@ Error típico si se pasa de la deuda (409): `{ "error": "El importe supera la de
 
 ## 5. Reglas de negocio útiles para la UI
 
+- **Gastos personales**: un gasto con `personal: true` solo lo ven y lo cambian quien paga (`pagadoPor`). No aparece en las listas, detalle, resumen, dashboard ni historial de los demás, ni siquiera de un admin; los endpoints responden 404 a quien no es el pagador. Solo quien paga puede anotarlo; si intenta anotar uno de otro, 400. Las plantillas recurrentes personales siguen la misma regla. Los gastos personales de un miembro desactivado se conservan, pero nadie los ve hasta que vuelva a activarse.
+
 - **Hogar de un adulto**: el reparto funciona (el creador recibe el 100 %), pero no hay liquidación que mostrar: el único saldo es 0 y no hay transferencias. La UI puede ocultar la pantalla de liquidación con un solo adulto activo.
 - **Importes**: mayores que 0, máximo 2 decimales y hasta 9.999.999.999,99. Más decimales dan 400. Conceptos de hasta 200 caracteres; nombres de hogar, miembro, categoría y perfil hasta 100.
 - **Meses**: parámetro `mes` con formato estricto `YYYY-MM` (`2026-10`); otro formato da 400. En `POST /api/pagos-liquidacion` el campo `mes` es una fecha que debe ser día 1 (`2026-10-01`). Las respuestas devuelven `mes` como `YYYY-MM`, salvo `PagoLiquidacionDto.mes`, que es fecha.

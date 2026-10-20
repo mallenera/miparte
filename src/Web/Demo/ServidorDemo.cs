@@ -233,13 +233,13 @@ public sealed partial class ServidorDemo
 
     private async Task<HttpResponseMessage> CrearGasto(GastoRequest r, CancellationToken ct)
     {
-        var res = await _gastos.CrearAsync(IdHogar, Datos(r), ct);
+        var res = await _gastos.CrearAsync(IdHogar, Datos(r), ct, _almacen.MiembroActual);
         return res.Error is { } e ? Error(e) : Respuesta(HttpStatusCode.Created, res.Valor!.ADto());
     }
 
     private async Task<HttpResponseMessage> EditarGasto(Guid id, GastoRequest r, CancellationToken ct)
     {
-        var res = await _gastos.EditarAsync(id, Datos(r), ct);
+        var res = await _gastos.EditarAsync(id, Datos(r), ct, _almacen.MiembroActual);
         return res.Error is { } e ? Error(e) : Ok(res.Valor!.ADto());
     }
 
@@ -271,13 +271,13 @@ public sealed partial class ServidorDemo
 
     private async Task<HttpResponseMessage> CrearRecurrente(GastoRecurrenteRequest r, CancellationToken ct)
     {
-        var res = await _recurrentes.CrearAsync(IdHogar, Datos(r), ct);
+        var res = await _recurrentes.CrearAsync(IdHogar, Datos(r), ct, _almacen.MiembroActual);
         return res.Error is { } e ? Error(e) : Respuesta(HttpStatusCode.Created, res.Valor!.ADto());
     }
 
     private async Task<HttpResponseMessage> EditarRecurrente(Guid id, GastoRecurrenteRequest r, CancellationToken ct)
     {
-        var res = await _recurrentes.EditarAsync(id, Datos(r), ct);
+        var res = await _recurrentes.EditarAsync(id, Datos(r), ct, _almacen.MiembroActual);
         return res.Error is { } e ? Error(e) : Ok(res.Valor!.ADto());
     }
 

@@ -455,4 +455,6 @@ public class EventoAuditoria
     public string? Antes { get; set; }
     /// <summary>JSON con el valor nuevo de los campos que cambian (o el estado completo al crear); null al borrar.</summary>
     public string? Despues { get; set; }
+    /// <summary>Solo para eventos de gastos personales: el miembro que paga, único que puede verlos. Null en el resto.</summary>
+    public Guid? PersonalDe { get; set; }
 }

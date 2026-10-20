@@ -11,6 +11,12 @@ public interface IHogarActual
 
     /// <summary>Usuario autenticado (claim sub) de la petición, o null si no hay; es el autor que recoge la auditoría.</summary>
     Guid? UsuarioId { get; }
+
+    /// <summary>
+    /// Miembro activo que hace la petición en el hogar actual, o null. Decide qué gastos personales ve: solo los de quien paga
+    /// (ni siquiera un admin ve los de otros). Sin miembro, no se ve ninguno.
+    /// </summary>
+    Guid? MiembroId { get; }
 }
 
 /// <summary>Implementación scoped de <see cref="IHogarActual"/>; la rellena el middleware al resolver el hogar.</summary>
@@ -21,4 +27,7 @@ public class HogarActual : IHogarActual
 
     /// <inheritdoc />
     public Guid? UsuarioId { get; set; }
+
+    /// <inheritdoc />
+    public Guid? MiembroId { get; set; }
 }

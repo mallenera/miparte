@@ -16,6 +16,9 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
     /// <summary>Hogar de la petición en curso; los query filters lo leen en cada consulta.</summary>
     private Guid? HogarId => hogarActual.HogarId;
 
+    /// <summary>Miembro que hace la petición en el hogar actual; las lecturas de gastos personales lo usan (ver <c>Visibilidad</c>).</summary>
+    public Guid? MiembroActual => hogarActual.MiembroId;
+
     /// <summary>Conjunto de <see cref="Hogar"/> del hogar actual.</summary>
     public DbSet<Hogar> Hogares => Set<Hogar>();
     /// <summary>Conjunto de <see cref="Miembro"/> del hogar actual.</summary>

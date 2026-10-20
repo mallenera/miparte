@@ -12,6 +12,7 @@ CREATE TABLE public.auditoria (
     entidad_id uuid NOT NULL,
     antes jsonb,
     despues jsonb,
+    personal_de uuid,
     CONSTRAINT auditoria_accion_check CHECK ((accion = ANY (ARRAY['crear'::text, 'editar'::text, 'borrar'::text, 'vincular'::text, 'usar'::text]))),
     CONSTRAINT auditoria_check CHECK (((antes IS NOT NULL) OR (despues IS NOT NULL))),
     CONSTRAINT auditoria_entidad_check CHECK (((length(entidad) >= 1) AND (length(entidad) <= 40)))

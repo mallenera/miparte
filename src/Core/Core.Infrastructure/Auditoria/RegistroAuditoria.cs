@@ -144,7 +144,27 @@ public static class RegistroAuditoria
             Accion = accion, Entidad = Nombre(raiz.Entity)!, EntidadId = IdDe(raiz.Entity),
             Antes = antes.Count == 0 ? null : JsonSerializer.Serialize(antes, Json),
             Despues = despues.Count == 0 ? null : JsonSerializer.Serialize(despues, Json),
+            PersonalDe = PersonalDe(raiz),
         };
+    }
+
+    /// <summary>
+    /// Quién puede ver el evento si es de un gasto personal: quien lo paga (<c>Guid.Empty</c> si no hay pagador, para que nadie lo vea).
+    /// Null en cualquier otro caso. Mira el valor antes y después, así un personal que deja de serlo sigue siendo de su dueño.
+    /// </summary>
+    private static Guid? PersonalDe(EntityEntry raiz)
+    {
+        if (raiz.Entity is not Gasto) return null;
+        var hayActual = raiz.State != EntityState.Deleted;
+        var hayPrevio = raiz.State != EntityState.Added;
+        var personal = (hayActual && (bool)raiz.Property(nameof(Gasto.EsPersonal)).CurrentValue!)
+                       || (hayPrevio && (bool)raiz.Property(nameof(Gasto.EsPersonal)).OriginalValue!);
+        if (!personal) return null;
+
+        var pagador = (Guid?)(hayActual
+            ? raiz.Property(nameof(Gasto.PagadoPor)).CurrentValue
+            : raiz.Property(nameof(Gasto.PagadoPor)).OriginalValue);
+        return pagador ?? Guid.Empty;
     }
 
     /// <summary>Filas hijas del gasto (reparto) o del perfil (detalle) antes y después del guardado, ordenadas por miembro.</summary>

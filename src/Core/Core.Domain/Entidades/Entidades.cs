@@ -364,6 +364,8 @@ public class GastoRecurrente
     public string? Concepto { get; set; }
     /// <summary>Indica si la recurrencia sigue generando gastos.</summary>
     public bool Activo { get; set; } = true;
+    /// <summary>Si los gastos generados son personales: los asume íntegros quien paga y quedan fuera de la liquidación.</summary>
+    public bool EsPersonal { get; set; }
 }
 
 /// <summary>Gasto del hogar pagado por un miembro y repartido entre varios según un perfil.</summary>

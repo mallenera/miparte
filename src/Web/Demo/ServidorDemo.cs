@@ -264,7 +264,7 @@ public sealed partial class ServidorDemo
     // ───── Recurrentes ─────
 
     private static DatosRecurrente Datos(GastoRecurrenteRequest r)
-        => new(r.Importe, r.CategoriaId, r.PagadoPor, r.PerfilRepartoId, r.DiaMes, r.Concepto, r.Activo);
+        => new(r.Importe, r.CategoriaId, r.PagadoPor, r.PerfilRepartoId, r.DiaMes, r.Concepto, r.Activo, r.Personal);
 
     private async Task<HttpResponseMessage> ObtenerRecurrente(Guid id, CancellationToken ct)
         => await _recurrentes.ObtenerAsync(id, ct) is { } r ? Ok(r.ADto()) : NoEncontrado();

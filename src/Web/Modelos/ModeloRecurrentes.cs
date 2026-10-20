@@ -84,6 +84,9 @@ public sealed class ModeloRecurrentes(CoreApiClient api, Func<DateTime> hoy)
     /// <summary>Concepto del formulario.</summary>
     public string Concepto { get; set; } = "";
 
+    /// <summary>Si la plantilla genera gastos personales (solo de quien paga, fuera de la liquidación).</summary>
+    public bool Personal { get; set; }
+
     /// <summary>Día del mes elegido.</summary>
     public int Dia { get; set; } = 1;
 
@@ -164,6 +167,7 @@ public sealed class ModeloRecurrentes(CoreApiClient api, Func<DateTime> hoy)
         Editando = null;
         Importe = "";
         Concepto = "";
+        Personal = false;
         Dia = 1;
         Categoria = Arbol.Count > 0 ? Arbol[0].Categoria.Id : Guid.Empty;
         Pagador = (Adultos.FirstOrDefault(m => m.EsYo) ?? Adultos.FirstOrDefault())?.Id ?? Guid.Empty;
@@ -183,6 +187,7 @@ public sealed class ModeloRecurrentes(CoreApiClient api, Func<DateTime> hoy)
         Editando = p.Id;
         Importe = p.Importe.ToString(CultureInfo.InvariantCulture);
         Concepto = p.Concepto ?? "";
+        Personal = p.Personal;
         Dia = p.DiaMes;
         Categoria = p.CategoriaId;
         Pagador = p.PagadoPor;
@@ -201,7 +206,7 @@ public sealed class ModeloRecurrentes(CoreApiClient api, Func<DateTime> hoy)
             // Al editar se conserva si la plantilla estaba pausada: el formulario no toca ese estado.
             var activo = Editando is { } actual ? Plantillas.FirstOrDefault(p => p.Id == actual)?.Activo ?? true : true;
             var peticion = new GastoRecurrenteRequest(importe, Categoria, Pagador, Perfil, (short)Dia,
-                string.IsNullOrWhiteSpace(Concepto) ? null : Concepto.Trim(), activo);
+                string.IsNullOrWhiteSpace(Concepto) ? null : Concepto.Trim(), activo, Personal);
             if (Editando is { } id)
             {
                 await api.GuardarRecurrenteAsync(id, peticion);
@@ -224,7 +229,7 @@ public sealed class ModeloRecurrentes(CoreApiClient api, Func<DateTime> hoy)
         EjecutarAsync(async () =>
         {
             await api.GuardarRecurrenteAsync(p.Id, new GastoRecurrenteRequest(
-                p.Importe, p.CategoriaId, p.PagadoPor, p.PerfilRepartoId, p.DiaMes, p.Concepto, !p.Activo));
+                p.Importe, p.CategoriaId, p.PagadoPor, p.PerfilRepartoId, p.DiaMes, p.Concepto, !p.Activo, p.Personal));
             return p.Activo ? "Plantilla pausada" : "Plantilla reanudada";
         });
 

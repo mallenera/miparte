@@ -32,7 +32,7 @@ public static class RecurrentesEndpoints
 
     /// <summary>Convierte el cuerpo de la petición en los datos del caso de uso.</summary>
     private static DatosRecurrente Datos(GastoRecurrenteRequest r)
-        => new(r.Importe, r.CategoriaId, r.PagadoPor, r.PerfilRepartoId, r.DiaMes, r.Concepto, r.Activo);
+        => new(r.Importe, r.CategoriaId, r.PagadoPor, r.PerfilRepartoId, r.DiaMes, r.Concepto, r.Activo, r.Personal);
 
     /// <summary>GET /api/gastos-recurrentes: lista las plantillas ordenadas por día del mes. 409 sin hogar.</summary>
     private static async Task<IResult> ListarAsync(

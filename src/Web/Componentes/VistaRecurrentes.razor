@@ -77,6 +77,7 @@ else
                         <div class="muted g-meta">
                             Día @p.DiaMes · @_m.NombreCategoria(p.CategoriaId) · paga @Formato.NombreMiembro(p.PagadoPor, _m.Miembros) · @_m.NombrePerfil(p.PerfilRepartoId)
                             @if (!p.Activo) { <span class="tag off">pausada</span> }
+                            @if (p.Personal) { <span class="tag admin">personal: no entra en la liquidación</span> }
                         </div>
                     </div>
                     <div class="g-importe">@Formato.Euros(p.Importe)</div>
@@ -123,6 +124,10 @@ else
                 </label>
                 <label>Día del mes (1-28)
                     <input type="number" min="1" max="28" required @bind="_m.Dia" @bind:event="oninput" />
+                </label>
+                <label class="chk">
+                    <input type="checkbox" @bind="_m.Personal" />
+                    Personal (solo de quien paga, fuera de la liquidación)
                 </label>
                 <label>Categoría
                     <select @bind="_m.Categoria" @bind:after="_m.AlCambiarCategoria">

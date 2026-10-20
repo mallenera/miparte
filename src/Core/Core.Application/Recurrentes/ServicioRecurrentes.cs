@@ -12,8 +12,10 @@ namespace MiParte.Core.Application.Recurrentes;
 /// <param name="DiaMes">Día del mes (1 a 28) en que se genera.</param>
 /// <param name="Concepto">Descripción opcional.</param>
 /// <param name="Activo">Si la plantilla genera gastos.</param>
+/// <param name="Personal">Si los gastos que genera son personales (solo para quien paga; fuera de la liquidación).</param>
 public sealed record DatosRecurrente(
-    decimal Importe, Guid CategoriaId, Guid PagadoPor, Guid PerfilRepartoId, short DiaMes, string? Concepto, bool Activo);
+    decimal Importe, Guid CategoriaId, Guid PagadoPor, Guid PerfilRepartoId, short DiaMes, string? Concepto, bool Activo,
+    bool Personal = false);
 
 /// <summary>Resultado de generar el mes: cuántos gastos se crearon y cuántas plantillas ya tenían el suyo.</summary>
 public sealed record GeneracionDelMes(DateOnly Mes, int Creados, int YaExistentes);
@@ -50,7 +52,7 @@ public sealed class ServicioRecurrentes(IRepositorioRecurrentes recurrentes, IRe
         {
             Id = Guid.NewGuid(), HogarId = hogarId, Importe = datos.Importe, CategoriaId = datos.CategoriaId,
             PagadoPor = datos.PagadoPor, PerfilRepartoId = datos.PerfilRepartoId, DiaMes = datos.DiaMes,
-            Concepto = ReglasMovimiento.NormalizarConcepto(datos.Concepto), Activo = datos.Activo,
+            Concepto = ReglasMovimiento.NormalizarConcepto(datos.Concepto), Activo = datos.Activo, EsPersonal = datos.Personal,
         };
         recurrentes.Anadir(plantilla);
         await recurrentes.GuardarAsync(ct);
@@ -71,6 +73,7 @@ public sealed class ServicioRecurrentes(IRepositorioRecurrentes recurrentes, IRe
         plantilla.DiaMes = datos.DiaMes;
         plantilla.Concepto = ReglasMovimiento.NormalizarConcepto(datos.Concepto);
         plantilla.Activo = datos.Activo;
+        plantilla.EsPersonal = datos.Personal;
         await recurrentes.GuardarAsync(ct);
         return Resultado<GastoRecurrente>.Ok(plantilla);
     }
@@ -113,7 +116,7 @@ public sealed class ServicioRecurrentes(IRepositorioRecurrentes recurrentes, IRe
                 var perfiles = await recurrentes.PerfilesAsync(ct);
 
                 // Una plantilla a cargo de la cuenta común no genera gastos mientras el hogar no la tenga activada.
-                if (pendientes.Any(p => perfiles[p.PerfilRepartoId].Modo == ModoReparto.CuentaComun)
+                if (pendientes.Any(p => !p.EsPersonal && perfiles[p.PerfilRepartoId].Modo == ModoReparto.CuentaComun)
                     && !await gastos.CuentaComunActivaAsync(ct))
                     return Resultado<GeneracionDelMes>.Conflicto(Mensajes.CuentaInactiva);
 

@@ -12,6 +12,7 @@ CREATE TABLE public.gasto_recurrente (
     dia_mes smallint NOT NULL,
     concepto text,
     activo boolean DEFAULT true NOT NULL,
+    es_personal boolean DEFAULT false NOT NULL,
     CONSTRAINT gasto_recurrente_dia_mes_check CHECK (((dia_mes >= 1) AND (dia_mes <= 28))),
     CONSTRAINT gasto_recurrente_importe_check CHECK ((importe > (0)::numeric))
 );

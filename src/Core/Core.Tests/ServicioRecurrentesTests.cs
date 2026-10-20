@@ -100,6 +100,33 @@ public class ServicioRecurrentesTests
     }
 
     [Fact]
+    public async Task Generar_PlantillaPersonal_CreaUnGastoPersonalDeQuienPaga()
+    {
+        await Plantilla(new DatosRecurrente(60m, _categoria, _ana, _igual.Id, 5, "Gimnasio", true, Personal: true));
+
+        var r = await Servicio.GenerarAsync(Septiembre, default);
+
+        Assert.Equal(1, r.Valor!.Creados);
+        var gasto = Assert.Single(_gastos.Gastos);
+        Assert.True(gasto.EsPersonal);
+        Assert.False(gasto.ACargoCuentaComun);
+        var parte = Assert.Single(gasto.Repartos);
+        Assert.Equal((_ana, 60m), (parte.MiembroId, parte.ImporteAsumido));
+    }
+
+    [Fact]
+    public async Task Generar_PlantillaPersonalConPerfilDeCuentaComunYCuentaInactiva_SiGenera()
+    {
+        // Lo personal no pasa por la cuenta común: no depende de que el hogar la tenga activada.
+        await Plantilla(new DatosRecurrente(60m, _categoria, _ana, _cuenta.Id, 5, "Gimnasio", true, Personal: true));
+
+        var r = await Servicio.GenerarAsync(Septiembre, default);
+
+        Assert.Null(r.Error);
+        Assert.False(Assert.Single(_gastos.Gastos).ACargoCuentaComun);
+    }
+
+    [Fact]
     public async Task Generar_NoGeneraLasPlantillasInactivas()
     {
         var p = await Plantilla();

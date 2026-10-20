@@ -184,11 +184,9 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
         // Una respuesta tardía de otro mes no pisa la actual (ni los campos del formulario que se rellenan desde ella).
         var version = ++_version;
         CuentaComunResponse estado;
-        List<IngresoCuentaComunDto> ingresos;
         try
         {
             estado = await api.ObtenerCuentaComunAsync(Formato.Mes(_mes));
-            ingresos = await api.ListarIngresosCuentaComunAsync();
         }
         catch (ApiException) when (version != _version)
         {
@@ -197,11 +195,25 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
 
         if (version != _version) return;
         Estado = estado;
-        Ingresos = ingresos;
         if (Estado.Pendientes.All(p => p.MiembroId != Reembolsado))
             Reembolsado = Estado.Pendientes.FirstOrDefault()?.MiembroId ?? Guid.Empty;
         AlCambiarAportante();
         AlCambiarSaldoInicial();
+
+        // Un fallo de los ingresos no tumba la cuenta: solo deja su error.
+        try
+        {
+            var ingresos = await api.ListarIngresosCuentaComunAsync();
+            if (version == _version) Ingresos = ingresos;
+        }
+        catch (ApiException e) when (version == _version)
+        {
+            Error = e.Message;
+        }
+        catch (ApiException)
+        {
+            // fallo de una petición ya superada
+        }
     }
 
     /// <summary>Al recargar, el formulario del saldo inicial muestra el que hay (o el mes mostrado si todavía no hay ninguno).</summary>

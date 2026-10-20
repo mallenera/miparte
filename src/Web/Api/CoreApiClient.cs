@@ -331,7 +331,7 @@ public sealed class CoreApiClient
     /// <summary>Ingresos a la cuenta común fuera de aportaciones y ahorro, del más reciente al más antiguo (<c>GET /api/cuenta-comun/ingresos</c>).</summary>
     /// <param name="ct">Token de cancelación.</param>
     public Task<List<IngresoCuentaComunDto>> ListarIngresosCuentaComunAsync(CancellationToken ct = default) =>
-        ObtenerListaAsync<IngresoCuentaComunDto>("api/cuenta-comun/ingresos", ct);
+        ObtenerAsync<List<IngresoCuentaComunDto>>("api/cuenta-comun/ingresos", ct); // sin caché: nada la invalida tras un ingreso
 
     /// <summary>Registra dinero que entra a la cuenta común, solo como histórico (<c>POST /api/cuenta-comun/ingresos</c>).</summary>
     /// <param name="peticion">Miembro que ingresa, importe, fecha y concepto.</param>

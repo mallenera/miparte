@@ -117,7 +117,7 @@ Validación de perfiles (400): nombre obligatorio (≤ 100); `modo` en `porcenta
 
 ### 3.5 Ingresos
 
-Los ingresos del hogar **no se guardan** y no hay endpoints de ingresos. Los perfiles de reparto son cuatro modos: `individual` (100 % de quien paga), `porcentaje` (por porcentajes, suman 100), `partes` (por número de personas/partes) y `cuenta_comun`. Un gasto con perfil `cuenta_comun` lo asume la cuenta común: `GastoResponse.aCargoCuentaComun` es `true`, `repartos` va vacío, no genera deuda entre personas y no entra en la liquidación ni en el «pagado» del resumen (sí en `gastosTotales` y en el total por categoría). Su saldo, aportaciones y reembolsos están en §3.9.
+Los ingresos personales del hogar **no se guardan**. Los ingresos externos a la cuenta común sí se registran, mediante los endpoints de §3.9 (`/api/cuenta-comun/ingresos`). Los perfiles de reparto son cuatro modos: `individual` (100 % de quien paga), `porcentaje` (por porcentajes, suman 100), `partes` (por número de personas/partes) y `cuenta_comun`. Un gasto con perfil `cuenta_comun` lo asume la cuenta común: `GastoResponse.aCargoCuentaComun` es `true`, `repartos` va vacío, no genera deuda entre personas y no entra en la liquidación ni en el «pagado» del resumen (sí en `gastosTotales` y en el total por categoría). Su saldo, aportaciones y reembolsos están en §3.9.
 
 ### 3.6 Gastos
 
@@ -205,7 +205,7 @@ Un mes cerrado congela sus **gastos** y, con ellos, su reparto, su resumen y su 
 
 Cada cambio de gasto, gasto recurrente, pago de liquidación, aportación, reembolso, ingreso y retirada de ahorro, perfil, categoría, miembro, invitación y enlace de grupo queda registrado **en la misma transacción** que el cambio (no puede haber cambio sin rastro). `accion`: `crear` (solo `despues`), `editar` (solo los campos que cambian, en `antes` y `despues`), `borrar` (solo `antes`), `vincular` (un usuario queda ligado a un miembro al aceptar una invitación) y `usar` (invitación aceptada). El reparto de un gasto (`repartos`) y el detalle de un perfil (`detalle`) van dentro de su evento. Crear un hogar es un único evento (no se detalla la semilla). Nunca se registran el token de una invitación ni su hash. `autor` es el nombre del miembro vinculado al usuario; `usuarioId` sigue siendo válido aunque ese miembro se desactive.
 
-Total: 62 endpoints de negocio (5 hogares/yo, 10 miembros/invitaciones/enlaces de grupo, 4 categorías, 5 perfiles, 5 gastos, 6 recurrentes, 8 resumen/liquidación/pagos/ciclos, 13 cuenta común, 5 cierre de mes, 1 auditoría) más `GET /health`.
+Total: 65 endpoints de negocio (5 hogares/yo, 10 miembros/invitaciones/enlaces de grupo, 4 categorías, 5 perfiles, 5 gastos, 6 recurrentes, 8 resumen/liquidación/pagos/ciclos, 16 cuenta común, 5 cierre de mes, 1 auditoría) más `GET /health`.
 
 ## 4. Ejemplos JSON
 

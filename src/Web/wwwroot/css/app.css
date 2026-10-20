@@ -453,7 +453,7 @@ input.invalid, input[aria-invalid="true"] { border-color: var(--err); outline: 0
 .btn[disabled] { opacity: .4; cursor: not-allowed; }
 .linkbtn {
     display: inline-flex; align-items: center; border: 0; background: none; color: var(--wine-text); font-weight: 600; text-decoration: underline;
-    cursor: pointer; padding: 4px 0; font-size: .88rem; transition: color var(--ease);
+    cursor: pointer; min-height: 36px; padding: 8px 4px; font-size: .88rem; transition: color var(--ease);
 }
 .linkbtn:hover { color: var(--ink); }
 .linkbtn.danger { color: var(--err); }
@@ -481,7 +481,7 @@ input.invalid, input[aria-invalid="true"] { border-color: var(--err); outline: 0
 
 /* Etiquetas */
 .tag {
-    display: inline-block; font-size: .66rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    display: inline-block; font-size: .8125rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
     padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); white-space: nowrap;
 }
 .tag.admin { background: var(--orange-soft); color: var(--orange-text); }
@@ -504,7 +504,7 @@ input.invalid, input[aria-invalid="true"] { border-color: var(--err); outline: 0
     display: block; font: 600 .9rem/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; /* taste-skill-ignore: código de invitación literal, se copia */ background: var(--surface);
     border: 1px dashed var(--line); border-radius: 8px; padding: 8px 10px; overflow-wrap: anywhere; user-select: all;
 }
-.lab2 { font-size: .68rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
+.lab2 { font-size: .8125rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
 
 /* Perfiles de reparto */
 .prof { padding-block: 4px; }

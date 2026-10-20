@@ -39,6 +39,7 @@ internal sealed class AlmacenDemo
 
     /// <summary>Depósitos de ahorro.</summary>
     public List<DepositoAhorro> Depositos { get; } = [];
+    public List<IngresoCuentaComun> Ingresos { get; } = [];
 
     /// <summary>Retiradas de ahorro.</summary>
     public List<RetiradaAhorro> Retiradas { get; } = [];

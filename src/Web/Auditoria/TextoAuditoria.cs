@@ -20,7 +20,7 @@ public static class TextoAuditoria
     [
         ("gasto", "Gastos"), ("gasto_recurrente", "Gastos recurrentes"), ("pago_liquidacion", "Pagos de liquidación"),
         ("aportacion_cuenta", "Aportaciones a la cuenta común"), ("reembolso_cuenta", "Reembolsos de la cuenta común"),
-        ("deposito_ahorro", "Ingresos de ahorro"), ("retirada_ahorro", "Retiradas de ahorro"),
+        ("ingreso_cuenta_comun", "Ingresos de la cuenta común"), ("deposito_ahorro", "Ingresos de ahorro"), ("retirada_ahorro", "Retiradas de ahorro"),
         ("perfil_reparto", "Perfiles de reparto"), ("categoria", "Categorías"),
         ("miembro", "Miembros"), ("invitacion", "Invitaciones"), ("hogar", "Hogar"),
     ];
@@ -30,7 +30,7 @@ public static class TextoAuditoria
         ["hogar"] = "el hogar", ["miembro"] = "un miembro", ["invitacion"] = "una invitación", ["gasto"] = "un gasto",
         ["gasto_recurrente"] = "un gasto recurrente", ["pago_liquidacion"] = "un pago de liquidación",
         ["aportacion_cuenta"] = "una aportación a la cuenta común", ["reembolso_cuenta"] = "un reembolso de la cuenta común",
-        ["retirada_ahorro"] = "una retirada de ahorro", ["deposito_ahorro"] = "un ingreso de ahorro",
+        ["ingreso_cuenta_comun"] = "un ingreso a la cuenta común", ["retirada_ahorro"] = "una retirada de ahorro", ["deposito_ahorro"] = "un ingreso de ahorro",
         ["perfil_reparto"] = "un perfil de reparto", ["categoria"] = "una categoría",
         ["ciclo_liquidacion"] = "un cierre de liquidación",
     };

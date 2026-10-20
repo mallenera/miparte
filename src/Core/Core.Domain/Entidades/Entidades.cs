@@ -262,6 +262,26 @@ public class DepositoAhorro
     public string? Concepto { get; set; }
 }
 
+/// <summary>
+/// Dinero que entra a la cuenta común fuera de la aportación mensual y del ahorro, por ejemplo lo que pagan las amigas de una cena
+/// que adelantó la cuenta (tabla ingreso_cuenta_comun). Es solo histórico: no mueve el saldo, el ahorro ni los reembolsos pendientes.
+/// </summary>
+public class IngresoCuentaComun
+{
+    /// <summary>Identificador del ingreso.</summary>
+    public Guid Id { get; set; }
+    /// <summary>Hogar al que pertenece.</summary>
+    public Guid HogarId { get; set; }
+    /// <summary>Miembro que lo registra.</summary>
+    public Guid MiembroId { get; set; }
+    /// <summary>Fecha del ingreso.</summary>
+    public DateOnly Fecha { get; set; }
+    /// <summary>Importe ingresado (positivo).</summary>
+    public decimal Importe { get; set; }
+    /// <summary>De dónde viene (p. ej. «Cena amigas»).</summary>
+    public string? Concepto { get; set; }
+}
+
 /// <summary>Dinero que el hogar saca del ahorro de la cuenta común (tabla retirada_ahorro).</summary>
 public class RetiradaAhorro
 {

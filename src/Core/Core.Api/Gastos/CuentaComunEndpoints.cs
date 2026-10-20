@@ -26,6 +26,9 @@ public static class CuentaComunEndpoints
         app.MapDelete("/api/cuenta-comun/saldo-inicial", BorrarSaldoInicialAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
         app.MapPost("/api/cuenta-comun/reembolsos", CrearReembolsoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
         app.MapDelete("/api/cuenta-comun/reembolsos/{id:guid}", BorrarReembolsoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
+        app.MapGet("/api/cuenta-comun/ingresos", ListarIngresosAsync).RequireAuthorization();
+        app.MapPost("/api/cuenta-comun/ingresos", CrearIngresoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
+        app.MapDelete("/api/cuenta-comun/ingresos/{id:guid}", BorrarIngresoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
         app.MapPost("/api/cuenta-comun/depositos-ahorro", CrearDepositoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.AhorroMovimientos);
         app.MapDelete("/api/cuenta-comun/depositos-ahorro/{id:guid}", BorrarDepositoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.AhorroMovimientos);
         app.MapPost("/api/cuenta-comun/retiradas-ahorro", CrearRetiradaAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.AhorroMovimientos);
@@ -126,6 +129,34 @@ public static class CuentaComunEndpoints
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
         var r = await servicio.EliminarReembolsoAsync(id, ct);
+        return r.Error is { } error ? ApiComun.Respuesta(error) : Results.NoContent();
+    }
+
+    /// <summary>GET /api/cuenta-comun/ingresos: ingresos a la cuenta común fuera de aportaciones y ahorro, del más reciente al más antiguo. 409 sin hogar.</summary>
+    private static async Task<IResult> ListarIngresosAsync(
+        [FromServices] ServicioCuentaComun servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
+    {
+        if (hogar.HogarId is null) return ApiComun.SinHogar();
+        var ingresos = await servicio.ListarIngresosAsync(ct);
+        return Results.Ok(ingresos.Select(i => i.ADto()).ToList());
+    }
+
+    /// <summary>POST /api/cuenta-comun/ingresos: registra dinero que entra a la cuenta común fuera de aportaciones y ahorro (solo histórico). 400 si el importe es inválido o el miembro no es del hogar; 409 sin hogar o con la cuenta inactiva. 201 si se crea.</summary>
+    private static async Task<IResult> CrearIngresoAsync(
+        CrearIngresoCuentaComunRequest req, [FromServices] ServicioCuentaComun servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
+    {
+        if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
+        var r = await servicio.CrearIngresoAsync(new RegistrarMovimiento(hogarId, req.MiembroId, req.Importe, req.Fecha, req.Concepto), ct);
+        if (r.Error is { } error) return ApiComun.Respuesta(error);
+        return Results.Created($"/api/cuenta-comun/ingresos/{r.Valor!.Id}", r.Valor.ADto());
+    }
+
+    /// <summary>DELETE /api/cuenta-comun/ingresos/{id}: borra un ingreso a la cuenta común. 409 sin hogar; 404 si no existe; 204 si se borra.</summary>
+    private static async Task<IResult> BorrarIngresoAsync(
+        Guid id, [FromServices] ServicioCuentaComun servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
+    {
+        if (hogar.HogarId is null) return ApiComun.SinHogar();
+        var r = await servicio.EliminarIngresoAsync(id, ct);
         return r.Error is { } error ? ApiComun.Respuesta(error) : Results.NoContent();
     }
 

@@ -103,6 +103,7 @@ public class ModelosRevisionTests
             var ruta = r.RequestUri!.PathAndQuery;
             if (ruta.StartsWith("/api/miembros")) return Task.FromResult(Ok(new[] { yo }));
             if (ruta.StartsWith("/api/cuenta-comun?mes=2026-09")) return septiembre.Task;
+            if (ruta.StartsWith("/api/cuenta-comun/ingresos")) return Task.FromResult(Ok(Array.Empty<IngresoCuentaComunDto>()));
             return Task.FromResult(Ok(Estado("2026-10", 500m)));
         });
         var m = new ModeloCuentaComun(cliente, Hoy);

@@ -146,6 +146,27 @@ public sealed class RepositorioCuentaComun(MiParteDbContext db) : IRepositorioCu
     }
 
     /// <inheritdoc />
+    public async Task GuardarIngresoAsync(IngresoCuentaComun ingreso, CancellationToken ct)
+    {
+        db.IngresosCuentaComun.Add(ingreso);
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<IngresoCuentaComun>> IngresosAsync(CancellationToken ct)
+        => await db.IngresosCuentaComun.OrderByDescending(i => i.Fecha).ThenBy(i => i.Id).ToListAsync(ct);
+
+    /// <inheritdoc />
+    public async Task<bool> EliminarIngresoAsync(Guid id, CancellationToken ct)
+    {
+        var i = await db.IngresosCuentaComun.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (i is null) return false;
+        db.IngresosCuentaComun.Remove(i);
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
+
+    /// <inheritdoc />
     public async Task GuardarDepositoAsync(DepositoAhorro deposito, CancellationToken ct)
     {
         db.DepositosAhorro.Add(deposito);

@@ -8,7 +8,11 @@ namespace MiParte.Web.Tests;
 internal sealed class ApiFalsa : HttpMessageHandler
 {
     private static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web);
-    private readonly Dictionary<string, Func<HttpRequestMessage, HttpResponseMessage>> _rutas = new();
+    // Por defecto, sin ingresos a la cuenta común: así las pruebas que no los tratan siguen igual.
+    private readonly Dictionary<string, Func<HttpRequestMessage, HttpResponseMessage>> _rutas = new()
+    {
+        ["GET /api/cuenta-comun/ingresos"] = _ => Respuesta(HttpStatusCode.OK, Array.Empty<IngresoCuentaComunDto>()),
+    };
 
     /// <summary>Peticiones recibidas como «MÉTODO ruta».</summary>
     public List<string> Recibidas { get; } = new();

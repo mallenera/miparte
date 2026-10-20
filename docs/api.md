@@ -117,7 +117,7 @@ Validación de perfiles (400): nombre obligatorio (≤ 100); `modo` en `porcenta
 
 ### 3.5 Ingresos
 
-Los ingresos del hogar **no se guardan** y no hay endpoints de ingresos. Los perfiles de reparto son cuatro modos: `individual` (100 % de quien paga), `porcentaje` (por porcentajes, suman 100), `partes` (por número de personas/partes) y `cuenta_comun`. Un gasto con perfil `cuenta_comun` lo asume la cuenta común: `GastoResponse.aCargoCuentaComun` es `true`, `repartos` va vacío, no genera deuda entre personas y no entra en la liquidación ni en el «pagado» del resumen (sí en `gastosTotales` y en el total por categoría). Su saldo, aportaciones y reembolsos están en §3.9.
+Los ingresos personales del hogar **no se guardan**. Los ingresos externos a la cuenta común sí se registran, mediante los endpoints de §3.9 (`/api/cuenta-comun/ingresos`). Los perfiles de reparto son cuatro modos: `individual` (100 % de quien paga), `porcentaje` (por porcentajes, suman 100), `partes` (por número de personas/partes) y `cuenta_comun`. Un gasto con perfil `cuenta_comun` lo asume la cuenta común: `GastoResponse.aCargoCuentaComun` es `true`, `repartos` va vacío, no genera deuda entre personas y no entra en la liquidación ni en el «pagado» del resumen (sí en `gastosTotales` y en el total por categoría). Su saldo, aportaciones y reembolsos están en §3.9.
 
 ### 3.6 Gastos
 
@@ -175,6 +175,9 @@ Los gastos personales (§3.6) no entran en la liquidación ni en `gastosTotales`
 | `PUT /api/cuenta-comun/aportaciones` | Fija lo que aporta un adulto desde un mes (`desde` = día 1); si ya había una de ese mes la sustituye. Importe 0 = deja de aportar. `ahorro` (opcional, 0 por defecto) es la parte del importe que se aparta: el resto queda para gastos | `FijarAportacionRequest` | `AportacionCuentaDto` 200 | 400 `desde` no es día 1, importe o ahorro negativos o con más de 2 decimales, ahorro mayor que el importe, miembro no adulto activo; 409 sin hogar o rebaja del ahorro que dejaría sin respaldo lo ya retirado o gastado desde el ahorro (`{ error, falta }`); 409 también con la cuenta común sin activar | permiso `cuenta.movimientos` |
 | `POST /api/cuenta-comun/reembolsos` | Registra un pago de la cuenta a quien adelantó gastos cargados a ella (`fecha` opcional, por defecto hoy UTC) | `CrearReembolsoRequest` | `ReembolsoCuentaDto` 201 | 400 importe o miembro fuera del hogar; 409 importe mayor que lo pendiente (`{ error, pendiente }`) o sin hogar | permiso `cuenta.movimientos` |
 | `DELETE /api/cuenta-comun/reembolsos/{id}` | Elimina un reembolso | - | 204 | 404; 409 sin hogar | permiso `cuenta.movimientos` |
+| `GET /api/cuenta-comun/ingresos` | Lista los ingresos a la cuenta común fuera de aportaciones y ahorro, del más reciente al más antiguo | - | `IngresoCuentaComunDto[]` 200 | 409 sin hogar | cualquier miembro del hogar |
+| `POST /api/cuenta-comun/ingresos` | Registra dinero que entra a la cuenta común (p. ej. lo que pagan las amigas de una cena). Solo histórico: no cambia saldo, ahorro ni reembolsos pendientes (`fecha` opcional, por defecto hoy UTC) | `CrearIngresoCuentaComunRequest` | `IngresoCuentaComunDto` 201 | 400 importe o miembro fuera del hogar; 409 cuenta inactiva o sin hogar | permiso `cuenta.movimientos` |
+| `DELETE /api/cuenta-comun/ingresos/{id}` | Elimina un ingreso a la cuenta común | - | 204 | 404; 409 sin hogar | permiso `cuenta.movimientos` |
 | `POST /api/cuenta-comun/depositos-ahorro` | Registra dinero que entra al ahorro fuera de la aportación mensual: ahorro inicial, lotería... (`fecha` opcional, por defecto hoy UTC) | `CrearDepositoAhorroRequest` | `DepositoAhorroDto` 201 | 400 importe o miembro fuera del hogar; 409 sin hogar | permiso `ahorro.movimientos` |
 | `DELETE /api/cuenta-comun/depositos-ahorro/{id}` | Elimina un ingreso de ahorro | - | 204 | 404; 409 sin hogar o si dejaría sin respaldo lo ya retirado o gastado desde el ahorro (`{ error, falta }`) | permiso `ahorro.movimientos` |
 | `POST /api/cuenta-comun/retiradas-ahorro` | Registra dinero que sale del ahorro (`fecha` opcional, por defecto hoy UTC) | `CrearRetiradaAhorroRequest` | `RetiradaAhorroDto` 201 | 400 importe o miembro fuera del hogar; 409 importe mayor que el ahorro disponible (`{ error, disponible }`) o sin hogar | permiso `ahorro.movimientos` |
@@ -214,7 +217,7 @@ Avisos push a los miembros del hogar cuando alguien anota un gasto nuevo que no 
 
 Un gasto nuevo no personal avisa a las suscripciones del hogar salvo a la del pagador (`PagadoPor`). El aviso sale en segundo plano: la respuesta de `POST /api/gastos` no espera al servicio push, y si la cola interna se llena o faltan las claves, el aviso se descarta sin fallar el gasto. Una suscripción que el servicio push da por caducada (404 o 410) se borra. El contenido del aviso es JSON `{ "titulo", "cuerpo", "ruta" }`. Si cambian las claves VAPID, las suscripciones existentes dejan de servir y hay que volver a activar los avisos.
 
-Total: 65 endpoints de negocio (5 hogares/yo, 10 miembros/invitaciones/enlaces de grupo, 4 categorías, 5 perfiles, 5 gastos, 6 recurrentes, 8 resumen/liquidación/pagos/ciclos, 13 cuenta común, 5 cierre de mes, 1 auditoría, 3 avisos del navegador) más `GET /health`.
+Total: 68 endpoints de negocio (5 hogares/yo, 10 miembros/invitaciones/enlaces de grupo, 4 categorías, 5 perfiles, 5 gastos, 6 recurrentes, 8 resumen/liquidación/pagos/ciclos, 16 cuenta común, 5 cierre de mes, 1 auditoría, 3 avisos del navegador) más `GET /health`.
 
 ## 4. Ejemplos JSON
 

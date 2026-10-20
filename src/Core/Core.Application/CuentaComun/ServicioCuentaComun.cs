@@ -153,6 +153,34 @@ public sealed class ServicioCuentaComun(IRepositorioCuentaComun repositorio, Tim
     public async Task<Resultado<bool>> EliminarReembolsoAsync(Guid id, CancellationToken ct)
         => await repositorio.EliminarReembolsoAsync(id, ct) ? Resultado<bool>.Ok(true) : Resultado<bool>.NoEncontrado();
 
+    /// <summary>
+    /// Registra dinero que entra a la cuenta común fuera de aportaciones y ahorro. Solo es histórico: no entra en los cálculos de saldo,
+    /// ahorro ni reembolsos. Inválido si el importe no vale o el miembro no es del hogar; conflicto si la cuenta está inactiva.
+    /// </summary>
+    public async Task<Resultado<IngresoCuentaComun>> CrearIngresoAsync(RegistrarMovimiento m, CancellationToken ct)
+    {
+        if (await ExigirActivaAsync<IngresoCuentaComun>(ct) is { } inactiva) return inactiva;
+        var error = ReglasMovimiento.ValidarImporte(m.Importe) ?? ReglasMovimiento.ValidarConcepto(m.Concepto);
+        if (error is not null) return Resultado<IngresoCuentaComun>.Invalido(error);
+        if (!await repositorio.ExisteMiembroAsync(m.MiembroId, ct))
+            return Resultado<IngresoCuentaComun>.Invalido("El miembro del ingreso debe pertenecer al hogar.");
+
+        var i = new IngresoCuentaComun
+        {
+            Id = Guid.NewGuid(), HogarId = m.HogarId, MiembroId = m.MiembroId, Importe = m.Importe,
+            Fecha = m.Fecha ?? Hoy, Concepto = ReglasMovimiento.NormalizarConcepto(m.Concepto),
+        };
+        await repositorio.GuardarIngresoAsync(i, ct);
+        return Resultado<IngresoCuentaComun>.Ok(i);
+    }
+
+    /// <summary>Ingresos a la cuenta común del hogar, del más reciente al más antiguo.</summary>
+    public Task<IReadOnlyList<IngresoCuentaComun>> ListarIngresosAsync(CancellationToken ct) => repositorio.IngresosAsync(ct);
+
+    /// <summary>Borra un ingreso a la cuenta común; no encontrado si no existe.</summary>
+    public async Task<Resultado<bool>> EliminarIngresoAsync(Guid id, CancellationToken ct)
+        => await repositorio.EliminarIngresoAsync(id, ct) ? Resultado<bool>.Ok(true) : Resultado<bool>.NoEncontrado();
+
     /// <summary>Registra dinero que entra al ahorro fuera de la aportación mensual. Inválido si el importe no vale o el miembro no es del hogar.</summary>
     public async Task<Resultado<DepositoAhorro>> CrearDepositoAsync(RegistrarMovimiento m, CancellationToken ct)
     {

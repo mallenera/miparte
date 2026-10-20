@@ -1,6 +1,6 @@
 # Cuenta demo y su restablecimiento
 
-La demo tiene dos formas (ver la fila «Demo sin registrarse» de [README.md](README.md)): el **modo local** del front (sin servidor, no necesita nada de esto) y la **cuenta demo real** (`demo` / `demo`, el front traduce `demo` a `demo@miparte.example`), que vive en el proyecto Supabase y es la que esta guía deja lista.
+La demo tiene dos formas (ver la fila «Demo sin registrarse» de [README.md](README.md)): el **modo local** del front (sin servidor, no necesita nada de esto) y la **cuenta demo real** (usuario `demo`, contraseña `9c88aaffa6d7e9e4`, distinta de `demo` a propósito; el front traduce `demo` a `demo@miparte.example`), que vive en el proyecto Supabase y es la que esta guía deja lista.
 
 | Fichero | Qué hace |
 |---|---|
@@ -12,7 +12,7 @@ Es una **semilla manual, no una migración**: CI no la aplica. La función solo 
 
 ## Paso a paso (proyecto Supabase real)
 
-Prerrequisito: las migraciones de `supabase/migrations` ya aplicadas (`supabase db push`), porque la semilla escribe en las tablas del hogar.
+Prerrequisito: el esquema ya migrado con `migrar` del proyecto `MiParte.Database` (ver [despliegue.md](despliegue.md)), porque la semilla escribe en las tablas del hogar.
 
 1. **Ejecutar la semilla una vez.** Supabase → SQL Editor → pega el contenido de `supabase/seed/demo.sql` → Run. O desde una terminal, con la cadena del **Session pooler** (puerto 5432, ver `.env.example`) en una variable de entorno, sin escribirla en ningún fichero del repo:
    ```bash

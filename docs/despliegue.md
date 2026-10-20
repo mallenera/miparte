@@ -6,7 +6,21 @@ Front en Cloudflare Pages, Core.Api en Render y datos/Auth en Supabase (planes g
 |---|---|---|
 | Front (`src/Web`) | Cloudflare Pages, proyecto `miparte` | `.github/workflows/deploy-web.yml` en cada push a `master` que toque el front |
 | Core.Api | Render, servicio `miparte-core` | Blueprint `render.yaml`; redespliega al pasar CI en `master` |
-| Esquema | Supabase | Migraciones de `supabase/migrations` aplicadas a mano (`supabase db push`) **antes** de desplegar el código que las usa |
+| Esquema | Supabase | `src/Database/MiParte.Database` (`migrar`) sobre la base del proyecto, **antes** de desplegar el código que la usa. Ver `pendientes` para comprobar qué falta |
+
+## Esquema en Supabase
+
+El esquema se aplica con el proyecto `MiParte.Database`, no con la CLI de Supabase. Con la cadena del Session pooler (puerto 5432) en una variable de entorno, sin escribirla en ningún fichero del repo:
+
+```bash
+dotnet run --project src/Database/MiParte.Database -- pendientes --conexion "$DATABASE_URL"
+```
+
+```bash
+dotnet run --project src/Database/MiParte.Database -- migrar --conexion "$DATABASE_URL"
+```
+
+`pendientes` lista lo que falta sin tocar la base; `migrar` lo aplica y es idempotente. Detalle en `src/Database/MiParte.Database/Estructura/README.md`.
 
 ## Core.Api en Render
 

@@ -94,6 +94,30 @@ DTOs en `src/Contracts/Asistente.cs` (`ChatRequest`, `MensajeChatDto`, `ChatResp
 
 Front: `Api:AssistantUrl` en `wwwroot/appsettings.json` (público, sin secretos) y, para la CSP, `ASSISTANT_URL` (nginx) o la variable de repositorio `ASSISTANT_URL` (Cloudflare). Si falta, el asistente flotante avisa de que no está configurada.
 
+## Despliegue en Render y Cloudflare
+
+Assistant.Api en Render (servicio `miparte-assistant`), front en Cloudflare Pages (`https://miparte.pages.dev`). Variables que Render no rellena solas (`sync: false` en `render.yaml`):
+
+| Dónde | Variable | Valor |
+|---|---|---|
+| Render, `miparte-assistant` | `Supabase__Url` | `https://<proyecto>.supabase.co`, igual que en Core.Api. Sin ella ningún token es válido (401) |
+| Render, `miparte-assistant` | `Asistente__CoreUrl` | `https://miparte-core.onrender.com`. Sin ella el asistente llama a `localhost:5001` y responde 502 |
+| Render, `miparte-assistant` | `Cors__OrigenesPermitidos__0` | `https://miparte.pages.dev` (solo el origen: el core no sirve aquí) |
+| Render, `miparte-assistant` | `Asistente__Proveedor` | `cloudflare` |
+| Render, `miparte-assistant` | `CLOUDFLARE_API_TOKEN` | Secreto: token con permiso Workers AI |
+| Render, `miparte-assistant` | `Asistente__CloudflareCuenta` | Account ID de Cloudflare |
+| GitHub, variables de Actions | `ASSISTANT_URL` | `https://miparte-assistant.onrender.com` (o la que asigne Render). Se usa al publicar el front |
+
+Tras cambiar `ASSISTANT_URL`, relanza el workflow «Desplegar web» (`workflow_dispatch` desde `master`): solo se ejecuta solo al cambiar el front.
+
+Comprobación rápida del CORS (debe salir `access-control-allow-origin: https://miparte.pages.dev`):
+
+```bash
+curl -s -i -X OPTIONS https://miparte-assistant.onrender.com/api/chat -H "Origin: https://miparte.pages.dev" -H "Access-Control-Request-Method: POST" -H "Access-Control-Request-Headers: authorization,content-type" | grep -i access-control
+```
+
+Síntomas frecuentes: sin cabecera CORS en el preflight, falta `Cors__OrigenesPermitidos__0` o su valor no es el del front; 401 con sesión válida, falta `Supabase__Url`; 502, falta `Asistente__CoreUrl` (el log muestra `localhost:5001`) o el servicio se está despertando.
+
 ## Probarlo en local
 
 ```bash

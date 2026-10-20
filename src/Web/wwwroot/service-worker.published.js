@@ -11,7 +11,9 @@ self.addEventListener('message', event => { if (event.data === 'SKIP_WAITING') s
 const cacheNamePrefix = 'offline-cache-';
 const cacheName = `${cacheNamePrefix}${self.assetsManifest.version}`;
 const offlineAssetsInclude = [ /\.dll$/, /\.pdb$/, /\.wasm/, /\.html/, /\.js$/, /\.json$/, /\.css$/, /.woff2?$/, /\.png$/, /\.svg$/, /\.jpe?g$/, /\.gif$/, /\.ico$/, /\.blat$/, /\.dat$/ ];
-const offlineAssetsExclude = [ /^service-worker\.js$/ ];
+// appsettings.json queda fuera: el workflow de despliegue lo reescribe (CoreUrl, AssistantUrl) después de publicar,
+// así que el hash del manifiesto no coincide y la instalación del service worker fallaría por SRI.
+const offlineAssetsExclude = [ /^service-worker\.js$/, /^appsettings\.json$/ ];
 
 // Replace with your base path if you are hosting on a subfolder. Ensure there is a trailing '/'.
 const base = "/";

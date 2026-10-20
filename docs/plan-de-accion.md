@@ -103,7 +103,7 @@ Las fases van en orden de prioridad. Cada ítem indica su criterio de hecho.
 
 **Pendientes de funciones ya hechas** (vienen de `docs/README.md`; no bloquean la entrega):
 - **Periodo de viaje**: el periodo propio todavía no se fija desde la API; la generación de recurrentes no respeta el periodo cerrado; la regla de gastos no tiene disparador en la base de datos.
-- **Marca v3b**: el linter de diseño (`taste-skill`, `scripts/lint.mjs`) da 0 FAIL desde 2026-10-20; quedan 16 avisos WARN de cajas con borde de 1 px, a decidir caso por caso. Revisión visual en claro, oscuro y móvil y `dotnet test`: correctos (2026-10-20).
+- **Marca v3b**: el linter de diseño (`taste-skill`, `scripts/lint.mjs`) da 0 FAIL desde 2026-10-20; cajas revisadas, 0 WARN (2026-10-20). Revisión visual en claro, oscuro y móvil y `dotnet test`: correctos (2026-10-20).
 
 Fuera de alcance declarado: objetivos de ahorro e intereses.
 

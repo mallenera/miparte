@@ -31,11 +31,11 @@ else
             <div class="aviso err u-mt12" role="alert">@_m.Error</div>
         }
 
-        <div class="u-mt10">
+        <div class="u-mt10 catlista">
             @foreach (var nodo in _m.Arbol)
             {
                 var c = nodo.Categoria;
-                <div class="catrow">
+                <div class="catrow cat">
                     <div class="c-name @(nodo.Nivel > 0 ? "sub" : "")">@c.Nombre</div>
                     <div class="c-sel">
                         @_m.NombrePerfil(c.PerfilRepartoId)

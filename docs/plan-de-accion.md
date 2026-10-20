@@ -1,6 +1,6 @@
 # Plan de acción
 
-Estado a 2026-10-18. Este documento recoge lo que ya está hecho, lo que falta y en qué orden atacarlo. El detalle de cada tema (diseño frente a código) está en la tabla de [README.md](README.md); aquí solo se resume y se ordena.
+Estado a 2026-10-20. Este documento recoge lo que ya está hecho, lo que falta y en qué orden atacarlo. El detalle de cada tema (diseño frente a código) está en la tabla de [README.md](README.md); aquí solo se resume y se ordena.
 
 ## 1. Estado actual
 
@@ -13,7 +13,7 @@ Estado a 2026-10-18. Este documento recoge lo que ya está hecho, lo que falta y
   - Seguridad: escritura directa cerrada, límite de peticiones, cabeceras y CSP, contenedores sin privilegios, errores en ProblemDetails.
   - Login y registro con verificación por correo, modo demo local y cuenta demo real.
   - Arquitectura por capas en Core (`Core.Application` y repositorios), base de datos gestionada con DbUp (`MiParte.Database`).
-  - Chatbot con cinco funciones de solo lectura (`Assistant.Api`), con el proveedor de pago actual pendiente de sustituir (ver fase 1, punto 3).
+  - Chatbot con cinco funciones de solo lectura (`Assistant.Api`), con proveedor gratuito (Cloudflare Workers AI, fase 1, punto 3).
   - PWA con aviso de actualización y reintentos ante arranques lentos de Render.
   - Core.Api y Assistant.Api desplegados en Render (fase 1, punto 1).
 - **Pendiente de verificación en entornos reales**: Supabase real, la cuenta demo real y la RLS (fase 1).
@@ -42,11 +42,11 @@ Las fases van en orden de prioridad. Cada ítem indica su criterio de hecho.
    - SMTP propio, `enable_confirmations` y la plantilla `supabase/templates/confirmacion.html`. Para «He olvidado la contraseña», pegar también `supabase/templates/recuperacion.html` en Authentication → Email Templates → Reset password; debe usar el código {{ .Token }}, no el enlace.
    - Redirect URLs de la web (sin el proveedor Google, ver fase 2).
    - Hecho cuando un registro nuevo recibe el código por correo.
-5. ~~**Cuenta demo real.**~~ **Hecho** (2026-10-18): en el proyecto real existe el hogar «Casa de Ana y Marcos» (id fijo), la tarea `restablecer-demo` (diaria, 04:00 UTC) está activa con las últimas ejecuciones correctas y la cuenta entra con la contraseña nueva (`b0db25c`). Pendiente opcional: el workflow manual con `DEMO_DB_URL`. Ejecutar `supabase/seed/demo.sql` y `demo_cron.sql` (pg_cron, diario 04:00 UTC) y probar el workflow manual `restablecer-demo.yml`. Hecho cuando el restablecimiento deja la cuenta como la semilla.
+5. ~~**Cuenta demo real.**~~ **Hecho** (2026-10-18): en el proyecto real existe el hogar «Casa de Ana y Marcos» (id fijo), la tarea `restablecer-demo` (diaria, 04:00 UTC) está activa con las últimas ejecuciones correctas y la cuenta entra con la contraseña nueva (`b0db25c`; comprobado en Supabase real el 2026-10-20). Pendiente opcional: el workflow manual con `DEMO_DB_URL`. Ejecutar `supabase/seed/demo.sql` y `demo_cron.sql` (pg_cron, diario 04:00 UTC) y probar el workflow manual `restablecer-demo.yml`. Hecho cuando el restablecimiento deja la cuenta como la semilla.
    - **Qué hace falta**: las migraciones ya aplicadas en Supabase (la semilla escribe en las tablas del hogar); crear la cuenta `demo` con su contraseña, o dejar que la semilla la cree (la semilla borra y recrea el usuario de Auth).
    - **Dónde**: SQL Editor de Supabase (pegar `demo.sql`, después `demo_cron.sql`) o `psql "$DEMO_DB_URL" -f` con la cadena del Session pooler (puerto 5432) en una variable de entorno.
    - **Extensión**: activar `pg_cron` en Database → Extensions antes de `demo_cron.sql`.
-   - **Comprobar**: `select * from cron.job where jobname = 'restablecer-demo'` y `cron.job_run_details`; entrar en la web con `demo`/`demo` y ver el hogar «Casa de Ana y Marcos».
+   - **Comprobar**: `select * from cron.job where jobname = 'restablecer-demo'` y `cron.job_run_details`; entrar en la web con la cuenta demo (credenciales en [demo.md](demo.md)) y ver el hogar «Casa de Ana y Marcos».
    - **Workflow manual**: crear el entorno `demo` en GitHub y el secreto `DEMO_DB_URL` (opcional; el restablecimiento diario ya funciona sin él).
    - **Riesgo a tener en cuenta**: restablecer recrea el usuario de Auth, así que quien esté dentro tiene que volver a entrar. Un proyecto pausado por inactividad no ejecuta el cron.
 6. ~~**Comprobar la RLS en Supabase real.**~~ **Hecho** (2026-10-18) en el proyecto real, con dos cuentas (A: hogares Beibis y Truca's Home; B: solo Truca's Home). Resultados, simulando el rol `authenticated` con su `sub` dentro de una transacción deshecha: B no ve el hogar Beibis ni sus gastos, miembros, reparto, categorías ni auditoría (0 filas); B sí ve Truca's Home (control). A ve sus dos hogares y el demo no le aparece. El rol `authenticated` solo tiene SELECT en las tablas de public; `anon` no tiene SELECT. Pendiente opcional: probar los 403 de Core.Api y Assistant.Api con tokens reales. Con dos hogares de prueba, confirmar que un usuario no lee ni escribe datos del otro (riesgo recogido en `docs/diseno-y-decisiones.md`). Hecho cuando el resultado queda anotado en `docs/`.
@@ -70,9 +70,9 @@ Las fases van en orden de prioridad. Cada ítem indica su criterio de hecho.
 
 ### Fase 3 · Decisiones de producto (las toma la pareja, no el código)
 
-12. **Cerrar D1 (alojamiento) y D2 (base de datos y login).** En la práctica ya son Render y Supabase; falta marcarlas como decididas en `docs/diseno-y-decisiones.md`.
+12. ~~**Cerrar D1 (alojamiento) y D2 (base de datos y login).**~~ **Hecho** (2026-10-20): D1 y D2 están marcadas como decididas en `docs/diseno-y-decisiones.md` (Render con Docker y Supabase).
 13. **Cerrar D3 y D4 (reparto del hijo y de la alimentación).** El perfil propio ya permite cualquier reparto; basta con que la pareja fije sus perfiles y se anote.
-14. **Cerrar D7 (coste y dominio) y unificar la numeración.** `docs/README.md` marca D7 como resuelto (modelo de lenguaje) y este plan lo usaba para coste y dominio. Decidir presupuesto del chatbot (ahora gratuito, ver fase 1) y dominio; comprobar en la OEPM que la marca y el dominio están libres.
+14. **Cerrar D7 (coste y dominio) y unificar la numeración.** **Parcial** (2026-10-20): la numeración ya es única, porque D7 cubre modelo de lenguaje y dominio en `docs/diseno-y-decisiones.md`. D7 queda decidido de momento: chatbot gratuito con Cloudflare Workers AI y sin dominio propio (la app va en `miparte.pages.dev`). **Aplazado** (2026-10-20): la comprobación de la marca «Mi parte, tu parte» en la OEPM no se hace de momento.
 
 ### Fase 4 · Funcionalidad pendiente (por utilidad)
 
@@ -100,6 +100,10 @@ Las fases van en orden de prioridad. Cada ítem indica su criterio de hecho.
     - Explicación del cambio de balance entre meses.
     - Simulador de reparto.
     - Reactivar el acceso con Google (fase 2, punto 7) cuando haya tiempo para revisarlo.
+
+**Pendientes de funciones ya hechas** (vienen de `docs/README.md`; no bloquean la entrega):
+- **Periodo de viaje**: el periodo propio todavía no se fija desde la API; la generación de recurrentes no respeta el periodo cerrado; la regla de gastos no tiene disparador en la base de datos.
+- **Marca v3b**: el linter de diseño (`taste-skill`, `scripts/lint.mjs`) da 0 FAIL desde 2026-10-20; cajas revisadas, 0 WARN (2026-10-20). Revisión visual en claro, oscuro y móvil y `dotnet test`: correctos (2026-10-20).
 
 Fuera de alcance declarado: objetivos de ahorro e intereses.
 

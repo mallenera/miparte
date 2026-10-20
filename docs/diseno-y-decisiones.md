@@ -48,7 +48,7 @@ La app y la web usan una sola imagen de marca, definida en la [hoja de identidad
 | Aviso | Ámbar | #9A6B00 | — |
 | Información | Azul | #2F5D8A | — |
 
-Los colores de estado nunca usan burdeos ni naranja y van siempre con signo o icono. Pendiente: comprobar en la OEPM que la marca y el dominio están libres.
+Los colores de estado nunca usan burdeos ni naranja y van siempre con signo o icono. Comprobación en la OEPM de la marca y el dominio: aplazada de momento (2026-10-20).
 
 ## Alcance funcional
 

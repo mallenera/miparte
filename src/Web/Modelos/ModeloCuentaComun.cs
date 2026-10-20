@@ -28,6 +28,16 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
     /// <summary>Adultos activos, los únicos que aportan, ingresan y retiran.</summary>
     public List<MiembroDto> Adultos { get; private set; } = [];
 
+    /// <summary>Todos los ingresos a la cuenta común del hogar, del más reciente al más antiguo.</summary>
+    public List<IngresoCuentaComunDto> Ingresos { get; private set; } = [];
+
+    /// <summary>Ingresos del mes mostrado.</summary>
+    public List<IngresoCuentaComunDto> IngresosDelMes => Ingresos
+        .Where(i => i.Fecha.Year == _mes.Year && i.Fecha.Month == _mes.Month).ToList();
+
+    /// <summary>Total ingresado en el mes mostrado.</summary>
+    public decimal TotalIngresosDelMes => IngresosDelMes.Sum(i => i.Importe);
+
     // ───── Estado de pantalla ─────
 
     /// <summary>Si se están cargando los datos.</summary>
@@ -83,6 +93,15 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
     /// <summary>Concepto de la retirada.</summary>
     public string ConceptoRetirada { get; set; } = "";
 
+    /// <summary>Miembro que hace el ingreso a la cuenta común.</summary>
+    public Guid Ingresante { get; set; }
+
+    /// <summary>Importe del ingreso a la cuenta común, tal como se escribe.</summary>
+    public string ImporteIngreso { get; set; } = "";
+
+    /// <summary>Concepto del ingreso a la cuenta común (de dónde viene).</summary>
+    public string ConceptoIngreso { get; set; } = "";
+
     /// <summary>Importe del ingreso al ahorro.</summary>
     public string ImporteDeposito { get; set; } = "";
 
@@ -101,6 +120,9 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
             string.IsNullOrWhiteSpace(AhorroAportacion) || Estado?.AhorroActivo == false ? "0" : AhorroAportacion,
             permitirCero: true, out var ahorro)
         && ahorro <= importe;
+
+    /// <summary>El importe del ingreso a la cuenta común es válido.</summary>
+    public bool IngresoValido => EntradaImporte.TryParse(ImporteIngreso, out _);
 
     /// <summary>El importe del ingreso es válido.</summary>
     public bool DepositoValido => EntradaImporte.TryParse(ImporteDeposito, out _);
@@ -146,6 +168,7 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
             Miembros = await api.ListarMiembrosAsync();
             Adultos = Miembros.Where(m => m.Tipo == TiposMiembro.Adulto && m.Activo).ToList();
             Aportante = Retirante = Depositante = (Adultos.FirstOrDefault(m => m.EsYo) ?? Adultos.FirstOrDefault())?.Id ?? Guid.Empty;
+            Ingresante = (Miembros.FirstOrDefault(m => m.EsYo) ?? Miembros.FirstOrDefault())?.Id ?? Guid.Empty;
             await RecargarAsync();
         }
         catch (ApiException e)
@@ -161,9 +184,11 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
         // Una respuesta tardía de otro mes no pisa la actual (ni los campos del formulario que se rellenan desde ella).
         var version = ++_version;
         CuentaComunResponse estado;
+        List<IngresoCuentaComunDto> ingresos;
         try
         {
             estado = await api.ObtenerCuentaComunAsync(Formato.Mes(_mes));
+            ingresos = await api.ListarIngresosCuentaComunAsync();
         }
         catch (ApiException) when (version != _version)
         {
@@ -172,6 +197,7 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
 
         if (version != _version) return;
         Estado = estado;
+        Ingresos = ingresos;
         if (Estado.Pendientes.All(p => p.MiembroId != Reembolsado))
             Reembolsado = Estado.Pendientes.FirstOrDefault()?.MiembroId ?? Guid.Empty;
         AlCambiarAportante();
@@ -232,6 +258,30 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
             ImporteReembolso = "";
             ConceptoReembolso = "";
             return "Reembolso registrado";
+        });
+
+    /// <summary>
+    /// Registra un ingreso a la cuenta común (p. ej. lo que pagan las amigas de una cena). Es solo histórico: no cambia el saldo ni los
+    /// reembolsos. Si el mes mostrado no es el actual, el ingreso se fecha el primer día de ese mes.
+    /// </summary>
+    public Task<string?> IngresarAsync() =>
+        EjecutarAsync(async () =>
+        {
+            var importe = Importe(ImporteIngreso);
+            var fecha = _mes == new DateOnly(hoy.Year, hoy.Month, 1) ? (DateOnly?)null : _mes;
+            await api.CrearIngresoCuentaComunAsync(new CrearIngresoCuentaComunRequest(Ingresante, importe, fecha, Texto(ConceptoIngreso)));
+            ImporteIngreso = "";
+            ConceptoIngreso = "";
+            return "Ingreso registrado";
+        });
+
+    /// <summary>Elimina un ingreso a la cuenta común.</summary>
+    public Task<string?> EliminarIngresoAsync(IngresoCuentaComunDto i) =>
+        EjecutarAsync(async () =>
+        {
+            await api.EliminarIngresoCuentaComunAsync(i.Id);
+            ConfirmandoEliminar = null;
+            return "Ingreso eliminado";
         });
 
     /// <summary>Ingresa dinero al ahorro fuera de la aportación mensual.</summary>

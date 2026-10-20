@@ -328,6 +328,23 @@ public sealed class CoreApiClient
     public Task EliminarReembolsoAsync(Guid id, CancellationToken ct = default) =>
         EnviarSinRespuestaAsync(HttpMethod.Delete, $"api/cuenta-comun/reembolsos/{id}", ct);
 
+    /// <summary>Ingresos a la cuenta común fuera de aportaciones y ahorro, del más reciente al más antiguo (<c>GET /api/cuenta-comun/ingresos</c>).</summary>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<List<IngresoCuentaComunDto>> ListarIngresosCuentaComunAsync(CancellationToken ct = default) =>
+        ObtenerListaAsync<IngresoCuentaComunDto>("api/cuenta-comun/ingresos", ct);
+
+    /// <summary>Registra dinero que entra a la cuenta común, solo como histórico (<c>POST /api/cuenta-comun/ingresos</c>).</summary>
+    /// <param name="peticion">Miembro que ingresa, importe, fecha y concepto.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<IngresoCuentaComunDto> CrearIngresoCuentaComunAsync(CrearIngresoCuentaComunRequest peticion, CancellationToken ct = default) =>
+        EnviarAsync<IngresoCuentaComunDto>(HttpMethod.Post, "api/cuenta-comun/ingresos", peticion, ct);
+
+    /// <summary>Elimina un ingreso a la cuenta común (<c>DELETE /api/cuenta-comun/ingresos/{id}</c>).</summary>
+    /// <param name="id">Ingreso a eliminar.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task EliminarIngresoCuentaComunAsync(Guid id, CancellationToken ct = default) =>
+        EnviarSinRespuestaAsync(HttpMethod.Delete, $"api/cuenta-comun/ingresos/{id}", ct);
+
     /// <summary>Registra un ingreso aparte en el ahorro de la cuenta común (<c>POST /api/cuenta-comun/depositos-ahorro</c>).</summary>
     /// <param name="peticion">Miembro, importe, fecha y concepto.</param>
     /// <param name="ct">Token de cancelación.</param>

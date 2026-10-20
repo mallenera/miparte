@@ -16,6 +16,7 @@ erDiagram
     hogar ||--o{ pago_liquidacion : anota
     hogar ||--o{ aportacion_cuenta : "aporta a la cuenta común"
     hogar ||--o{ reembolso_cuenta : "reembolsa de la cuenta común"
+    hogar ||--o{ ingreso_cuenta_comun : "ingresa en la cuenta común (solo histórico)"
     hogar ||--o{ retirada_ahorro : "retira del ahorro"
     hogar ||--o{ deposito_ahorro : "ingresa en el ahorro"
     hogar ||--o{ mes_cerrado : "cierra"
@@ -34,6 +35,7 @@ erDiagram
     pago_liquidacion }o--|| miembro : "de / a"
     aportacion_cuenta }o--|| miembro : ""
     reembolso_cuenta }o--|| miembro : ""
+    ingreso_cuenta_comun }o--|| miembro : ""
     retirada_ahorro }o--|| miembro : ""
     deposito_ahorro }o--|| miembro : ""
 ```
@@ -58,6 +60,7 @@ erDiagram
 | `auditoria` | Historial **de solo añadir** (un trigger rechaza `UPDATE`, `DELETE` y `TRUNCATE`, también al propietario; solo se permite el borrado en cascada al eliminar el hogar). `usuario_id` sin FK (el rastro sobrevive a la cuenta), `accion`, `entidad`, `entidad_id`, `antes`/`despues` en `jsonb`. La escribe solo Core.Api, dentro de la transacción del cambio; la lee un admin vía RLS (`es_admin_hogar`). |
 | `aportacion_cuenta` | Importe fijo mensual de un adulto a la cuenta común, vigente `desde` un mes (día 1); único por miembro y mes. El importe de un mes es el de la fila más reciente que no lo supere; 0 = deja de aportar. `ahorro` (0 ≤ ahorro ≤ importe, por `check`) es la parte que se aparta para ahorro; el resto queda para gastos. |
 | `reembolso_cuenta` | Pago de la cuenta común a un miembro por gastos que adelantó (`gasto.a_cargo_cuenta_comun`). Baja lo pendiente y el efectivo, no el saldo. |
+| `ingreso_cuenta_comun` | Dinero que entra a la cuenta común fuera de aportaciones y ahorro, por ejemplo lo que pagan las amigas de una cena (`importe > 0`, concepto opcional). Solo histórico: no toca saldo, ahorro ni reembolsos pendientes. |
 | `deposito_ahorro` | Dinero que entra al ahorro de la cuenta común fuera de la aportación mensual (ahorro inicial, lotería...; `importe > 0`, concepto opcional). Suma al ahorro disponible, no toca el saldo de gastos. Solo lectura para los roles de cliente. |
 | `mes_cerrado` | Mes cerrado por un miembro (`mes` = día 1, único por hogar; `cerrado_por` = usuario sin FK). Mientras exista la fila no se pueden crear, editar ni borrar gastos con fecha en ese mes ni generar recurrentes en él; reabrir = borrar la fila. Solo lectura para los roles de cliente: escribe Core.Api, que deja cerrar a cualquier miembro y reabrir solo a un admin. |
 | `retirada_ahorro` | Dinero que el hogar saca del ahorro de la cuenta común (`importe > 0`, concepto opcional). Baja el ahorro disponible, no el saldo de gastos. Core.Api impide retirar más de lo ahorrado. Solo lectura para los roles de cliente. |

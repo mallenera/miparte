@@ -131,6 +131,9 @@ public sealed partial class ServidorDemo
             ("cuenta-comun", 3, "DELETE") when subruta == "saldo-inicial" => Sin(await _cuenta.EliminarSaldoInicialAsync(ct)),
             ("cuenta-comun", 3, "POST") when subruta == "reembolsos" => await CrearReembolso((await Cuerpo<CrearReembolsoRequest>())!, ct),
             ("cuenta-comun", 4, "DELETE") when subruta == "reembolsos" && id is { } i => Sin(await _cuenta.EliminarReembolsoAsync(i, ct)),
+            ("cuenta-comun", 3, "GET") when subruta == "ingresos" => Ok((await _cuenta.ListarIngresosAsync(ct)).Select(i => i.ADto()).ToList()),
+            ("cuenta-comun", 3, "POST") when subruta == "ingresos" => await CrearIngreso((await Cuerpo<CrearIngresoCuentaComunRequest>())!, ct),
+            ("cuenta-comun", 4, "DELETE") when subruta == "ingresos" && id is { } i => Sin(await _cuenta.EliminarIngresoAsync(i, ct)),
             ("cuenta-comun", 3, "POST") when subruta == "depositos-ahorro" => await CrearDeposito((await Cuerpo<CrearDepositoAhorroRequest>())!, ct),
             ("cuenta-comun", 4, "DELETE") when subruta == "depositos-ahorro" && id is { } i => Sin(await _cuenta.EliminarDepositoAsync(i, ct)),
             ("cuenta-comun", 3, "POST") when subruta == "retiradas-ahorro" => await CrearRetirada((await Cuerpo<CrearRetiradaAhorroRequest>())!, ct),
@@ -314,6 +317,12 @@ public sealed partial class ServidorDemo
     private async Task<HttpResponseMessage> CrearReembolso(CrearReembolsoRequest r, CancellationToken ct)
     {
         var res = await _cuenta.CrearReembolsoAsync(new RegistrarMovimiento(IdHogar, r.MiembroId, r.Importe, r.Fecha, r.Concepto), ct);
+        return res.Error is { } e ? Error(e) : Respuesta(HttpStatusCode.Created, res.Valor!.ADto());
+    }
+
+    private async Task<HttpResponseMessage> CrearIngreso(CrearIngresoCuentaComunRequest r, CancellationToken ct)
+    {
+        var res = await _cuenta.CrearIngresoAsync(new RegistrarMovimiento(IdHogar, r.MiembroId, r.Importe, r.Fecha, r.Concepto), ct);
         return res.Error is { } e ? Error(e) : Respuesta(HttpStatusCode.Created, res.Valor!.ADto());
     }
 

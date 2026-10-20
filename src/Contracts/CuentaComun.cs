@@ -30,6 +30,21 @@ public record ReembolsoCuentaDto(Guid Id, Guid MiembroId, DateOnly Fecha, decima
 /// <param name="Concepto">Descripción opcional.</param>
 public record CrearReembolsoRequest(Guid MiembroId, decimal Importe, DateOnly? Fecha, string? Concepto);
 
+/// <summary>Dinero que entra a la cuenta común fuera de la aportación mensual y del ahorro (p. ej. lo que pagan las amigas de una cena). Solo histórico: no cambia saldos ni reembolsos.</summary>
+/// <param name="Id">Identificador del ingreso.</param>
+/// <param name="MiembroId">Miembro que lo registra.</param>
+/// <param name="Fecha">Fecha del ingreso.</param>
+/// <param name="Importe">Importe ingresado.</param>
+/// <param name="Concepto">De dónde viene (opcional).</param>
+public record IngresoCuentaComunDto(Guid Id, Guid MiembroId, DateOnly Fecha, decimal Importe, string? Concepto);
+
+/// <summary>POST /api/cuenta-comun/ingresos. Fecha por defecto: hoy (UTC).</summary>
+/// <param name="MiembroId">Miembro que registra el ingreso.</param>
+/// <param name="Importe">Importe ingresado.</param>
+/// <param name="Fecha">Fecha del ingreso; si es null se usa hoy (UTC).</param>
+/// <param name="Concepto">Descripción opcional.</param>
+public record CrearIngresoCuentaComunRequest(Guid MiembroId, decimal Importe, DateOnly? Fecha, string? Concepto);
+
 /// <summary>Dinero que entra al ahorro de la cuenta común fuera de la aportación mensual (ahorro inicial, lotería...).</summary>
 /// <param name="Id">Identificador del depósito.</param>
 /// <param name="MiembroId">Miembro que lo registra.</param>

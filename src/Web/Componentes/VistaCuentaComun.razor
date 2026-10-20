@@ -271,6 +271,69 @@ else if (_m.Estado is not null)
         }
     </section>
 
+    <section class="card" aria-labelledby="t-ingresos">
+        <div class="card-head"><h2 id="t-ingresos">Ingresos</h2></div>
+        <p class="muted">Dinero que entra a la cuenta común fuera de las aportaciones y del ahorro, por ejemplo lo que pagan las amigas de una cena. Queda solo en el histórico: no cambia el saldo ni los reembolsos.</p>
+
+        @if (_m.IngresosDelMes.Count == 0)
+        {
+            <div class="empty">No hay ingresos este mes.</div>
+        }
+
+        @foreach (var i in _m.IngresosDelMes)
+        {
+            <div class="gastorow">
+                <div class="g-main">
+                    <div class="g-concepto">@(string.IsNullOrWhiteSpace(i.Concepto) ? "Ingreso" : i.Concepto)</div>
+                    <div class="muted g-meta">@i.Fecha.ToString("dd/MM/yyyy", Es) · ingresó @Formato.NombreMiembro(i.MiembroId, _m.Miembros)</div>
+                </div>
+                <div class="g-importe">@Formato.Euros(i.Importe)</div>
+                @if (PuedeCuenta)
+                {
+                    <div class="c-acc">
+                        @if (_m.ConfirmandoEliminar == i.Id)
+                        {
+                            <span class="muted">¿Eliminar?</span>
+                            <button class="linkbtn danger" type="button" @onclick="() => EliminarIngresoAsync(i)">Sí</button>
+                            <button class="linkbtn" type="button" @onclick="() => _m.ConfirmandoEliminar = null">No</button>
+                        }
+                        else
+                        {
+                            <button class="linkbtn danger" type="button" aria-label="Eliminar ingreso de @Formato.NombreMiembro(i.MiembroId, _m.Miembros)" @onclick="() => _m.ConfirmandoEliminar = i.Id">Eliminar</button>
+                        }
+                    </div>
+                }
+            </div>
+        }
+
+        @if (_m.IngresosDelMes.Count > 0)
+        {
+            <div class="muted g-meta">Total ingresado este mes: @Formato.Euros(_m.TotalIngresosDelMes)</div>
+        }
+
+        @if (PuedeCuenta)
+        {
+            <form class="addcat" id="form-ingreso-cuenta" @onsubmit="IngresarAsync">
+                <h3 class="u-titulo-form">Nuevo ingreso</h3>
+                <label>Lo ingresa
+                    <select @bind="_m.Ingresante">
+                        @foreach (var miembro in _m.Miembros.Where(x => x.Activo))
+                        {
+                            <option value="@miembro.Id">@miembro.Nombre</option>
+                        }
+                    </select>
+                </label>
+                <label>Importe (€)
+                    <input inputmode="decimal" required placeholder="0,00" @bind="_m.ImporteIngreso" @bind:event="oninput" />
+                </label>
+                <label>Concepto
+                    <input maxlength="200" placeholder="Por ejemplo, Cena amigas" @bind="_m.ConceptoIngreso" @bind:event="oninput" />
+                </label>
+                <button class="btn" type="submit" disabled="@(!_m.IngresoValido || _m.Enviando)">Ingresar</button>
+            </form>
+        }
+    </section>
+
     @if (_m.Estado.AhorroActivo)
     {
         <section class="card" aria-labelledby="t-ahorro">
@@ -430,6 +493,10 @@ else if (_m.Estado is not null)
     private Task EliminarRetiradaAsync(RetiradaAhorroDto r) => Mostrar(_m.EliminarRetiradaAsync(r));
 
     private Task EliminarAsync(ReembolsoCuentaDto r) => Mostrar(_m.EliminarAsync(r));
+
+    private Task IngresarAsync() => Mostrar(_m.IngresarAsync());
+
+    private Task EliminarIngresoAsync(IngresoCuentaComunDto i) => Mostrar(_m.EliminarIngresoAsync(i));
 
     /// <summary>Espera la operación del modelo y, si salió bien, muestra su aviso.</summary>
     private async Task Mostrar(Task<string?> operacion)

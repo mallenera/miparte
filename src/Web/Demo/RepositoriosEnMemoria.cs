@@ -276,6 +276,17 @@ internal sealed class RepositorioCuentaComunEnMemoria(AlmacenDemo a) : IReposito
 
     public Task<bool> EliminarReembolsoAsync(Guid id, CancellationToken ct) => Task.FromResult(a.Reembolsos.RemoveAll(r => r.Id == id) > 0);
 
+    public Task GuardarIngresoAsync(IngresoCuentaComun ingreso, CancellationToken ct)
+    {
+        a.Ingresos.Add(ingreso);
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<IngresoCuentaComun>> IngresosAsync(CancellationToken ct)
+        => Task.FromResult<IReadOnlyList<IngresoCuentaComun>>(a.Ingresos.OrderByDescending(i => i.Fecha).ThenBy(i => i.Id).ToList());
+
+    public Task<bool> EliminarIngresoAsync(Guid id, CancellationToken ct) => Task.FromResult(a.Ingresos.RemoveAll(i => i.Id == id) > 0);
+
     public Task GuardarDepositoAsync(DepositoAhorro deposito, CancellationToken ct)
     {
         a.Depositos.Add(deposito);

@@ -876,12 +876,12 @@ public class GastosLiquidacionTests
     {
         var e = await Montar();
         await CrearGasto(e, Gasto(e, 900m, e.Perfil6040)); // compartido: Ana 540, Beto 360
-        var g = await CrearGasto(e, Gasto(e, 80m, e.Perfil6040, pagador: e.Beto) with { Personal = true }); // el perfil se ignora
+        var g = await CrearGasto(e, Gasto(e, 80m, e.Perfil6040, pagador: e.Ana) with { Personal = true }); // el perfil se ignora; lo anota quien paga
 
         Assert.True(g.Personal);
         Assert.False(g.ACargoCuentaComun);
         var parte = Assert.Single(g.Repartos);
-        Assert.Equal((e.Beto, 80m), (parte.MiembroId, parte.ImporteAsumido));
+        Assert.Equal((e.Ana, 80m), (parte.MiembroId, parte.ImporteAsumido));
         var leido = await Leer<GastoResponse>(await e.Cliente.GetAsync($"/api/gastos/{g.Id}"));
         Assert.True(leido.Personal);
 
@@ -894,8 +894,8 @@ public class GastosLiquidacionTests
         var resumen = await Leer<ResumenMensualResponse>(await e.Cliente.GetAsync("/api/resumen?mes=2026-09"));
         Assert.Equal((900m, 80m), (resumen.GastosTotales, resumen.GastosPersonales));
         var beto = resumen.Miembros.Single(m => m.MiembroId == e.Beto);
-        Assert.Equal((0m, 360m, 80m), (beto.Pagado, beto.Asumido, beto.Personal));
-        Assert.Equal(0m, resumen.Miembros.Single(m => m.MiembroId == e.Ana).Personal);
+        Assert.Equal((0m, 360m, 0m), (beto.Pagado, beto.Asumido, beto.Personal));
+        Assert.Equal(80m, resumen.Miembros.Single(m => m.MiembroId == e.Ana).Personal);
         Assert.Equal(900m, resumen.Categorias.Sum(c => c.Total));
     }
 

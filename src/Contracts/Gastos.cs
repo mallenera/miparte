@@ -51,8 +51,10 @@ public record GastoResponse(
 /// <param name="DiaMes">Día del mes (1 a 28) en que se genera el gasto.</param>
 /// <param name="Concepto">Descripción opcional del gasto.</param>
 /// <param name="Activo">Si la plantilla está activa; por defecto true.</param>
+/// <param name="Personal">Si los gastos generados son personales (solo para quien paga, fuera de la liquidación); por defecto false.</param>
 public record GastoRecurrenteRequest(
-    decimal Importe, Guid CategoriaId, Guid PagadoPor, Guid PerfilRepartoId, short DiaMes, string? Concepto, bool Activo = true);
+    decimal Importe, Guid CategoriaId, Guid PagadoPor, Guid PerfilRepartoId, short DiaMes, string? Concepto, bool Activo = true,
+    bool Personal = false);
 
 /// <summary>Plantilla de gasto mensual guardada.</summary>
 /// <param name="Id">Identificador de la plantilla.</param>
@@ -63,9 +65,10 @@ public record GastoRecurrenteRequest(
 /// <param name="DiaMes">Día del mes (1 a 28) en que se genera el gasto.</param>
 /// <param name="Concepto">Descripción opcional del gasto.</param>
 /// <param name="Activo">Si la plantilla está activa.</param>
+/// <param name="Personal">Si los gastos generados son personales.</param>
 public record GastoRecurrenteResponse(
     Guid Id, decimal Importe, Guid CategoriaId, Guid PagadoPor, Guid PerfilRepartoId, short DiaMes,
-    string? Concepto, bool Activo);
+    string? Concepto, bool Activo, bool Personal = false);
 
 /// <summary>Resultado de POST /api/gastos-recurrentes/generar: gastos creados y plantillas que ya tenían gasto ese mes.</summary>
 /// <param name="Mes">Mes procesado, en formato YYYY-MM.</param>

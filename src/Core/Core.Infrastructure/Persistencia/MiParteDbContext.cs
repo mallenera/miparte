@@ -16,6 +16,9 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
     /// <summary>Hogar de la petición en curso; los query filters lo leen en cada consulta.</summary>
     private Guid? HogarId => hogarActual.HogarId;
 
+    /// <summary>Miembro que hace la petición en el hogar actual; las lecturas de gastos personales lo usan (ver <c>Visibilidad</c>).</summary>
+    public Guid? MiembroActual => hogarActual.MiembroId;
+
     /// <summary>Conjunto de <see cref="Hogar"/> del hogar actual.</summary>
     public DbSet<Hogar> Hogares => Set<Hogar>();
     /// <summary>Conjunto de <see cref="Miembro"/> del hogar actual.</summary>
@@ -42,6 +45,8 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
     public DbSet<EnlaceGrupo> EnlacesGrupo => Set<EnlaceGrupo>();
     /// <summary>Conjunto de <see cref="PagoLiquidacionRegistro"/> del hogar actual.</summary>
     public DbSet<PagoLiquidacionRegistro> PagosLiquidacion => Set<PagoLiquidacionRegistro>();
+    /// <summary>Conjunto de <see cref="SuscripcionPush"/> del hogar actual.</summary>
+    public DbSet<SuscripcionPush> SuscripcionesPush => Set<SuscripcionPush>();
 
     /// <summary>Conjunto de <see cref="AportacionCuenta"/> del hogar actual.</summary>
     public DbSet<AportacionCuenta> AportacionesCuenta => Set<AportacionCuenta>();
@@ -151,6 +156,15 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
             e.HasKey(x => x.Id);
             e.Property(x => x.CreadoEn).HasDefaultValueSql("now()");
             // FK (hogar_id, creado_por) -> miembro(hogar_id, id) y las restricciones de caducidad y hash: se aplican en SQL.
+            e.HasQueryFilter(x => x.HogarId == HogarId);
+        });
+
+        b.Entity<SuscripcionPush>(e =>
+        {
+            e.ToTable("suscripcion_push");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.CreadaEn).HasDefaultValueSql("now()");
+            // FK (hogar_id, miembro_id) -> miembro y las restricciones de endpoint y claves: se aplican en SQL.
             e.HasQueryFilter(x => x.HogarId == HogarId);
         });
 

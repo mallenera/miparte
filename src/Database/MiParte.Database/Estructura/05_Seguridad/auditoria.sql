@@ -8,7 +8,7 @@ ALTER TABLE public.auditoria ENABLE ROW LEVEL SECURITY;
 -- Name: auditoria auditoria_select; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY auditoria_select ON public.auditoria FOR SELECT TO authenticated USING (public.es_admin_hogar(hogar_id));
+CREATE POLICY auditoria_select ON public.auditoria FOR SELECT TO authenticated USING ((public.es_admin_hogar(hogar_id) AND ((personal_de IS NULL) OR (personal_de = public.mi_miembro_id(hogar_id)))));
 
 
 --

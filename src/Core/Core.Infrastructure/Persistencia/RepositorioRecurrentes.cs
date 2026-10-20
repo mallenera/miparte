@@ -26,15 +26,16 @@ public sealed class RepositorioRecurrentes(MiParteDbContext db) : IRepositorioRe
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<GastoRecurrente>> ListarAsync(CancellationToken ct)
-        => await db.GastosRecurrentes.AsNoTracking().OrderBy(r => r.DiaMes).ThenBy(r => r.Id).ToListAsync(ct);
+        => await db.GastosRecurrentes.AsNoTracking().RecurrentesVisiblesPara(db.MiembroActual)
+            .OrderBy(r => r.DiaMes).ThenBy(r => r.Id).ToListAsync(ct);
 
     /// <inheritdoc />
     public Task<GastoRecurrente?> ObtenerAsync(Guid id, CancellationToken ct)
-        => db.GastosRecurrentes.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+        => db.GastosRecurrentes.AsNoTracking().RecurrentesVisiblesPara(db.MiembroActual).FirstOrDefaultAsync(x => x.Id == id, ct);
 
     /// <inheritdoc />
     public Task<GastoRecurrente?> ObtenerParaEditarAsync(Guid id, CancellationToken ct)
-        => db.GastosRecurrentes.FirstOrDefaultAsync(x => x.Id == id, ct);
+        => db.GastosRecurrentes.RecurrentesVisiblesPara(db.MiembroActual).FirstOrDefaultAsync(x => x.Id == id, ct);
 
     /// <inheritdoc />
     public void Anadir(GastoRecurrente plantilla) => db.GastosRecurrentes.Add(plantilla);

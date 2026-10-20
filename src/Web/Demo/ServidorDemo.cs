@@ -236,13 +236,13 @@ public sealed partial class ServidorDemo
 
     private async Task<HttpResponseMessage> CrearGasto(GastoRequest r, CancellationToken ct)
     {
-        var res = await _gastos.CrearAsync(IdHogar, Datos(r), ct);
+        var res = await _gastos.CrearAsync(IdHogar, Datos(r), ct, _almacen.MiembroActual);
         return res.Error is { } e ? Error(e) : Respuesta(HttpStatusCode.Created, res.Valor!.ADto());
     }
 
     private async Task<HttpResponseMessage> EditarGasto(Guid id, GastoRequest r, CancellationToken ct)
     {
-        var res = await _gastos.EditarAsync(id, Datos(r), ct);
+        var res = await _gastos.EditarAsync(id, Datos(r), ct, _almacen.MiembroActual);
         return res.Error is { } e ? Error(e) : Ok(res.Valor!.ADto());
     }
 
@@ -267,20 +267,20 @@ public sealed partial class ServidorDemo
     // ───── Recurrentes ─────
 
     private static DatosRecurrente Datos(GastoRecurrenteRequest r)
-        => new(r.Importe, r.CategoriaId, r.PagadoPor, r.PerfilRepartoId, r.DiaMes, r.Concepto, r.Activo);
+        => new(r.Importe, r.CategoriaId, r.PagadoPor, r.PerfilRepartoId, r.DiaMes, r.Concepto, r.Activo, r.Personal);
 
     private async Task<HttpResponseMessage> ObtenerRecurrente(Guid id, CancellationToken ct)
         => await _recurrentes.ObtenerAsync(id, ct) is { } r ? Ok(r.ADto()) : NoEncontrado();
 
     private async Task<HttpResponseMessage> CrearRecurrente(GastoRecurrenteRequest r, CancellationToken ct)
     {
-        var res = await _recurrentes.CrearAsync(IdHogar, Datos(r), ct);
+        var res = await _recurrentes.CrearAsync(IdHogar, Datos(r), ct, _almacen.MiembroActual);
         return res.Error is { } e ? Error(e) : Respuesta(HttpStatusCode.Created, res.Valor!.ADto());
     }
 
     private async Task<HttpResponseMessage> EditarRecurrente(Guid id, GastoRecurrenteRequest r, CancellationToken ct)
     {
-        var res = await _recurrentes.EditarAsync(id, Datos(r), ct);
+        var res = await _recurrentes.EditarAsync(id, Datos(r), ct, _almacen.MiembroActual);
         return res.Error is { } e ? Error(e) : Ok(res.Valor!.ADto());
     }
 

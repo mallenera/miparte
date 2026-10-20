@@ -58,7 +58,7 @@ public static class GastosEndpoints
         GastoRequest req, [FromServices] ServicioGastos servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
-        var r = await servicio.CrearAsync(hogarId, Datos(req), ct);
+        var r = await servicio.CrearAsync(hogarId, Datos(req), ct, hogar.MiembroId);
         if (r.Error is { } error) return ApiComun.Respuesta(error);
         return Results.Created($"/api/gastos/{r.Valor!.Id}", r.Valor.ADto());
     }
@@ -68,7 +68,7 @@ public static class GastosEndpoints
         Guid id, GastoRequest req, [FromServices] ServicioGastos servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
-        var r = await servicio.EditarAsync(id, Datos(req), ct);
+        var r = await servicio.EditarAsync(id, Datos(req), ct, hogar.MiembroId);
         return r.Error is { } error ? ApiComun.Respuesta(error) : Results.Ok(r.Valor!.ADto());
     }
 

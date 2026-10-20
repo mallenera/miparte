@@ -8,6 +8,7 @@ using MiParte.Core.Api.Cierres;
 using MiParte.Core.Api.Gastos;
 using MiParte.Core.Api.Hogares;
 using MiParte.Core.Api.Miembros;
+using MiParte.Core.Api.Notificaciones;
 using MiParte.Core.Api.Reparto;
 using MiParte.Core.Api.Seguridad;
 using MiParte.Core.Application.CuentaComun;
@@ -18,6 +19,7 @@ using MiParte.Core.Application.Gastos;
 using MiParte.Core.Application.Hogares;
 using MiParte.Core.Application.Liquidacion;
 using MiParte.Core.Application.Miembros;
+using MiParte.Core.Application.Notificaciones;
 using MiParte.Core.Application.Periodos;
 using MiParte.Core.Application.Perfiles;
 using MiParte.Core.Application.Recurrentes;
@@ -41,11 +43,19 @@ var connectionString = builder.Configuration.GetConnectionString("Default");
 if (!string.IsNullOrWhiteSpace(connectionString))
 {
     builder.Services.AddPersistencia(connectionString);
+    // Envío de avisos del navegador: solo con base de datos, de donde leen las suscripciones.
+    builder.Services.AddHostedService<EnviadorNotificacionesPush>();
 }
 
 // Casos de uso y repositorios: fuera del if porque solo necesitan el MiParteDbContext, que los tests sustituyen.
 builder.Services.AddRepositorios();
-builder.Services.AddScoped(sp => new ServicioGastos(sp.GetRequiredService<IRepositorioGastos>()));
+// Avisos: la cola es fuera del if (los casos de uso la llenan); sin claves VAPID el envío queda desactivado.
+builder.Services.AddColaNotificacionesPush();
+builder.Services.Configure<OpcionesPush>(builder.Configuration.GetSection(OpcionesPush.Seccion));
+builder.Services.AddScoped(sp => new ServicioNotificaciones(
+    sp.GetRequiredService<IRepositorioNotificaciones>(), sp.GetRequiredService<IRepositorioMiembros>(), sp.GetRequiredService<TimeProvider>()));
+builder.Services.AddScoped(sp => new ServicioGastos(
+    sp.GetRequiredService<IRepositorioGastos>(), sp.GetRequiredService<IPublicadorNotificaciones>()));
 builder.Services.AddScoped(sp => new ServicioPerfiles(sp.GetRequiredService<IRepositorioPerfiles>()));
 builder.Services.AddScoped(sp => new ServicioHogares(sp.GetRequiredService<IRepositorioHogares>()));
 builder.Services.AddScoped(sp => new ServicioAuditoria(sp.GetRequiredService<IRepositorioAuditoria>()));
@@ -125,6 +135,7 @@ app.MapEnlacesGrupo();
 app.MapAuditoria();
 app.MapCierresMes();
 app.MapCierresPeriodo();
+app.MapNotificaciones();
 
 app.Run();
 

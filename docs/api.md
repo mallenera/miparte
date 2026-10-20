@@ -139,7 +139,7 @@ Los ingresos personales del hogar **no se guardan**. Los ingresos externos a la 
 |---|---|---|---|---|---|
 | `GET /api/gastos-recurrentes` | Lista (por `diaMes`) | - | `GastoRecurrenteResponse[]` 200 | 409 sin hogar | miembro |
 | `GET /api/gastos-recurrentes/{id}` | Una plantilla | - | `GastoRecurrenteResponse` 200 | 404; 409 | miembro |
-| `POST /api/gastos-recurrentes` | Crea plantilla | `GastoRecurrenteRequest` | `GastoRecurrenteResponse` 201 | 400 importe, `diaMes` fuera de 1-28, categoría o perfil inexistente, pagador no adulto activo; 409 sin hogar o con las recurrentes desactivadas en el hogar | permiso `recurrentes.gestionar` |
+| `POST /api/gastos-recurrentes` | Crea plantilla. Con `personal: true` cada gasto generado es personal: lo asume íntegro quien paga, sin reparto ni cuenta común, y queda fuera de la liquidación | `GastoRecurrenteRequest` | `GastoRecurrenteResponse` 201 | 400 importe, `diaMes` fuera de 1-28, categoría o perfil inexistente, pagador no adulto activo; 409 sin hogar o con las recurrentes desactivadas en el hogar | permiso `recurrentes.gestionar` |
 | `PUT /api/gastos-recurrentes/{id}` | Edita (no toca gastos ya generados) | `GastoRecurrenteRequest` | `GastoRecurrenteResponse` 200 | 400, 404, 409 | permiso `recurrentes.gestionar` |
 | `DELETE /api/gastos-recurrentes/{id}` | Borra | - | 204 | 404; 409 si ya tiene gastos generados (desactivar con PUT `activo=false`) | permiso `recurrentes.gestionar` |
 | `PUT /api/hogar/recurrentes` | **Permiso `hogar.funciones`.** Activa o desactiva los gastos recurrentes del hogar (`{ "activas": true }`). Desactivarlos no borra plantillas: quedan pausadas. Con ellos desactivados, `POST /api/gastos-recurrentes` y `POST /api/gastos-recurrentes/generar` responden 409 (`"Las recurrentes no están activadas en este hogar."`); las consultas, la edición y el borrado siguen funcionando | `ActivarRecurrentesRequest` | `{ "activas": bool }` 200 | 403 sin el permiso; 409 sin hogar | permiso `hogar.funciones` |
@@ -205,7 +205,19 @@ Un mes cerrado congela sus **gastos** y, con ellos, su reparto, su resumen y su 
 
 Cada cambio de gasto, gasto recurrente, pago de liquidación, aportación, reembolso, ingreso y retirada de ahorro, perfil, categoría, miembro, invitación y enlace de grupo queda registrado **en la misma transacción** que el cambio (no puede haber cambio sin rastro). `accion`: `crear` (solo `despues`), `editar` (solo los campos que cambian, en `antes` y `despues`), `borrar` (solo `antes`), `vincular` (un usuario queda ligado a un miembro al aceptar una invitación) y `usar` (invitación aceptada). El reparto de un gasto (`repartos`) y el detalle de un perfil (`detalle`) van dentro de su evento. Crear un hogar es un único evento (no se detalla la semilla). Nunca se registran el token de una invitación ni su hash. `autor` es el nombre del miembro vinculado al usuario; `usuarioId` sigue siendo válido aunque ese miembro se desactive.
 
-Total: 65 endpoints de negocio (5 hogares/yo, 10 miembros/invitaciones/enlaces de grupo, 4 categorías, 5 perfiles, 5 gastos, 6 recurrentes, 8 resumen/liquidación/pagos/ciclos, 16 cuenta común, 5 cierre de mes, 1 auditoría) más `GET /health`.
+### 3.12 Avisos del navegador
+
+Avisos push a los miembros del hogar cuando alguien anota un gasto nuevo que no es personal. Cada miembro activa los avisos en su propio dispositivo; no hace falta permiso, es una preferencia personal. La suscripción la guarda el miembro activo del usuario en el hogar actual.
+
+| Método y ruta | Descripción | Request | Response | Errores | Permisos |
+|---|---|---|---|---|---|
+| `GET /api/notificaciones/clave-publica` | Clave pública VAPID con la que el navegador se suscribe | - | `ClavePublicaPushResponse` 200 | 401 sin token; 404 si el servidor no tiene las claves configuradas | - |
+| `POST /api/notificaciones/suscripcion` | Registra la suscripción de este dispositivo. Si el mismo endpoint estaba registrado (quizá con otro miembro), lo sustituye | `SuscripcionPushRequest` | 204 | 400 endpoint que no es https o claves vacías; 403 no eres miembro activo; 409 sin hogar | - |
+| `DELETE /api/notificaciones/suscripcion` | Quita la suscripción de este dispositivo. Idempotente: 204 también si ya no existía | `BajaSuscripcionPushRequest` | 204 | 400 sin endpoint; 403 no eres miembro activo; 409 sin hogar | - |
+
+Un gasto nuevo no personal avisa a las suscripciones del hogar salvo a la del pagador (`PagadoPor`). El aviso sale en segundo plano: la respuesta de `POST /api/gastos` no espera al servicio push, y si la cola interna se llena o faltan las claves, el aviso se descarta sin fallar el gasto. Una suscripción que el servicio push da por caducada (404 o 410) se borra. El contenido del aviso es JSON `{ "titulo", "cuerpo", "ruta" }`. Si cambian las claves VAPID, las suscripciones existentes dejan de servir y hay que volver a activar los avisos.
+
+Total: 68 endpoints de negocio (5 hogares/yo, 10 miembros/invitaciones/enlaces de grupo, 4 categorías, 5 perfiles, 5 gastos, 6 recurrentes, 8 resumen/liquidación/pagos/ciclos, 16 cuenta común, 5 cierre de mes, 1 auditoría, 3 avisos del navegador) más `GET /health`.
 
 ## 4. Ejemplos JSON
 
@@ -477,6 +489,8 @@ Categoría a cargo de la cuenta común (con la cuenta activada; el servidor asig
 Error típico si se pasa de la deuda (409): `{ "error": "El importe supera la deuda pendiente entre ambos miembros (150.00).", "pendiente": 150.00 }`.
 
 ## 5. Reglas de negocio útiles para la UI
+
+- **Gastos personales**: un gasto con `personal: true` solo lo ven y lo cambian quien paga (`pagadoPor`). No aparece en las listas, detalle, resumen, dashboard ni historial de los demás, ni siquiera de un admin; los endpoints responden 404 a quien no es el pagador. Solo quien paga puede anotarlo; si intenta anotar uno de otro, 400. Las plantillas recurrentes personales siguen la misma regla. Los gastos personales de un miembro desactivado se conservan, pero nadie los ve hasta que vuelva a activarse.
 
 - **Hogar de un adulto**: el reparto funciona (el creador recibe el 100 %), pero no hay liquidación que mostrar: el único saldo es 0 y no hay transferencias. La UI puede ocultar la pantalla de liquidación con un solo adulto activo.
 - **Importes**: mayores que 0, máximo 2 decimales y hasta 9.999.999.999,99. Más decimales dan 400. Conceptos de hasta 200 caracteres; nombres de hogar, miembro, categoría y perfil hasta 100.

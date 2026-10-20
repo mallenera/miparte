@@ -74,7 +74,11 @@ public class HogarActualMiddleware(RequestDelegate next)
             }
 
             if (hogarActual.HogarId is { } hogarElegido)
-                ctx.Items[ClaveMiembro] = miembros.FirstOrDefault(m => m.HogarId == hogarElegido);
+            {
+                var yo = miembros.FirstOrDefault(m => m.HogarId == hogarElegido);
+                ctx.Items[ClaveMiembro] = yo;
+                hogarActual.MiembroId = yo?.Id;
+            }
         }
 
         try

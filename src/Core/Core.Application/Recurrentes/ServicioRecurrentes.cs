@@ -12,8 +12,10 @@ namespace MiParte.Core.Application.Recurrentes;
 /// <param name="DiaMes">Día del mes (1 a 28) en que se genera.</param>
 /// <param name="Concepto">Descripción opcional.</param>
 /// <param name="Activo">Si la plantilla genera gastos.</param>
+/// <param name="Personal">Si los gastos que genera son personales (solo para quien paga; fuera de la liquidación).</param>
 public sealed record DatosRecurrente(
-    decimal Importe, Guid CategoriaId, Guid PagadoPor, Guid PerfilRepartoId, short DiaMes, string? Concepto, bool Activo);
+    decimal Importe, Guid CategoriaId, Guid PagadoPor, Guid PerfilRepartoId, short DiaMes, string? Concepto, bool Activo,
+    bool Personal = false);
 
 /// <summary>Resultado de generar el mes: cuántos gastos se crearon y cuántas plantillas ya tenían el suyo.</summary>
 public sealed record GeneracionDelMes(DateOnly Mes, int Creados, int YaExistentes);
@@ -41,16 +43,17 @@ public sealed class ServicioRecurrentes(IRepositorioRecurrentes recurrentes, IRe
     /// Crea una plantilla. Conflicto si el hogar tiene desactivados los gastos recurrentes; inválida si el importe, el día, la categoría,
     /// el pagador o el perfil no valen.
     /// </summary>
-    public async Task<Resultado<GastoRecurrente>> CrearAsync(Guid hogarId, DatosRecurrente datos, CancellationToken ct)
+    public async Task<Resultado<GastoRecurrente>> CrearAsync(Guid hogarId, DatosRecurrente datos, CancellationToken ct, Guid? quien = null)
     {
         if (!await recurrentes.RecurrentesActivasAsync(ct)) return Resultado<GastoRecurrente>.Conflicto(Mensajes.RecurrentesInactivas);
+        if (AjenaPersonal(datos, quien)) return Resultado<GastoRecurrente>.Invalido(ServicioGastos.PersonalDeOtro);
         if (await ValidarAsync(datos, ct) is { } error) return Resultado<GastoRecurrente>.Invalido(error);
 
         var plantilla = new GastoRecurrente
         {
             Id = Guid.NewGuid(), HogarId = hogarId, Importe = datos.Importe, CategoriaId = datos.CategoriaId,
             PagadoPor = datos.PagadoPor, PerfilRepartoId = datos.PerfilRepartoId, DiaMes = datos.DiaMes,
-            Concepto = ReglasMovimiento.NormalizarConcepto(datos.Concepto), Activo = datos.Activo,
+            Concepto = ReglasMovimiento.NormalizarConcepto(datos.Concepto), Activo = datos.Activo, EsPersonal = datos.Personal,
         };
         recurrentes.Anadir(plantilla);
         await recurrentes.GuardarAsync(ct);
@@ -58,10 +61,11 @@ public sealed class ServicioRecurrentes(IRepositorioRecurrentes recurrentes, IRe
     }
 
     /// <summary>Actualiza la plantilla sin modificar los gastos ya generados (el historial es inmutable).</summary>
-    public async Task<Resultado<GastoRecurrente>> EditarAsync(Guid id, DatosRecurrente datos, CancellationToken ct)
+    public async Task<Resultado<GastoRecurrente>> EditarAsync(Guid id, DatosRecurrente datos, CancellationToken ct, Guid? quien = null)
     {
         var plantilla = await recurrentes.ObtenerParaEditarAsync(id, ct);
         if (plantilla is null) return Resultado<GastoRecurrente>.NoEncontrado();
+        if (AjenaPersonal(datos, quien)) return Resultado<GastoRecurrente>.Invalido(ServicioGastos.PersonalDeOtro);
         if (await ValidarAsync(datos, ct) is { } error) return Resultado<GastoRecurrente>.Invalido(error);
 
         plantilla.Importe = datos.Importe;
@@ -71,6 +75,7 @@ public sealed class ServicioRecurrentes(IRepositorioRecurrentes recurrentes, IRe
         plantilla.DiaMes = datos.DiaMes;
         plantilla.Concepto = ReglasMovimiento.NormalizarConcepto(datos.Concepto);
         plantilla.Activo = datos.Activo;
+        plantilla.EsPersonal = datos.Personal;
         await recurrentes.GuardarAsync(ct);
         return Resultado<GastoRecurrente>.Ok(plantilla);
     }
@@ -113,7 +118,7 @@ public sealed class ServicioRecurrentes(IRepositorioRecurrentes recurrentes, IRe
                 var perfiles = await recurrentes.PerfilesAsync(ct);
 
                 // Una plantilla a cargo de la cuenta común no genera gastos mientras el hogar no la tenga activada.
-                if (pendientes.Any(p => perfiles[p.PerfilRepartoId].Modo == ModoReparto.CuentaComun)
+                if (pendientes.Any(p => !p.EsPersonal && perfiles[p.PerfilRepartoId].Modo == ModoReparto.CuentaComun)
                     && !await gastos.CuentaComunActivaAsync(ct))
                     return Resultado<GeneracionDelMes>.Conflicto(Mensajes.CuentaInactiva);
 
@@ -141,6 +146,9 @@ public sealed class ServicioRecurrentes(IRepositorioRecurrentes recurrentes, IRe
             return Resultado<GeneracionDelMes>.Ok(new GeneracionDelMes(inicio, pendientes.Count, plantillas.Count - pendientes.Count));
         }
     }
+
+    /// <summary>Una plantilla personal solo la crea o cambia quien paga (ver <see cref="ServicioGastos"/>); null de <paramref name="quien"/> = sin control.</summary>
+    private static bool AjenaPersonal(DatosRecurrente d, Guid? quien) => d.Personal && quien is { } yo && d.PagadoPor != yo;
 
     /// <summary>Valida importe, concepto, día del mes, categoría, pagador adulto activo y perfil de reparto; devuelve el error o null.</summary>
     private async Task<string?> ValidarAsync(DatosRecurrente d, CancellationToken ct)

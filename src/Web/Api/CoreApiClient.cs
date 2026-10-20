@@ -419,6 +419,23 @@ public sealed class CoreApiClient
     public Task ReabrirMesAsync(string mes, CancellationToken ct = default) =>
         EnviarSinRespuestaAsync(HttpMethod.Delete, $"api/cierres-mes/{Uri.EscapeDataString(mes)}", ct);
 
+    /// <summary>Clave pública VAPID para suscribir este navegador a los avisos (<c>GET /api/notificaciones/clave-publica</c>). 404 si el servidor no tiene avisos configurados.</summary>
+    /// <param name="ct">Token de cancelación.</param>
+    public async Task<string> ObtenerClaveAvisosAsync(CancellationToken ct = default) =>
+        (await ObtenerAsync<ClavePublicaPushResponse>("api/notificaciones/clave-publica", ct)).ClavePublica;
+
+    /// <summary>Registra la suscripción de este dispositivo a los avisos (<c>POST /api/notificaciones/suscripcion</c>).</summary>
+    /// <param name="peticion">Endpoint y claves que devuelve el navegador al suscribirse.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task GuardarSuscripcionAvisosAsync(SuscripcionPushRequest peticion, CancellationToken ct = default) =>
+        EnviarSinRespuestaAsync(HttpMethod.Post, "api/notificaciones/suscripcion", ct, peticion);
+
+    /// <summary>Quita la suscripción de este dispositivo (<c>DELETE /api/notificaciones/suscripcion</c>). No falla si ya no existía.</summary>
+    /// <param name="endpoint">Endpoint de la suscripción que se quita.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task QuitarSuscripcionAvisosAsync(string endpoint, CancellationToken ct = default) =>
+        EnviarSinRespuestaAsync(HttpMethod.Delete, "api/notificaciones/suscripcion", ct, new BajaSuscripcionPushRequest(endpoint));
+
     private Task<T> ObtenerAsync<T>(string ruta, CancellationToken ct) => EnviarAsync<T>(HttpMethod.Get, ruta, null, ct);
 
     /// <summary>Lectura de una lista que casi no cambia: pasa por la caché, que la reutiliza entre pantallas durante <see cref="CacheLecturas.Vigencia"/>.</summary>
@@ -450,9 +467,10 @@ public sealed class CoreApiClient
         if (afectadas.Count > 0) _cache.Invalidar(afectadas.ToArray());
     }
 
-    private async Task EnviarSinRespuestaAsync(HttpMethod metodo, string ruta, CancellationToken ct)
+    private async Task EnviarSinRespuestaAsync(HttpMethod metodo, string ruta, CancellationToken ct, object? cuerpo = null)
     {
         using var peticion = new HttpRequestMessage(metodo, ruta);
+        if (cuerpo is not null) peticion.Content = JsonContent.Create(cuerpo, cuerpo.GetType());
         HttpResponseMessage respuesta;
         try
         {

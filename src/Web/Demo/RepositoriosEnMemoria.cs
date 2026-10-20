@@ -49,7 +49,9 @@ internal static class RepositoriosEnMemoria
 internal sealed class RepositorioLiquidacionEnMemoria(AlmacenDemo a) : IRepositorioLiquidacion
 {
     public Task<IReadOnlyList<Gasto>> GastosDelMesAsync(DateOnly inicio, CancellationToken ct)
-        => Task.FromResult<IReadOnlyList<Gasto>>(a.Gastos.Where(g => g.Fecha >= inicio && g.Fecha < inicio.AddMonths(1)).ToList());
+        => Task.FromResult<IReadOnlyList<Gasto>>(a.Gastos
+            .Where(g => g.Fecha >= inicio && g.Fecha < inicio.AddMonths(1) && ReglasPrivacidad.EsVisible(g.EsPersonal, g.PagadoPor, a.MiembroActual))
+            .ToList());
 
     public Task<IReadOnlyList<Miembro>> MiembrosAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<Miembro>>(a.Miembros.ToList());
 
@@ -110,7 +112,7 @@ internal sealed class RepositorioGastosEnMemoria(AlmacenDemo a) : IRepositorioGa
 
     public Task<IReadOnlyList<Gasto>> ListarAsync(FiltroGastos f, CancellationToken ct)
     {
-        var q = a.Gastos.AsEnumerable();
+        var q = a.Gastos.Where(g => ReglasPrivacidad.EsVisible(g.EsPersonal, g.PagadoPor, a.MiembroActual));
         if (f.Desde is { } desde) q = q.Where(g => g.Fecha >= desde);
         if (f.Hasta is { } hasta) q = q.Where(g => g.Fecha <= hasta);
         if (f.CategoriaId is { } c) q = q.Where(g => g.CategoriaId == c);
@@ -120,7 +122,8 @@ internal sealed class RepositorioGastosEnMemoria(AlmacenDemo a) : IRepositorioGa
         return Task.FromResult<IReadOnlyList<Gasto>>(q.OrderByDescending(g => g.Fecha).ThenBy(g => g.Id).ToList());
     }
 
-    public Task<Gasto?> ObtenerAsync(Guid id, CancellationToken ct) => Task.FromResult(a.Gastos.FirstOrDefault(g => g.Id == id));
+    public Task<Gasto?> ObtenerAsync(Guid id, CancellationToken ct) => Task.FromResult(a.Gastos.FirstOrDefault(g =>
+        g.Id == id && ReglasPrivacidad.EsVisible(g.EsPersonal, g.PagadoPor, a.MiembroActual)));
 
     public Task<Gasto?> ObtenerParaEditarAsync(Guid id, CancellationToken ct) => ObtenerAsync(id, ct);
 
@@ -374,9 +377,12 @@ internal sealed class RepositorioRecurrentesEnMemoria(AlmacenDemo a) : IReposito
     }
 
     public Task<IReadOnlyList<GastoRecurrente>> ListarAsync(CancellationToken ct)
-        => Task.FromResult<IReadOnlyList<GastoRecurrente>>(a.Recurrentes.OrderBy(r => r.DiaMes).ThenBy(r => r.Id).ToList());
+        => Task.FromResult<IReadOnlyList<GastoRecurrente>>(a.Recurrentes
+            .Where(r => ReglasPrivacidad.EsVisible(r.EsPersonal, r.PagadoPor, a.MiembroActual))
+            .OrderBy(r => r.DiaMes).ThenBy(r => r.Id).ToList());
 
-    public Task<GastoRecurrente?> ObtenerAsync(Guid id, CancellationToken ct) => Task.FromResult(a.Recurrentes.FirstOrDefault(r => r.Id == id));
+    public Task<GastoRecurrente?> ObtenerAsync(Guid id, CancellationToken ct) => Task.FromResult(a.Recurrentes.FirstOrDefault(r =>
+        r.Id == id && ReglasPrivacidad.EsVisible(r.EsPersonal, r.PagadoPor, a.MiembroActual)));
 
     public Task<GastoRecurrente?> ObtenerParaEditarAsync(Guid id, CancellationToken ct) => ObtenerAsync(id, ct);
 

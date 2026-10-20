@@ -42,6 +42,14 @@ El plan gratuito duerme el servicio tras 15 minutos sin tráfico: la primera pet
 3. Cambia `ConnectionStrings__Default` a `...;SSL Mode=VerifyFull;Root Certificate=/etc/secrets/supabase-ca.crt` (en lugar de `SSL Mode=Require`) y guarda; Render redespliega.
 4. Si el log muestra un error de certificado o de nombre, no bajes a `Require`: corrige el certificado, la ruta de `Root Certificate` o el host (debe ser el del certificado). `VerifyFull` valida cadena y nombre del host; `VerifyCA` solo la cadena.
 
+### Avisos del navegador (claves VAPID)
+
+Los avisos push necesitan un par de claves VAPID en Core.Api. Se generan una sola vez, fuera del repo (con Node instalado: `npx web-push generate-vapid-keys`), y la privada no se guarda en ningún fichero del proyecto:
+
+1. Render → `miparte-core` → Environment: `Notificaciones__VapidPublica` (clave pública), `Notificaciones__VapidPrivada` (clave privada, secreta) y `Notificaciones__Contacto` (`mailto:` de contacto). Render redespliega.
+2. Comprueba `GET /api/notificaciones/clave-publica` con un token válido: 200 con la clave pública. Sin claves responde 404 y el front no ofrece los avisos.
+3. Si cambias las claves, las suscripciones de los dispositivos dejan de funcionar: cada miembro tiene que volver a activar los avisos.
+
 ## Errores 500
 
 Core.Api responde `500 { "error": "Error interno del servidor." }` ante una excepción no controlada, con las cabeceras CORS ya aplicadas, y deja la traza en los logs de Render. Si el navegador muestra un 500, el motivo real está ahí, no en la consola del navegador.

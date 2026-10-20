@@ -7,6 +7,9 @@ self.addEventListener('activate', event => event.waitUntil(onActivate(event)));
 self.addEventListener('fetch', event => event.respondWith(onFetch(event)));
 // La aplicación pide activar la versión nueva cuando el usuario pulsa «Actualizar» (ver js/registrar-sw.js).
 self.addEventListener('message', event => { if (event.data === 'SKIP_WAITING') self.skipWaiting(); });
+// Avisos del navegador: el servicio push despierta este worker con {titulo, cuerpo, ruta} (ver EnviadorNotificacionesPush).
+self.addEventListener('push', event => event.waitUntil(mostrarAviso(event)));
+self.addEventListener('notificationclick', event => event.waitUntil(abrirAviso(event)));
 
 const cacheNamePrefix = 'offline-cache-';
 const cacheName = `${cacheNamePrefix}${self.assetsManifest.version}`;
@@ -56,4 +59,27 @@ async function onFetch(event) {
     }
 
     return cachedResponse || fetch(event.request);
+}
+
+async function mostrarAviso(event) {
+    let datos = {};
+    try { datos = event.data ? event.data.json() : {}; } catch { /* carga no JSON: se muestra el aviso genérico */ }
+    await self.registration.showNotification(datos.titulo || 'Mi parte, tu parte', {
+        body: datos.cuerpo || '',
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        data: { ruta: datos.ruta || '/' },
+    });
+}
+
+async function abrirAviso(event) {
+    event.notification.close();
+    const url = new URL(event.notification.data?.ruta || '/', self.registration.scope).href;
+    const ventanas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const abierta = ventanas.find(v => 'focus' in v);
+    if (abierta) {
+        await abierta.focus();
+        return abierta.navigate ? abierta.navigate(url) : undefined;
+    }
+    return self.clients.openWindow(url);
 }

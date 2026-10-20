@@ -1,3 +1,5 @@
+using System.Globalization;
+using MiParte.Core.Application.Notificaciones;
 using MiParte.Core.Domain;
 using MiParte.Core.Domain.Entidades;
 
@@ -17,7 +19,7 @@ public sealed record DatosGasto(
     bool PagadoDesdeAhorro, bool Personal);
 
 /// <summary>Casos de uso de los gastos: cada gasto guarda su reparto calculado al crearlo o editarlo, y solo entonces.</summary>
-public sealed class ServicioGastos(IRepositorioGastos repositorio)
+public sealed class ServicioGastos(IRepositorioGastos repositorio, IPublicadorNotificaciones? notificaciones = null)
 {
     /// <summary>Gastos que cumplen el filtro, del más reciente al más antiguo.</summary>
     public Task<IReadOnlyList<Gasto>> ListarAsync(FiltroGastos filtro, CancellationToken ct)
@@ -29,10 +31,12 @@ public sealed class ServicioGastos(IRepositorioGastos repositorio)
     /// <summary>
     /// Crea el gasto y guarda su reparto en la misma transacción. Es inválido si los datos o el reparto no valen; es un
     /// conflicto si el mes está cerrado, si va a cargo de la cuenta común y el hogar no la ha activado, o si se paga desde el
-    /// ahorro y este no alcanza.
+    /// ahorro y este no alcanza. Tras guardarlo avisa a los demás miembros (salvo el pagador, que es quien normalmente lo anota;
+    /// los gastos personales no avisan).
     /// </summary>
-    public async Task<Resultado<Gasto>> CrearAsync(Guid hogarId, DatosGasto datos, CancellationToken ct)
+    public async Task<Resultado<Gasto>> CrearAsync(Guid hogarId, DatosGasto datos, CancellationToken ct, Guid? quien = null)
     {
+        if (AjenoAlPersonal(datos, quien)) return Resultado<Gasto>.Invalido(PersonalDeOtro);
         var preparado = await PrepararAsync(datos, ct);
         if (preparado.Error is { } invalido) return Resultado<Gasto>.Invalido(invalido);
         if (await ComprobarAsync(datos, preparado.CuentaComun, excluir: null, [datos.Fecha], ct) is { } fallo) return fallo;
@@ -46,15 +50,37 @@ public sealed class ServicioGastos(IRepositorioGastos repositorio)
         };
         RepartoGasto.Aplicar(gasto, preparado.Partes!);
         repositorio.Anadir(gasto);
-        return await repositorio.GuardarAsync(ct) ? Resultado<Gasto>.Ok(gasto) : Resultado<Gasto>.Conflicto(Mensajes.MesCerrado);
+        if (!await repositorio.GuardarAsync(ct)) return Resultado<Gasto>.Conflicto(Mensajes.MesCerrado);
+
+        if (!gasto.EsPersonal) notificaciones?.Publicar(AvisoGastoNuevo(gasto, datos.PagadoPor));
+        return Resultado<Gasto>.Ok(gasto);
     }
 
-    /// <summary>Actualiza el gasto y recalcula solo su reparto, sin tocar el resto del histórico. No encontrado si no existe.</summary>
-    public Task<Resultado<Gasto>> EditarAsync(Guid id, DatosGasto datos, CancellationToken ct)
+    /// <summary>Aviso de un gasto nuevo: concepto e importe, sin el pagador (ya lo sabe quien lo anotó).</summary>
+    private static NotificacionPush AvisoGastoNuevo(Gasto gasto, Guid? pagadoPor)
+    {
+        var concepto = string.IsNullOrWhiteSpace(gasto.Concepto) ? "Gasto sin concepto" : gasto.Concepto;
+        var importe = gasto.Importe.ToString("N2", CultureInfo.GetCultureInfo("es-ES"));
+        return new NotificacionPush(gasto.HogarId, pagadoPor, "Nuevo gasto", $"{concepto} · {importe} €", "/gastos");
+    }
+
+    /// <summary>
+    /// Un gasto personal lo anota y lo cambia solo quien lo paga. <paramref name="quien"/> es el miembro de la petición; null lo usa
+    /// el propio sistema (sin control, p. ej. la demo interna) y la API siempre lo informa.
+    /// </summary>
+    private static bool AjenoAlPersonal(DatosGasto datos, Guid? quien)
+        => datos.Personal && quien is { } yo && datos.PagadoPor != yo;
+
+    /// <summary>Mensaje cuando alguien intenta anotar o cambiar un gasto personal que no es suyo.</summary>
+    public const string PersonalDeOtro = "Un gasto personal solo puede anotarlo y cambiarlo quien lo paga.";
+
+    /// <summary>Actualiza el gasto y recalcula solo su reparto, sin tocar el resto del histórico. No encontrado si no existe o es un personal ajeno.</summary>
+    public Task<Resultado<Gasto>> EditarAsync(Guid id, DatosGasto datos, CancellationToken ct, Guid? quien = null)
         => repositorio.EnExclusionAsync(async () =>
         {
             var gasto = await repositorio.ObtenerParaEditarAsync(id, ct);
             if (gasto is null) return Resultado<Gasto>.NoEncontrado();
+            if (AjenoAlPersonal(datos, quien)) return Resultado<Gasto>.Invalido(PersonalDeOtro);
             // Un gasto ya liquidado por un ciclo cerrado no cambia: el cierre ya lo dio por bueno con su importe y reparto.
             if (gasto.CicloLiquidacionId is not null) return Resultado<Gasto>.Conflicto(Mensajes.GastoEnCiclo);
             var preparado = await PrepararAsync(datos, ct);

@@ -15,7 +15,9 @@ public sealed class RepositorioLiquidacion(MiParteDbContext db) : IRepositorioLi
     public async Task<IReadOnlyList<Gasto>> GastosDelMesAsync(DateOnly inicio, CancellationToken ct)
     {
         var fin = inicio.AddMonths(1);
-        return await db.Gastos.AsNoTracking().Include(g => g.Repartos).Include(g => g.RepartosACargo).Where(g => g.Fecha >= inicio && g.Fecha < fin).ToListAsync(ct);
+        // Los personales de otros no se ven aquí; la liquidación ya los deja fuera de sus cálculos (LiquidacionMes y ResumenMes).
+        return await db.Gastos.AsNoTracking().Include(g => g.Repartos).Include(g => g.RepartosACargo)
+            .Where(g => g.Fecha >= inicio && g.Fecha < fin).GastosVisiblesPara(db.MiembroActual).ToListAsync(ct);
     }
 
     /// <inheritdoc />

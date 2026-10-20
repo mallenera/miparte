@@ -8,9 +8,11 @@ using MiParte.Core.Application.Gastos;
 using MiParte.Core.Application.Hogares;
 using MiParte.Core.Application.Liquidacion;
 using MiParte.Core.Application.Miembros;
+using MiParte.Core.Application.Notificaciones;
 using MiParte.Core.Application.Periodos;
 using MiParte.Core.Application.Perfiles;
 using MiParte.Core.Application.Recurrentes;
+using MiParte.Core.Infrastructure.Notificaciones;
 using MiParte.Core.Infrastructure.Persistencia;
 
 namespace MiParte.Core.Infrastructure;
@@ -51,6 +53,18 @@ public static class DependencyInjection
         services.AddScoped<IRepositorioHogares>(sp => new RepositorioHogares(sp.GetRequiredService<MiParteDbContext>()));
         services.AddScoped<IRepositorioAuditoria>(sp => new RepositorioAuditoria(sp.GetRequiredService<MiParteDbContext>()));
         services.AddScoped<IRepositorioPeriodos>(sp => new RepositorioPeriodos(sp.GetRequiredService<MiParteDbContext>()));
+        services.AddScoped<IRepositorioNotificaciones>(sp => new RepositorioNotificaciones(sp.GetRequiredService<MiParteDbContext>()));
+        return services;
+    }
+
+    /// <summary>
+    /// Registra cola de avisos push: un singleton que los casos de uso llenan con <see cref="IPublicadorNotificaciones"/> y que
+    /// consume el servicio de envío de Core.Api. No necesita base de datos, así que va aparte de <see cref="AddRepositorios"/>.
+    /// </summary>
+    public static IServiceCollection AddColaNotificacionesPush(this IServiceCollection services)
+    {
+        services.AddSingleton<ColaNotificacionesPush>();
+        services.AddSingleton<IPublicadorNotificaciones>(sp => sp.GetRequiredService<ColaNotificacionesPush>());
         return services;
     }
 }

@@ -384,6 +384,8 @@ public class GastoRecurrente
     public string? Concepto { get; set; }
     /// <summary>Indica si la recurrencia sigue generando gastos.</summary>
     public bool Activo { get; set; } = true;
+    /// <summary>Si los gastos generados son personales: los asume íntegros quien paga y quedan fuera de la liquidación.</summary>
+    public bool EsPersonal { get; set; }
 }
 
 /// <summary>Gasto del hogar pagado por un miembro y repartido entre varios según un perfil.</summary>
@@ -473,4 +475,6 @@ public class EventoAuditoria
     public string? Antes { get; set; }
     /// <summary>JSON con el valor nuevo de los campos que cambian (o el estado completo al crear); null al borrar.</summary>
     public string? Despues { get; set; }
+    /// <summary>Solo para eventos de gastos personales: el miembro que paga, único que puede verlos. Null en el resto.</summary>
+    public Guid? PersonalDe { get; set; }
 }

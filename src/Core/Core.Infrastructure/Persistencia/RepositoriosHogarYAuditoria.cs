@@ -114,7 +114,7 @@ public sealed class RepositorioAuditoria(MiParteDbContext db) : IRepositorioAudi
     /// <inheritdoc />
     public async Task<IReadOnlyList<EventoAuditoria>> ListarAsync(ConsultaAuditoria c, int limite, CancellationToken ct)
     {
-        var q = db.Auditoria.AsQueryable();
+        var q = db.Auditoria.AsQueryable().AuditoriaVisiblePara(db.MiembroActual);
         if (!string.IsNullOrWhiteSpace(c.Entidad)) q = q.Where(e => e.Entidad == c.Entidad);
         if (c.EntidadId is { } id) q = q.Where(e => e.EntidadId == id);
         if (c.Hasta is { } corte)

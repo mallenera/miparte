@@ -16,6 +16,9 @@ internal sealed class AlmacenDemo
     /// <summary>Miembros del hogar.</summary>
     public List<Miembro> Miembros { get; } = [];
 
+    /// <summary>Miembro que hace de la sesión local (quien ve los gastos personales en la demo), o null.</summary>
+    public Guid? MiembroActual => Miembros.FirstOrDefault(m => m.UserId == Guid.Parse(CuentaDemo.IdUsuarioLocal))?.Id;
+
     /// <summary>Perfiles de reparto con su detalle.</summary>
     public List<PerfilReparto> Perfiles { get; } = [];
 

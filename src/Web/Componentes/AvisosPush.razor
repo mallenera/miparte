@@ -1,0 +1,117 @@
+@* Avisos del navegador de este dispositivo: activa o desactiva la suscripción push del miembro. No aparece en la cuenta demo. *@
+@using System.Net
+@inject CoreApiClient Api
+@inject ServicioSesion Sesion
+@inject IJSRuntime JS
+
+@if (!Sesion.EsDemo)
+{
+    <section class="card" aria-labelledby="t-avisos">
+        <div class="card-head"><h2 id="t-avisos">Avisos en este dispositivo</h2></div>
+        <p class="muted">Recibe un aviso cuando alguien del hogar anota un gasto nuevo. Afecta solo a este navegador o a la app instalada.</p>
+
+        @if (_cargando)
+        {
+            <div class="spinbox" role="status"><div class="spin"></div><span>Comprobando los avisos…</span></div>
+        }
+        else if (_noDisponible is not null)
+        {
+            <p class="muted u-mt12" role="status">@_noDisponible</p>
+        }
+        else
+        {
+            <p class="u-mt12">Estado: <strong>@(_activos ? "activados" : "desactivados")</strong></p>
+            <button class="btn btn-sm u-mt12" type="button" disabled="@_ocupado" @onclick="AlternarAsync">
+                @(_activos ? "Desactivar avisos" : "Activar avisos")
+            </button>
+        }
+
+        @if (_error is not null)
+        {
+            <div class="aviso err u-mt12" role="alert">@_error</div>
+        }
+    </section>
+}
+
+@code {
+    private bool _cargando = true, _activos, _ocupado;
+    private string? _clave, _noDisponible, _error;
+
+    /// <summary>Suscripción del navegador tal como la aplana <c>avisos-push.js</c>.</summary>
+    private sealed record SuscripcionNavegador(string Endpoint, string P256dh, string Auth);
+
+    /// <summary>Lee la clave del servidor y si este navegador ya está suscrito. Sin soporte o sin configurar, lo explica en vez de fallar.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        if (Sesion.EsDemo)
+        {
+            _cargando = false;
+            return;
+        }
+        try
+        {
+            if (!await JS.InvokeAsync<bool>("miParteAvisos.soportado"))
+                _noDisponible = "Este navegador no admite avisos. En iPhone o iPad, instala la app en la pantalla de inicio.";
+            else
+            {
+                _clave = await Api.ObtenerClaveAvisosAsync();
+                _activos = await JS.InvokeAsync<SuscripcionNavegador?>("miParteAvisos.suscripcionActual") is not null;
+            }
+        }
+        catch (ApiException ex) when (ex.Codigo == HttpStatusCode.NotFound)
+        {
+            _noDisponible = "El servidor todavía no tiene configurados los avisos.";
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (JSException)
+        {
+            _error = "No se pudo consultar el estado de los avisos en este navegador.";
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    /// <summary>Pide permiso y se suscribe, o cancela la suscripción y la olvida en el servidor. Si el servidor falla, el estado no cambia.</summary>
+    private async Task AlternarAsync()
+    {
+        _ocupado = true;
+        _error = null;
+        try
+        {
+            if (_activos)
+            {
+                var endpoint = await JS.InvokeAsync<string?>("miParteAvisos.desactivar");
+                if (endpoint is not null) await Api.QuitarSuscripcionAvisosAsync(endpoint);
+                _activos = false;
+            }
+            else
+            {
+                var suscripcion = await JS.InvokeAsync<SuscripcionNavegador?>("miParteAvisos.activar", _clave);
+                if (suscripcion is null)
+                    _error = "No has permitido las notificaciones. Cámbialo en los ajustes del sitio del navegador para activarlas.";
+                else
+                {
+                    await Api.GuardarSuscripcionAvisosAsync(new SuscripcionPushRequest(suscripcion.Endpoint, suscripcion.P256dh, suscripcion.Auth));
+                    _activos = true;
+                }
+            }
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (JSException)
+        {
+            _error = "No se pudo cambiar el aviso en este navegador.";
+        }
+        finally
+        {
+            _ocupado = false;
+        }
+    }
+}

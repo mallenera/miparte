@@ -87,6 +87,22 @@ public class ModeloRecurrentesTests
     }
 
     [Fact]
+    public async Task Crear_como_personal_envia_el_indicador_en_la_peticion()
+    {
+        var (m, api) = Crear();
+        api.Responde("POST /api/gastos-recurrentes", HttpStatusCode.Created, Plantilla("Gimnasio", 3));
+        await m.CargarAsync();
+        m.Concepto = "Gimnasio";
+        m.Importe = "40";
+        m.Dia = 3;
+        m.Personal = true;
+
+        await m.GuardarAsync();
+
+        Assert.Contains("\"personal\":true", api.Cuerpos["POST /api/gastos-recurrentes"]);
+    }
+
+    [Fact]
     public async Task Pausar_envia_la_plantilla_con_activo_invertido()
     {
         var p = Plantilla("Gas");

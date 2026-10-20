@@ -32,7 +32,7 @@ public static class RecurrentesEndpoints
 
     /// <summary>Convierte el cuerpo de la petición en los datos del caso de uso.</summary>
     private static DatosRecurrente Datos(GastoRecurrenteRequest r)
-        => new(r.Importe, r.CategoriaId, r.PagadoPor, r.PerfilRepartoId, r.DiaMes, r.Concepto, r.Activo);
+        => new(r.Importe, r.CategoriaId, r.PagadoPor, r.PerfilRepartoId, r.DiaMes, r.Concepto, r.Activo, r.Personal);
 
     /// <summary>GET /api/gastos-recurrentes: lista las plantillas ordenadas por día del mes. 409 sin hogar.</summary>
     private static async Task<IResult> ListarAsync(
@@ -56,7 +56,7 @@ public static class RecurrentesEndpoints
         GastoRecurrenteRequest req, [FromServices] ServicioRecurrentes servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
-        var r = await servicio.CrearAsync(hogarId, Datos(req), ct);
+        var r = await servicio.CrearAsync(hogarId, Datos(req), ct, hogar.MiembroId);
         if (r.Error is { } error) return ApiComun.Respuesta(error);
         return Results.Created($"/api/gastos-recurrentes/{r.Valor!.Id}", r.Valor.ADto());
     }
@@ -66,7 +66,7 @@ public static class RecurrentesEndpoints
         Guid id, GastoRecurrenteRequest req, [FromServices] ServicioRecurrentes servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
-        var r = await servicio.EditarAsync(id, Datos(req), ct);
+        var r = await servicio.EditarAsync(id, Datos(req), ct, hogar.MiembroId);
         return r.Error is { } error ? ApiComun.Respuesta(error) : Results.Ok(r.Valor!.ADto());
     }
 

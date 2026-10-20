@@ -40,7 +40,7 @@ public static class Dtos
 
     /// <summary>Plantilla de gasto recurrente.</summary>
     public static GastoRecurrenteResponse ADto(this GastoRecurrente r)
-        => new(r.Id, r.Importe, r.CategoriaId, r.PagadoPor, r.PerfilRepartoId, r.DiaMes, r.Concepto, r.Activo);
+        => new(r.Id, r.Importe, r.CategoriaId, r.PagadoPor, r.PerfilRepartoId, r.DiaMes, r.Concepto, r.Activo, r.EsPersonal);
 
     /// <summary>Hogar con las funciones activadas y su tipo de grupo.</summary>
     public static HogarResumen ADto(this Hogar h)

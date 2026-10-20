@@ -76,19 +76,19 @@ Las fases van en orden de prioridad. Cada ítem indica su criterio de hecho.
 
 ### Fase 4 · Funcionalidad pendiente (por utilidad)
 
-15. **Notificaciones push del navegador.** Opt-in por usuario desde la PWA. Avisos cuando alguien agrega un gasto (a los demás miembros) y cuando se cierra una liquidación (ciclo o periodo), y al registrar un pago de liquidación. Diseño:
+15. **Notificaciones push del navegador.** *No iniciado* (no hay código: ni `suscripcion_push` ni WebPush). Opt-in por usuario desde la PWA. Avisos cuando alguien agrega un gasto (a los demás miembros) y cuando se cierra una liquidación (ciclo o periodo), y al registrar un pago de liquidación. Diseño:
     - Tabla `suscripcion_push` (miembro, endpoint y claves) en `Estructura/`, con RLS y filtro por hogar.
     - `POST`/`DELETE /api/notificaciones/suscripcion` en Core.Api.
     - Envío desde Core.Application en segundo plano, sin hacer fallar la petición; claves VAPID en variables de entorno; librería WebPush de .NET.
     - Manejador `push` y clic en el service worker. Sin cambios de CSP.
     - Límite: en iOS solo con la PWA instalada. La cuenta demo no envía avisos.
     - Hecho cuando un gasto nuevo llega como notificación a otro miembro, y el aviso se puede activar y desactivar.
-16. **Recurrentes que generen gastos personales** (pendiente en la fila de gastos personales).
-17. **Asistente**: streaming de respuestas y chat en la cuenta demo.
+16. **Recurrentes que generen gastos personales.** *Pendiente*: los gastos personales ya están hechos (`20261022140000_gasto_personal.sql`); falta que las plantillas recurrentes los generen.
+17. **Asistente**: streaming de respuestas y chat en la cuenta demo. *No iniciado* (sin streaming en `Assistant.Api`; el chat en la demo no está comprobado).
 
-18. **Alta de gastos por chat, con confirmación.** Herramienta de escritura en `Assistant.Api` que propone un gasto (concepto, importe, fecha, categoría, pagador y reparto) y solo lo guarda tras una confirmación explícita de la persona (segunda llamada con botón «Confirmar»). Usa el JWT y el hogar de la persona, así que Core.Api aplica sus permisos. El modelo no fija el importe ni el reparto definitivos: los muestra y los confirma la persona. Decisiones antes de empezar: campos mínimos que pide el chat, si el reparto sale del perfil de la categoría, y si la auditoría registra el alta como hecha por el asistente. Hecho cuando «apunta 12 € de café» deja un borrador, no guarda nada sin «Confirmar» y el gasto aparece en Gastos con el autor correcto.
-19. **Extras del diseño**: presupuestos con alertas y exportación a Excel o PDF; categorización automática de gastos (D6, extra).
-20. **Mejoras «Posterior»** del diseño, cada una con su propio análisis antes de empezar:
+18. **Alta de gastos por chat, con confirmación.** *No iniciado* (el asistente solo tiene funciones de lectura). Herramienta de escritura en `Assistant.Api` que propone un gasto (concepto, importe, fecha, categoría, pagador y reparto) y solo lo guarda tras una confirmación explícita de la persona (segunda llamada con botón «Confirmar»). Usa el JWT y el hogar de la persona, así que Core.Api aplica sus permisos. El modelo no fija el importe ni el reparto definitivos: los muestra y los confirma la persona. Decisiones antes de empezar: campos mínimos que pide el chat, si el reparto sale del perfil de la categoría, y si la auditoría registra el alta como hecha por el asistente. Hecho cuando «apunta 12 € de café» deja un borrador, no guarda nada sin «Confirmar» y el gasto aparece en Gastos con el autor correcto.
+19. **Extras del diseño**: presupuestos con alertas y exportación a Excel o PDF; categorización automática de gastos (D6, extra). *No iniciado* (sin código).
+20. **Mejoras «Posterior»** del diseño, cada una con su propio análisis antes de empezar. *No iniciado* en todas; solo el interruptor de Google (fase 2, punto 7) está preparado.
     - Avisos por correo (resumen mensual y recibos próximos).
     - Reembolsos y devoluciones ligados a un gasto.
     - Copia de seguridad y exportación completa.

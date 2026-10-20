@@ -22,7 +22,8 @@ public class ModeloCuentaComunTests
     {
         var api = new ApiFalsa()
             .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { _ana, _marcos })
-            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, estado);
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, estado)
+            .Responde("GET /api/cuenta-comun/ingresos", HttpStatusCode.OK, Array.Empty<IngresoCuentaComunDto>());
         var cliente = new CoreApiClient(new HttpClient(api) { BaseAddress = new Uri("http://localhost:5001/") });
         return (new ModeloCuentaComun(cliente, Hoy), api);
     }
@@ -225,5 +226,73 @@ public class ModeloCuentaComunTests
     {
         Assert.Equal("33,33 %", ModeloCuentaComun.Porcentaje(33.333m));
         Assert.Equal("50 %", ModeloCuentaComun.Porcentaje(50m));
+    }
+
+    [Fact]
+    public async Task Ingresar_envia_el_miembro_y_el_concepto_y_limpia_el_formulario()
+    {
+        var (m, api) = Crear(Estado());
+        api.Responde("POST /api/cuenta-comun/ingresos", HttpStatusCode.Created,
+            new IngresoCuentaComunDto(Guid.NewGuid(), _marcos.Id, Hoy, 40m, "Cena amigas"));
+        await m.CargarAsync();
+        m.Ingresante = _marcos.Id;
+        m.ImporteIngreso = "40";
+        m.ConceptoIngreso = "  Cena amigas ";
+
+        var aviso = await m.IngresarAsync();
+
+        Assert.Equal("Ingreso registrado", aviso);
+        var cuerpo = api.Cuerpos["POST /api/cuenta-comun/ingresos"];
+        Assert.Contains($"\"miembroId\":\"{_marcos.Id}\"", cuerpo);
+        Assert.Contains("\"concepto\":\"Cena amigas\"", cuerpo);
+        Assert.DoesNotContain("\"fecha\":\"", cuerpo); // el mes actual: lo fecha la API (hoy)
+        Assert.Equal("", m.ImporteIngreso);
+        Assert.Equal("", m.ConceptoIngreso);
+    }
+
+    [Fact]
+    public async Task Ingresar_en_otro_mes_lo_fecha_el_primer_dia_de_ese_mes()
+    {
+        var (m, api) = Crear(Estado());
+        api.Responde("POST /api/cuenta-comun/ingresos", HttpStatusCode.Created,
+            new IngresoCuentaComunDto(Guid.NewGuid(), _ana.Id, new DateOnly(2026, 9, 1), 40m, null));
+        await m.CargarAsync();
+        await m.CambiarMesAsync(-1);
+        m.ImporteIngreso = "40";
+
+        await m.IngresarAsync();
+
+        Assert.Contains("\"fecha\":\"2026-09-01\"", api.Cuerpos["POST /api/cuenta-comun/ingresos"]);
+    }
+
+    [Fact]
+    public async Task IngresosDelMes_solo_muestra_los_del_mes_mostrado_y_suma_su_total()
+    {
+        var (m, api) = Crear(Estado());
+        api.Responde("GET /api/cuenta-comun/ingresos", HttpStatusCode.OK, new[]
+        {
+            new IngresoCuentaComunDto(Guid.NewGuid(), _ana.Id, new DateOnly(2026, 10, 3), 40m, "Cena amigas"),
+            new IngresoCuentaComunDto(Guid.NewGuid(), _marcos.Id, new DateOnly(2026, 10, 20), 15m, null),
+            new IngresoCuentaComunDto(Guid.NewGuid(), _ana.Id, new DateOnly(2026, 9, 28), 99m, "Otro mes"),
+        });
+
+        await m.CargarAsync();
+
+        Assert.Equal(2, m.IngresosDelMes.Count);
+        Assert.Equal(55m, m.TotalIngresosDelMes);
+    }
+
+    [Fact]
+    public async Task Eliminar_un_ingreso_recarga_y_avisa()
+    {
+        var ingreso = new IngresoCuentaComunDto(Guid.NewGuid(), _ana.Id, Hoy, 40m, "Cena amigas");
+        var (m, api) = Crear(Estado());
+        api.Responde($"DELETE /api/cuenta-comun/ingresos/{ingreso.Id}", HttpStatusCode.NoContent);
+        await m.CargarAsync();
+
+        var aviso = await m.EliminarIngresoAsync(ingreso);
+
+        Assert.Equal("Ingreso eliminado", aviso);
+        Assert.Contains($"DELETE /api/cuenta-comun/ingresos/{ingreso.Id}", api.Recibidas);
     }
 }

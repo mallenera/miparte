@@ -47,6 +47,9 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
     public DbSet<AportacionCuenta> AportacionesCuenta => Set<AportacionCuenta>();
     /// <summary>Conjunto de <see cref="ReembolsoCuenta"/> del hogar actual.</summary>
     public DbSet<ReembolsoCuenta> ReembolsosCuenta => Set<ReembolsoCuenta>();
+    /// <summary>Conjunto de <see cref="IngresoCuentaComun"/> del hogar actual.</summary>
+    public DbSet<IngresoCuentaComun> IngresosCuentaComun => Set<IngresoCuentaComun>();
+
     /// <summary>Conjunto de <see cref="DepositoAhorro"/> del hogar actual.</summary>
     public DbSet<DepositoAhorro> DepositosAhorro => Set<DepositoAhorro>();
     /// <summary>Conjunto de <see cref="RetiradaAhorro"/> del hogar actual.</summary>
@@ -179,6 +182,13 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
             e.ToTable("ciclo_liquidacion");
             e.Property(x => x.CerradoEn).HasDefaultValueSql("now()");
             e.Property(x => x.Total).HasPrecision(12, 2);
+            e.HasQueryFilter(x => x.HogarId == HogarId);
+        });
+
+        b.Entity<IngresoCuentaComun>(e =>
+        {
+            e.ToTable("ingreso_cuenta_comun");
+            e.Property(x => x.Importe).HasPrecision(12, 2);
             e.HasQueryFilter(x => x.HogarId == HogarId);
         });
 

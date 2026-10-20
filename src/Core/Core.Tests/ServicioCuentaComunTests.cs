@@ -116,6 +116,66 @@ public class ServicioCuentaComunTests
     }
 
     [Fact]
+    public async Task CrearIngreso_SeGuardaSoloComoHistorico()
+    {
+        var r = await Servicio.CrearIngresoAsync(new(Hogar, _marcos, 40m, Septiembre.AddDays(5), "Cena amigas"), default);
+
+        Assert.Null(r.Error);
+        var ingreso = Assert.Single(_repo.Ingresos);
+        Assert.Equal("Cena amigas", ingreso.Concepto);
+        Assert.Empty(_repo.Depositos);
+        Assert.Empty(_repo.Reembolsos);
+        Assert.Empty(_repo.Retiradas);
+    }
+
+    [Fact]
+    public async Task CrearIngreso_ConLaCuentaInactiva_EsConflicto()
+    {
+        _repo.Cuenta = false;
+
+        var r = await Servicio.CrearIngresoAsync(Mov(_ana, 40m), default);
+
+        Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
+        Assert.Empty(_repo.Ingresos);
+    }
+
+    [Fact]
+    public async Task CrearIngreso_ConImporteInvalido_EsInvalido()
+    {
+        var r = await Servicio.CrearIngresoAsync(Mov(_ana, 0m), default);
+
+        Assert.Equal(TipoError.Invalido, r.Error!.Tipo);
+        Assert.Empty(_repo.Ingresos);
+    }
+
+    [Fact]
+    public async Task CrearIngreso_DeMiembroAjeno_EsInvalido()
+    {
+        var r = await Servicio.CrearIngresoAsync(new(Hogar, Guid.NewGuid(), 40m, null, null), default);
+
+        Assert.Equal(TipoError.Invalido, r.Error!.Tipo);
+    }
+
+    [Fact]
+    public async Task EliminarIngreso_Inexistente_EsNoEncontrado()
+    {
+        var r = await Servicio.EliminarIngresoAsync(Guid.NewGuid(), default);
+
+        Assert.Equal(TipoError.NoEncontrado, r.Error!.Tipo);
+    }
+
+    [Fact]
+    public async Task EliminarIngreso_LoBorra()
+    {
+        var ingreso = (await Servicio.CrearIngresoAsync(Mov(_ana, 40m), default)).Valor!;
+
+        var r = await Servicio.EliminarIngresoAsync(ingreso.Id, default);
+
+        Assert.Null(r.Error);
+        Assert.Empty(_repo.Ingresos);
+    }
+
+    [Fact]
     public async Task EliminarDeposito_QueDejaSinRespaldoLoRetirado_EsConflicto()
     {
         var deposito = (await Servicio.CrearDepositoAsync(Mov(_ana, 200m), default)).Valor!;
@@ -321,6 +381,19 @@ public class ServicioCuentaComunTests
         }
 
         public Task<bool> EliminarReembolsoAsync(Guid id, CancellationToken ct) => Task.FromResult(Reembolsos.RemoveAll(r => r.Id == id) > 0);
+
+        public List<IngresoCuentaComun> Ingresos { get; } = [];
+
+        public Task GuardarIngresoAsync(IngresoCuentaComun ingreso, CancellationToken ct)
+        {
+            Ingresos.Add(ingreso);
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<IngresoCuentaComun>> IngresosAsync(CancellationToken ct)
+            => Task.FromResult<IReadOnlyList<IngresoCuentaComun>>(Ingresos.OrderByDescending(i => i.Fecha).ThenBy(i => i.Id).ToList());
+
+        public Task<bool> EliminarIngresoAsync(Guid id, CancellationToken ct) => Task.FromResult(Ingresos.RemoveAll(i => i.Id == id) > 0);
 
         public Task GuardarDepositoAsync(DepositoAhorro deposito, CancellationToken ct)
         {

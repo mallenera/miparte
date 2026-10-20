@@ -69,6 +69,15 @@ public interface IRepositorioCuentaComun
     /// <summary>Borra un reembolso; false si no existe en el hogar.</summary>
     Task<bool> EliminarReembolsoAsync(Guid id, CancellationToken ct);
 
+    /// <summary>Guarda un ingreso a la cuenta común nuevo.</summary>
+    Task GuardarIngresoAsync(IngresoCuentaComun ingreso, CancellationToken ct);
+
+    /// <summary>Ingresos a la cuenta común del hogar, del más reciente al más antiguo.</summary>
+    Task<IReadOnlyList<IngresoCuentaComun>> IngresosAsync(CancellationToken ct);
+
+    /// <summary>Borra un ingreso a la cuenta común; false si no existe en el hogar.</summary>
+    Task<bool> EliminarIngresoAsync(Guid id, CancellationToken ct);
+
     /// <summary>Guarda un depósito de ahorro nuevo.</summary>
     Task GuardarDepositoAsync(DepositoAhorro deposito, CancellationToken ct);
 

@@ -62,6 +62,9 @@ public static class Dtos
     /// <summary>Reembolso de la cuenta común.</summary>
     public static ReembolsoCuentaDto ADto(this ReembolsoCuenta r) => new(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto);
 
+    /// <summary>Ingreso a la cuenta común fuera de aportaciones y ahorro.</summary>
+    public static IngresoCuentaComunDto ADto(this IngresoCuentaComun i) => new(i.Id, i.MiembroId, i.Fecha, i.Importe, i.Concepto);
+
     /// <summary>Depósito de ahorro.</summary>
     public static DepositoAhorroDto ADto(this DepositoAhorro d) => new(d.Id, d.MiembroId, d.Fecha, d.Importe, d.Concepto);
 

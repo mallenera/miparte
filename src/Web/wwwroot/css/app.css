@@ -376,7 +376,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
     margin-left: 2px; font-size: .62rem; letter-spacing: .08em; text-transform: uppercase; background: var(--surface-2);
     color: var(--ink-2); padding: 2px 7px; border-radius: 999px;
 }
-.panel { padding-block: 40px 0; display: grid; gap: 24px; }
+.panel { padding-block: 40px calc(96px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 24px; }
 .panel:focus { outline: none; }
 
 /* Tarjetas y estructura */
@@ -529,6 +529,8 @@ input.invalid, input[aria-invalid="true"] { border-color: var(--err); outline: 0
 .catrow .c-name.sub { padding-left: 22px; font-weight: 500; }
 .catrow .c-name.sub::before { content: '↳'; color: var(--ink-2); }
 .catrow .c-sel { grid-area: sel; color: var(--ink-2); font-size: .88rem; }
+.catlista { display: grid; gap: 8px; }
+.catrow.cat { padding: 12px 14px; border-radius: 12px; background: var(--surface-2); }
 .catrow .c-acc { grid-area: acc; display: flex; gap: 12px; justify-content: flex-end; }
 @media (max-width: 640px) {
     .catrow { grid-template-columns: minmax(0, 1fr); grid-template-areas: "name" "sel" "acc"; }

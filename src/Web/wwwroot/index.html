@@ -35,8 +35,9 @@
         <a href="" class="reload">Recargar</a>
         <a class="dismiss">&times;</a>
     </div>
-    <script src="_framework/blazor.webassembly.js"></script>
+    <!-- registrar-sw.js antes que Blazor: AvisoActualizacion lo llama al pintarse y, si aún no existe, la app falla al arrancar. -->
     <script src="js/registrar-sw.js"></script>
+    <script src="_framework/blazor.webassembly.js"></script>
 </body>
 
 </html>

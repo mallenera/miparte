@@ -39,4 +39,7 @@ public record BorradorGastoDto(
 /// <param name="PagadoPor">Miembro adulto activo que paga el gasto.</param>
 /// <param name="CategoriaId">Categoría que se mostró en el borrador. Si ya no es la predeterminada, la API responde 409.</param>
 /// <param name="PerfilRepartoId">Perfil que se mostró en el borrador. Si ya no es el predeterminado, la API responde 409.</param>
-public record ConfirmarGastoRequest(decimal Importe, string Concepto, DateOnly Fecha, Guid PagadoPor, Guid CategoriaId, Guid PerfilRepartoId);
+/// <param name="Categoria">Nombre de la categoría que se mostró. Si el nombre ha cambiado desde entonces, la API responde 409.</param>
+/// <param name="Perfil">Nombre del perfil que se mostró. Si el nombre ha cambiado desde entonces, la API responde 409.</param>
+public record ConfirmarGastoRequest(
+    decimal Importe, string Concepto, DateOnly Fecha, Guid PagadoPor, Guid CategoriaId, Guid PerfilRepartoId, string Categoria, string Perfil);

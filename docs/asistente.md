@@ -87,10 +87,11 @@ La única escritura del asistente; la llama el front solo cuando la persona puls
 
 ```json
 { "importe": 12.00, "concepto": "Café", "fecha": "2026-10-06", "pagadoPor": "b0000000-0000-4000-8000-0000000000aa",
-  "categoriaId": "d0000000-0000-4000-8000-000000000009", "perfilRepartoId": "e0000000-0000-4000-8000-000000000001" }
+  "categoriaId": "d0000000-0000-4000-8000-000000000009", "perfilRepartoId": "e0000000-0000-4000-8000-000000000001",
+  "categoria": "Supermercado", "perfil": "Casa" }
 ```
 
-`pagadoPor` es un miembro adulto activo elegido por la persona. `categoriaId` y `perfilRepartoId` son los que se mostraron en el borrador (el front los copia de `borrador`). El servidor compara esos ids con los predeterminados para gastos **en el momento de confirmar**: si coinciden, guarda el gasto con ellos; si no (el hogar ha cambiado la categoría o el perfil marcados desde la propuesta), **no guarda nada** y responde **409** con un mensaje en español que pide volver a pedir el gasto para ver la propuesta actualizada. Responde **201** con el `GastoResponse` guardado. Errores: 400 (importe, concepto, fecha o pagador no válidos), 401, 403 o 409 con el mensaje de Core.Api (por ejemplo, sin permiso `gastos.crear`, o el hogar no tiene exactamente un predeterminado de categoría o de perfil), 429, 502 y 503. Con Core.Api rechazando el gasto, nada queda guardado. En el front, un 409 deja el borrador descartado con el aviso.
+`pagadoPor` es un miembro adulto activo elegido por la persona. `categoriaId` y `perfilRepartoId` son los que se mostraron en el borrador (el front los copia de `borrador`). `categoria` y `perfil` son los nombres mostrados. El servidor compara ids y nombres con los predeterminados para gastos **en el momento de confirmar**: si coinciden, guarda el gasto; si no (el hogar ha cambiado la categoría o el perfil marcados, o les ha cambiado el nombre, desde la propuesta), **no guarda nada** y responde **409** con un mensaje en español que pide volver a pedir el gasto para ver la propuesta actualizada. Responde **201** con el `GastoResponse` guardado. Errores: 400 (importe, concepto, fecha o pagador no válidos), 401, 403 o 409 con el mensaje de Core.Api (por ejemplo, sin permiso `gastos.crear`, o el hogar no tiene exactamente un predeterminado de categoría o de perfil), 429, 502 y 503. Con Core.Api rechazando el gasto, nada queda guardado. En el front, un 409 deja el borrador descartado con el aviso.
 
 DTOs en `src/Contracts/Asistente.cs` (`ChatRequest`, `MensajeChatDto`, `ChatResponse`, `BorradorGastoDto`, `ConfirmarGastoRequest`).
 

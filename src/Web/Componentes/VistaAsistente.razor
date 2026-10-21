@@ -239,7 +239,7 @@
         m.Aviso = null;
         try
         {
-            await Api.ConfirmarGastoAsync(new ConfirmarGastoRequest(b.Importe, b.Concepto, b.Fecha, pagador, b.CategoriaId, b.PerfilRepartoId));
+            await Api.ConfirmarGastoAsync(new ConfirmarGastoRequest(b.Importe, b.Concepto, b.Fecha, pagador, b.CategoriaId, b.PerfilRepartoId, b.Categoria, b.Perfil));
             m.EstadoBorrador = EstadoBorrador.Guardado;
         }
         catch (ApiException e) when (e.Codigo == System.Net.HttpStatusCode.Conflict)

@@ -214,7 +214,7 @@ public class EndpointChatTests
         await using var f = Crear(new ModeloFalso(), datos);
 
         var r = await Cliente(f, Token(Guid.NewGuid()), Hogar).PostAsJsonAsync("/api/chat/confirmar-gasto",
-            new ConfirmarGastoRequest(12m, "Café", new DateOnly(2026, 7, 14), DatosFalsos.Luis, DatosFalsos.Super, DatosFalsos.PerfilCasa));
+            new ConfirmarGastoRequest(12m, "Café", new DateOnly(2026, 7, 14), DatosFalsos.Luis, DatosFalsos.Super, DatosFalsos.PerfilCasa, "Supermercado", "Casa"));
 
         Assert.Equal(HttpStatusCode.Created, r.StatusCode);
         Assert.Single(datos.GastosCreados);
@@ -227,7 +227,7 @@ public class EndpointChatTests
         await using var f = Crear(new ModeloFalso(), datos);
 
         var r = await Cliente(f, Token(Guid.NewGuid())).PostAsJsonAsync("/api/chat/confirmar-gasto",
-            new ConfirmarGastoRequest(12m, "Café", new DateOnly(2026, 7, 14), DatosFalsos.Luis, DatosFalsos.Super, DatosFalsos.PerfilCasa));
+            new ConfirmarGastoRequest(12m, "Café", new DateOnly(2026, 7, 14), DatosFalsos.Luis, DatosFalsos.Super, DatosFalsos.PerfilCasa, "Supermercado", "Casa"));
 
         Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
         Assert.Empty(datos.GastosCreados);
@@ -243,7 +243,7 @@ public class EndpointChatTests
         await using var f = Crear(new ModeloFalso(), datos);
 
         var r = await Cliente(f, Token(Guid.NewGuid()), Hogar).PostAsJsonAsync("/api/chat/confirmar-gasto",
-            new ConfirmarGastoRequest(12m, "Café", new DateOnly(2026, 7, 14), DatosFalsos.Luis, DatosFalsos.Super, DatosFalsos.PerfilCasa));
+            new ConfirmarGastoRequest(12m, "Café", new DateOnly(2026, 7, 14), DatosFalsos.Luis, DatosFalsos.Super, DatosFalsos.PerfilCasa, "Supermercado", "Casa"));
 
         Assert.Equal(HttpStatusCode.Forbidden, r.StatusCode);
         var cuerpo = await r.Content.ReadFromJsonAsync<Dictionary<string, string>>();

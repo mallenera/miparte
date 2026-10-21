@@ -84,7 +84,7 @@ public class AltaGastoTests
         var datos = new DatosFalsos();
 
         var gasto = await new ServicioAltaGasto().ConfirmarAsync(
-            new ConfirmarGastoRequest(12m, "  Café  ", Fecha, DatosFalsos.Luis, DatosFalsos.Super, DatosFalsos.PerfilCasa), datos, default);
+            new ConfirmarGastoRequest(12m, "  Café  ", Fecha, DatosFalsos.Luis, DatosFalsos.Super, DatosFalsos.PerfilCasa, "Supermercado", "Casa"), datos, default);
 
         var creado = Assert.Single(datos.GastosCreados);
         Assert.Equal(12m, creado.Importe);
@@ -102,7 +102,7 @@ public class AltaGastoTests
         var datos = new DatosFalsos { PerfilPredeterminado = false };
 
         var e = await Assert.ThrowsAsync<GastoRechazadoException>(() => new ServicioAltaGasto().ConfirmarAsync(
-            new ConfirmarGastoRequest(12m, "Café", Fecha, DatosFalsos.Luis, DatosFalsos.Super, DatosFalsos.PerfilCasa), datos, default));
+            new ConfirmarGastoRequest(12m, "Café", Fecha, DatosFalsos.Luis, DatosFalsos.Super, DatosFalsos.PerfilCasa, "Supermercado", "Casa"), datos, default));
 
         Assert.Equal(HttpStatusCode.Conflict, e.Codigo);
         Assert.Contains("perfil de reparto", e.Message);
@@ -115,7 +115,7 @@ public class AltaGastoTests
         var datos = new DatosFalsos();
 
         await Assert.ThrowsAsync<SolicitudInvalidaException>(() => new ServicioAltaGasto().ConfirmarAsync(
-            new ConfirmarGastoRequest(12.345m, "Café", Fecha, DatosFalsos.Luis, DatosFalsos.Super, DatosFalsos.PerfilCasa), datos, default));
+            new ConfirmarGastoRequest(12.345m, "Café", Fecha, DatosFalsos.Luis, DatosFalsos.Super, DatosFalsos.PerfilCasa, "Supermercado", "Casa"), datos, default));
 
         Assert.Empty(datos.GastosCreados);
     }
@@ -127,7 +127,7 @@ public class AltaGastoTests
         var datos = new DatosFalsos();
 
         var e = await Assert.ThrowsAsync<GastoRechazadoException>(() => new ServicioAltaGasto().ConfirmarAsync(
-            new ConfirmarGastoRequest(12m, "Café", Fecha, DatosFalsos.Luis, DatosFalsos.Ocio, DatosFalsos.PerfilCasa), datos, default));
+            new ConfirmarGastoRequest(12m, "Café", Fecha, DatosFalsos.Luis, DatosFalsos.Ocio, DatosFalsos.PerfilCasa, "Supermercado", "Casa"), datos, default));
 
         Assert.Equal(HttpStatusCode.Conflict, e.Codigo);
         Assert.Equal(AltaGasto.PredeterminadosCambiados, e.Message);
@@ -140,9 +140,28 @@ public class AltaGastoTests
         var datos = new DatosFalsos();
 
         var e = await Assert.ThrowsAsync<GastoRechazadoException>(() => new ServicioAltaGasto().ConfirmarAsync(
-            new ConfirmarGastoRequest(12m, "Café", Fecha, DatosFalsos.Luis, DatosFalsos.Super, Guid.NewGuid()), datos, default));
+            new ConfirmarGastoRequest(12m, "Café", Fecha, DatosFalsos.Luis, DatosFalsos.Super, Guid.NewGuid(), "Supermercado", "Casa"), datos, default));
 
         Assert.Equal(HttpStatusCode.Conflict, e.Codigo);
+        Assert.Empty(datos.GastosCreados);
+    }
+
+    [Fact]
+    public async Task Confirmar_siCambioElNombreDeLaCategoriaOElDelPerfil_rechazaSinGuardar()
+    {
+        // Mismos ids, pero la categoría se renombró («Supermercado» → «Super») desde el borrador.
+        var datos = new DatosFalsos();
+
+        var e = await Assert.ThrowsAsync<GastoRechazadoException>(() => new ServicioAltaGasto().ConfirmarAsync(
+            new ConfirmarGastoRequest(12m, "Café", Fecha, DatosFalsos.Luis, DatosFalsos.Super, DatosFalsos.PerfilCasa, "Super", "Casa"), datos, default));
+
+        Assert.Equal(HttpStatusCode.Conflict, e.Codigo);
+        Assert.Equal(AltaGasto.PredeterminadosCambiados, e.Message);
+        Assert.Empty(datos.GastosCreados);
+
+        // Lo mismo si cambió el nombre del perfil.
+        await Assert.ThrowsAsync<GastoRechazadoException>(() => new ServicioAltaGasto().ConfirmarAsync(
+            new ConfirmarGastoRequest(12m, "Café", Fecha, DatosFalsos.Luis, DatosFalsos.Super, DatosFalsos.PerfilCasa, "Supermercado", "Piso"), datos, default));
         Assert.Empty(datos.GastosCreados);
     }
 
@@ -152,7 +171,7 @@ public class AltaGastoTests
         var datos = new DatosFalsos();
 
         await new ServicioAltaGasto().ConfirmarAsync(
-            new ConfirmarGastoRequest(12m, "Café", Fecha, DatosFalsos.Luis, DatosFalsos.Super, DatosFalsos.PerfilCasa), datos, default);
+            new ConfirmarGastoRequest(12m, "Café", Fecha, DatosFalsos.Luis, DatosFalsos.Super, DatosFalsos.PerfilCasa, "Supermercado", "Casa"), datos, default);
 
         Assert.Single(datos.GastosCreados);
     }
@@ -166,7 +185,7 @@ public class AltaGastoTests
         };
 
         var e = await Assert.ThrowsAsync<GastoRechazadoException>(() => new ServicioAltaGasto().ConfirmarAsync(
-            new ConfirmarGastoRequest(12m, "Café", Fecha, DatosFalsos.Luis, DatosFalsos.Super, DatosFalsos.PerfilCasa), datos, default));
+            new ConfirmarGastoRequest(12m, "Café", Fecha, DatosFalsos.Luis, DatosFalsos.Super, DatosFalsos.PerfilCasa, "Supermercado", "Casa"), datos, default));
 
         Assert.Equal(HttpStatusCode.Forbidden, e.Codigo);
         Assert.Equal("No tienes permiso para registrar gastos.", e.Message);

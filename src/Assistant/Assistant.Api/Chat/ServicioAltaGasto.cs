@@ -1,4 +1,5 @@
 using System.Net;
+using MiParte.Assistant.Api.Herramientas;
 using MiParte.Assistant.Api.Hogar;
 using MiParte.Contracts;
 
@@ -31,7 +32,10 @@ public sealed class ServicioAltaGasto
 
         // Lo que la persona confirma es lo que se le mostró en el borrador. Si los predeterminados han cambiado desde entonces,
         // no se guarda nada: se le pide que vea la propuesta de nuevo.
-        if (categoria.Id != peticion.CategoriaId || perfil.Id != peticion.PerfilRepartoId)
+        // Se comparan el id y el nombre tal como se muestran (limpios, igual que en el borrador).
+        if (categoria.Id != peticion.CategoriaId || perfil.Id != peticion.PerfilRepartoId
+            || CatalogoHerramientas.Limpiar(categoria.Nombre) != peticion.Categoria
+            || CatalogoHerramientas.Limpiar(perfil.Nombre) != peticion.Perfil)
             throw new GastoRechazadoException(HttpStatusCode.Conflict, AltaGasto.PredeterminadosCambiados);
 
         return await datos.CrearGastoAsync(

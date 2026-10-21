@@ -8,7 +8,7 @@
 
 Mi parte, tu parte (el nombre de la app) registra los ingresos y gastos mensuales de un hogar y calcula cuánto debe asumir cada miembro y quién debe dinero a quién, con un chatbot que responde preguntas como "¿cuánto gasté en alimentación en junio?".
 
-Es el proyecto fin de máster de desarrollo en IA (BigSchool). Se usará en un hogar concreto: una pareja y un hijo que es solo de uno de los dos. Por eso el reparto de gastos es el corazón del diseño.
+Es el proyecto fin de máster de desarrollo en IA (BigSchool). Está pensada para hogares con miembros adultos y, a veces, con hijos que pertenecen solo a uno de ellos. Por eso el reparto de gastos es el corazón del diseño.
 
 **Datos de partida acordados:**
 

@@ -86,10 +86,11 @@ La conversación no se guarda en el servidor; el historial lo manda el cliente i
 La única escritura del asistente; la llama el front solo cuando la persona pulsa «Confirmar» en la tarjeta del borrador.
 
 ```json
-{ "importe": 12.00, "concepto": "Café", "fecha": "2026-10-06", "pagadoPor": "b0000000-0000-4000-8000-0000000000aa" }
+{ "importe": 12.00, "concepto": "Café", "fecha": "2026-10-06", "pagadoPor": "b0000000-0000-4000-8000-0000000000aa",
+  "categoriaId": "d0000000-0000-4000-8000-000000000009", "perfilRepartoId": "e0000000-0000-4000-8000-000000000001" }
 ```
 
-`pagadoPor` es un miembro adulto activo elegido por la persona. Categoría y perfil **no** se envían: el servidor usa los marcados como predeterminados para gastos en ese momento. Responde **201** con el `GastoResponse` guardado. Errores: 400 (importe, concepto, fecha o pagador no válidos), 401, 403 o 409 con el mensaje de Core.Api (por ejemplo, sin permiso `gastos.crear`, o el hogar no tiene un predeterminado de categoría o de perfil), 429, 502 y 503. Con Core.Api rechazando el gasto, nada queda guardado.
+`pagadoPor` es un miembro adulto activo elegido por la persona. `categoriaId` y `perfilRepartoId` son los que se mostraron en el borrador (el front los copia de `borrador`). El servidor compara esos ids con los predeterminados para gastos **en el momento de confirmar**: si coinciden, guarda el gasto con ellos; si no (el hogar ha cambiado la categoría o el perfil marcados desde la propuesta), **no guarda nada** y responde **409** con un mensaje en español que pide volver a pedir el gasto para ver la propuesta actualizada. Responde **201** con el `GastoResponse` guardado. Errores: 400 (importe, concepto, fecha o pagador no válidos), 401, 403 o 409 con el mensaje de Core.Api (por ejemplo, sin permiso `gastos.crear`, o el hogar no tiene exactamente un predeterminado de categoría o de perfil), 429, 502 y 503. Con Core.Api rechazando el gasto, nada queda guardado. En el front, un 409 deja el borrador descartado con el aviso.
 
 DTOs en `src/Contracts/Asistente.cs` (`ChatRequest`, `MensajeChatDto`, `ChatResponse`, `BorradorGastoDto`, `ConfirmarGastoRequest`).
 
@@ -157,7 +158,7 @@ Sin clave se puede ver el asistente flotante y comprobar el 503; el modo demo de
 ## Pendiente
 
 - Cancelar una pregunta en curso (el streaming no tiene botón de parar).
-- Pagador por defecto: hoy lo elige siempre la persona en la tarjeta; el chat no lo supone.
+- Pruebas con la API real de Anthropic y con una clave de desarrollo: pendientes. Sin ellas, el streaming real y la tarjeta del borrador no están verificados en navegador.
 - Etiqueta `X-Origen` sin verificar: el origen «asistente» lo declara el cliente con el JWT de la persona. Si se quiere una prueba real, haría falta un canal de confianza entre Assistant.Api y Core.Api (decisión pendiente).
 - Streaming con Anthropic: el código de `CreateStreaming` compila, pero no se ha probado contra la API real (no hay clave en el entorno de desarrollo); el test cubre solo el respaldo sin streaming.
 - Memoria de la conversación entre sesiones (hoy vive en la página).

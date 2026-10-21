@@ -29,6 +29,11 @@ public sealed class ServicioAltaGasto
         var perfil = AltaGasto.Unico((await datos.PerfilesAsync(ct)).Where(p => p.PredeterminadoGastos).ToList())
             ?? throw new GastoRechazadoException(HttpStatusCode.Conflict, AltaGasto.SinPerfil);
 
+        // Lo que la persona confirma es lo que se le mostró en el borrador. Si los predeterminados han cambiado desde entonces,
+        // no se guarda nada: se le pide que vea la propuesta de nuevo.
+        if (categoria.Id != peticion.CategoriaId || perfil.Id != peticion.PerfilRepartoId)
+            throw new GastoRechazadoException(HttpStatusCode.Conflict, AltaGasto.PredeterminadosCambiados);
+
         return await datos.CrearGastoAsync(
             new GastoRequest(peticion.Fecha, peticion.Importe, categoria.Id, peticion.PagadoPor, perfil.Id, concepto), ct);
     }

@@ -23,6 +23,10 @@ public static class AltaGasto
     public const string SinPerfil =
         "No hay ningún perfil de reparto marcado como predeterminado para gastos. Pide a un administrador que lo marque en la configuración del hogar.";
 
+    /// <summary>Mensaje cuando la categoría o el perfil predeterminados cambiaron después de mostrar el borrador.</summary>
+    public const string PredeterminadosCambiados =
+        "Los predeterminados para gastos han cambiado desde que se propuso el gasto, así que no lo he guardado. Pide de nuevo el gasto para ver la propuesta actualizada.";
+
     /// <summary>Comprueba el importe: mayor que 0, como mucho 2 decimales y dentro del máximo de Core.Api.</summary>
     /// <param name="importe">Importe en euros.</param>
     /// <exception cref="SolicitudInvalidaException">El importe no vale.</exception>

@@ -18,6 +18,8 @@ public class AsistenteTests : BunitContext
     private static readonly HogarResumen Casa = new(Guid.NewGuid(), "Casa");
     private static readonly Guid Ana = Guid.NewGuid();
     private static readonly Guid Luis = Guid.NewGuid();
+    private static readonly Guid CategoriaSuper = Guid.NewGuid();
+    private static readonly Guid PerfilCasa = Guid.NewGuid();
     private static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web);
 
     private const string RutaChat = "POST /api/chat/stream";
@@ -192,7 +194,7 @@ public class AsistenteTests : BunitContext
     public void El_borrador_se_muestra_y_no_se_puede_confirmar_sin_elegir_quien_paga()
     {
         var api = Chat(new ChatResponse("Te lo dejo preparado.", ["proponer_gasto"],
-            new BorradorGastoDto(12m, "Café", new DateOnly(2026, 10, 6), "Alimentación", "Casa")));
+            new BorradorGastoDto(12m, "Café", new DateOnly(2026, 10, 6), "Alimentación", "Casa", CategoriaSuper, PerfilCasa)));
         var core = new ApiFalsa().Responde("GET /api/miembros", HttpStatusCode.OK,
             new[] { new MiembroDto(Ana, "Ana", "adulto", null, true, "admin", true, true), new MiembroDto(Luis, "Luis", "adulto", null, true, "miembro", true) });
         Registrar(api, core: core);
@@ -209,7 +211,7 @@ public class AsistenteTests : BunitContext
     [Fact]
     public void Confirmar_envia_el_gasto_con_quien_paga_y_lo_marca_como_guardado()
     {
-        var borrador = new BorradorGastoDto(12m, "Café", new DateOnly(2026, 10, 6), "Alimentación", "Casa");
+        var borrador = new BorradorGastoDto(12m, "Café", new DateOnly(2026, 10, 6), "Alimentación", "Casa", CategoriaSuper, PerfilCasa);
         var api = Chat(new ChatResponse("Te lo dejo preparado.", ["proponer_gasto"], borrador))
             .Responde("POST /api/chat/confirmar-gasto", HttpStatusCode.Created,
                 new GastoResponse(Guid.NewGuid(), borrador.Fecha, 12m, Guid.NewGuid(), Luis, Guid.NewGuid(), "Café", null, []));
@@ -227,13 +229,36 @@ public class AsistenteTests : BunitContext
         var enviado = JsonSerializer.Deserialize<ConfirmarGastoRequest>(api.Cuerpos["POST /api/chat/confirmar-gasto"], Web)!;
         Assert.Equal((12m, "Café", Luis), (enviado.Importe, enviado.Concepto, enviado.PagadoPor));
         Assert.Equal(borrador.Fecha, enviado.Fecha);
+        Assert.Equal((CategoriaSuper, PerfilCasa), (enviado.CategoriaId, enviado.PerfilRepartoId));
+    }
+
+    [Fact]
+    public void Si_los_predeterminados_cambiaron_el_borrador_se_descarta_y_avisa()
+    {
+        var api = Chat(new ChatResponse("Te lo dejo preparado.", ["proponer_gasto"],
+                new BorradorGastoDto(12m, "Café", new DateOnly(2026, 10, 6), "Alimentación", "Casa", CategoriaSuper, PerfilCasa)))
+            .Error("POST /api/chat/confirmar-gasto", HttpStatusCode.Conflict,
+                "Los predeterminados para gastos han cambiado desde que se propuso el gasto, así que no lo he guardado.");
+        var core = new ApiFalsa().Responde("GET /api/miembros", HttpStatusCode.OK,
+            new[] { new MiembroDto(Ana, "Ana", "adulto", null, true, "admin", true, true), new MiembroDto(Luis, "Luis", "adulto", null, true, "miembro", true) });
+        Registrar(api, core: core);
+        var c = Render<VistaAsistente>();
+        c.Find("#pregunta").Input("Apunta 12 € de café hoy");
+        c.Find("form.chatform").Submit();
+        c.Find("div.borrador select").Change(Luis.ToString());
+
+        c.Find("div.borrador button.btn").Click();
+
+        Assert.Contains("Descartado", c.Markup);
+        Assert.Contains("los predeterminados para gastos han cambiado", c.Markup.ToLowerInvariant());
+        Assert.Empty(c.FindAll("div.borrador button.btn"));
     }
 
     [Fact]
     public void Descartar_el_borrador_no_guarda_nada()
     {
         var api = Chat(new ChatResponse("Te lo dejo preparado.", ["proponer_gasto"],
-            new BorradorGastoDto(12m, "Café", new DateOnly(2026, 10, 6), "Alimentación", "Casa")));
+            new BorradorGastoDto(12m, "Café", new DateOnly(2026, 10, 6), "Alimentación", "Casa", CategoriaSuper, PerfilCasa)));
         var core = new ApiFalsa().Responde("GET /api/miembros", HttpStatusCode.OK, new[] { new MiembroDto(Ana, "Ana", "adulto", null, true, "admin", true, true) });
         Registrar(api, core: core);
         var c = Render<VistaAsistente>();

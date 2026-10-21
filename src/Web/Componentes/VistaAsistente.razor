@@ -65,10 +65,6 @@
                                     <button class="btn btn-sm" type="button" disabled="@(_confirmando || string.IsNullOrEmpty(m.Pagador))" @onclick="() => ConfirmarAsync(m)">Confirmar</button>
                                     <button class="linkbtn" type="button" disabled="@_confirmando" @onclick="() => Descartar(m)">Descartar</button>
                                 </div>
-                                @if (m.Aviso is not null)
-                                {
-                                    <div class="aviso err u-mt12" role="alert">@m.Aviso</div>
-                                }
                             }
                             else if (m.EstadoBorrador == EstadoBorrador.Guardado)
                             {
@@ -77,6 +73,10 @@
                             else
                             {
                                 <div class="muted u-mt12">Descartado: no se ha guardado.</div>
+                            }
+                            @if (m.Aviso is not null)
+                            {
+                                <div class="aviso err u-mt12" role="alert">@m.Aviso</div>
                             }
                         </div>
                     }
@@ -239,8 +239,14 @@
         m.Aviso = null;
         try
         {
-            await Api.ConfirmarGastoAsync(new ConfirmarGastoRequest(b.Importe, b.Concepto, b.Fecha, pagador));
+            await Api.ConfirmarGastoAsync(new ConfirmarGastoRequest(b.Importe, b.Concepto, b.Fecha, pagador, b.CategoriaId, b.PerfilRepartoId));
             m.EstadoBorrador = EstadoBorrador.Guardado;
+        }
+        catch (ApiException e) when (e.Codigo == System.Net.HttpStatusCode.Conflict)
+        {
+            // Los predeterminados cambiaron: esta propuesta ya no vale y no se puede confirmar; hay que pedir el gasto de nuevo.
+            m.EstadoBorrador = EstadoBorrador.Descartado;
+            m.Aviso = e.Message;
         }
         catch (ApiException e)
         {

@@ -134,7 +134,7 @@ public static class CatalogoHerramientas
         var perfil = AltaGasto.Unico((await datos.PerfilesAsync(ct)).Where(p => p.PredeterminadoGastos).ToList());
         if (perfil is null) return Error(AltaGasto.SinPerfil);
 
-        var borrador = new BorradorGastoDto(importe, concepto, fecha, Limpiar(categoria.Nombre), Limpiar(perfil.Nombre));
+        var borrador = new BorradorGastoDto(importe, concepto, fecha, Limpiar(categoria.Nombre), Limpiar(perfil.Nombre), categoria.Id, perfil.Id);
         var contenido = JsonSerializer.Serialize(new
         {
             borrador = new { borrador.Importe, borrador.Concepto, fecha = borrador.Fecha.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), borrador.Categoria, borrador.Perfil },

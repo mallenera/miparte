@@ -24,7 +24,10 @@ public record ChatResponse(string Respuesta, IReadOnlyList<string> Herramientas,
 /// <param name="Fecha">Fecha del gasto, indicada por la persona (el asistente no la supone).</param>
 /// <param name="Categoria">Nombre de la categoría predeterminada que se usará.</param>
 /// <param name="Perfil">Nombre del perfil de reparto predeterminado que se usará.</param>
-public record BorradorGastoDto(decimal Importe, string Concepto, DateOnly Fecha, string Categoria, string Perfil);
+/// <param name="CategoriaId">Identificador de esa categoría; la confirmación lo compara con el predeterminado actual.</param>
+/// <param name="PerfilRepartoId">Identificador de ese perfil; la confirmación lo compara con el predeterminado actual.</param>
+public record BorradorGastoDto(
+    decimal Importe, string Concepto, DateOnly Fecha, string Categoria, string Perfil, Guid CategoriaId, Guid PerfilRepartoId);
 
 /// <summary>
 /// Confirmación de un borrador (<c>POST /api/chat/confirmar-gasto</c>). Categoría y perfil no viajan: el servidor usa
@@ -34,4 +37,6 @@ public record BorradorGastoDto(decimal Importe, string Concepto, DateOnly Fecha,
 /// <param name="Concepto">Concepto del gasto.</param>
 /// <param name="Fecha">Fecha del gasto.</param>
 /// <param name="PagadoPor">Miembro adulto activo que paga el gasto.</param>
-public record ConfirmarGastoRequest(decimal Importe, string Concepto, DateOnly Fecha, Guid PagadoPor);
+/// <param name="CategoriaId">Categoría que se mostró en el borrador. Si ya no es la predeterminada, la API responde 409.</param>
+/// <param name="PerfilRepartoId">Perfil que se mostró en el borrador. Si ya no es el predeterminado, la API responde 409.</param>
+public record ConfirmarGastoRequest(decimal Importe, string Concepto, DateOnly Fecha, Guid PagadoPor, Guid CategoriaId, Guid PerfilRepartoId);

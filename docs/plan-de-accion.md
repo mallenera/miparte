@@ -99,9 +99,9 @@ Fuera de alcance declarado: objetivos de ahorro e intereses.
 
 ### Fase 5 · Entrega del proyecto fin de máster
 
-21. **Memoria**: incluir arquitectura por capas, decisiones D1-D7, pruebas (unitarias, PostgreSQL real, bUnit) y las líneas futuras de la fase 4.
-22. **Reproducibilidad**: README de despliegue y de arranque local (`docs/despliegue.md`, `docs/demo.md`) revisado contra lo que se haya probado en la fase 1.
-23. **Calidad final**: `dotnet test` completo y revisión de los comentarios XML de producción según `.claude/rules/idioma-y-documentacion.md`.
+21. **Memoria**: incluir arquitectura por capas, decisiones D1-D7, pruebas (unitarias, PostgreSQL real, bUnit) y las líneas futuras de la fase 4. *Estado (refactor/entrega-calidad)*: borrador en `docs/memoria.md` (Markdown, solo con contenido del repo). Quedan marcados como **[PENDIENTE]** los datos de presentación (título oficial, autoría, tutor, fecha y formato del centro) y las pruebas en navegador real con el proyecto de producción.
+22. **Reproducibilidad**: README de despliegue y de arranque local (`docs/despliegue.md`, `docs/demo.md`) revisado contra lo que se haya probado en la fase 1. *Estado (refactor/entrega-calidad)*: revisado contra el código, scripts, `docker-compose.yml`, `render.yaml` y workflows. Corregido: enlace roto a una fila inexistente del README en `demo.md`; `despliegue.md` no describía `miparte-assistant` ni `ASSISTANT_URL`; README raíz con ruta de `supabase/` obsoleta y «ingresos» en la descripción. Sin verificar: despliegue real en Render, Cloudflare Pages, `pg_cron` y workflows (requieren cuentas y secretos); pruebas de fase 1 no revisadas.
+23. **Calidad final**: `dotnet test` completo y revisión de los comentarios XML de producción según `.claude/rules/idioma-y-documentacion.md`. *Estado (refactor/entrega-calidad)*: `dotnet build` sin errores (3 advertencias en tests). `dotnet test` con PostgreSQL 18 local (`MIPARTE_TEST_DB`, esquema migrado con `--con-auth-stub`): 1187 correctas, 0 omitidas, 0 fallidas. Sin esa variable: 1136 correctas, 51 omitidas, 0 fallidas. Comentarios XML: 1660 de 1660 miembros públicos de producción con `///` (100 %; se han añadido los 14 de tipos privados anidados de `Herramientas.cs` y `ClienteWorkersAi.cs`). Clean code: sin TODO ni código comentado; propuesta de división de `CoreApiClient.cs` pendiente de aprobación.
 
 ## 3. Orden sugerido
 

@@ -50,13 +50,17 @@ Los avisos push necesitan un par de claves VAPID en Core.Api. Se generan una sol
 2. Comprueba `GET /api/notificaciones/clave-publica` con un token válido: 200 con la clave pública. Sin claves responde 404 y el front no ofrece los avisos.
 3. Si cambias las claves, las suscripciones de los dispositivos dejan de funcionar: cada miembro tiene que volver a activar los avisos.
 
+## Assistant.Api en Render
+
+El mismo Blueprint crea `miparte-assistant` (`src/Assistant/Dockerfile`). Pide `Supabase__Url`, `Asistente__CoreUrl` (URL de `miparte-core`, sin barra final), `ANTHROPIC_API_KEY` y `Cors__OrigenesPermitidos__0`; `Supabase__JwtSecret` solo si el proyecto aún usa el secreto HS256 legado. No necesita cadena de conexión. Sin `ANTHROPIC_API_KEY` el chat responde 503. La URL resultante es la variable `ASSISTANT_URL` de GitHub Actions (opcional: sin ella el chat queda desactivado en el front publicado).
+
 ## Errores 500
 
 Core.Api responde `500 { "error": "Error interno del servidor." }` ante una excepción no controlada, con las cabeceras CORS ya aplicadas, y deja la traza en los logs de Render. Si el navegador muestra un 500, el motivo real está ahí, no en la consola del navegador.
 
 ## Front en Cloudflare Pages
 
-Secretos de GitHub `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID`, y variable `CORE_URL` con la URL de Core.Api. El workflow la usa para `Api:CoreUrl` y para la CSP (`src/Web/cloudflare/_headers.template`, equivalente de `default.conf.template`).
+Secretos de GitHub `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID`, y variable `CORE_URL` con la URL de Core.Api (y opcionalmente `ASSISTANT_URL`, ver arriba). El workflow la usa para `Api:CoreUrl` y para la CSP (`src/Web/cloudflare/_headers.template`, equivalente de `default.conf.template`).
 
 ## Supabase Auth
 

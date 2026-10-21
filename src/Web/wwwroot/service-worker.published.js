@@ -14,9 +14,10 @@ self.addEventListener('notificationclick', event => event.waitUntil(abrirAviso(e
 const cacheNamePrefix = 'offline-cache-';
 const cacheName = `${cacheNamePrefix}${self.assetsManifest.version}`;
 const offlineAssetsInclude = [ /\.dll$/, /\.pdb$/, /\.wasm/, /\.html/, /\.js$/, /\.json$/, /\.css$/, /.woff2?$/, /\.png$/, /\.svg$/, /\.jpe?g$/, /\.gif$/, /\.ico$/, /\.blat$/, /\.dat$/ ];
-// appsettings.json queda fuera: el workflow de despliegue lo reescribe (CoreUrl, AssistantUrl) después de publicar,
-// así que el hash del manifiesto no coincide y la instalación del service worker fallaría por SRI.
-const offlineAssetsExclude = [ /^service-worker\.js$/, /^appsettings\.json$/ ];
+// appsettings.json sí se precarga (Blazor lo lee al arrancar; sin él la app no abre sin conexión). Por eso el
+// workflow de despliegue fija CoreUrl y AssistantUrl ANTES de publicar: si lo tocara después, su hash no
+// coincidiría con el del manifiesto y la instalación del service worker fallaría por SRI.
+const offlineAssetsExclude = [ /^service-worker\.js$/ ];
 
 // Replace with your base path if you are hosting on a subfolder. Ensure there is a trailing '/'.
 const base = "/";

@@ -30,6 +30,9 @@ public interface IRepositorioGastos
     /// <summary>Si la categoría existe en el hogar.</summary>
     Task<bool> CategoriaExisteAsync(Guid id, CancellationToken ct);
 
+    /// <summary>Nombre de la categoría del hogar; null si no existe.</summary>
+    Task<string?> NombreCategoriaAsync(Guid id, CancellationToken ct);
+
     /// <summary>Si el miembro existe en el hogar, está activo y es adulto.</summary>
     Task<bool> EsAdultoActivoAsync(Guid id, CancellationToken ct);
 

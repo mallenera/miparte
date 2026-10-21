@@ -10,6 +10,7 @@ internal sealed class RepositorioGastosFalso : IRepositorioGastos
     public List<Gasto> Gastos { get; } = [];
     public List<Miembro> Miembros { get; } = [];
     public List<Guid> Categorias { get; } = [];
+    public Dictionary<Guid, string> NombresCategorias { get; } = [];
     public List<PerfilReparto> Perfiles { get; } = [];
     public List<DateOnly> MesesCerrados { get; } = [];
     public bool CuentaActiva { get; set; }
@@ -31,6 +32,9 @@ internal sealed class RepositorioGastosFalso : IRepositorioGastos
     public Task<Gasto?> ObtenerParaEditarAsync(Guid id, CancellationToken ct) => ObtenerAsync(id, ct);
 
     public Task<bool> CategoriaExisteAsync(Guid id, CancellationToken ct) => Task.FromResult(Categorias.Contains(id));
+
+    public Task<string?> NombreCategoriaAsync(Guid id, CancellationToken ct)
+        => Task.FromResult(NombresCategorias.GetValueOrDefault(id));
 
     public Task<bool> EsAdultoActivoAsync(Guid id, CancellationToken ct)
         => Task.FromResult(Miembros.Any(m => m.Id == id && m.Activo && m.Tipo == TipoMiembro.Adulto));

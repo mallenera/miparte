@@ -1,4 +1,5 @@
 using MiParte.Core.Application.Liquidacion;
+using MiParte.Core.Application.Notificaciones;
 using MiParte.Core.Domain;
 using MiParte.Core.Domain.Entidades;
 
@@ -13,7 +14,8 @@ public sealed record CierrePeriodoResultado(Periodo Periodo, DateTimeOffset Cerr
 /// <summary>
 /// Casos de uso del periodo propio de un viaje o evento: cerrarlo (congela sus gastos y deja la liquidación final) y reabrirlo.
 /// </summary>
-public sealed class ServicioPeriodos(IRepositorioPeriodos repositorio, IRepositorioLiquidacion liquidacion, TimeProvider reloj)
+public sealed class ServicioPeriodos(
+    IRepositorioPeriodos repositorio, IRepositorioLiquidacion liquidacion, TimeProvider reloj, IPublicadorNotificaciones? notificaciones = null)
 {
     /// <summary>
     /// Cierra el periodo propio del hogar en nombre de <paramref name="yo"/>. Un periodo abierto termina hoy; uno de rango conserva
@@ -73,6 +75,7 @@ public sealed class ServicioPeriodos(IRepositorioPeriodos repositorio, IReposito
         if (pendientes.Count == 0)
         {
             await repositorio.GuardarAsync(ct);
+            notificaciones?.Publicar(AvisoPeriodoCerrado(yo.HogarId, yo.Id, null));
             return Resultado<CierrePeriodoResultado>.Ok(new CierrePeriodoResultado(periodo, ahora, null));
         }
 
@@ -83,6 +86,14 @@ public sealed class ServicioPeriodos(IRepositorioPeriodos repositorio, IReposito
             CerradoEn = ahora, CerradoPor = yo.Id, DesdeGastoFecha = desde, HastaFecha = hasta, Total = total,
         };
         await liquidacion.CerrarCicloAsync(ciclo, pendientes.Select(g => g.Id).ToList(), ct);
+        notificaciones?.Publicar(AvisoPeriodoCerrado(yo.HogarId, yo.Id, ciclo));
         return Resultado<CierrePeriodoResultado>.Ok(new CierrePeriodoResultado(periodo, ahora, new CicloConAutor(ciclo, yo.Nombre)));
     }
+
+    /// <summary>Aviso del cierre del periodo; con liquidación final, incluye su total. No lo recibe quien cerró el periodo.</summary>
+    private static NotificacionPush AvisoPeriodoCerrado(Guid hogarId, Guid cerradoPor, CicloLiquidacion? ciclo)
+        => new(
+            hogarId, cerradoPor, "Periodo cerrado",
+            ciclo is null ? "Sin gastos pendientes por liquidar" : $"Liquidación final · {FormatoAvisos.Importe(ciclo.Total)} €",
+            "/");
 }

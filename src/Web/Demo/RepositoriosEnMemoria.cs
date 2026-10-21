@@ -132,6 +132,9 @@ internal sealed class RepositorioGastosEnMemoria(AlmacenDemo a) : IRepositorioGa
 
     public Task<bool> CategoriaExisteAsync(Guid id, CancellationToken ct) => Task.FromResult(a.Categorias.Any(c => c.Id == id));
 
+    public Task<string?> NombreCategoriaAsync(Guid id, CancellationToken ct)
+        => Task.FromResult(a.Categorias.FirstOrDefault(c => c.Id == id)?.Nombre);
+
     public Task<bool> EsAdultoActivoAsync(Guid id, CancellationToken ct)
         => Task.FromResult(a.Miembros.Any(m => m.Id == id && m.Activo && m.Tipo == TipoMiembro.Adulto));
 

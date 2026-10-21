@@ -137,14 +137,14 @@ Cada gasto tiene un perfil de reparto; quien paga (`pagado_por`) y quien asume e
 
 > **Estado actual:** el modo «Proporcional a ingresos» ya no existe como modo propio (los ingresos no se guardan). Esa necesidad se cubre con un perfil de *Porcentaje* o *Por partes* acordado por el hogar. Los modos vigentes son individual, porcentajes, partes y cuenta común; el detalle está en [README.md](README.md#estado-diseño-frente-a-código). Las referencias posteriores a «proporcional a ingresos» (el caso del hogar, el perfil por defecto de cada categoría y D3-D4) se leen con esa equivalencia.
 
-**Caso de vuestro hogar.** A (sin hijo) ingresa 2X y B (con hijo) ingresa X. En un gasto de 900 € pagado por A con reparto proporcional a ingresos, A asume 600 € y B asume 300 €, por lo que B debe 300 € a A.
+**Ejemplo ilustrativo.** Supongamos que A ingresa 2X y B ingresa X. En un gasto de 900 € pagado por A con reparto proporcional a ingresos, A asume 600 € y B asume 300 €, por lo que B debe 300 € a A.
 
 El % proporcional es fijo para todo el hogar: se escribe a mano o se calcula con una calculadora de ingresos que no guarda los importes. Si cambian los sueldos, se actualiza y solo afecta a los gastos nuevos. Cada gasto guarda su modo de reparto, los porcentajes aplicados y lo que asume cada persona, así que cambiar el porcentaje, las partes o los perfiles después no altera los gastos ya introducidos.
 
 **Tratamiento del hijo.** Es una decisión de criterio de cada hogar, no técnica. Las opciones están en la tabla de decisiones (D3 y D4). La app permite combinarlas: cada categoría lleva un perfil por defecto, por ejemplo:
 
 - Casa y suministros → proporcional a ingresos.
-- Alimentación → proporcional a ingresos, o por partes 2:1 si se cuenta al hijo.
+- Alimentación → proporcional a ingresos, o por partes si se cuenta al hijo.
 - Gastos del hijo → el perfil que fije el hogar al configurar sus perfiles.
 - Ocio personal → individual.
 
@@ -263,8 +263,8 @@ Siete decisiones condicionan el desarrollo; la D3 y la D4 no dependen de la téc
 |---|---|---|---|---|
 | D1 | Dónde se aloja la app | Render o Railway con Docker; Streamlit Community Cloud (gratis, pero sin dominio propio) | Render o Railway con Docker, porque admiten dominio propio | **Decidida**: Render con Docker para Core.Api y Assistant.Api, Cloudflare Pages para el front (ver [despliegue.md](despliegue.md)) |
 | D2 | Base de datos y login | Supabase (PostgreSQL + login con correo y Google); SQLite local con login propio | Supabase: incluye ambos logins y plan gratuito | **Decidida**: Supabase (PostgreSQL y Auth con correo; el acceso con Google está oculto de momento) |
-| D3 | Cómo se reparten los gastos del hijo | 100 % B; proporcional a ingresos (A asume 2/3); perfil propio (por ejemplo 50/50 o 70/30) | Perfil propio configurable; el porcentaje lo fija cada hogar | **Resuelta por cada hogar**: la app ofrece los perfiles. Un miembro a cargo tiene peso en un perfil de porcentajes o partes, y ese perfil se asigna a una categoría o a un gasto. Cada hogar fija su porcentaje al configurar sus perfiles; la app no fija ninguno |
-| D4 | Reparto de la alimentación | Proporcional a ingresos; por partes 2:1 contando al hijo | Cada hogar decide si el hijo cuenta como una parte | **Resuelta por cada hogar**: la app permite que el hijo cuente como una parte en un perfil por partes, con el peso que configure cada hogar. Si cuenta o no lo decide cada hogar al configurar sus perfiles |
+| D3 | Cómo se reparten los gastos del hijo | 100 % B; proporcional a ingresos (A asume 2/3); perfil propio | Perfil propio configurable; el porcentaje lo fija cada hogar | **Resuelta por cada hogar**: la app ofrece los perfiles. Un miembro a cargo tiene peso en un perfil de porcentajes o partes, y ese perfil se asigna a una categoría o a un gasto. Cada hogar fija su porcentaje al configurar sus perfiles; la app no fija ninguno |
+| D4 | Reparto de la alimentación | Proporcional a ingresos; por partes contando al hijo | Cada hogar decide si el hijo cuenta como una parte | **Resuelta por cada hogar**: la app permite que el hijo cuente como una parte en un perfil por partes, con el peso que configure cada hogar. Si cuenta o no lo decide cada hogar al configurar sus perfiles |
 | D5 | Interfaz | Streamlit; FastAPI con frontend web instalable (PWA) | Streamlit para el MVP; migrar después reutilizando lógica y base de datos | **Superada**: se optó por Blazor WASM (PWA) + minimal API .NET + Supabase |
 | D6 | Alcance de la IA | Solo chatbot; chatbot más categorización automática de gastos | Chatbot en el MVP; categorización como extra si da tiempo | Chatbot hecho; categorización pendiente |
 | D7 | Modelo de lenguaje del chatbot y dominio | Proveedor, modelo y coste por definir; registrador del dominio por elegir | Comprobar requisitos del máster y precios actuales antes de decidir | **Decidido de momento**: Cloudflare Workers AI en el plan gratuito (`Asistente__Proveedor=cloudflare`, sin coste); Anthropic queda como alternativa de pago (`claude-sonnet-5-5`, configurable con `Asistente__Modelo`). **Dominio**: sin dominio propio de momento; la app se publica en `miparte.pages.dev`. Todo el stack es gratuito |

@@ -68,7 +68,7 @@ Las fases van en orden de prioridad. Cada ítem indica su criterio de hecho.
 
     - Revisión de CSP en el navegador (2026-10-19): sin violaciones en las pantallas visitadas (acceso, resumen, gastos, dashboard, recurrentes, categorías, cuenta común, configuración, historial). Google Fonts bloqueado; Pwned Passwords y Supabase accesibles; sin scripts inline; el único atributo `style` es el que pone el propio runtime de Blazor en `<html>`. Limitación: la consola del navegador integrado no conserva los errores de carga de cada página.
 
-### Fase 3 · Decisiones de producto (las toma la pareja, no el código)
+### Fase 3 · Decisiones de producto (las toma cada hogar, no el código)
 
 12. ~~**Cerrar D1 (alojamiento) y D2 (base de datos y login).**~~ **Hecho** (2026-10-20): D1 y D2 están marcadas como decididas en `docs/diseno-y-decisiones.md` (Render con Docker y Supabase).
 13. **Cerrar D3 y D4 (reparto del hijo y de la alimentación).** **Resuelto** (2026-10-21): son decisiones de cada hogar, no de la app. La app ofrece los perfiles de reparto y cada hogar fija los suyos al configurarlos. Los valores concretos no están en el código ni en esta documentación.

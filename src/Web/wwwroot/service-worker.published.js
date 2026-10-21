@@ -31,7 +31,22 @@ async function onInstall(event) {
         .filter(asset => offlineAssetsInclude.some(pattern => pattern.test(asset.url)))
         .filter(asset => !offlineAssetsExclude.some(pattern => pattern.test(asset.url)))
         .map(asset => new Request(asset.url, { integrity: asset.hash, cache: 'no-cache' }));
-    await caches.open(cacheName).then(cache => cache.addAll(assetsRequests));
+    // No vale cache.addAll: Cloudflare Pages responde a /index.html con un 308 a «/», la respuesta queda marcada como
+    // redirigida y el navegador rechaza servirla a una navegación (la app no abre a partir de la segunda visita).
+    // Se descarga todo primero (si algo falla, la versión anterior sigue intacta) y se guarda una copia limpia.
+    const respuestas = await Promise.all(assetsRequests.map(async request => {
+        const response = await fetch(request);
+        if (!response.ok) throw new TypeError(`Service worker: ${request.url} respondió ${response.status}`);
+        return sinRedireccion(response);
+    }));
+    const cache = await caches.open(cacheName);
+    await Promise.all(assetsRequests.map((request, i) => cache.put(request, respuestas[i])));
+}
+
+// Copia de la respuesta sin la marca «redirected», que impide usarla para responder a una navegación.
+async function sinRedireccion(response) {
+    if (!response.redirected) return response;
+    return new Response(await response.blob(), { status: response.status, statusText: response.statusText, headers: response.headers });
 }
 
 async function onActivate(event) {
@@ -63,14 +78,15 @@ async function onFetch(event) {
         }
     }
 
-    if (cachedResponse) return cachedResponse;
+    // Cachés guardadas por versiones anteriores del worker pueden contener el index.html redirigido.
+    if (cachedResponse) return sinRedireccion(cachedResponse);
     try {
         return await fetch(event.request);
     } catch (error) {
         // Sin red, una navegación cae a la app en caché en vez de la página de error de Chrome (ERR_FAILED).
         if (event.request.mode === 'navigate') {
             const indice = await caches.match('index.html').catch(() => undefined);
-            if (indice) return indice;
+            if (indice) return sinRedireccion(indice);
         }
         throw error;
     }

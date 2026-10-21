@@ -3,6 +3,7 @@
 
 <footer class="pie">
     <span>© @(Fecha?.Year ?? DateTime.Now.Year) Mi parte, tu parte</span>
+    <a href="contacto">Contacto</a>
     @if (Fecha is { } fecha)
     {
         <span>Actualizada el <time datetime="@fecha.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)">@fecha.ToString("d 'de' MMMM 'de' yyyy", Es)</time></span>

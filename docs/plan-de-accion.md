@@ -107,9 +107,9 @@ Fuera de alcance declarado: objetivos de ahorro e intereses.
 
 ### Fase 5 · Entrega del proyecto fin de máster
 
-21. **Memoria**: incluir arquitectura por capas, decisiones D1-D7, pruebas (unitarias, PostgreSQL real, bUnit) y las líneas futuras de la fase 4.
-22. **Reproducibilidad**: README de despliegue y de arranque local (`docs/despliegue.md`, `docs/demo.md`) revisado contra lo que se haya probado en la fase 1.
-23. **Calidad final**: `dotnet test` completo y revisión de los comentarios XML de producción según `.claude/rules/idioma-y-documentacion.md`.
+21. **Memoria**: incluir arquitectura por capas, decisiones D1-D7, pruebas (unitarias, PostgreSQL real, bUnit) y las líneas futuras de la fase 4. *Estado (refactor/entrega-calidad)*: no hay documento de memoria en el repo; no se ha escrito. Pendiente de decidir: dónde y en qué formato (ver preguntas en el informe).
+22. **Reproducibilidad**: README de despliegue y de arranque local (`docs/despliegue.md`, `docs/demo.md`) revisado contra lo que se haya probado en la fase 1. *Estado (refactor/entrega-calidad)*: revisado contra el código, scripts, `docker-compose.yml`, `render.yaml` y workflows. Corregido: enlace roto a una fila inexistente del README en `demo.md`; `despliegue.md` no describía `miparte-assistant` ni `ASSISTANT_URL`; README raíz con ruta de `supabase/` obsoleta y «ingresos» en la descripción. Sin verificar: despliegue real en Render, Cloudflare Pages, `pg_cron` y workflows (requieren cuentas y secretos); pruebas de fase 1 no revisadas.
+23. **Calidad final**: `dotnet test` completo y revisión de los comentarios XML de producción según `.claude/rules/idioma-y-documentacion.md`. *Estado (refactor/entrega-calidad)*: `dotnet build` sin errores (3 advertencias en tests). `dotnet test` con PostgreSQL 18 local (`MIPARTE_TEST_DB`, esquema migrado con `--con-auth-stub`): 1187 correctas, 0 omitidas, 0 fallidas. Sin esa variable: 1136 correctas, 51 omitidas, 0 fallidas. Comentarios XML: 1646 de 1660 miembros públicos de producción con `///` (99 %); los 14 restantes son miembros de tipos privados anidados (`Herramientas.cs`, `ClienteWorkersAi.cs`). Clean code: sin TODO ni código comentado; refactors de tamaño medio pendientes de decisión.
 
 ## 3. Orden sugerido
 

@@ -1,6 +1,6 @@
 # Cuenta demo y su restablecimiento
 
-La demo tiene dos formas (ver la fila «Demo sin registrarse» de [README.md](README.md)): el **modo local** del front (sin servidor, no necesita nada de esto) y la **cuenta demo real** (usuario `demo`, contraseña `9c88aaffa6d7e9e4`, distinta de `demo` a propósito; el front traduce `demo` a `demo@miparte.example`), que vive en el proyecto Supabase y es la que esta guía deja lista.
+La demo tiene dos formas: el **modo local** del front (código en `src/Web/Demo/`, sin servidor, no necesita nada de esto) y la **cuenta demo real** (usuario `demo`, contraseña `9c88aaffa6d7e9e4`, distinta de `demo` a propósito; el front traduce `demo` a `demo@miparte.example`), que vive en el proyecto Supabase y es la que esta guía deja lista.
 
 | Fichero | Qué hace |
 |---|---|

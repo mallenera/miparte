@@ -1,5 +1,5 @@
 # miparte
-Mi Parte, Tu Parte: app web de gastos e ingresos del hogar con reparto por porcentaje, partes o ingresos, liquidación mensual y chatbot con IA. Proyecto fin de máster.
+Mi Parte, Tu Parte: app web de gastos del hogar con reparto individual, por porcentaje, por partes o con cuenta común, liquidación mensual y chatbot con IA. Proyecto fin de máster.
 
 ## Estructura
 ```
@@ -13,7 +13,8 @@ src/
 ├── Assistant/
 │   └── Assistant.Api/  chatbot con tool calling
 └── Contracts/      DTOs compartidos entre front y servicios
-supabase/       migraciones y políticas RLS (Supabase/PostgreSQL)
+src/Database/MiParte.Database/  esquema SQL (Estructura/) y migraciones (PostgreSQL / Supabase)
+supabase/       configuración local de Supabase, semilla demo y tests de base de datos
 docs/               decisiones y documentación
 ```
 

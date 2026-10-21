@@ -136,7 +136,7 @@ Cada gasto tiene un perfil de reparto; quien paga (`pagado_por`) y quien asume e
 
 > **Estado actual:** el modo «Proporcional a ingresos» ya no existe como modo propio (los ingresos no se guardan). Esa necesidad se cubre con un perfil de *Porcentaje* o *Por partes* acordado por el hogar. Los modos vigentes son individual, porcentajes, partes y cuenta común; el detalle está en [README.md](README.md#estado-diseño-frente-a-código). Las referencias posteriores a «proporcional a ingresos» (el caso del hogar, el perfil por defecto de cada categoría y D3-D4) se leen con esa equivalencia.
 
-**Ejemplo ilustrativo.** Supongamos que A ingresa 2X y B ingresa X. En un gasto de 900 € pagado por A con reparto proporcional a ingresos, A asume 600 € y B asume 300 €, por lo que B debe 300 € a A.
+**Ejemplo ilustrativo.** Supongamos que un hogar acuerda un porcentaje fijo para A y B según sus ingresos. En un gasto pagado por A, B asume la parte que le corresponde según ese porcentaje y debe a A esa parte del importe.
 
 El % proporcional es fijo para todo el hogar: se escribe a mano o se calcula con una calculadora de ingresos que no guarda los importes. Si cambian los sueldos, se actualiza y solo afecta a los gastos nuevos. Cada gasto guarda su modo de reparto, los porcentajes aplicados y lo que asume cada persona, así que cambiar el porcentaje, las partes o los perfiles después no altera los gastos ya introducidos.
 

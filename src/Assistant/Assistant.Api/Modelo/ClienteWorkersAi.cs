@@ -157,9 +157,11 @@ public sealed class ClienteWorkersAi : IClienteModelo
         [property: JsonPropertyName("role")] string Rol,
         [property: JsonPropertyName("content")] string? Contenido)
     {
+        /// <summary>Llamadas a herramientas del mensaje del asistente; se omiten en el JSON si no hay ninguna.</summary>
         [JsonPropertyName("tool_calls"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<LlamadaCf>? LlamadasHerramienta { get; init; }
 
+        /// <summary>Identificador de la llamada a la que responde un mensaje de herramienta.</summary>
         [JsonPropertyName("tool_call_id"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? IdLlamada { get; init; }
     }
@@ -184,48 +186,58 @@ public sealed class ClienteWorkersAi : IClienteModelo
 
     private sealed class SobreCloudflare
     {
+        /// <summary>Indica si Cloudflare completó la petición.</summary>
         [JsonPropertyName("success")]
         public bool Success { get; set; }
 
+        /// <summary>Cuerpo del resultado de la petición.</summary>
         [JsonPropertyName("result")]
         public ResultadoCloudflare? Resultado { get; set; }
     }
 
     private sealed class ResultadoCloudflare
     {
+        /// <summary>Respuestas generadas por el modelo.</summary>
         [JsonPropertyName("choices")]
         public List<OpcionRecibida>? Opciones { get; set; }
     }
 
     private sealed class OpcionRecibida
     {
+        /// <summary>Mensaje de la respuesta.</summary>
         [JsonPropertyName("message")]
         public MensajeRecibido Mensaje { get; set; } = new();
     }
 
     private sealed class MensajeRecibido
     {
+        /// <summary>Texto del mensaje, si lo hay.</summary>
         [JsonPropertyName("content")]
         public string? Contenido { get; set; }
 
+        /// <summary>Llamadas a herramientas que pide el modelo.</summary>
         [JsonPropertyName("tool_calls")]
         public List<LlamadaRecibida>? LlamadasHerramienta { get; set; }
     }
 
     private sealed class LlamadaRecibida
     {
+        /// <summary>Identificador de la llamada.</summary>
         [JsonPropertyName("id")]
         public string? Id { get; set; }
 
+        /// <summary>Función a ejecutar y sus argumentos.</summary>
         [JsonPropertyName("function")]
         public FuncionRecibida Funcion { get; set; } = new();
     }
 
     private sealed class FuncionRecibida
     {
+        /// <summary>Nombre de la función.</summary>
         [JsonPropertyName("name")]
         public string Nombre { get; set; } = "";
 
+        /// <summary>Argumentos tal como los envía el modelo, en JSON.</summary>
         [JsonPropertyName("arguments")]
         public JsonElement Argumentos { get; set; }
     }

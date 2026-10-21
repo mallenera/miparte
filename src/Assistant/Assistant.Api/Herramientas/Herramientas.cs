@@ -315,6 +315,7 @@ public static class CatalogoHerramientas
     /// <summary>Mes y año resueltos; recuerda si el año se asumió.</summary>
     private readonly record struct Periodo(int Anio, int Mes, bool Asumido)
     {
+        /// <summary>Mes en formato AAAA-MM.</summary>
         public string Texto => $"{Anio:D4}-{Mes:D2}";
 
         /// <summary>Sin año: el en curso, salvo que el mes aún no haya llegado, que entonces es el último que pasó (el año anterior).</summary>
@@ -326,6 +327,7 @@ public static class CatalogoHerramientas
                 : new Periodo(m > hoy.Month ? hoy.Year - 1 : hoy.Year, m, true);
         }
 
+        /// <summary>Marca el resultado si el año se asumió, para que la respuesta lo indique.</summary>
         public void AnotarSiAsumido(Dictionary<string, object?> resultado)
         {
             if (Asumido) resultado["anioAsumido"] = true;

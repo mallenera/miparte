@@ -1,4 +1,3 @@
-using System.Globalization;
 using MiParte.Core.Application.Notificaciones;
 using MiParte.Core.Domain;
 using MiParte.Core.Domain.Entidades;
@@ -52,16 +51,41 @@ public sealed class ServicioGastos(IRepositorioGastos repositorio, IPublicadorNo
         repositorio.Anadir(gasto);
         if (!await repositorio.GuardarAsync(ct)) return Resultado<Gasto>.Conflicto(Mensajes.MesCerrado);
 
-        if (!gasto.EsPersonal) notificaciones?.Publicar(AvisoGastoNuevo(gasto, datos.PagadoPor));
+        if (!gasto.EsPersonal && notificaciones is not null)
+            notificaciones.Publicar(await AvisoGastoNuevoAsync(gasto, datos.PagadoPor, ct));
         return Resultado<Gasto>.Ok(gasto);
     }
 
-    /// <summary>Aviso de un gasto nuevo: concepto e importe, sin el pagador (ya lo sabe quien lo anotó).</summary>
-    private static NotificacionPush AvisoGastoNuevo(Gasto gasto, Guid? pagadoPor)
+    /// <summary>
+    /// Aviso de un gasto nuevo: de dónde sale (quién lo realiza, la cuenta común o el ahorro), importe, categoría y descripción si
+    /// la hay. Un gasto de la cuenta común o del ahorro lo reciben todos los miembros; el resto no va a quien lo paga, que es quien
+    /// normalmente lo anota.
+    /// </summary>
+    private async Task<NotificacionPush> AvisoGastoNuevoAsync(Gasto gasto, Guid? pagadoPor, CancellationToken ct)
     {
-        var concepto = string.IsNullOrWhiteSpace(gasto.Concepto) ? "Gasto sin concepto" : gasto.Concepto;
-        var importe = gasto.Importe.ToString("N2", CultureInfo.GetCultureInfo("es-ES"));
-        return new NotificacionPush(gasto.HogarId, pagadoPor, "Nuevo gasto", $"{concepto} · {importe} €", "/gastos");
+        string titulo;
+        Guid? excluir = pagadoPor;
+        if (gasto.PagadoDesdeAhorro)
+        {
+            titulo = "Nuevo gasto pagado desde el ahorro";
+            excluir = null;
+        }
+        else if (gasto.ACargoCuentaComun)
+        {
+            titulo = "Nuevo gasto de la cuenta común";
+            excluir = null;
+        }
+        else
+        {
+            var miembros = await repositorio.MiembrosActivosAsync(ct);
+            var nombre = pagadoPor is { } pagador ? miembros.FirstOrDefault(m => m.Id == pagador)?.Nombre : null;
+            titulo = nombre is null ? "Nuevo gasto" : $"Nuevo gasto realizado por {nombre}";
+        }
+
+        var categoria = await repositorio.NombreCategoriaAsync(gasto.CategoriaId, ct) ?? "Sin categoría";
+        var partes = new List<string> { $"{FormatoAvisos.Importe(gasto.Importe)} €", categoria };
+        if (!string.IsNullOrWhiteSpace(gasto.Concepto)) partes.Add(gasto.Concepto);
+        return new NotificacionPush(gasto.HogarId, excluir, titulo, string.Join(" · ", partes), "/gastos");
     }
 
     /// <summary>

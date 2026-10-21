@@ -44,6 +44,10 @@ public sealed class RepositorioGastos(MiParteDbContext db) : IRepositorioGastos
     public Task<bool> CategoriaExisteAsync(Guid id, CancellationToken ct) => db.Categorias.AnyAsync(c => c.Id == id, ct);
 
     /// <inheritdoc />
+    public Task<string?> NombreCategoriaAsync(Guid id, CancellationToken ct)
+        => db.Categorias.Where(c => c.Id == id).Select(c => c.Nombre).FirstOrDefaultAsync(ct);
+
+    /// <inheritdoc />
     public Task<bool> EsAdultoActivoAsync(Guid id, CancellationToken ct)
         => db.Miembros.AnyAsync(m => m.Id == id && m.Activo && m.Tipo == TipoMiembro.Adulto, ct);
 

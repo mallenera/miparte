@@ -13,6 +13,21 @@ public interface IClienteModelo
     /// <param name="ct">Token de cancelación.</param>
     /// <exception cref="ModeloNoDisponibleException">El proveedor no responde, rechaza la petición o no hay clave configurada.</exception>
     Task<RespuestaModelo> CrearAsync(SolicitudModelo solicitud, CancellationToken ct);
+
+    /// <summary>
+    /// Igual que <see cref="CrearAsync"/>, pero entrega el texto a medida que se genera (<paramref name="alTexto"/>).
+    /// Por defecto no hay streaming real: se pide la respuesta completa y se entrega de una vez; los proveedores que
+    /// sepan transmitir la sobrescriben.
+    /// </summary>
+    /// <param name="solicitud">Sistema, mensajes y herramientas disponibles.</param>
+    /// <param name="alTexto">Recibe cada trozo de texto en el orden en que llega.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    async Task<RespuestaModelo> CrearStreamingAsync(SolicitudModelo solicitud, Func<string, Task> alTexto, CancellationToken ct)
+    {
+        var respuesta = await CrearAsync(solicitud, ct);
+        foreach (var texto in respuesta.Bloques.OfType<BloqueTexto>()) await alTexto(texto.Texto);
+        return respuesta;
+    }
 }
 
 /// <summary>Fallo del proveedor del modelo; el mensaje es seguro para registrar (sin claves ni cuerpos).</summary>

@@ -1,11 +1,12 @@
-@* Chat del asistente (vive en el panel flotante PanelAsistente): chat de solo consulta sobre los gastos del hogar. El texto de las respuestas se pinta siempre como texto (nunca como HTML). *@
+@* Chat del asistente (vive en el panel flotante PanelAsistente). Las respuestas llegan en vivo y se pintan siempre como texto (nunca como HTML). Puede proponer un gasto como borrador: no se guarda hasta que la persona lo confirma. *@
 @inject AsistenteApiClient Api
+@inject CoreApiClient Core
 @inject EstadoHogar Hogar
 @inject ServicioSesion Sesion
 @inject MiParte.Web.Configuracion.OpcionesWeb Opciones
 
 <div class="asist">
-    <p class="muted">Pregunta por los gastos del hogar. Solo consulta: no crea, cambia ni borra nada, y las cifras salen de tus datos, no de la imaginación del modelo.</p>
+    <p class="muted">Pregunta por los gastos del hogar; las cifras salen de tus datos. Puede preparar un gasto nuevo, pero nunca lo guarda sin que lo confirmes.</p>
     @if (_mensajes.Count > 0)
     {
         <button class="linkbtn" type="button" @onclick="Reiniciar" disabled="@_enviando">Nueva conversación</button>
@@ -43,9 +44,45 @@
                     {
                         <div class="fuente muted">Consultado: @string.Join(", ", m.Herramientas.Select(NombreHerramienta))</div>
                     }
+                    @if (m.Borrador is { } b)
+                    {
+                        <div class="borrador" role="group" aria-label="Gasto propuesto">
+                            <strong>Gasto propuesto (sin guardar)</strong>
+                            <div>@b.Concepto · @Formato.Euros(b.Importe) · @b.Fecha.ToString("dd/MM/yyyy")</div>
+                            <div class="muted">Categoría: @b.Categoria · Perfil: @b.Perfil</div>
+                            @if (m.EstadoBorrador == EstadoBorrador.Pendiente)
+                            {
+                                <label class="u-mt12">Quién paga
+                                    <select @bind="m.Pagador">
+                                        <option value="">Elige a quien paga</option>
+                                        @foreach (var adulto in _adultos)
+                                        {
+                                            <option value="@adulto.Id">@adulto.Nombre</option>
+                                        }
+                                    </select>
+                                </label>
+                                <div class="actions u-mt12">
+                                    <button class="btn btn-sm" type="button" disabled="@(_confirmando || string.IsNullOrEmpty(m.Pagador))" @onclick="() => ConfirmarAsync(m)">Confirmar</button>
+                                    <button class="linkbtn" type="button" disabled="@_confirmando" @onclick="() => Descartar(m)">Descartar</button>
+                                </div>
+                            }
+                            else if (m.EstadoBorrador == EstadoBorrador.Guardado)
+                            {
+                                <div class="ok u-mt12" role="status">Gasto guardado.</div>
+                            }
+                            else
+                            {
+                                <div class="muted u-mt12">Descartado: no se ha guardado.</div>
+                            }
+                            @if (m.Aviso is not null)
+                            {
+                                <div class="aviso err u-mt12" role="alert">@m.Aviso</div>
+                            }
+                        </div>
+                    }
                 </div>
             }
-            @if (_enviando)
+            @if (_enviando && (_enCurso is null || _enCurso.Texto.Length == 0))
             {
                 <div class="burbuja" role="status">
                     <span class="quien">Asistente</span>
@@ -83,12 +120,28 @@
         "¿Gastamos más que el mes pasado?",
     ];
 
-    private sealed record Burbuja(bool EsMio, string Texto, IReadOnlyList<string> Herramientas);
+    /// <summary>Estado de un borrador de gasto en la conversación.</summary>
+    private enum EstadoBorrador { Pendiente, Guardado, Descartado }
+
+    /// <summary>Un mensaje de la conversación. El del asistente se va completando mientras llega el streaming.</summary>
+    private sealed class Burbuja(bool esMio, string texto, IReadOnlyList<string> herramientas)
+    {
+        public bool EsMio { get; } = esMio;
+        public string Texto { get; set; } = texto;
+        public IReadOnlyList<string> Herramientas { get; set; } = herramientas;
+        public BorradorGastoDto? Borrador { get; set; }
+        public EstadoBorrador EstadoBorrador { get; set; } = EstadoBorrador.Pendiente;
+        public string Pagador { get; set; } = "";
+        public string? Aviso { get; set; }
+    }
 
     private readonly List<Burbuja> _mensajes = [];
+    private List<MiembroDto> _adultos = [];
+    private Burbuja? _enCurso;
     private string _texto = "";
     private string? _error;
     private bool _enviando;
+    private bool _confirmando;
 
     private bool Disponible => Opciones.AsistenteConfigurado || Sesion.EsDemoLocal;
 
@@ -99,12 +152,14 @@
         "balance_mes" => "balance del mes",
         "liquidacion_mes" => "liquidación del mes",
         "comparar_meses" => "comparación de meses",
+        "proponer_gasto" => "propuesta de gasto",
         _ => nombre,
     };
 
     private void Reiniciar()
     {
         _mensajes.Clear();
+        _enCurso = null;
         _error = null;
         _texto = "";
     }
@@ -115,27 +170,97 @@
         if (_enviando || string.IsNullOrEmpty(pregunta)) return; // evita el doble envío
         _enviando = true;
         _error = null;
-        _mensajes.Add(new Burbuja(true, pregunta, []));
+        var usuario = new Burbuja(true, pregunta, []);
+        _mensajes.Add(usuario);
         _texto = "";
         var historial = _mensajes
             .TakeLast(MaxHistorial)
             .Select(m => new MensajeChatDto(m.EsMio ? "user" : "assistant", m.Texto))
             .ToList();
+        var asistente = new Burbuja(false, "", []);
         try
         {
-            var respuesta = await Api.PreguntarAsync(historial);
-            _mensajes.Add(new Burbuja(false, respuesta.Respuesta, respuesta.Herramientas));
+            ChatResponse respuesta;
+            if (Sesion.EsDemoLocal)
+            {
+                // La demo no tiene streaming: respuesta fija de una vez.
+                respuesta = await Api.PreguntarAsync(historial);
+                asistente.Texto = respuesta.Respuesta;
+            }
+            else
+            {
+                _mensajes.Add(asistente);
+                _enCurso = asistente;
+                respuesta = await Api.PreguntarEnDirectoAsync(historial, async trozo =>
+                {
+                    asistente.Texto += trozo;
+                    StateHasChanged(); // cada trozo se pinta según llega
+                    await Task.CompletedTask;
+                });
+                asistente.Texto = respuesta.Respuesta; // la respuesta final manda sobre los trozos
+            }
+
+            asistente.Herramientas = respuesta.Herramientas;
+            asistente.Borrador = respuesta.Borrador;
+            if (!_mensajes.Contains(asistente)) _mensajes.Add(asistente);
+            if (respuesta.Borrador is not null && _adultos.Count == 0) await CargarAdultosAsync();
         }
         catch (ApiException e)
         {
-            // La pregunta no llegó a contestarse: se devuelve al cuadro para poder reintentarla.
-            _mensajes.RemoveAt(_mensajes.Count - 1);
+            // La pregunta no llegó a contestarse: se quitan sus burbujas y se devuelve al cuadro para reintentarla.
+            _mensajes.Remove(asistente);
+            _mensajes.Remove(usuario);
             _texto = pregunta;
             _error = e.Message;
         }
         finally
         {
+            _enCurso = null;
             _enviando = false;
         }
+    }
+
+    private async Task CargarAdultosAsync()
+    {
+        try
+        {
+            _adultos = (await Core.ListarMiembrosAsync()).Where(m => m.Activo && m.Tipo == TiposMiembro.Adulto).OrderBy(m => m.Nombre).ToList();
+        }
+        catch (ApiException)
+        {
+            _adultos = []; // sin lista no se puede elegir quién paga: el botón de confirmar queda desactivado
+        }
+    }
+
+    private async Task ConfirmarAsync(Burbuja m)
+    {
+        if (m.Borrador is not { } b || !Guid.TryParse(m.Pagador, out var pagador) || _confirmando) return;
+        _confirmando = true;
+        m.Aviso = null;
+        try
+        {
+            await Api.ConfirmarGastoAsync(new ConfirmarGastoRequest(b.Importe, b.Concepto, b.Fecha, pagador, b.CategoriaId, b.PerfilRepartoId, b.Categoria, b.Perfil));
+            m.EstadoBorrador = EstadoBorrador.Guardado;
+        }
+        catch (ApiException e) when (e.Codigo == System.Net.HttpStatusCode.Conflict)
+        {
+            // Los predeterminados cambiaron: esta propuesta ya no vale y no se puede confirmar; hay que pedir el gasto de nuevo.
+            m.EstadoBorrador = EstadoBorrador.Descartado;
+            m.Aviso = e.Message;
+        }
+        catch (ApiException e)
+        {
+            m.Aviso = e.Message; // el borrador sigue pendiente para reintentarlo
+        }
+        finally
+        {
+            _confirmando = false;
+        }
+    }
+
+    private void Descartar(Burbuja m)
+    {
+        m.EstadoBorrador = EstadoBorrador.Descartado;
+        m.Aviso = null;
     }
 }

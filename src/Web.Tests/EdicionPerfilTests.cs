@@ -87,6 +87,18 @@ public class EdicionPerfilTests
     }
 
     [Fact]
+    public void La_marca_predeterminado_para_gastos_viaja_del_perfil_guardado_a_la_peticion()
+    {
+        var guardado = new PerfilRepartoDto(Guid.NewGuid(), "Casa", "partes",
+            [new PerfilDetalleDto(Ana, 1m)], PredeterminadoGastos: true);
+
+        var e = EdicionPerfil.Desde(guardado, [Ana]);
+
+        Assert.True(e.PredeterminadoGastos);
+        Assert.True(e.ARequest().PredeterminadoGastos);
+    }
+
+    [Fact]
     public void Desde_un_perfil_guardado_carga_los_valores_y_deja_a_cero_a_los_nuevos_adultos()
     {
         var guardado = new PerfilRepartoDto(Guid.NewGuid(), "60/40", "porcentaje",

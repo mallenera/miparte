@@ -7,6 +7,7 @@ CREATE TABLE public.perfil_reparto (
     hogar_id uuid NOT NULL,
     nombre text NOT NULL,
     modo text NOT NULL,
+    predeterminado_gastos boolean DEFAULT false NOT NULL,
     CONSTRAINT perfil_reparto_modo_check CHECK ((modo = ANY (ARRAY['porcentaje'::text, 'partes'::text, 'cuenta_comun'::text, 'individual'::text]))),
     CONSTRAINT perfil_reparto_nombre_check CHECK ((length(btrim(nombre)) > 0))
 );
@@ -42,3 +43,11 @@ ALTER TABLE public.perfil_reparto
 
 ALTER TABLE ONLY public.perfil_reparto
     ADD CONSTRAINT perfil_reparto_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: perfil_reparto_predeterminado_gastos_key; Type: INDEX; Schema: public; Owner: -
+-- Como máximo un perfil predeterminado para gastos por hogar.
+--
+
+CREATE UNIQUE INDEX perfil_reparto_predeterminado_gastos_key ON public.perfil_reparto USING btree (hogar_id) WHERE predeterminado_gastos;

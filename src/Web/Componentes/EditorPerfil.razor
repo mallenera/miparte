@@ -16,6 +16,10 @@
             </select>
         </label>
     </div>
+    <label class="chk">
+        <input type="checkbox" @bind="_edicion.PredeterminadoGastos" />
+        Predeterminado para gastos
+    </label>
 
     @if (_edicion.Modo == ModosReparto.CuentaComun)
     {

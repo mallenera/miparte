@@ -196,7 +196,7 @@ public sealed partial class ServidorDemo
 
     private async Task<HttpResponseMessage> GuardarCategoria(Guid? id, GuardarCategoriaRequest r, CancellationToken ct)
     {
-        var datos = new DatosCategoria(r.Nombre, r.CategoriaPadreId, r.PerfilRepartoId, r.ACargoCuentaComun);
+        var datos = new DatosCategoria(r.Nombre, r.CategoriaPadreId, r.PerfilRepartoId, r.ACargoCuentaComun, r.PredeterminadoGastos);
         var res = id is { } existente
             ? await _categorias.ActualizarAsync(existente, datos, ct)
             : await _categorias.CrearAsync(IdHogar, datos, ct);
@@ -210,8 +210,8 @@ public sealed partial class ServidorDemo
     {
         var detalle = r.Detalle?.Select(d => new ValorMiembro(d.MiembroId, d.Valor)).ToList();
         var res = id is { } existente
-            ? await _perfiles.ActualizarAsync(existente, r.Nombre, r.Modo, detalle, ct)
-            : await _perfiles.CrearAsync(IdHogar, r.Nombre, r.Modo, detalle, ct);
+            ? await _perfiles.ActualizarAsync(existente, r.Nombre, r.Modo, detalle, r.PredeterminadoGastos, ct)
+            : await _perfiles.CrearAsync(IdHogar, r.Nombre, r.Modo, detalle, r.PredeterminadoGastos, ct);
         return res.Error is { } e ? Error(e) : Respuesta(id is null ? HttpStatusCode.Created : HttpStatusCode.OK, res.Valor!.ADto());
     }
 

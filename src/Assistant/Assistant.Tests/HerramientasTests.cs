@@ -18,10 +18,10 @@ public class HerramientasTests
     }
 
     [Fact]
-    public void Catalogo_TieneLasCincoFuncionesDelDiseno()
+    public void Catalogo_TieneLasCincoFuncionesDeLecturaYLaPropuestaDeGasto()
     {
         var nombres = CatalogoHerramientas.Definiciones.Select(d => d.Nombre).ToHashSet();
-        Assert.Equal(["gasto_total", "gasto_por_categoria", "balance_mes", "liquidacion_mes", "comparar_meses"], nombres);
+        Assert.Equal(["gasto_total", "gasto_por_categoria", "balance_mes", "liquidacion_mes", "comparar_meses", "proponer_gasto"], nombres);
         Assert.All(CatalogoHerramientas.Definiciones, d => Assert.Equal("object", d.EsquemaEntrada.GetProperty("type").GetString()));
     }
 

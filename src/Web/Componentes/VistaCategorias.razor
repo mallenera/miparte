@@ -39,6 +39,10 @@ else
                     <div class="c-name @(nodo.Nivel > 0 ? "sub" : "")">@c.Nombre</div>
                     <div class="c-sel">
                         @_m.NombrePerfil(c.PerfilRepartoId)
+                        @if (c.PredeterminadoGastos)
+                        {
+                            <span class="tag">Predeterminada para gastos</span>
+                        }
                         @if (c.ACargoCuentaComun)
                         {
                             <span class="tag cur">A cargo de la cuenta común</span>
@@ -103,6 +107,10 @@ else
                                 <input type="checkbox" @bind="_m.ACargo" />
                                 A cargo de la cuenta común
                             </label>
+                            <label class="chk">
+                                <input type="checkbox" @bind="_m.Predeterminado" />
+                                Predeterminada para gastos
+                            </label>
                             <button class="btn btn-sm" type="submit" disabled="@string.IsNullOrWhiteSpace(_m.Nombre)">Guardar</button>
                             <button class="linkbtn" type="button" @onclick="() => _m.Editando = null">Cancelar</button>
                         </form>
@@ -147,6 +155,10 @@ else
             <label class="chk">
                 <input type="checkbox" @bind="_m.NuevoACargo" />
                 A cargo de la cuenta común
+            </label>
+            <label class="chk">
+                <input type="checkbox" @bind="_m.NuevoPredeterminado" />
+                Predeterminada para gastos
             </label>
             <button class="btn" type="submit" disabled="@string.IsNullOrWhiteSpace(_m.NuevoNombre)">Añadir</button>
         </form>

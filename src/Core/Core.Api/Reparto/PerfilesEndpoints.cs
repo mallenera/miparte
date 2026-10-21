@@ -47,7 +47,7 @@ public static class PerfilesEndpoints
         GuardarPerfilRequest req, [FromServices] ServicioPerfiles servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
-        var r = await servicio.CrearAsync(hogarId, req.Nombre, req.Modo, Valores(req), ct);
+        var r = await servicio.CrearAsync(hogarId, req.Nombre, req.Modo, Valores(req), req.PredeterminadoGastos, ct);
         if (r.Error is { } error) return ApiComun.Respuesta(error);
         return Results.Created($"/api/perfiles/{r.Valor!.Id}", r.Valor.ADto());
     }
@@ -56,7 +56,7 @@ public static class PerfilesEndpoints
     private static async Task<IResult> ActualizarAsync(
         Guid id, GuardarPerfilRequest req, [FromServices] ServicioPerfiles servicio, CancellationToken ct)
     {
-        var r = await servicio.ActualizarAsync(id, req.Nombre, req.Modo, Valores(req), ct);
+        var r = await servicio.ActualizarAsync(id, req.Nombre, req.Modo, Valores(req), req.PredeterminadoGastos, ct);
         return r.Error is { } error ? ApiComun.Respuesta(error) : Results.Ok(r.Valor!.ADto());
     }
 

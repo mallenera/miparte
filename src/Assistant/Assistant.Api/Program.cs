@@ -38,6 +38,7 @@ else
     builder.Services.AddSingleton<IClienteModelo, ClienteAnthropic>();
 }
 builder.Services.AddScoped<ServicioChat>();
+builder.Services.AddScoped<ServicioAltaGasto>();
 
 // CORS: orígenes en Cors:OrigenesPermitidos (env Cors__OrigenesPermitidos__0, ...). Sin configuración, ninguno.
 var origenes = builder.Configuration.GetSection("Cors:OrigenesPermitidos").Get<string[]>()

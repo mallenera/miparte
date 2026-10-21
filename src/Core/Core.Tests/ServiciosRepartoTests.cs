@@ -25,7 +25,7 @@ public class ServicioPerfilesTests
     private ServicioPerfiles Servicio => new(_repo);
 
     private Task<Resultado<PerfilReparto>> Crear(string nombre, string modo, params (Guid, decimal)[] detalle)
-        => Servicio.CrearAsync(Hogar, nombre, modo, detalle.Select(d => new ValorMiembro(d.Item1, d.Item2)).ToList(), default);
+        => Servicio.CrearAsync(Hogar, nombre, modo, detalle.Select(d => new ValorMiembro(d.Item1, d.Item2)).ToList(), false, default);
 
     [Fact]
     public async Task Crear_PorcentajeQueSuma100_LoGuardaConSuDetalle()
@@ -132,11 +132,51 @@ public class ServicioPerfilesTests
     {
         var p = (await Crear("Casa", "partes", (_ana, 2m), (_marcos, 1m))).Valor!;
 
-        var r = await Servicio.ActualizarAsync(p.Id, "Casa", "partes", [new ValorMiembro(_marcos, 5m)], default);
+        var r = await Servicio.ActualizarAsync(p.Id, "Casa", "partes", [new ValorMiembro(_marcos, 5m)], false, default);
 
         Assert.Null(r.Error);
         var d = Assert.Single(r.Valor!.Detalles);
         Assert.Equal((_marcos, 5m), (d.MiembroId, d.Valor));
+    }
+
+    [Fact]
+    public async Task Crear_MarcadoPredeterminadoParaGastos_LoGuarda()
+    {
+        var r = await Servicio.CrearAsync(Hogar, "Casa", "individual", null, true, default);
+
+        Assert.Null(r.Error);
+        Assert.True(r.Valor!.PredeterminadoGastos);
+    }
+
+    [Fact]
+    public async Task Actualizar_CambiaLaMarcaPredeterminadoParaGastos()
+    {
+        var p = (await Crear("Casa", "partes", (_ana, 1m))).Valor!;
+        Assert.False(p.PredeterminadoGastos);
+
+        var marcado = await Servicio.ActualizarAsync(p.Id, "Casa", "partes", [new ValorMiembro(_ana, 1m)], true, default);
+        Assert.True(marcado.Valor!.PredeterminadoGastos);
+
+        var desmarcado = await Servicio.ActualizarAsync(p.Id, "Casa", "partes", [new ValorMiembro(_ana, 1m)], false, default);
+        Assert.False(desmarcado.Valor!.PredeterminadoGastos);
+    }
+
+    [Fact]
+    public async Task Predeterminado_SoloPuedeHaberUnoPorHogar()
+    {
+        var primero = (await Servicio.CrearAsync(Hogar, "Casa", "individual", null, true, default)).Valor!;
+
+        var segundo = await Servicio.CrearAsync(Hogar, "Otra", "individual", null, true, default);
+        Assert.Equal(TipoError.Conflicto, segundo.Error!.Tipo);
+        Assert.Contains("predeterminado", segundo.Error.Mensaje);
+
+        // Editar el mismo perfil conservando la marca no es un segundo predeterminado.
+        var propio = await Servicio.ActualizarAsync(primero.Id, "Casa", "individual", null, true, default);
+        Assert.Null(propio.Error);
+
+        // Otro perfil sin marca sigue pudiendo editarse sin conflicto.
+        var sinMarca = (await Crear("Sin marca", "individual")).Valor!;
+        Assert.Null((await Servicio.ActualizarAsync(sinMarca.Id, "Sin marca", "individual", null, false, default)).Error);
     }
 
     private sealed class RepositorioFalso : IRepositorioPerfiles
@@ -163,6 +203,9 @@ public class ServicioPerfilesTests
 
         public Task<bool> NombreEnUsoAsync(string nombre, Guid? excluirId, CancellationToken ct)
             => Task.FromResult(Perfiles.Any(p => p.Nombre == nombre && p.Id != excluirId));
+
+        public Task<bool> OtroPredeterminadoGastosAsync(Guid? excluirId, CancellationToken ct)
+            => Task.FromResult(Perfiles.Any(p => p.PredeterminadoGastos && p.Id != excluirId));
 
         public Task<bool> EnUsoAsync(Guid id, CancellationToken ct) => Task.FromResult(EnUso.Contains(id));
 
@@ -211,6 +254,28 @@ public class ServicioCategoriasTests
 
     private Task<Resultado<Categoria>> Crear(string nombre, Guid? padre = null, Guid? perfil = null, bool aCargo = false)
         => Servicio.CrearAsync(Hogar, new DatosCategoria(nombre, padre, perfil, aCargo), default);
+
+    [Fact]
+    public async Task Crear_PredeterminadaParaGastos_LaGuardaYActualizarLaCambia()
+    {
+        var c = (await Servicio.CrearAsync(Hogar, new DatosCategoria("Super", null, null, false, true), default)).Valor!;
+        Assert.True(c.PredeterminadoGastos);
+
+        var r = await Servicio.ActualizarAsync(c.Id, new DatosCategoria("Super", null, null, false, false), default);
+
+        Assert.False(r.Valor!.PredeterminadoGastos);
+    }
+
+    [Fact]
+    public async Task Predeterminada_SoloPuedeHaberUnaPorHogar()
+    {
+        Assert.Null((await Servicio.CrearAsync(Hogar, new DatosCategoria("Super", null, null, false, true), default)).Error);
+
+        var r = await Servicio.CrearAsync(Hogar, new DatosCategoria("Farmacia", null, null, false, true), default);
+
+        Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
+        Assert.Contains("predeterminada", r.Error.Mensaje);
+    }
 
     [Fact]
     public async Task Crear_ACargoSinPerfil_UsaElPerfilDeCuentaComun()
@@ -377,6 +442,9 @@ public class ServicioCategoriasTests
 
         public Task<bool> NombreEnNivelAsync(Guid? padreId, string nombre, Guid? excluirId, CancellationToken ct)
             => Task.FromResult(Categorias.Any(c => c.CategoriaPadreId == padreId && c.Nombre == nombre && c.Id != excluirId));
+
+        public Task<bool> OtraPredeterminadaGastosAsync(Guid? excluirId, CancellationToken ct)
+            => Task.FromResult(Categorias.Any(c => c.PredeterminadoGastos && c.Id != excluirId));
 
         public Task<bool> TieneSubcategoriasAsync(Guid id, CancellationToken ct)
             => Task.FromResult(Categorias.Any(c => c.CategoriaPadreId == id));

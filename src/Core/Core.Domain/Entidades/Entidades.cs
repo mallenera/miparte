@@ -329,6 +329,8 @@ public class PerfilReparto
     public ModoReparto Modo { get; set; }
     /// <summary>Valor asignado a cada miembro (porcentaje o partes).</summary>
     public List<PerfilRepartoDetalle> Detalles { get; set; } = [];
+    /// <summary>Si el perfil está marcado «predeterminado para gastos»: el asistente lo propone al dar de alta un gasto desde el chat.</summary>
+    public bool PredeterminadoGastos { get; set; }
 }
 
 /// <summary>Valor de un miembro dentro de un perfil de reparto.</summary>
@@ -361,6 +363,8 @@ public class Categoria
     public Guid? PerfilRepartoId { get; set; }
     /// <summary>Si los gastos de esta categoría van por defecto a cargo de la cuenta común (su perfil por defecto es el de cuenta común).</summary>
     public bool ACargoCuentaComun { get; set; }
+    /// <summary>Si la categoría está marcada «predeterminada para gastos»: el asistente la propone al dar de alta un gasto desde el chat.</summary>
+    public bool PredeterminadoGastos { get; set; }
 }
 
 /// <summary>Plantilla de gasto que se genera periódicamente un día fijo del mes.</summary>
@@ -477,4 +481,16 @@ public class EventoAuditoria
     public string? Despues { get; set; }
     /// <summary>Solo para eventos de gastos personales: el miembro que paga, único que puede verlos. Null en el resto.</summary>
     public Guid? PersonalDe { get; set; }
+    /// <summary>Origen del cambio: <see cref="OrigenesAuditoria"/>.Manual (lo hizo la persona) o Asistente (confirmado desde el chat).</summary>
+    public string Origen { get; set; } = OrigenesAuditoria.Manual;
+}
+
+/// <summary>Valores de <see cref="EventoAuditoria.Origen"/>.</summary>
+public static class OrigenesAuditoria
+{
+    /// <summary>El cambio lo hizo la persona desde la aplicación (valor por defecto).</summary>
+    public const string Manual = "manual";
+
+    /// <summary>El cambio lo propuso el asistente y lo confirmó la persona; el autor sigue siendo quien confirma.</summary>
+    public const string Asistente = "asistente";
 }

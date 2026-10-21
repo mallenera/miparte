@@ -57,7 +57,7 @@ public static class RegistroAuditoria
     /// <summary>Genera los eventos de todo lo que hay pendiente de guardar en el tracker.</summary>
     /// <param name="tracker">Seguimiento de cambios del contexto (se llama antes de guardar).</param>
     /// <param name="usuarioId">Autor de los cambios.</param>
-    public static List<EventoAuditoria> Capturar(ChangeTracker tracker, Guid? usuarioId)
+    public static List<EventoAuditoria> Capturar(ChangeTracker tracker, Guid? usuarioId, string origen = OrigenesAuditoria.Manual)
     {
         tracker.DetectChanges();
         var entradas = tracker.Entries().ToList();
@@ -88,13 +88,13 @@ public static class RegistroAuditoria
 
         foreach (var raiz in raices)
         {
-            var evento = Evento(raiz, entradas, usuarioId, ahora);
+            var evento = Evento(raiz, entradas, usuarioId, ahora, origen);
             if (evento is not null) eventos.Add(evento);
         }
         return eventos;
     }
 
-    private static EventoAuditoria? Evento(EntityEntry raiz, List<EntityEntry> todas, Guid? usuarioId, DateTimeOffset ahora)
+    private static EventoAuditoria? Evento(EntityEntry raiz, List<EntityEntry> todas, Guid? usuarioId, DateTimeOffset ahora, string origen)
     {
         var antes = new Dictionary<string, object?>();
         var despues = new Dictionary<string, object?>();
@@ -144,7 +144,7 @@ public static class RegistroAuditoria
             Accion = accion, Entidad = Nombre(raiz.Entity)!, EntidadId = IdDe(raiz.Entity),
             Antes = antes.Count == 0 ? null : JsonSerializer.Serialize(antes, Json),
             Despues = despues.Count == 0 ? null : JsonSerializer.Serialize(despues, Json),
-            PersonalDe = PersonalDe(raiz),
+            PersonalDe = PersonalDe(raiz), Origen = origen,
         };
     }
 

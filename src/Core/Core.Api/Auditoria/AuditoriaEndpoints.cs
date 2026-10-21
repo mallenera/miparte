@@ -41,7 +41,7 @@ public static class AuditoriaEndpoints
         var autores = r.Valor!.Autores;
         return Results.Ok(r.Valor.Eventos.Select(e => new EventoAuditoriaDto(
             e.Id, e.Cuando, e.UsuarioId, e.UsuarioId is { } u ? autores.GetValueOrDefault(u) : null,
-            e.Accion, e.Entidad, e.EntidadId, Parsear(e.Antes), Parsear(e.Despues))).ToList());
+            e.Accion, e.Entidad, e.EntidadId, Parsear(e.Antes), Parsear(e.Despues), e.Origen)).ToList());
     }
 
     /// <summary>Convierte el JSON guardado en un elemento serializable; null si no hay.</summary>

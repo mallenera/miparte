@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using Anthropic;
 using Anthropic.Exceptions;
@@ -33,19 +34,10 @@ public sealed class ClienteAnthropic : IClienteModelo
         if (_cliente is null)
             throw new ModeloNoDisponibleException("Falta la variable de entorno ANTHROPIC_API_KEY.");
 
-        var parametros = new MessageCreateParams
-        {
-            Model = _modelo,
-            MaxTokens = solicitud.MaxTokens,
-            System = solicitud.Sistema,
-            Messages = solicitud.Mensajes.Select(AMensaje).ToList(),
-            Tools = solicitud.Herramientas.Select(AHerramienta).ToList(),
-        };
-
         Message respuesta;
         try
         {
-            respuesta = await _cliente.Messages.Create(parametros, ct);
+            respuesta = await _cliente.Messages.Create(AParametros(solicitud), ct);
         }
         catch (AnthropicApiException ex)
         {
@@ -59,14 +51,91 @@ public sealed class ClienteAnthropic : IClienteModelo
 
         return new RespuestaModelo(
             respuesta.Content.Select(DeBloque).OfType<BloqueModelo>().ToList(),
-            Motivo(respuesta),
+            MotivoDeTexto(respuesta.StopReason?.ToString() ?? ""),
             (int)respuesta.Usage.InputTokens,
             (int)respuesta.Usage.OutputTokens);
     }
 
-    private static MotivoParada Motivo(Message m)
+    /// <summary>
+    /// Pide la respuesta en streaming: el texto se entrega según llega y los bloques se reconstruyen al terminar, en el
+    /// mismo orden que en <see cref="CrearAsync"/>. Las llamadas a herramientas se acumulan a partir de sus fragmentos JSON.
+    /// </summary>
+    public async Task<RespuestaModelo> CrearStreamingAsync(SolicitudModelo solicitud, Func<string, Task> alTexto, CancellationToken ct)
     {
-        var motivo = m.StopReason?.ToString() ?? "";
+        if (_cliente is null)
+            throw new ModeloNoDisponibleException("Falta la variable de entorno ANTHROPIC_API_KEY.");
+
+        var bloques = new List<AcumuladoBloque>();
+        var porIndice = new Dictionary<long, AcumuladoBloque>();
+        var motivo = "";
+        var tokensEntrada = 0;
+        var tokensSalida = 0;
+        try
+        {
+            var flujo = _cliente.Messages.CreateStreaming(AParametros(solicitud), ct);
+            await foreach (var evento in flujo)
+            {
+                if (evento.TryPickStart(out var inicio))
+                {
+                    tokensEntrada = (int)inicio.Message.Usage.InputTokens;
+                }
+                else if (evento.TryPickContentBlockStart(out var comienzo))
+                {
+                    var nuevo = new AcumuladoBloque();
+                    if (comienzo.ContentBlock.TryPickToolUse(out ToolUseBlock? uso))
+                    {
+                        nuevo.Id = uso.ID;
+                        nuevo.Nombre = uso.Name;
+                        nuevo.EsHerramienta = true;
+                    }
+                    bloques.Add(nuevo);
+                    porIndice[comienzo.Index] = nuevo;
+                }
+                else if (evento.TryPickContentBlockDelta(out var delta))
+                {
+                    if (!porIndice.TryGetValue(delta.Index, out var bloque)) continue;
+                    if (delta.Delta.TryPickText(out TextDelta? texto))
+                    {
+                        bloque.Texto.Append(texto.Text);
+                        await alTexto(texto.Text);
+                    }
+                    else if (delta.Delta.TryPickInputJson(out InputJsonDelta? json))
+                    {
+                        bloque.Json.Append(json.PartialJson);
+                    }
+                }
+                else if (evento.TryPickDelta(out var final))
+                {
+                    motivo = final.Delta.StopReason?.ToString() ?? motivo;
+                    tokensSalida = (int)final.Usage.OutputTokens;
+                }
+            }
+        }
+        catch (AnthropicApiException ex)
+        {
+            throw new ModeloNoDisponibleException($"Anthropic respondió con un error ({ex.GetType().Name}).", ex);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new ModeloNoDisponibleException("No se pudo contactar con Anthropic.", ex);
+        }
+
+        var salida = bloques.Select(b => b.A()).ToList();
+        return new RespuestaModelo(salida, MotivoDeTexto(motivo), tokensEntrada, tokensSalida);
+    }
+
+    /// <summary>Parámetros de la Messages API a partir de la solicitud del asistente (compartidos por ambas variantes).</summary>
+    private MessageCreateParams AParametros(SolicitudModelo solicitud) => new()
+    {
+        Model = _modelo,
+        MaxTokens = solicitud.MaxTokens,
+        System = solicitud.Sistema,
+        Messages = solicitud.Mensajes.Select(AMensaje).ToList(),
+        Tools = solicitud.Herramientas.Select(AHerramienta).ToList(),
+    };
+
+    private static MotivoParada MotivoDeTexto(string motivo)
+    {
         return motivo switch
         {
             _ when motivo.Contains("tool", StringComparison.OrdinalIgnoreCase) => MotivoParada.UsoDeHerramienta,
@@ -135,5 +204,32 @@ public sealed class ClienteAnthropic : IClienteModelo
             Description = h.Descripcion,
             InputSchema = new() { Properties = propiedades, Required = requeridas },
         };
+    }
+
+    /// <summary>Bloque que se va reconstruyendo a partir de los eventos de streaming.</summary>
+    private sealed class AcumuladoBloque
+    {
+        /// <summary>Texto acumulado (bloques de texto).</summary>
+        public StringBuilder Texto { get; } = new();
+
+        /// <summary>Argumentos JSON acumulados (llamadas a herramientas).</summary>
+        public StringBuilder Json { get; } = new();
+
+        /// <summary>Identificador de la llamada a herramienta.</summary>
+        public string Id { get; set; } = "";
+
+        /// <summary>Nombre de la herramienta.</summary>
+        public string Nombre { get; set; } = "";
+
+        /// <summary>Si el bloque es una llamada a herramienta (y no texto).</summary>
+        public bool EsHerramienta { get; set; }
+
+        /// <summary>Convierte el bloque acumulado en su forma final del dominio.</summary>
+        public BloqueModelo A()
+        {
+            if (!EsHerramienta) return new BloqueTexto(Texto.ToString());
+            var json = Json.Length == 0 ? "{}" : Json.ToString();
+            return new BloqueUsoHerramienta(Id, Nombre, JsonDocument.Parse(json).RootElement.Clone());
+        }
     }
 }

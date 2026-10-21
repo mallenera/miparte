@@ -113,6 +113,8 @@ Permisos: "miembro" = cualquier miembro activo del hogar (incluye admin). "admin
 | `PUT /api/perfiles/{id}` | Reemplaza nombre, modo y detalle | `GuardarPerfilRequest` | `PerfilRepartoDto` 200 | 400, 404, 409 | permiso `perfiles.gestionar` |
 | `DELETE /api/perfiles/{id}?moverA={id}` | Elimina. Si está en uso hay que indicar `moverA`: sus categorías, gastos y recurrentes pasan a ese perfil (debe ser de cuenta común si el borrado lo es, y no serlo si no) | - | 204 | 400 destino inexistente, el mismo o de otra naturaleza; 404; 409 en uso sin `moverA` (el cuerpo lleva `enUso: true`) | permiso `perfiles.gestionar` |
 
+`predeterminadoGastos` (opcional, `false` por defecto; en `PerfilRepartoDto`, `GuardarPerfilRequest` y en las categorías) marca la casilla «Predeterminado para gastos». Es un booleano sin más reglas en la API **como máximo uno por hogar** en cada caso: un segundo perfil o una segunda categoría marcados dan 409 con un mensaje que lo dice (el índice único parcial de la base lo garantiza). Ninguno marcado no es error; el asistente avisa de que falta el predeterminado. El asistente la usa para proponer el alta de un gasto desde el chat (`docs/asistente.md`); los endpoints de negocio no la leen. `PUT` la reemplaza junto con el resto de campos, así que el cliente debe enviarla también al editar.
+
 Validación de perfiles (400): nombre obligatorio (≤ 100); `modo` en `porcentaje|partes|cuenta_comun|individual`; `cuenta_comun` e `individual` no llevan detalle; `porcentaje` y `partes` exigen detalle sin miembros repetidos, adultos activos o miembros a cargo con responsable adulto activo, valores ≥ 0; `porcentaje` debe sumar 100 (tolerancia 0,0001); `partes` necesita alguna parte > 0.
 
 ### 3.5 Ingresos
@@ -204,6 +206,8 @@ Un mes cerrado congela sus **gastos** y, con ellos, su reparto, su resumen y su 
 | `GET /api/auditoria?entidad=&entidadId=&limite=&hasta=&despuesDeId=` | Historial de cambios del hogar, del más reciente al más antiguo (empates por `id`). `limite` 1-200 (50 por defecto). Se pagina con el `cuando` y el `id` del último evento recibido, enviados como `hasta` (ISO 8601) y `despuesDeId`; con solo `hasta` se perderían los eventos de un mismo guardado, que comparten `cuando` | - | `EventoAuditoriaDto[]` 200 | 400 límite fuera de 1-200; 403 sin el permiso `historial.ver`; 409 sin hogar | permiso `historial.ver` |
 
 Cada cambio de gasto, gasto recurrente, pago de liquidación, aportación, reembolso, ingreso y retirada de ahorro, perfil, categoría, miembro, invitación y enlace de grupo queda registrado **en la misma transacción** que el cambio (no puede haber cambio sin rastro). `accion`: `crear` (solo `despues`), `editar` (solo los campos que cambian, en `antes` y `despues`), `borrar` (solo `antes`), `vincular` (un usuario queda ligado a un miembro al aceptar una invitación) y `usar` (invitación aceptada). El reparto de un gasto (`repartos`) y el detalle de un perfil (`detalle`) van dentro de su evento. Crear un hogar es un único evento (no se detalla la semilla). Nunca se registran el token de una invitación ni su hash. `autor` es el nombre del miembro vinculado al usuario; `usuarioId` sigue siendo válido aunque ese miembro se desactive.
+
+**Origen del cambio (`origen`).** Cada `EventoAuditoriaDto` lleva `origen`: `manual` (por defecto, lo que hace la persona desde la aplicación) o `asistente` (un gasto que propuso el chat y confirmó la persona). Assistant.Api lo marca enviando la cabecera `X-Origen: asistente` en `POST /api/gastos` al confirmar un borrador (`POST /api/chat/confirmar-gasto`, `docs/asistente.md`). El autor (`usuarioId`, `autor`) sigue siendo quien confirma. Es una **etiqueta** que envía el cliente con el JWT de la persona, no una prueba de origen: cualquier otro valor de `X-Origen` cuenta como `manual`. Columna `auditoria.origen` (`manual` o `asistente`), script `Scripts/20261024130000_predeterminado_unico_y_origen_auditoria.sql`.
 
 ### 3.12 Avisos del navegador
 
@@ -332,6 +336,8 @@ Reglas: un enlace **revocado** o **caducado** no admite uniones (409, con `revoc
 ```
 
 Categoría a cargo de la cuenta común (con la cuenta activada; el servidor asigna el perfil de cuenta común si no se envía): `{ "nombre": "Comunidad", "categoriaPadreId": null, "perfilRepartoId": null, "aCargoCuentaComun": true }`.
+
+Categoría marcada «predeterminada para gastos» (`predeterminadoGastos`, opcional, `false` por defecto; `CategoriaDto` lo devuelve siempre): `{ "nombre": "Supermercado", "categoriaPadreId": null, "perfilRepartoId": null, "aCargoCuentaComun": false, "predeterminadoGastos": true }`.
 
 ### Perfiles
 

@@ -15,6 +15,7 @@ namespace MiParte.Contracts;
 /// <param name="EntidadId">Identificador de la entidad afectada.</param>
 /// <param name="Antes">Valores anteriores, o null.</param>
 /// <param name="Despues">Valores nuevos, o null.</param>
+/// <param name="Origen">«manual» (lo hizo la persona desde la aplicación) o «asistente» (alta propuesta por el chat y confirmada por la persona; el autor es quien confirma).</param>
 public record EventoAuditoriaDto(
     Guid Id, DateTimeOffset Cuando, Guid? UsuarioId, string? Autor, string Accion, string Entidad, Guid EntidadId,
-    JsonElement? Antes, JsonElement? Despues);
+    JsonElement? Antes, JsonElement? Despues, string Origen = "manual");

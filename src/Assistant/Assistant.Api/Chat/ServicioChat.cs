@@ -35,7 +35,8 @@ public sealed class ServicioChat(IClienteModelo modelo, IOptions<OpcionesAsisten
 
         Cómo trabajas:
         - Solo puedes consultar datos con las funciones que tienes (solo lectura). No inventes cifras ni calcules a ojo: usa siempre una función y cita sus resultados. Los importes son en euros.
-        - Si la pregunta no encaja en ninguna función (otros temas, consejos de inversión o ahorro personalizados, modificar o borrar datos), dilo con claridad y explica qué sí puedes hacer: totales de gasto, desglose por categoría, balance del mes, liquidación (quién debe a quién) y comparación de meses. No puedes crear, editar ni borrar nada.
+        - Si la pregunta no encaja en ninguna función (otros temas, consejos de inversión o ahorro personalizados, editar o borrar datos), dilo con claridad y explica qué sí puedes hacer: totales de gasto, desglose por categoría, balance del mes, liquidación (quién debe a quién), comparación de meses y apuntar un gasto nuevo. No puedes editar ni borrar nada.
+        - Para apuntar un gasto: necesitas importe, concepto y fecha. Si falta alguno, pregúntalo (no supongas la fecha). Entonces llama a proponer_gasto. El gasto solo queda preparado: nunca digas que está guardado; la persona lo revisa y lo confirma con su botón. No elijas categoría ni perfil: los pone el hogar.
         - Si falta el año, la función asume el año en curso (o el anterior si el mes aún no ha llegado) y lo marca con anioAsumido: dilo en la respuesta. Si el mes es ambiguo, pregunta.
         - Si una función devuelve un error, explícaselo a la persona con tus palabras; no lo reintentes con datos inventados.
 
@@ -54,32 +55,47 @@ public sealed class ServicioChat(IClienteModelo modelo, IOptions<OpcionesAsisten
     /// <exception cref="ModeloNoDisponibleException">El modelo falló.</exception>
     /// <exception cref="HogarNoAccesibleException">Core.Api denegó el acceso al hogar.</exception>
     /// <exception cref="DatosNoDisponiblesException">Core.Api no pudo responder.</exception>
+    public Task<ChatResponse> ResponderAsync(IReadOnlyList<MensajeChatDto>? mensajes, IDatosHogar datos, CancellationToken ct)
+        => ResponderAsync(mensajes, datos, null, ct);
+
+    /// <summary>
+    /// Igual que <see cref="ResponderAsync(IReadOnlyList{MensajeChatDto}, IDatosHogar, CancellationToken)"/>, pero si
+    /// <paramref name="alTexto"/> no es null el texto de cada turno se entrega según llega (respuesta en vivo). La respuesta
+    /// final es la misma en ambos casos.
+    /// </summary>
+    /// <param name="mensajes">Historial enviado por el cliente (se valida y recorta).</param>
+    /// <param name="datos">Acceso a los datos del hogar de la persona.</param>
+    /// <param name="alTexto">Recibe el texto a medida que se genera, o null para no transmitirlo.</param>
+    /// <param name="ct">Token de cancelación.</param>
     public async Task<ChatResponse> ResponderAsync(
-        IReadOnlyList<MensajeChatDto>? mensajes, IDatosHogar datos, CancellationToken ct)
+        IReadOnlyList<MensajeChatDto>? mensajes, IDatosHogar datos, Func<string, Task>? alTexto, CancellationToken ct)
     {
         var historial = Validar(mensajes);
         var hoy = DateOnly.FromDateTime(reloj.GetLocalNow().DateTime);
         var sistema = $"{InstruccionesBase}\n\nFecha de hoy: {hoy:yyyy-MM-dd}.";
         var conversacion = new List<MensajeModelo>(historial);
         var usadas = new List<string>();
+        BorradorGastoDto? borrador = null;
         var llamadas = 0;
 
         for (var vuelta = 0; vuelta < _o.MaxIteraciones; vuelta++)
         {
-            var respuesta = await modelo.CrearAsync(
-                new SolicitudModelo(sistema, conversacion, CatalogoHerramientas.Definiciones, _o.MaxTokens), ct);
+            var solicitud = new SolicitudModelo(sistema, conversacion, CatalogoHerramientas.Definiciones, _o.MaxTokens);
+            var respuesta = alTexto is null
+                ? await modelo.CrearAsync(solicitud, ct)
+                : await modelo.CrearStreamingAsync(solicitud, alTexto, ct);
 
             switch (respuesta.Motivo)
             {
                 case MotivoParada.Rechazo:
-                    return new ChatResponse(RespuestaRechazada, usadas);
+                    return new ChatResponse(RespuestaRechazada, usadas, borrador);
                 case MotivoParada.UsoDeHerramienta:
                     break;
                 default:
                     var texto = TextoDe(respuesta);
-                    if (texto.Length == 0) return new ChatResponse(RespuestaSinResolver, usadas);
+                    if (texto.Length == 0) return new ChatResponse(RespuestaSinResolver, usadas, borrador);
                     if (respuesta.Motivo == MotivoParada.LimiteDeTokens) texto += "…";
-                    return new ChatResponse(texto, usadas);
+                    return new ChatResponse(texto, usadas, borrador);
             }
 
             conversacion.Add(new MensajeModelo(RolModelo.Asistente, respuesta.Bloques));
@@ -93,6 +109,7 @@ public sealed class ServicioChat(IClienteModelo modelo, IOptions<OpcionesAsisten
                 }
                 var resultado = await CatalogoHerramientas.EjecutarAsync(uso.Nombre, uso.Entrada, datos, hoy, ct);
                 if (!usadas.Contains(uso.Nombre)) usadas.Add(uso.Nombre);
+                borrador = resultado.Borrador ?? borrador;
                 resultados.Add(new BloqueResultadoHerramienta(uso.Id, resultado.Contenido, resultado.EsError));
             }
 
@@ -100,7 +117,7 @@ public sealed class ServicioChat(IClienteModelo modelo, IOptions<OpcionesAsisten
             conversacion.Add(new MensajeModelo(RolModelo.Usuario, resultados));
         }
 
-        return new ChatResponse(RespuestaSinResolver, usadas);
+        return new ChatResponse(RespuestaSinResolver, usadas, borrador);
     }
 
     /// <summary>

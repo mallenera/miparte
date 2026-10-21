@@ -7,6 +7,8 @@ namespace MiParte.Core.Application.Perfiles;
 public sealed class ServicioPerfiles(IRepositorioPerfiles repositorio)
 {
     private const string NombreRepetido = "Ya existe un perfil con ese nombre.";
+    private const string MensajePredeterminado =
+        "Ya hay otro perfil de reparto marcado como predeterminado para gastos. Desmárcalo antes de marcar este.";
 
     /// <summary>Perfiles del hogar con su detalle, ordenados por nombre.</summary>
     public Task<IReadOnlyList<PerfilReparto>> ListarAsync(CancellationToken ct) => repositorio.ListarAsync(ct);
@@ -14,30 +16,41 @@ public sealed class ServicioPerfiles(IRepositorioPerfiles repositorio)
     /// <summary>Un perfil con su detalle; null si no existe.</summary>
     public Task<PerfilReparto?> ObtenerAsync(Guid id, CancellationToken ct) => repositorio.ObtenerAsync(id, ct);
 
-    /// <summary>Crea un perfil con su detalle. Inválido si el nombre, el modo o el detalle no valen; conflicto si el nombre ya existe.</summary>
+    /// <summary>
+    /// Crea un perfil con su detalle. Inválido si el nombre, el modo o el detalle no valen; conflicto si el nombre ya existe.
+    /// <paramref name="predeterminadoGastos"/> marca el perfil como predeterminado para gastos (lo propone el asistente).
+    /// </summary>
     public async Task<Resultado<PerfilReparto>> CrearAsync(
-        Guid hogarId, string? nombre, string? modo, IReadOnlyList<ValorMiembro>? detalle, CancellationToken ct)
+        Guid hogarId, string? nombre, string? modo, IReadOnlyList<ValorMiembro>? detalle, bool predeterminadoGastos, CancellationToken ct)
     {
         var v = await ValidarAsync(nombre, modo, detalle, null, ct);
         if (v.Error is not null) return v.Error;
+        if (predeterminadoGastos && await repositorio.OtroPredeterminadoGastosAsync(null, ct))
+            return Resultado<PerfilReparto>.Conflicto(MensajePredeterminado);
 
-        var perfil = new PerfilReparto { Id = Guid.NewGuid(), HogarId = hogarId, Nombre = v.Nombre, Modo = v.Modo };
+        var perfil = new PerfilReparto
+        {
+            Id = Guid.NewGuid(), HogarId = hogarId, Nombre = v.Nombre, Modo = v.Modo, PredeterminadoGastos = predeterminadoGastos,
+        };
         perfil.Detalles.AddRange(v.Detalle.Select(d => Nuevo(hogarId, perfil.Id, d)));
         repositorio.Anadir(perfil);
         return await repositorio.GuardarAsync(ct) ? Resultado<PerfilReparto>.Ok(perfil) : Resultado<PerfilReparto>.Conflicto(NombreRepetido);
     }
 
-    /// <summary>Sustituye nombre, modo y detalle del perfil; los gastos ya guardados no se recalculan.</summary>
+    /// <summary>Sustituye nombre, modo, detalle y marca «predeterminado para gastos»; los gastos ya guardados no se recalculan.</summary>
     public async Task<Resultado<PerfilReparto>> ActualizarAsync(
-        Guid id, string? nombre, string? modo, IReadOnlyList<ValorMiembro>? detalle, CancellationToken ct)
+        Guid id, string? nombre, string? modo, IReadOnlyList<ValorMiembro>? detalle, bool predeterminadoGastos, CancellationToken ct)
     {
         var perfil = await repositorio.ObtenerParaEditarAsync(id, ct);
         if (perfil is null) return Resultado<PerfilReparto>.NoEncontrado();
         var v = await ValidarAsync(nombre, modo, detalle, id, ct);
         if (v.Error is not null) return v.Error;
+        if (predeterminadoGastos && await repositorio.OtroPredeterminadoGastosAsync(id, ct))
+            return Resultado<PerfilReparto>.Conflicto(MensajePredeterminado);
 
         perfil.Nombre = v.Nombre;
         perfil.Modo = v.Modo;
+        perfil.PredeterminadoGastos = predeterminadoGastos;
         repositorio.ReemplazarDetalle(perfil, v.Detalle.Select(d => Nuevo(perfil.HogarId, perfil.Id, d)).ToList());
         return await repositorio.GuardarAsync(ct) ? Resultado<PerfilReparto>.Ok(perfil) : Resultado<PerfilReparto>.Conflicto(NombreRepetido);
     }

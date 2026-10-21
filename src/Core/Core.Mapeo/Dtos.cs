@@ -33,10 +33,10 @@ public static class Dtos
     /// <summary>Perfil de reparto con el detalle ordenado por miembro y el modo en texto.</summary>
     public static PerfilRepartoDto ADto(this PerfilReparto p) => new(
         p.Id, p.Nombre, TextoModoReparto.ATexto(p.Modo),
-        p.Detalles.OrderBy(d => d.MiembroId).Select(d => new PerfilDetalleDto(d.MiembroId, d.Valor)).ToList());
+        p.Detalles.OrderBy(d => d.MiembroId).Select(d => new PerfilDetalleDto(d.MiembroId, d.Valor)).ToList(), p.PredeterminadoGastos);
 
     /// <summary>Categoría de gasto.</summary>
-    public static CategoriaDto ADto(this Categoria c) => new(c.Id, c.Nombre, c.CategoriaPadreId, c.PerfilRepartoId, c.ACargoCuentaComun);
+    public static CategoriaDto ADto(this Categoria c) => new(c.Id, c.Nombre, c.CategoriaPadreId, c.PerfilRepartoId, c.ACargoCuentaComun, c.PredeterminadoGastos);
 
     /// <summary>Plantilla de gasto recurrente.</summary>
     public static GastoRecurrenteResponse ADto(this GastoRecurrente r)

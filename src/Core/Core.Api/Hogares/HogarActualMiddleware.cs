@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using MiParte.Core.Domain.Entidades;
 using MiParte.Core.Infrastructure.Persistencia;
 
 namespace MiParte.Core.Api.Hogares;
@@ -13,6 +14,9 @@ public class HogarActualMiddleware(RequestDelegate next)
 {
     /// <summary>Nombre de la cabecera HTTP con la que el cliente elige hogar cuando pertenece a varios.</summary>
     public const string Cabecera = "X-Hogar-Id";
+
+    /// <summary>Cabecera opcional con el origen del cambio para la auditoría (solo «asistente» tiene efecto).</summary>
+    public const string CabeceraOrigen = "X-Origen";
 
     /// <summary>Clave de <c>HttpContext.Items</c> con el miembro (<c>Miembro</c>, solo lectura) del usuario en el hogar de la petición, o null si no hay.</summary>
     public const string ClaveMiembro = "miparte.miembro-actual";
@@ -32,6 +36,14 @@ public class HogarActualMiddleware(RequestDelegate next)
         if (ctx.User.Identity?.IsAuthenticated == true && Guid.TryParse(sub, out var autor)
             && ctx.RequestServices.GetService<HogarActual>() is { } actual)
             actual.UsuarioId = autor;
+
+        // Origen para la auditoría. La cabecera la pone Assistant.Api al confirmar un borrador del chat: es una etiqueta del
+        // cliente con el JWT de la persona, no una prueba de origen; cualquier otro valor cuenta como manual.
+        if (ctx.RequestServices.GetService<HogarActual>() is { } origenActual)
+            origenActual.Origen = ctx.Request.Headers.TryGetValue(CabeceraOrigen, out var origen)
+                && string.Equals(origen.ToString(), OrigenesAuditoria.Asistente, StringComparison.OrdinalIgnoreCase)
+                ? OrigenesAuditoria.Asistente
+                : OrigenesAuditoria.Manual;
 
         if (!sinHogar && ctx.User.Identity?.IsAuthenticated == true && Guid.TryParse(sub, out var userId))
         {

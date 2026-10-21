@@ -51,6 +51,23 @@ public class AuditoriaTests
     }
 
     [Fact]
+    public async Task Gasto_ConCabeceraAsistente_QuedaConOrigenAsistente_Y_LaPeticionNormalQuedaManual()
+    {
+        var x = await Montar();
+        var pedido = new HttpRequestMessage(HttpMethod.Post, "/api/gastos") { Content = JsonContent.Create(Gasto(x, 100m)) };
+        pedido.Headers.Add("X-Origen", "asistente");
+        var desdeChat = await Leer<GastoResponse>(await x.Admin.SendAsync(pedido), HttpStatusCode.Created);
+        await x.Admin.PostAsJsonAsync("/api/gastos", Gasto(x, 50m, "Desde la app"));
+
+        var eventos = await Eventos(x.Admin, "?entidad=gasto");
+
+        Assert.Equal("asistente", Assert.Single(eventos.Where(e => e.EntidadId == desdeChat.Id)).Origen);
+        Assert.Contains(eventos, e => e.EntidadId != desdeChat.Id && e.Origen == "manual");
+        // El autor sigue siendo quien confirma, no un usuario del asistente.
+        Assert.All(eventos, e => Assert.Equal(x.Usuario, e.UsuarioId));
+    }
+
+    [Fact]
     public async Task Gasto_CrearEditarYBorrar_DejanRastroConAntesYDespues()
     {
         var x = await Montar();

@@ -86,18 +86,6 @@ Las fases van en orden de prioridad. Cada ítem indica su criterio de hecho.
 17. **Asistente**: streaming de respuestas y chat en la cuenta demo. *No iniciado* (sin streaming en `Assistant.Api`; el chat en la demo no está comprobado).
 
 18. **Alta de gastos por chat, con confirmación.** *No iniciado* (el asistente solo tiene funciones de lectura). Herramienta de escritura en `Assistant.Api` que propone un gasto (concepto, importe, fecha, categoría, pagador y reparto) y solo lo guarda tras una confirmación explícita de la persona (segunda llamada con botón «Confirmar»). Usa el JWT y el hogar de la persona, así que Core.Api aplica sus permisos. El modelo no fija el importe ni el reparto definitivos: los muestra y los confirma la persona. Decisiones antes de empezar: campos mínimos que pide el chat, si el reparto sale del perfil de la categoría, y si la auditoría registra el alta como hecha por el asistente. Hecho cuando «apunta 12 € de café» deja un borrador, no guarda nada sin «Confirmar» y el gasto aparece en Gastos con el autor correcto.
-19. **Extras del diseño**: presupuestos con alertas y exportación a Excel o PDF; categorización automática de gastos (D6, extra). *No iniciado* (sin código).
-20. **Mejoras «Posterior»** del diseño, cada una con su propio análisis antes de empezar. *No iniciado* en todas; solo el interruptor de Google (fase 2, punto 7) está preparado.
-    - Avisos por correo (resumen mensual y recibos próximos).
-    - Reembolsos y devoluciones ligados a un gasto.
-    - Copia de seguridad y exportación completa.
-    - Resumen anual.
-    - Previsión de gasto fijo.
-    - Foto del ticket adjunta (sin lectura automática).
-    - Etiquetas transversales a las categorías.
-    - Explicación del cambio de balance entre meses.
-    - Simulador de reparto.
-    - Reactivar el acceso con Google (fase 2, punto 7) cuando haya tiempo para revisarlo.
 
 **Pendientes de funciones ya hechas** (vienen de `docs/README.md`; no bloquean la entrega):
 - **Periodo de viaje**: el periodo propio todavía no se fija desde la API; la generación de recurrentes no respeta el periodo cerrado; la regla de gastos no tiene disparador en la base de datos.

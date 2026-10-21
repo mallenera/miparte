@@ -62,10 +62,10 @@ El MVP cubre el registro, el reparto y la liquidación mensual; el resto se aña
 | Comodidad | Gastos recurrentes que se generan solos cada mes; edición y filtros | MVP |
 | Análisis | Dashboard mensual: gastos por categoría y por persona, entradas y salidas de la cuenta común; comparativa con meses anteriores | MVP |
 | IA | Chatbot de consulta con tool calling | MVP |
-| Control | Presupuestos por categoría con aviso al acercarse al límite | Posterior |
-| Control | Gastos anuales prorrateados (seguro, IBI) y objetivos de ahorro | Posterior |
-| Datos | Exportación a Excel/PDF; importación de movimientos bancarios (CSV) | Posterior |
-| IA | Categorización automática por descripción; detección de anomalías; previsión del mes siguiente; lectura de tickets (OCR) | Posterior |
+| Control | Presupuestos por categoría con aviso al acercarse al límite | Aplazado (decisión de la pareja) |
+| Control | Gastos anuales prorrateados (seguro, IBI) y objetivos de ahorro | Aplazado (decisión de la pareja) |
+| Datos | Exportación a Excel/PDF; importación de movimientos bancarios (CSV) | Aplazado (decisión de la pareja) |
+| IA | Categorización automática por descripción; detección de anomalías; previsión del mes siguiente; lectura de tickets (OCR) | Aplazado (decisión de la pareja) |
 
 Lo que no entre en el MVP queda documentado como líneas futuras en la memoria del máster.
 
@@ -106,20 +106,20 @@ Tres mejoras entran en el MVP porque hacen utilizable el resumen "A debe a B"; e
 | Pagos entre miembros | Se anota cuando A paga a B y la deuda baja | MVP |
 | Cierre de mes | Un mes cerrado no admite cambios en sus gastos | MVP |
 | Gastos personales | Gastos de una sola persona que no entran en la liquidación | MVP |
-| Reembolsos y devoluciones | Importe negativo ligado al gasto original | Posterior |
-| Etiquetas | Marcas transversales a las categorías (vacaciones, reforma, Navidad) con su propio resumen | Posterior |
+| Reembolsos y devoluciones | Importe negativo ligado al gasto original | Aplazado (decisión de la pareja) |
+| Etiquetas | Marcas transversales a las categorías (vacaciones, reforma, Navidad) con su propio resumen | Aplazado (decisión de la pareja) |
 | Alta de gastos por chat | "He gastado 45 € en el súper": el bot propone categoría y reparto, y guarda solo tras confirmar | Posterior |
-| Por qué cambió el balance | Pregunta al chatbot que compara meses y explica la diferencia | Posterior |
-| Simulador de reparto | Muestra qué cambia si varía el porcentaje, reutilizando la lógica de reparto | Posterior |
-| Resumen anual | Totales del año por categoría y por persona | Posterior |
-| Previsión de gasto fijo | Recurrentes más gastos prorrateados, para conocer el mínimo del mes | Posterior |
-| Foto del ticket | Imagen adjunta al gasto, sin lectura automática | Posterior |
-| Avisos por correo | Resumen mensual y recibos próximos | Posterior |
-| Invitación al hogar | Alta de la pareja por correo con permisos; la persona a cargo no necesita login | Posterior |
+| Por qué cambió el balance | Pregunta al chatbot que compara meses y explica la diferencia | Aplazado (decisión de la pareja) |
+| Simulador de reparto | Muestra qué cambia si varía el porcentaje, reutilizando la lógica de reparto | Aplazado (decisión de la pareja) |
+| Resumen anual | Totales del año por categoría y por persona | Aplazado (decisión de la pareja) |
+| Previsión de gasto fijo | Recurrentes más gastos prorrateados, para conocer el mínimo del mes | Aplazado (decisión de la pareja) |
+| Foto del ticket | Imagen adjunta al gasto, sin lectura automática | Aplazado (decisión de la pareja) |
+| Avisos por correo | Resumen mensual y recibos próximos | Aplazado (decisión de la pareja) |
+| Invitación al hogar | Alta de la pareja por correo con permisos; la persona a cargo no necesita login | **Hecho** (invitaciones por enlace, `docs/api.md`) |
 | Historial de cambios | Quién modificó qué y cuándo | **Hecho** (rama `feature/security`; solo lo lee un admin, `docs/api.md` §3.10) |
-| Copia de seguridad y exportación | Descarga completa de los datos del hogar | Posterior |
+| Copia de seguridad y exportación | Descarga completa de los datos del hogar | Aplazado (decisión de la pareja) |
 
-Estas mejoras necesitarán tablas nuevas, por ejemplo para pagos, etiquetas e invitaciones; se definen cuando cada una entre en desarrollo. El historial de cambios ya está hecho (tabla `auditoria`, ver `docs/modelo-de-datos.md`).
+Estas mejoras necesitarán tablas nuevas, por ejemplo para pagos, etiquetas e invitaciones; se definen cuando cada una entre en desarrollo. Las marcadas como «Aplazado (decisión de la pareja)» no se desarrollan de momento. El historial de cambios ya está hecho (tabla `auditoria`, ver `docs/modelo-de-datos.md`).
 
 ## Reglas de reparto de gastos
 
@@ -233,7 +233,7 @@ Los planes cambian: antes de decidir hay que comprobar las condiciones vigentes.
 
 ## Modelo de datos
 
-PostgreSQL (Supabase) con nueve tablas base (las mejoras posteriores añaden otras); cada registro cuelga de un hogar para aislar los datos de cada familia. Los ingresos del hogar no se guardan: solo el porcentaje proporcional y las aportaciones a la cuenta común.
+PostgreSQL (Supabase) con nueve tablas base (las mejoras posteriores, si se retoman, añadirán otras); cada registro cuelga de un hogar para aislar los datos de cada familia. Los ingresos del hogar no se guardan: solo el porcentaje proporcional y las aportaciones a la cuenta común.
 
 | Tabla | Contenido |
 |---|---|
@@ -265,7 +265,7 @@ Siete decisiones condicionan el desarrollo; la D3 y la D4 no dependen de la téc
 | D3 | Cómo se reparten los gastos del hijo | 100 % del miembro con hijo; proporcional a ingresos (el miembro sin hijo asume 2/3); perfil propio | Perfil propio configurable; el porcentaje lo fija cada hogar | **Resuelta por cada hogar**: la app ofrece los perfiles. Un miembro a cargo tiene peso en un perfil de porcentajes o partes, y ese perfil se asigna a una categoría o a un gasto. Cada hogar fija su porcentaje al configurar sus perfiles; la app no fija ninguno |
 | D4 | Reparto de la alimentación | Proporcional a ingresos; por partes contando al hijo | Cada hogar decide si el hijo cuenta como una parte | **Resuelta por cada hogar**: la app permite que el hijo cuente como una parte en un perfil por partes, con el peso que configure cada hogar. Si cuenta o no lo decide cada hogar al configurar sus perfiles |
 | D5 | Interfaz | Streamlit; FastAPI con frontend web instalable (PWA) | Streamlit para el MVP; migrar después reutilizando lógica y base de datos | **Superada**: se optó por Blazor WASM (PWA) + minimal API .NET + Supabase |
-| D6 | Alcance de la IA | Solo chatbot; chatbot más categorización automática de gastos | Chatbot en el MVP; categorización como extra si da tiempo | Chatbot hecho; categorización pendiente |
+| D6 | Alcance de la IA | Solo chatbot; chatbot más categorización automática de gastos | Chatbot en el MVP; categorización como extra si da tiempo | Chatbot hecho; categorización aplazada (decisión de la pareja) |
 | D7 | Modelo de lenguaje del chatbot y dominio | Proveedor, modelo y coste por definir; registrador del dominio por elegir | Comprobar requisitos del máster y precios actuales antes de decidir | **Decidido de momento**: Cloudflare Workers AI en el plan gratuito (`Asistente__Proveedor=cloudflare`, sin coste); Anthropic queda como alternativa de pago (`claude-sonnet-5-5`, configurable con `Asistente__Modelo`). **Dominio**: sin dominio propio de momento; la app se publica en `miparte.pages.dev`. Todo el stack es gratuito |
 
 ## Plan por fases, riesgos y calidad
@@ -278,7 +278,7 @@ Estado a 2026-10-17: todas las fases de este plan están implementadas en el có
 - **Cálculo:** liquidación mensual con tests unitarios de todos los modos de reparto, incluido el caso A=2X, B=X y el reparto 2 contra 1, y de que un gasto guardado no cambie al cambiar el porcentaje.
 - **Comodidad:** gastos recurrentes, edición, filtros y dashboard mensual.
 - **Chatbot:** las cinco funciones iniciales con tool calling.
-- **Extras si da tiempo:** presupuestos con alertas, exportación a Excel/PDF, categorización automática.
+- **Extras aplazados (decisión de la pareja):** presupuestos con alertas, exportación a Excel/PDF, categorización automática.
 
 **Riesgos y cómo se cubren:**
 

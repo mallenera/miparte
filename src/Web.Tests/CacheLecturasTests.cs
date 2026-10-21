@@ -214,4 +214,71 @@ public class CacheLecturasTests
         Assert.Equal(2, Peticiones("GET /api/categorias"));
         Assert.Equal(2, Peticiones("GET /api/perfiles"));
     }
+
+    [Fact]
+    public async Task Aceptar_una_invitacion_olvida_miembros_y_categorias()
+    {
+        _api.Responde("POST /api/invitaciones/aceptar", HttpStatusCode.OK, Casa);
+        var api = await ClienteAsync();
+        await api.ListarMiembrosAsync();
+        await api.ListarCategoriasAsync();
+
+        await api.AceptarInvitacionAsync(new AceptarInvitacionRequest("token"));
+        await api.ListarMiembrosAsync();
+        await api.ListarCategoriasAsync();
+
+        Assert.Equal(2, Peticiones("GET /api/miembros"));
+        Assert.Equal(2, Peticiones("GET /api/categorias"));
+    }
+
+    [Fact]
+    public async Task Unirse_por_enlace_olvida_miembros_y_categorias()
+    {
+        _api.Responde("POST /api/enlaces-grupo/unirse", HttpStatusCode.OK, Casa);
+        var api = await ClienteAsync();
+        await api.ListarMiembrosAsync();
+        await api.ListarCategoriasAsync();
+
+        await api.UnirseEnlaceGrupoAsync(new UnirseEnlaceGrupoRequest("codigo", "Nueva"));
+        await api.ListarMiembrosAsync();
+        await api.ListarCategoriasAsync();
+
+        Assert.Equal(2, Peticiones("GET /api/miembros"));
+        Assert.Equal(2, Peticiones("GET /api/categorias"));
+    }
+
+    [Fact]
+    public async Task Crear_un_hogar_olvida_todas_las_lecturas_del_anterior()
+    {
+        _api.Responde("POST /api/hogares", HttpStatusCode.Created, Otra);
+        var api = await ClienteAsync();
+        await api.ListarMiembrosAsync();
+        await api.ListarCategoriasAsync();
+        await api.ListarPerfilesAsync();
+
+        await api.CrearHogarAsync(new CrearHogarRequest("Otra", "Yo"));
+        await api.ListarMiembrosAsync();
+        await api.ListarCategoriasAsync();
+        await api.ListarPerfilesAsync();
+
+        Assert.Equal(2, Peticiones("GET /api/miembros"));
+        Assert.Equal(2, Peticiones("GET /api/categorias"));
+        Assert.Equal(2, Peticiones("GET /api/perfiles"));
+    }
+
+    [Fact]
+    public async Task Reabrir_un_mes_olvida_los_cierres_pero_no_las_categorias()
+    {
+        _api.Responde("DELETE /api/cierres-mes/2026-09", HttpStatusCode.NoContent);
+        var api = await ClienteAsync();
+        await api.ListarCierresMesAsync();
+        await api.ListarCategoriasAsync();
+
+        await api.ReabrirMesAsync("2026-09");
+        await api.ListarCierresMesAsync();
+        await api.ListarCategoriasAsync();
+
+        Assert.Equal(2, Peticiones("GET /api/cierres-mes"));
+        Assert.Equal(1, Peticiones("GET /api/categorias"));
+    }
 }

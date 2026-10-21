@@ -93,7 +93,7 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
     private void Auditar()
     {
         if (!AuditoriaActiva) return;
-        var eventos = RegistroAuditoria.Capturar(ChangeTracker, hogarActual.UsuarioId);
+        var eventos = RegistroAuditoria.Capturar(ChangeTracker, hogarActual.UsuarioId, hogarActual.Origen);
         if (eventos.Count > 0) Auditoria.AddRange(eventos);
     }
 

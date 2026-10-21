@@ -43,3 +43,11 @@ ALTER TABLE public.perfil_reparto
 
 ALTER TABLE ONLY public.perfil_reparto
     ADD CONSTRAINT perfil_reparto_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: perfil_reparto_predeterminado_gastos_key; Type: INDEX; Schema: public; Owner: -
+-- Como máximo un perfil predeterminado para gastos por hogar.
+--
+
+CREATE UNIQUE INDEX perfil_reparto_predeterminado_gastos_key ON public.perfil_reparto USING btree (hogar_id) WHERE predeterminado_gastos;

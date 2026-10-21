@@ -26,6 +26,9 @@ public interface IRepositorioCategorias
     /// <summary>Si otra categoría (distinta de <paramref name="excluirId"/>) tiene ese nombre bajo ese padre.</summary>
     Task<bool> NombreEnNivelAsync(Guid? padreId, string nombre, Guid? excluirId, CancellationToken ct);
 
+    /// <summary>Si otra categoría (distinta de <paramref name="excluirId"/>) ya está marcada predeterminada para gastos.</summary>
+    Task<bool> OtraPredeterminadaGastosAsync(Guid? excluirId, CancellationToken ct);
+
     /// <summary>Si la categoría tiene subcategorías.</summary>
     Task<bool> TieneSubcategoriasAsync(Guid id, CancellationToken ct);
 

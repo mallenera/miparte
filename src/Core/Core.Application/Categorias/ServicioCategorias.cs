@@ -17,6 +17,8 @@ public sealed record DatosCategoria(
 public sealed class ServicioCategorias(IRepositorioCategorias repositorio, IRepositorioGastos gastos)
 {
     private const string NombreRepetido = "Ya existe una categoría con ese nombre en ese nivel.";
+    private const string MensajePredeterminada =
+        "Ya hay otra categoría marcada como predeterminada para gastos. Desmárcala antes de marcar esta.";
 
     /// <summary>Categorías del hogar ordenadas por nombre.</summary>
     public Task<IReadOnlyList<Categoria>> ListarAsync(CancellationToken ct) => repositorio.ListarAsync(ct);
@@ -26,6 +28,8 @@ public sealed class ServicioCategorias(IRepositorioCategorias repositorio, IRepo
     {
         var v = await ValidarAsync(datos, null, ct);
         if (v.Error is not null) return v.Error;
+        if (datos.PredeterminadoGastos && await repositorio.OtraPredeterminadaGastosAsync(null, ct))
+            return Resultado<Categoria>.Conflicto(MensajePredeterminada);
 
         var categoria = new Categoria
         {
@@ -43,6 +47,8 @@ public sealed class ServicioCategorias(IRepositorioCategorias repositorio, IRepo
         if (categoria is null) return Resultado<Categoria>.NoEncontrado();
         var v = await ValidarAsync(datos, id, ct);
         if (v.Error is not null) return v.Error;
+        if (datos.PredeterminadoGastos && await repositorio.OtraPredeterminadaGastosAsync(id, ct))
+            return Resultado<Categoria>.Conflicto(MensajePredeterminada);
 
         categoria.Nombre = v.Nombre;
         categoria.CategoriaPadreId = datos.CategoriaPadreId;

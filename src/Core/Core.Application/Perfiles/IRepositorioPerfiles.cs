@@ -20,6 +20,9 @@ public interface IRepositorioPerfiles
     /// <summary>Si otro perfil (distinto de <paramref name="excluirId"/>) tiene ese nombre.</summary>
     Task<bool> NombreEnUsoAsync(string nombre, Guid? excluirId, CancellationToken ct);
 
+    /// <summary>Si otro perfil (distinto de <paramref name="excluirId"/>) ya está marcado predeterminado para gastos.</summary>
+    Task<bool> OtroPredeterminadoGastosAsync(Guid? excluirId, CancellationToken ct);
+
     /// <summary>Si alguna categoría, gasto o gasto recurrente usa el perfil.</summary>
     Task<bool> EnUsoAsync(Guid id, CancellationToken ct);
 

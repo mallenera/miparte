@@ -37,6 +37,10 @@ public sealed class RepositorioPerfiles(MiParteDbContext db) : IRepositorioPerfi
         => db.PerfilesReparto.AnyAsync(p => p.Nombre == nombre && p.Id != excluirId, ct);
 
     /// <inheritdoc />
+    public Task<bool> OtroPredeterminadoGastosAsync(Guid? excluirId, CancellationToken ct)
+        => db.PerfilesReparto.AnyAsync(p => p.PredeterminadoGastos && p.Id != excluirId, ct);
+
+    /// <inheritdoc />
     public async Task<bool> EnUsoAsync(Guid id, CancellationToken ct)
         => await db.Categorias.AnyAsync(c => c.PerfilRepartoId == id, ct)
             || await db.Gastos.AnyAsync(g => g.PerfilRepartoId == id, ct)
@@ -114,6 +118,10 @@ public sealed class RepositorioCategorias(MiParteDbContext db) : IRepositorioCat
     /// <inheritdoc />
     public Task<bool> EstaACargoDeLaCuentaAsync(Guid id, CancellationToken ct)
         => db.Categorias.AnyAsync(c => c.Id == id && c.ACargoCuentaComun, ct);
+
+    /// <inheritdoc />
+    public Task<bool> OtraPredeterminadaGastosAsync(Guid? excluirId, CancellationToken ct)
+        => db.Categorias.AnyAsync(c => c.PredeterminadoGastos && c.Id != excluirId, ct);
 
     /// <inheritdoc />
     public async Task<IReadOnlyDictionary<Guid, Guid?>> PadresAsync(CancellationToken ct)

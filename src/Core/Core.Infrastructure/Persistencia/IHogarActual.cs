@@ -17,6 +17,12 @@ public interface IHogarActual
     /// (ni siquiera un admin ve los de otros). Sin miembro, no se ve ninguno.
     /// </summary>
     Guid? MiembroId { get; }
+
+    /// <summary>
+    /// Origen de la petición para la auditoría: <see cref="MiParte.Core.Domain.Entidades.OrigenesAuditoria"/>.Asistente si la
+    /// petición llega confirmada desde el chat (cabecera <c>X-Origen</c>); en otro caso, manual.
+    /// </summary>
+    string Origen { get; }
 }
 
 /// <summary>Implementación scoped de <see cref="IHogarActual"/>; la rellena el middleware al resolver el hogar.</summary>
@@ -30,4 +36,7 @@ public class HogarActual : IHogarActual
 
     /// <inheritdoc />
     public Guid? MiembroId { get; set; }
+
+    /// <inheritdoc />
+    public string Origen { get; set; } = MiParte.Core.Domain.Entidades.OrigenesAuditoria.Manual;
 }

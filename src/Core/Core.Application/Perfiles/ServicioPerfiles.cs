@@ -7,6 +7,8 @@ namespace MiParte.Core.Application.Perfiles;
 public sealed class ServicioPerfiles(IRepositorioPerfiles repositorio)
 {
     private const string NombreRepetido = "Ya existe un perfil con ese nombre.";
+    private const string MensajePredeterminado =
+        "Ya hay otro perfil de reparto marcado como predeterminado para gastos. Desmárcalo antes de marcar este.";
 
     /// <summary>Perfiles del hogar con su detalle, ordenados por nombre.</summary>
     public Task<IReadOnlyList<PerfilReparto>> ListarAsync(CancellationToken ct) => repositorio.ListarAsync(ct);
@@ -23,6 +25,8 @@ public sealed class ServicioPerfiles(IRepositorioPerfiles repositorio)
     {
         var v = await ValidarAsync(nombre, modo, detalle, null, ct);
         if (v.Error is not null) return v.Error;
+        if (predeterminadoGastos && await repositorio.OtroPredeterminadoGastosAsync(null, ct))
+            return Resultado<PerfilReparto>.Conflicto(MensajePredeterminado);
 
         var perfil = new PerfilReparto
         {
@@ -41,6 +45,8 @@ public sealed class ServicioPerfiles(IRepositorioPerfiles repositorio)
         if (perfil is null) return Resultado<PerfilReparto>.NoEncontrado();
         var v = await ValidarAsync(nombre, modo, detalle, id, ct);
         if (v.Error is not null) return v.Error;
+        if (predeterminadoGastos && await repositorio.OtroPredeterminadoGastosAsync(id, ct))
+            return Resultado<PerfilReparto>.Conflicto(MensajePredeterminado);
 
         perfil.Nombre = v.Nombre;
         perfil.Modo = v.Modo;

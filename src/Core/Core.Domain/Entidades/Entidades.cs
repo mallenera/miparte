@@ -481,4 +481,16 @@ public class EventoAuditoria
     public string? Despues { get; set; }
     /// <summary>Solo para eventos de gastos personales: el miembro que paga, único que puede verlos. Null en el resto.</summary>
     public Guid? PersonalDe { get; set; }
+    /// <summary>Origen del cambio: <see cref="OrigenesAuditoria"/>.Manual (lo hizo la persona) o Asistente (confirmado desde el chat).</summary>
+    public string Origen { get; set; } = OrigenesAuditoria.Manual;
+}
+
+/// <summary>Valores de <see cref="EventoAuditoria.Origen"/>.</summary>
+public static class OrigenesAuditoria
+{
+    /// <summary>El cambio lo hizo la persona desde la aplicación (valor por defecto).</summary>
+    public const string Manual = "manual";
+
+    /// <summary>El cambio lo propuso el asistente y lo confirmó la persona; el autor sigue siendo quien confirma.</summary>
+    public const string Asistente = "asistente";
 }

@@ -44,3 +44,11 @@ ALTER TABLE public.categoria
 
 ALTER TABLE ONLY public.categoria
     ADD CONSTRAINT categoria_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: categoria_predeterminado_gastos_key; Type: INDEX; Schema: public; Owner: -
+-- Como máximo una categoría predeterminada para gastos por hogar.
+--
+
+CREATE UNIQUE INDEX categoria_predeterminado_gastos_key ON public.categoria USING btree (hogar_id) WHERE predeterminado_gastos;

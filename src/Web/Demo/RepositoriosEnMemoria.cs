@@ -446,6 +446,9 @@ internal sealed class RepositorioPerfilesEnMemoria(AlmacenDemo a) : IRepositorio
     public Task<bool> NombreEnUsoAsync(string nombre, Guid? excluirId, CancellationToken ct)
         => Task.FromResult(a.Perfiles.Any(p => p.Nombre == nombre && p.Id != excluirId));
 
+    public Task<bool> OtroPredeterminadoGastosAsync(Guid? excluirId, CancellationToken ct)
+        => Task.FromResult(a.Perfiles.Any(p => p.PredeterminadoGastos && p.Id != excluirId));
+
     public Task<bool> EnUsoAsync(Guid id, CancellationToken ct)
         => Task.FromResult(a.Categorias.Any(c => c.PerfilRepartoId == id) || a.Gastos.Any(g => g.PerfilRepartoId == id)
             || a.Recurrentes.Any(r => r.PerfilRepartoId == id));
@@ -502,6 +505,9 @@ internal sealed class RepositorioCategoriasEnMemoria(AlmacenDemo a) : IRepositor
 
     public Task<bool> NombreEnNivelAsync(Guid? padreId, string nombre, Guid? excluirId, CancellationToken ct)
         => Task.FromResult(a.Categorias.Any(c => c.CategoriaPadreId == padreId && c.Nombre == nombre && c.Id != excluirId));
+
+    public Task<bool> OtraPredeterminadaGastosAsync(Guid? excluirId, CancellationToken ct)
+        => Task.FromResult(a.Categorias.Any(c => c.PredeterminadoGastos && c.Id != excluirId));
 
     public Task<bool> TieneSubcategoriasAsync(Guid id, CancellationToken ct) => Task.FromResult(a.Categorias.Any(c => c.CategoriaPadreId == id));
 

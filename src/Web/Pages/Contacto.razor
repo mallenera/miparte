@@ -1,0 +1,39 @@
+@page "/contacto"
+
+<PageTitle>Contacto · Mi parte, tu parte</PageTitle>
+
+@* El formulario no envía nada: abre el correo del usuario con el asunto elegido. El mensaje se escribe allí, así que no viaja en la URL. *@
+<div class="auth ancho">
+    <h1 class="page-title">Contacto</h1>
+    <p class="muted">¿Tienes una duda, una idea de mejora o quieres comentar algo? Escríbenos y lo leeremos.</p>
+
+    <div class="fieldrow">
+        <label for="motivo">Motivo</label>
+        <select id="motivo" @bind="_motivo">
+            @foreach (var (clave, texto, _) in Motivos)
+            {
+                <option value="@clave">@texto</option>
+            }
+        </select>
+    </div>
+
+    <a class="btn btn-block" href="@Enlace"><Icono Nombre="message-circle" Tamano="16" />Escribir correo</a>
+    <p class="muted">Se abrirá tu aplicación de correo con el asunto preparado. Dinos qué necesitas en el cuerpo del mensaje.</p>
+</div>
+
+@code {
+    private const string Destino = "mipartetuparte@gmail.com";
+
+    private static readonly (string Clave, string Texto, string Asunto)[] Motivos =
+    [
+        ("duda", "Tengo una duda", "Mi parte, tu parte: duda"),
+        ("mejora", "Propongo una mejora", "Mi parte, tu parte: propuesta de mejora"),
+        ("otro", "Otro asunto", "Mi parte, tu parte: contacto"),
+    ];
+
+    private string _motivo = "duda";
+
+    /// <summary>Enlace mailto con el asunto del motivo elegido; el cuerpo lo escribe la persona en su correo.</summary>
+    private string Enlace =>
+        $"mailto:{Destino}?subject={Uri.EscapeDataString(Motivos.First(m => m.Clave == _motivo).Asunto)}";
+}

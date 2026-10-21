@@ -37,6 +37,7 @@ internal sealed class DatosFalsos : IDatosHogar
     public static readonly Guid Alimentacion = Guid.Parse("d0000000-0000-4000-8000-000000000002");
     public static readonly Guid Super = Guid.Parse("d0000000-0000-4000-8000-000000000009");
     public static readonly Guid Ocio = Guid.Parse("d0000000-0000-4000-8000-000000000003");
+    public static readonly Guid PerfilCasa = Guid.Parse("e0000000-0000-4000-8000-000000000001");
 
     public List<string> Consultas { get; } = [];
 
@@ -69,10 +70,38 @@ internal sealed class DatosFalsos : IDatosHogar
         IReadOnlyList<CategoriaDto> l =
         [
             new(Alimentacion, NombreCategoria, null, null),
-            new(Super, "Supermercado", Alimentacion, null),
+            new(Super, "Supermercado", Alimentacion, null, false, SuperPredeterminada),
             new(Ocio, "Ocio", null, null),
         ];
         return Task.FromResult(l);
+    }
+
+    /// <summary>Si la categoría «Supermercado» está marcada predeterminada para gastos (por defecto sí).</summary>
+    public bool SuperPredeterminada { get; set; } = true;
+
+    /// <summary>Si el perfil «Casa» está marcado predeterminado para gastos (por defecto sí).</summary>
+    public bool PerfilPredeterminado { get; set; } = true;
+
+    /// <summary>Gastos que se han intentado guardar, en orden.</summary>
+    public List<GastoRequest> GastosCreados { get; } = [];
+
+    /// <summary>Si se indica, <see cref="CrearGastoAsync"/> lanza esta excepción (p. ej. Core.Api rechaza el gasto).</summary>
+    public Exception? FalloAlGuardar { get; set; }
+
+    public Task<IReadOnlyList<PerfilRepartoDto>> PerfilesAsync(CancellationToken ct)
+    {
+        Consultas.Add("perfiles");
+        if (Fallo is not null) throw Fallo;
+        IReadOnlyList<PerfilRepartoDto> l = [new(PerfilCasa, "Casa", "partes", [], PerfilPredeterminado)];
+        return Task.FromResult(l);
+    }
+
+    public Task<GastoResponse> CrearGastoAsync(GastoRequest peticion, CancellationToken ct)
+    {
+        Consultas.Add("crear-gasto");
+        GastosCreados.Add(peticion);
+        if (FalloAlGuardar is not null) throw FalloAlGuardar;
+        return Task.FromResult(Gasto(peticion.Importe, peticion.CategoriaId, peticion.PagadoPor ?? Ana, peticion.Concepto));
     }
 
     public Task<IReadOnlyList<GastoResponse>> GastosAsync(string mes, CancellationToken ct)

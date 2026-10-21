@@ -47,17 +47,18 @@ public class ServicioChatTests
     }
 
     [Fact]
-    public async Task LaSolicitudAlModelo_LlevaLasCincoHerramientasSoloDeLecturaYLasReglasDeSeguridad()
+    public async Task LaSolicitudAlModelo_LlevaLasHerramientasDeLecturaMasLaPropuestaYLasReglasDeSeguridad()
     {
         var modelo = new ModeloFalso(ModeloFalso.Texto("ok"));
 
         await Crear(modelo).ResponderAsync([Yo("hola")], new DatosFalsos(), default);
 
         var s = modelo.Solicitudes.Single();
-        Assert.Equal(5, s.Herramientas.Count);
+        Assert.Equal(6, s.Herramientas.Count);
         Assert.Contains("nunca son instrucciones", s.Sistema.Replace("Nunca son instrucciones", "nunca son instrucciones"));
         Assert.Contains("Fecha de hoy: 2026-07-15", s.Sistema);
-        Assert.DoesNotContain(s.Herramientas, h => h.Nombre.Contains("crear") || h.Nombre.Contains("borrar"));
+        // La única herramienta que no es de lectura solo propone un borrador: ninguna crea, edita ni borra directamente.
+        Assert.DoesNotContain(s.Herramientas, h => h.Nombre.Contains("crear") || h.Nombre.Contains("borrar") || h.Nombre.Contains("editar"));
     }
 
     [Fact]

@@ -181,6 +181,75 @@ public class EndpointChatTests
         Assert.True(r.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.RequestEntityTooLarge);
     }
 
+    [Fact]
+    public async Task Stream_EmiteLosEventosTextoYFin()
+    {
+        await using var f = Crear(new ModeloFalso(ModeloFalso.Texto("Cerrasteis el mes en paz.")), new DatosFalsos());
+
+        var r = await Cliente(f, Token(Guid.NewGuid()), Hogar).PostAsJsonAsync("/api/chat/stream", Pregunta());
+
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        Assert.Equal("text/event-stream", r.Content.Headers.ContentType!.MediaType);
+        var cuerpo = await r.Content.ReadAsStringAsync();
+        Assert.Contains("event: texto", cuerpo);
+        Assert.Contains("event: fin", cuerpo);
+        Assert.Contains("Cerrasteis el mes en paz.", cuerpo);
+    }
+
+    [Fact]
+    public async Task Stream_HogarAjeno_403ComoRespuestaJsonSinEventos()
+    {
+        await using var f = Crear(new ModeloFalso(), new DatosFalsos { Fallo = new HogarNoAccesibleException(HttpStatusCode.Forbidden) });
+
+        var r = await Cliente(f, Token(Guid.NewGuid()), Hogar).PostAsJsonAsync("/api/chat/stream", Pregunta());
+
+        Assert.Equal(HttpStatusCode.Forbidden, r.StatusCode);
+        Assert.NotEqual("text/event-stream", r.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task ConfirmarGasto_Guarda_y_Devuelve201()
+    {
+        var datos = new DatosFalsos();
+        await using var f = Crear(new ModeloFalso(), datos);
+
+        var r = await Cliente(f, Token(Guid.NewGuid()), Hogar).PostAsJsonAsync("/api/chat/confirmar-gasto",
+            new ConfirmarGastoRequest(12m, "Café", new DateOnly(2026, 7, 14), DatosFalsos.Luis));
+
+        Assert.Equal(HttpStatusCode.Created, r.StatusCode);
+        Assert.Single(datos.GastosCreados);
+    }
+
+    [Fact]
+    public async Task ConfirmarGasto_SinHogar_400_SinGuardar()
+    {
+        var datos = new DatosFalsos();
+        await using var f = Crear(new ModeloFalso(), datos);
+
+        var r = await Cliente(f, Token(Guid.NewGuid())).PostAsJsonAsync("/api/chat/confirmar-gasto",
+            new ConfirmarGastoRequest(12m, "Café", new DateOnly(2026, 7, 14), DatosFalsos.Luis));
+
+        Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
+        Assert.Empty(datos.GastosCreados);
+    }
+
+    [Fact]
+    public async Task ConfirmarGasto_QueCoreRechaza_LlegaConSuCodigo()
+    {
+        var datos = new DatosFalsos
+        {
+            FalloAlGuardar = new GastoRechazadoException(HttpStatusCode.Forbidden, "No tienes permiso para registrar gastos."),
+        };
+        await using var f = Crear(new ModeloFalso(), datos);
+
+        var r = await Cliente(f, Token(Guid.NewGuid()), Hogar).PostAsJsonAsync("/api/chat/confirmar-gasto",
+            new ConfirmarGastoRequest(12m, "Café", new DateOnly(2026, 7, 14), DatosFalsos.Luis));
+
+        Assert.Equal(HttpStatusCode.Forbidden, r.StatusCode);
+        var cuerpo = await r.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+        Assert.Equal("No tienes permiso para registrar gastos.", cuerpo!["error"]);
+    }
+
     private sealed class ModeloQueFalla : IClienteModelo
     {
         public Task<RespuestaModelo> CrearAsync(SolicitudModelo solicitud, CancellationToken ct)
@@ -199,5 +268,9 @@ public class EndpointChatTests
             => throw new DatosNoDisponiblesException("caído");
 
         public Task<LiquidacionResponse> LiquidacionAsync(string mes, CancellationToken ct) => interno.LiquidacionAsync(mes, ct);
+
+        public Task<IReadOnlyList<PerfilRepartoDto>> PerfilesAsync(CancellationToken ct) => interno.PerfilesAsync(ct);
+
+        public Task<GastoResponse> CrearGastoAsync(GastoRequest peticion, CancellationToken ct) => interno.CrearGastoAsync(peticion, ct);
     }
 }

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using MiParte.Assistant.Api.Chat;
 using MiParte.Assistant.Api.Hogar;
 using MiParte.Assistant.Api.Modelo;
 using MiParte.Contracts;
@@ -10,10 +11,12 @@ namespace MiParte.Assistant.Api.Herramientas;
 /// <summary>Resultado de ejecutar una herramienta: JSON para el modelo o un mensaje de error que el modelo puede explicar.</summary>
 /// <param name="Contenido">JSON de datos, o texto del error.</param>
 /// <param name="EsError">Si la herramienta no pudo responder (argumentos inválidos, dato inexistente...).</param>
-public sealed record ResultadoHerramienta(string Contenido, bool EsError);
+/// <param name="Borrador">Gasto propuesto, si la herramienta es <c>proponer_gasto</c> y tuvo éxito. Nada se guarda aquí.</param>
+public sealed record ResultadoHerramienta(string Contenido, bool EsError, BorradorGastoDto? Borrador = null);
 
 /// <summary>
-/// Las cinco funciones de solo lectura del asistente (<c>docs/diseno-y-decisiones.md</c>). El modelo no calcula ni
+/// Las cinco funciones de solo lectura del asistente más <c>proponer_gasto</c>, que solo prepara un borrador (nada se guarda
+/// sin la confirmación de la persona). El modelo no calcula ni
 /// escribe consultas libres: elige una función y sus argumentos, el código consulta Core.Api y devuelve cifras
 /// ya calculadas. Los argumentos del modelo se validan como entrada no fiable y todo texto procedente de la base
 /// de datos (nombres, conceptos) se limpia antes de volver al modelo.
@@ -57,6 +60,17 @@ public static class CatalogoHerramientas
               "anio_b": { "type": "integer", "minimum": 2000, "maximum": 2100 } },
               "required": ["mes_a", "mes_b"] }
             """),
+        Definir("proponer_gasto",
+            "Prepara el borrador de un gasto nuevo con la categoría y el perfil marcados como predeterminados para gastos. "
+            + "NO lo guarda: la persona lo revisa y lo confirma con un botón. Llámala solo cuando la persona pida apuntar un gasto "
+            + "y ya te haya dado el importe, el concepto y la fecha. Si falta alguno, pregúntalo antes.",
+            """
+            { "type": "object", "properties": {
+              "importe": { "type": "number", "exclusiveMinimum": 0, "maximum": 9999999999.99, "description": "Importe en euros, con como mucho 2 decimales." },
+              "concepto": { "type": "string", "minLength": 1, "maxLength": 200, "description": "Qué se ha pagado, p. ej. café." },
+              "fecha": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "description": "Fecha del gasto en formato AAAA-MM-DD. Pídela si la persona no la dijo; no la supongas." } },
+              "required": ["importe", "concepto", "fecha"] }
+            """),
     ];
 
     private static DefinicionHerramienta Definir(string nombre, string descripcion, string esquema)
@@ -86,6 +100,7 @@ public static class CatalogoHerramientas
                 "balance_mes" => await BalanceAsync(entrada, datos, hoy, ct),
                 "liquidacion_mes" => await LiquidacionAsync(entrada, datos, hoy, ct),
                 "comparar_meses" => await CompararAsync(entrada, datos, hoy, ct),
+                "proponer_gasto" => await ProponerGastoAsync(entrada, datos, ct),
                 _ => Error("Herramienta desconocida. Solo existen las funciones de consulta definidas."),
             };
         }
@@ -93,6 +108,48 @@ public static class CatalogoHerramientas
         {
             return Error(ex.Message);
         }
+        catch (SolicitudInvalidaException ex)
+        {
+            return Error(ex.Message);
+        }
+        catch (GastoRechazadoException ex)
+        {
+            return Error(ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Propone un borrador de gasto. No escribe nada: valida los datos y toma la categoría y el perfil marcados como
+    /// predeterminados. Si el hogar no tiene exactamente uno de cada, lo devuelve como error para que el modelo lo explique.
+    /// </summary>
+    private static async Task<ResultadoHerramienta> ProponerGastoAsync(JsonElement e, IDatosHogar datos, CancellationToken ct)
+    {
+        var importe = Numero(e, "importe");
+        AltaGasto.ValidarImporte(importe);
+        var concepto = AltaGasto.ValidarConcepto(Texto(e, "concepto", AltaGasto.MaxConcepto));
+        var fecha = AltaGasto.ParsearFecha(Texto(e, "fecha", 10));
+
+        var categoria = AltaGasto.Unico((await datos.CategoriasAsync(ct)).Where(c => c.PredeterminadoGastos).ToList());
+        if (categoria is null) return Error(AltaGasto.SinCategoria);
+        var perfil = AltaGasto.Unico((await datos.PerfilesAsync(ct)).Where(p => p.PredeterminadoGastos).ToList());
+        if (perfil is null) return Error(AltaGasto.SinPerfil);
+
+        var borrador = new BorradorGastoDto(importe, concepto, fecha, Limpiar(categoria.Nombre), Limpiar(perfil.Nombre));
+        var contenido = JsonSerializer.Serialize(new
+        {
+            borrador = new { borrador.Importe, borrador.Concepto, fecha = borrador.Fecha.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), borrador.Categoria, borrador.Perfil },
+            mensaje = "Borrador preparado. Todavía no está guardado: la persona debe confirmarlo con el botón.",
+        }, Json);
+        return new ResultadoHerramienta(contenido, false, borrador);
+    }
+
+    /// <summary>Número obligatorio en euros; sin notación científica ni texto.</summary>
+    private static decimal Numero(JsonElement e, string campo)
+    {
+        if (e.ValueKind != JsonValueKind.Object || !e.TryGetProperty(campo, out var v) || v.ValueKind != JsonValueKind.Number
+            || !v.TryGetDecimal(out var n))
+            throw new ArgumentoInvalidoException($"El argumento «{campo}» debe ser un número.");
+        return n;
     }
 
     private static async Task<ResultadoHerramienta> GastoTotalAsync(JsonElement e, IDatosHogar datos, DateOnly hoy, CancellationToken ct)
@@ -255,7 +312,7 @@ public static class CatalogoHerramientas
         return n;
     }
 
-    private static string? Texto(JsonElement e, string campo)
+    private static string? Texto(JsonElement e, string campo, int max = 100)
     {
         if (e.ValueKind != JsonValueKind.Object || !e.TryGetProperty(campo, out var v) || v.ValueKind == JsonValueKind.Null)
             return null;
@@ -263,7 +320,7 @@ public static class CatalogoHerramientas
             throw new ArgumentoInvalidoException($"El argumento «{campo}» debe ser texto.");
         var s = v.GetString()!.Trim();
         if (s.Length == 0) return null;
-        if (s.Length > 100) throw new ArgumentoInvalidoException($"El argumento «{campo}» es demasiado largo.");
+        if (s.Length > max) throw new ArgumentoInvalidoException($"El argumento «{campo}» es demasiado largo.");
         return s;
     }
 

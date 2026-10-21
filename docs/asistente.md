@@ -13,8 +13,8 @@ Front (Blazor) ──JWT + X-Hogar-Id──▶ Assistant.Api ──JWT + X-Hogar
 - **Sin acceso propio a la base de datos.** Assistant.Api no tiene cadena de conexión: consulta `GET /api/miembros`, `/api/categorias`, `/api/gastos`, `/api/resumen` y `/api/liquidacion` de Core.Api reenviando el JWT de la persona y su `X-Hogar-Id`. La multitenencia (RLS y filtro global por `hogar_id`) la sigue aplicando Core.Api; el asistente nunca ve datos de otro hogar aunque el modelo lo pidiera.
 - **Autenticación.** `MiParte.Auth` valida el JWT de Supabase igual que en Core.Api (`Supabase__Url`, `Supabase__JwtSecret`).
 - **Hogar.** La cabecera `X-Hogar-Id` es obligatoria. Antes de llamar al modelo se hace una consulta a Core.Api con ese hogar: si la persona no es miembro activo, 403 y el modelo no se invoca.
-- **Cliente del modelo.** `IClienteModelo` abstrae el proveedor. `Asistente__Proveedor` elige `ClienteAnthropic` (SDK oficial, `Anthropic` en NuGet, por defecto) o `ClienteWorkersAi` (Cloudflare Workers AI, REST `/ai/run/{modelo}`, cuota gratuita diaria; Cloudflare dice no usar el contenido para entrenar ni conservarlo más allá de la petición). Modelo por defecto `claude-sonnet-5-5`, configurable con `Asistente__Modelo`. Sin streaming de momento (pendiente).
-- **Solo lectura.** Las cinco funciones del diseño no modifican nada. No hay herramientas de escritura porque el diseño no las contempla («solo lee datos del hogar»); si se añadieran, tendrían que pedir confirmación explícita antes de ejecutarse (propuesta de la herramienta, botón «Confirmar» en el front y una segunda llamada).
+- **Cliente del modelo.** `IClienteModelo` abstrae el proveedor. `Asistente__Proveedor` elige `ClienteAnthropic` (SDK oficial, `Anthropic` en NuGet, por defecto) o `ClienteWorkersAi` (Cloudflare Workers AI, REST `/ai/run/{modelo}`, cuota gratuita diaria; Cloudflare dice no usar el contenido para entrenar ni conservarlo más allá de la petición). Modelo por defecto `claude-sonnet-5-5`, configurable con `Asistente__Modelo`. **Streaming**: `POST /api/chat/stream` entrega el texto en vivo (SSE). Con Anthropic el texto llega según se genera (`CreateStreaming`); con Workers AI, o cualquier proveedor sin streaming real, la respuesta llega de una vez (el método por defecto de `IClienteModelo`).
+- **Solo lectura, más un borrador.** Las cinco funciones de consulta no modifican nada. `proponer_gasto` solo prepara un borrador: no escribe. **La única escritura es `POST /api/chat/confirmar-gasto`**, que llama la persona con su botón «Confirmar» (una segunda llamada, nunca la propuesta del modelo). Guarda el gasto en Core.Api con el JWT y el hogar de la persona, así que Core aplica sus permisos (`gastos.crear`) y sus reglas. La categoría y el perfil son los marcados como predeterminados para gastos **en ese momento** (el cliente no los envía; sin exactamente uno de cada, 409). El pagador lo elige la persona al confirmar. La petición lleva `X-Origen: asistente` y Core registra el alta con origen `asistente` en la auditoría (el autor sigue siendo quien confirma; la cabecera es una etiqueta del cliente, no una prueba de origen).
 
 ## Funciones de consulta
 
@@ -25,13 +25,14 @@ Front (Blazor) ──JWT + X-Hogar-Id──▶ Assistant.Api ──JWT + X-Hogar
 | `balance_mes` | `mes`, `anio?` | `GET /api/resumen` (pagado, asumido y diferencia por miembro) |
 | `liquidacion_mes` | `mes`, `anio?` | `GET /api/liquidacion` (nombres en lugar de ids) |
 | `comparar_meses` | `mes_a`, `anio_a?`, `mes_b`, `anio_b?` | `GET /api/resumen` de ambos meses |
+| `proponer_gasto` | `importe` (> 0, máx. 2 decimales), `concepto` (máx. 200), `fecha` (`AAAA-MM-DD`, obligatoria: no se supone) | `GET /api/categorias` y `GET /api/perfiles`; solo lee. Devuelve el borrador (categoría y perfil predeterminados); si no hay exactamente uno de cada, error para que el modelo lo explique |
 
 Reglas del diseño que se cumplen en código: si falta el año se asume el en curso (o el anterior si el mes aún no ha llegado) y el resultado lleva `anioAsumido: true` para que el modelo lo diga; si la pregunta no encaja en ninguna función, el prompt del sistema obliga a decirlo en vez de improvisar. Los argumentos del modelo se validan como entrada no fiable; un error de validación vuelve al modelo como resultado de herramienta con `is_error` para que se lo explique a la persona.
 
 ## Protección frente a prompt injection y abuso
 
 - **Los datos son datos.** Los resultados de las funciones viajan siempre como `tool_result` dentro de `{"datos": ...}`, nunca en el prompt del sistema, y las instrucciones del sistema dicen que nombres, categorías y conceptos son texto escrito por usuarios que no debe obedecerse. Los textos de la base de datos se limpian (sin caracteres de control, máximo 60 caracteres) antes de volver al modelo; los conceptos de los gastos ni siquiera se envían.
-- **Superficie mínima.** El modelo solo dispone de cinco funciones de lectura sobre el hogar de la persona; aunque una inyección tuviera éxito, no hay nada que modificar ni otro hogar al que llegar.
+- **Superficie mínima.** El modelo dispone de cinco funciones de lectura y de `proponer_gasto`, que solo devuelve un borrador; ninguna escribe. Una inyección que tuviera éxito podría como mucho proponer un gasto, que la persona ve, confirma o descarta. El alta nunca depende del texto del modelo: solo `POST /api/chat/confirmar-gasto` escribe, y lo llama la persona. Ni el importe ni la fecha ni el reparto los fija el modelo: los revisa la persona en la tarjeta del borrador.
 - **El historial del cliente es de la persona.** Solo se aceptan roles `user` y `assistant` (otro rol da 400), con máximo `Asistente__MaxMensajes` (20) mensajes de `Asistente__MaxCaracteresMensaje` (1500) caracteres; el último debe ser de `user`.
 - **Bucle acotado.** Máximo 5 vueltas y 8 llamadas a funciones por pregunta (`Asistente__MaxIteraciones`, `Asistente__MaxLlamadasHerramienta`); `max_tokens` 1024 por turno.
 - **Coste.** Límite de `Asistente__MensajesPorMinuto` (10) preguntas por usuario y de 60 peticiones por minuto en total (429 con `Retry-After`); cuerpo máximo 64 KB. Las peticiones sin sesión se cuentan por IP, que tras el proxy de Render es la del cliente solo con `ProxyInverso__*` configurado (ver Configuración).
@@ -70,7 +71,27 @@ Cabeceras: `Authorization: Bearer <access_token>` y `X-Hogar-Id: <guid>`.
 | 502 | Core.Api no responde (el asistente no inventa cifras: no contesta) |
 | 503 | El modelo no está disponible o falta `ANTHROPIC_API_KEY` |
 
-DTOs en `src/Contracts/Asistente.cs` (`ChatRequest`, `MensajeChatDto`, `ChatResponse`).
+`ChatResponse.borrador` es el gasto propuesto en esa respuesta (`BorradorGastoDto`: `importe`, `concepto`, `fecha`, `categoria`, `perfil`) o `null`. Nada está guardado todavía.
+
+### `POST /api/chat/stream`
+Misma petición que `/api/chat` y mismas cabeceras y errores (400, 401, 403, 429, 413 antes de empezar). Respuesta `text/event-stream` con eventos en orden:
+
+- `event: texto` con `data: {"texto": "..."}`: trozos de la respuesta según se generan. El cliente los muestra en vivo.
+- `event: fin` con `data:` igual a la `ChatResponse` completa. Es la respuesta definitiva: si difiere de los trozos, manda esta.
+- `event: error` con `data: {"error": "..."}`: solo si el fallo llega ya empezado el flujo. Antes de empezar, el error es una respuesta JSON normal con su código.
+
+La conversación no se guarda en el servidor; el historial lo manda el cliente igual que en `/api/chat`.
+
+### `POST /api/chat/confirmar-gasto`
+La única escritura del asistente; la llama el front solo cuando la persona pulsa «Confirmar» en la tarjeta del borrador.
+
+```json
+{ "importe": 12.00, "concepto": "Café", "fecha": "2026-10-06", "pagadoPor": "b0000000-0000-4000-8000-0000000000aa" }
+```
+
+`pagadoPor` es un miembro adulto activo elegido por la persona. Categoría y perfil **no** se envían: el servidor usa los marcados como predeterminados para gastos en ese momento. Responde **201** con el `GastoResponse` guardado. Errores: 400 (importe, concepto, fecha o pagador no válidos), 401, 403 o 409 con el mensaje de Core.Api (por ejemplo, sin permiso `gastos.crear`, o el hogar no tiene un predeterminado de categoría o de perfil), 429, 502 y 503. Con Core.Api rechazando el gasto, nada queda guardado.
+
+DTOs en `src/Contracts/Asistente.cs` (`ChatRequest`, `MensajeChatDto`, `ChatResponse`, `BorradorGastoDto`, `ConfirmarGastoRequest`).
 
 ## Configuración
 
@@ -135,8 +156,10 @@ Sin clave se puede ver el asistente flotante y comprobar el 503; el modo demo de
 
 ## Pendiente
 
-- Streaming de la respuesta (SSE) y cancelar una pregunta en curso.
-- Herramientas de escritura con confirmación explícita (hoy fuera del diseño).
+- Cancelar una pregunta en curso (el streaming no tiene botón de parar).
+- Pagador por defecto: hoy lo elige siempre la persona en la tarjeta; el chat no lo supone.
+- Etiqueta `X-Origen` sin verificar: el origen «asistente» lo declara el cliente con el JWT de la persona. Si se quiere una prueba real, haría falta un canal de confianza entre Assistant.Api y Core.Api (decisión pendiente).
+- Streaming con Anthropic: el código de `CreateStreaming` compila, pero no se ha probado contra la API real (no hay clave en el entorno de desarrollo); el test cubre solo el respaldo sin streaming.
 - Memoria de la conversación entre sesiones (hoy vive en la página).
 - Pruebas manuales con el modelo real, evaluación de calidad de las respuestas y ajuste del prompt.
 - Límite diario de coste por hogar.

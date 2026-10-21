@@ -57,6 +57,32 @@ public class EsquemaPostgresTests
     }
 
     [SkippableFact]
+    public async Task PredeterminadoParaGastos_SoloUnoPorHogar_LoImpideElIndiceUnico()
+    {
+        Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
+
+        var hogar = Guid.NewGuid();
+        await using (var conn = new NpgsqlConnection(Cadena))
+        {
+            await conn.OpenAsync();
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "insert into hogar (id, nombre) values (@h, 'Un predeterminado');";
+            cmd.Parameters.AddWithValue("h", hogar);
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        await using (var ctx = Crear(hogar))
+        {
+            ctx.Categorias.Add(new Categoria { Id = Guid.NewGuid(), HogarId = hogar, Nombre = "Super", PredeterminadoGastos = true });
+            await ctx.SaveChangesAsync();
+        }
+
+        await using var segundo = Crear(hogar);
+        segundo.Categorias.Add(new Categoria { Id = Guid.NewGuid(), HogarId = hogar, Nombre = "Farmacia", PredeterminadoGastos = true });
+        await Assert.ThrowsAsync<DbUpdateException>(() => segundo.SaveChangesAsync());
+    }
+
+    [SkippableFact]
     public async Task GuardaYLeeGastoConRepartos_AislandoPorHogar()
     {
         Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");

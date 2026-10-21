@@ -329,6 +329,8 @@ public class PerfilReparto
     public ModoReparto Modo { get; set; }
     /// <summary>Valor asignado a cada miembro (porcentaje o partes).</summary>
     public List<PerfilRepartoDetalle> Detalles { get; set; } = [];
+    /// <summary>Si el perfil está marcado «predeterminado para gastos»: el asistente lo propone al dar de alta un gasto desde el chat.</summary>
+    public bool PredeterminadoGastos { get; set; }
 }
 
 /// <summary>Valor de un miembro dentro de un perfil de reparto.</summary>
@@ -361,6 +363,8 @@ public class Categoria
     public Guid? PerfilRepartoId { get; set; }
     /// <summary>Si los gastos de esta categoría van por defecto a cargo de la cuenta común (su perfil por defecto es el de cuenta común).</summary>
     public bool ACargoCuentaComun { get; set; }
+    /// <summary>Si la categoría está marcada «predeterminada para gastos»: el asistente la propone al dar de alta un gasto desde el chat.</summary>
+    public bool PredeterminadoGastos { get; set; }
 }
 
 /// <summary>Plantilla de gasto que se genera periódicamente un día fijo del mes.</summary>

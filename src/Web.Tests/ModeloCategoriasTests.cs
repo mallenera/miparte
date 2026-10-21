@@ -131,6 +131,27 @@ public class ModeloCategoriasTests
     }
 
     [Fact]
+    public async Task Predeterminada_para_gastos_viaja_al_editar_y_al_crear()
+    {
+        var marcada = new CategoriaDto(_cocina.Id, "Cocina", _casa.Id, null, false, true);
+        var (m, api) = Crear();
+        api.Responde($"PUT /api/categorias/{_cocina.Id}", HttpStatusCode.OK, marcada);
+        api.Responde("POST /api/categorias", HttpStatusCode.Created, _ocio);
+        await m.CargarAsync();
+
+        m.EmpezarEdicion(marcada);
+        Assert.True(m.Predeterminado);
+        await m.GuardarEdicionAsync(marcada);
+        Assert.Contains("\"predeterminadoGastos\":true", api.Cuerpos[$"PUT /api/categorias/{_cocina.Id}"]);
+
+        m.NuevoNombre = "Super";
+        m.NuevoPredeterminado = true;
+        await m.AnadirAsync();
+        Assert.Contains("\"predeterminadoGastos\":true", api.Cuerpos["POST /api/categorias"]);
+        Assert.False(m.NuevoPredeterminado);
+    }
+
+    [Fact]
     public async Task Anadir_una_subcategoria_lo_avisa_y_limpia_el_nombre()
     {
         var (m, api) = Crear();

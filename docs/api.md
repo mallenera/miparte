@@ -113,6 +113,8 @@ Permisos: "miembro" = cualquier miembro activo del hogar (incluye admin). "admin
 | `PUT /api/perfiles/{id}` | Reemplaza nombre, modo y detalle | `GuardarPerfilRequest` | `PerfilRepartoDto` 200 | 400, 404, 409 | permiso `perfiles.gestionar` |
 | `DELETE /api/perfiles/{id}?moverA={id}` | Elimina. Si está en uso hay que indicar `moverA`: sus categorías, gastos y recurrentes pasan a ese perfil (debe ser de cuenta común si el borrado lo es, y no serlo si no) | - | 204 | 400 destino inexistente, el mismo o de otra naturaleza; 404; 409 en uso sin `moverA` (el cuerpo lleva `enUso: true`) | permiso `perfiles.gestionar` |
 
+`predeterminadoGastos` (opcional, `false` por defecto; en `PerfilRepartoDto`, `GuardarPerfilRequest` y en las categorías) marca la casilla «Predeterminado para gastos». Es un booleano sin más reglas en la API (no hay límite de marcados por hogar; la respuesta a varios o ninguno está pendiente de decisión, ver `docs/plan-de-accion.md` punto 18). El asistente la usará para proponer el alta de un gasto desde el chat; hoy no la lee ningún endpoint de negocio. `PUT` la reemplaza junto con el resto de campos, así que el cliente debe enviarla también al editar.
+
 Validación de perfiles (400): nombre obligatorio (≤ 100); `modo` en `porcentaje|partes|cuenta_comun|individual`; `cuenta_comun` e `individual` no llevan detalle; `porcentaje` y `partes` exigen detalle sin miembros repetidos, adultos activos o miembros a cargo con responsable adulto activo, valores ≥ 0; `porcentaje` debe sumar 100 (tolerancia 0,0001); `partes` necesita alguna parte > 0.
 
 ### 3.5 Ingresos
@@ -332,6 +334,8 @@ Reglas: un enlace **revocado** o **caducado** no admite uniones (409, con `revoc
 ```
 
 Categoría a cargo de la cuenta común (con la cuenta activada; el servidor asigna el perfil de cuenta común si no se envía): `{ "nombre": "Comunidad", "categoriaPadreId": null, "perfilRepartoId": null, "aCargoCuentaComun": true }`.
+
+Categoría marcada «predeterminada para gastos» (`predeterminadoGastos`, opcional, `false` por defecto; `CategoriaDto` lo devuelve siempre): `{ "nombre": "Supermercado", "categoriaPadreId": null, "perfilRepartoId": null, "aCargoCuentaComun": false, "predeterminadoGastos": true }`.
 
 ### Perfiles
 

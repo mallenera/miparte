@@ -28,7 +28,7 @@ public static class CategoriasEndpoints
 
     /// <summary>Convierte el cuerpo de la petición en los datos del caso de uso.</summary>
     private static DatosCategoria Datos(GuardarCategoriaRequest r)
-        => new(r.Nombre, r.CategoriaPadreId, r.PerfilRepartoId, r.ACargoCuentaComun);
+        => new(r.Nombre, r.CategoriaPadreId, r.PerfilRepartoId, r.ACargoCuentaComun, r.PredeterminadoGastos);
 
     /// <summary>GET /api/categorias: devuelve las categorías del hogar ordenadas por nombre.</summary>
     private static async Task<IResult> ListarAsync([FromServices] ServicioCategorias servicio, CancellationToken ct)

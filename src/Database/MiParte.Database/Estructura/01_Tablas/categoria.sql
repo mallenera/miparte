@@ -9,6 +9,7 @@ CREATE TABLE public.categoria (
     categoria_padre_id uuid,
     perfil_reparto_id uuid,
     a_cargo_cuenta_comun boolean DEFAULT false NOT NULL,
+    predeterminado_gastos boolean DEFAULT false NOT NULL,
     CONSTRAINT categoria_nombre_check CHECK ((length(btrim(nombre)) > 0))
 );
 

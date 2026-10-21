@@ -56,6 +56,9 @@ public sealed class EdicionPerfil
     /// <summary>Modo de reparto.</summary>
     public string Modo { get; private set; } = ModosReparto.Partes;
 
+    /// <summary>Si el perfil se marca «predeterminado para gastos» (lo propone el asistente).</summary>
+    public bool PredeterminadoGastos { get; set; }
+
     /// <summary>Valor por adulto activo (porcentaje o partes según el modo).</summary>
     public Dictionary<Guid, decimal> Valores { get; } = new();
 
@@ -74,6 +77,7 @@ public sealed class EdicionPerfil
     {
         var e = new EdicionPerfil(adultos) { Nombre = perfil.Nombre };
         e.Modo = perfil.Modo;
+        e.PredeterminadoGastos = perfil.PredeterminadoGastos;
         e.Valores.Clear();
         foreach (var a in e._adultos) e.Valores[a] = perfil.Detalle.FirstOrDefault(d => d.MiembroId == a)?.Valor ?? 0m;
         return e;
@@ -123,5 +127,6 @@ public sealed class EdicionPerfil
         Nombre.Trim(), Modo,
         ModosReparto.LlevaDetalle(Modo)
             ? _adultos.Select(a => new PerfilDetalleDto(a, Valores.GetValueOrDefault(a))).ToList()
-            : []);
+            : [],
+        PredeterminadoGastos);
 }

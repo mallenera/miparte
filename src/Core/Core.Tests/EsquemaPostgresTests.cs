@@ -24,6 +24,39 @@ public class EsquemaPostgresTests
     }
 
     [SkippableFact]
+    public async Task PredeterminadoParaGastos_SeGuardaYSeLeeEnPerfilYCategoria()
+    {
+        Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
+
+        var hogar = Guid.NewGuid();
+        var perfil = Guid.NewGuid();
+        var categoria = Guid.NewGuid();
+
+        await using (var conn = new NpgsqlConnection(Cadena))
+        {
+            await conn.OpenAsync();
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "insert into hogar (id, nombre) values (@h, 'Predeterminados');";
+            cmd.Parameters.AddWithValue("h", hogar);
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        await using (var ctx = Crear(hogar))
+        {
+            ctx.PerfilesReparto.Add(new PerfilReparto
+            {
+                Id = perfil, HogarId = hogar, Nombre = "Casa", Modo = ModoReparto.Individual, PredeterminadoGastos = true,
+            });
+            ctx.Categorias.Add(new Categoria { Id = categoria, HogarId = hogar, Nombre = "Super", PredeterminadoGastos = true });
+            await ctx.SaveChangesAsync();
+        }
+
+        await using var lectura = Crear(hogar);
+        Assert.True((await lectura.PerfilesReparto.SingleAsync(p => p.Id == perfil)).PredeterminadoGastos);
+        Assert.True((await lectura.Categorias.SingleAsync(c => c.Id == categoria)).PredeterminadoGastos);
+    }
+
+    [SkippableFact]
     public async Task GuardaYLeeGastoConRepartos_AislandoPorHogar()
     {
         Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");

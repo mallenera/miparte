@@ -7,6 +7,7 @@ CREATE TABLE public.perfil_reparto (
     hogar_id uuid NOT NULL,
     nombre text NOT NULL,
     modo text NOT NULL,
+    predeterminado_gastos boolean DEFAULT false NOT NULL,
     CONSTRAINT perfil_reparto_modo_check CHECK ((modo = ANY (ARRAY['porcentaje'::text, 'partes'::text, 'cuenta_comun'::text, 'individual'::text]))),
     CONSTRAINT perfil_reparto_nombre_check CHECK ((length(btrim(nombre)) > 0))
 );

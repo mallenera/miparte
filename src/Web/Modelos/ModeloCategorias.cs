@@ -59,6 +59,9 @@ public sealed class ModeloCategorias(CoreApiClient api)
     /// <summary>Si la categoría que se edita va a cargo de la cuenta común.</summary>
     public bool ACargo { get; set; }
 
+    /// <summary>Si la categoría que se edita está marcada «predeterminada para gastos».</summary>
+    public bool Predeterminado { get; set; }
+
     /// <summary>Nombre de la categoría nueva.</summary>
     public string NuevoNombre { get; set; } = "";
 
@@ -70,6 +73,9 @@ public sealed class ModeloCategorias(CoreApiClient api)
 
     /// <summary>Si la categoría nueva va a cargo de la cuenta común.</summary>
     public bool NuevoACargo { get; set; }
+
+    /// <summary>Si la categoría nueva se marca «predeterminada para gastos».</summary>
+    public bool NuevoPredeterminado { get; set; }
 
     /// <summary>Nombre del perfil, «—» si no existe o «Sin perfil» si no tiene.</summary>
     public string NombrePerfil(Guid? id)
@@ -134,6 +140,7 @@ public sealed class ModeloCategorias(CoreApiClient api)
         Padre = c.CategoriaPadreId?.ToString() ?? "";
         Perfil = c.PerfilRepartoId?.ToString() ?? "";
         ACargo = c.ACargoCuentaComun;
+        Predeterminado = c.PredeterminadoGastos;
         Error = null;
     }
 
@@ -141,7 +148,7 @@ public sealed class ModeloCategorias(CoreApiClient api)
     public Task<string?> GuardarEdicionAsync(CategoriaDto c) =>
         EjecutarAsync(async () =>
         {
-            await api.GuardarCategoriaAsync(c.Id, new GuardarCategoriaRequest(Nombre.Trim(), ComoGuid(Padre), ComoGuid(Perfil), ACargo));
+            await api.GuardarCategoriaAsync(c.Id, new GuardarCategoriaRequest(Nombre.Trim(), ComoGuid(Padre), ComoGuid(Perfil), ACargo, Predeterminado));
             Editando = null;
             return "Categoría guardada";
         });
@@ -188,9 +195,10 @@ public sealed class ModeloCategorias(CoreApiClient api)
     public Task<string?> AnadirAsync() =>
         EjecutarAsync(async () =>
         {
-            await api.CrearCategoriaAsync(new GuardarCategoriaRequest(NuevoNombre.Trim(), ComoGuid(NuevoPadre), ComoGuid(NuevoPerfil), NuevoACargo));
+            await api.CrearCategoriaAsync(new GuardarCategoriaRequest(NuevoNombre.Trim(), ComoGuid(NuevoPadre), ComoGuid(NuevoPerfil), NuevoACargo, NuevoPredeterminado));
             NuevoNombre = "";
             NuevoACargo = false;
+            NuevoPredeterminado = false;
             return string.IsNullOrEmpty(NuevoPadre) ? "Categoría añadida" : "Subcategoría añadida";
         });
 

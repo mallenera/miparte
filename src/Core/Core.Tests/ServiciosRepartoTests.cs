@@ -25,7 +25,7 @@ public class ServicioPerfilesTests
     private ServicioPerfiles Servicio => new(_repo);
 
     private Task<Resultado<PerfilReparto>> Crear(string nombre, string modo, params (Guid, decimal)[] detalle)
-        => Servicio.CrearAsync(Hogar, nombre, modo, detalle.Select(d => new ValorMiembro(d.Item1, d.Item2)).ToList(), default);
+        => Servicio.CrearAsync(Hogar, nombre, modo, detalle.Select(d => new ValorMiembro(d.Item1, d.Item2)).ToList(), false, default);
 
     [Fact]
     public async Task Crear_PorcentajeQueSuma100_LoGuardaConSuDetalle()
@@ -132,11 +132,33 @@ public class ServicioPerfilesTests
     {
         var p = (await Crear("Casa", "partes", (_ana, 2m), (_marcos, 1m))).Valor!;
 
-        var r = await Servicio.ActualizarAsync(p.Id, "Casa", "partes", [new ValorMiembro(_marcos, 5m)], default);
+        var r = await Servicio.ActualizarAsync(p.Id, "Casa", "partes", [new ValorMiembro(_marcos, 5m)], false, default);
 
         Assert.Null(r.Error);
         var d = Assert.Single(r.Valor!.Detalles);
         Assert.Equal((_marcos, 5m), (d.MiembroId, d.Valor));
+    }
+
+    [Fact]
+    public async Task Crear_MarcadoPredeterminadoParaGastos_LoGuarda()
+    {
+        var r = await Servicio.CrearAsync(Hogar, "Casa", "individual", null, true, default);
+
+        Assert.Null(r.Error);
+        Assert.True(r.Valor!.PredeterminadoGastos);
+    }
+
+    [Fact]
+    public async Task Actualizar_CambiaLaMarcaPredeterminadoParaGastos()
+    {
+        var p = (await Crear("Casa", "partes", (_ana, 1m))).Valor!;
+        Assert.False(p.PredeterminadoGastos);
+
+        var marcado = await Servicio.ActualizarAsync(p.Id, "Casa", "partes", [new ValorMiembro(_ana, 1m)], true, default);
+        Assert.True(marcado.Valor!.PredeterminadoGastos);
+
+        var desmarcado = await Servicio.ActualizarAsync(p.Id, "Casa", "partes", [new ValorMiembro(_ana, 1m)], false, default);
+        Assert.False(desmarcado.Valor!.PredeterminadoGastos);
     }
 
     private sealed class RepositorioFalso : IRepositorioPerfiles
@@ -211,6 +233,17 @@ public class ServicioCategoriasTests
 
     private Task<Resultado<Categoria>> Crear(string nombre, Guid? padre = null, Guid? perfil = null, bool aCargo = false)
         => Servicio.CrearAsync(Hogar, new DatosCategoria(nombre, padre, perfil, aCargo), default);
+
+    [Fact]
+    public async Task Crear_PredeterminadaParaGastos_LaGuardaYActualizarLaCambia()
+    {
+        var c = (await Servicio.CrearAsync(Hogar, new DatosCategoria("Super", null, null, false, true), default)).Valor!;
+        Assert.True(c.PredeterminadoGastos);
+
+        var r = await Servicio.ActualizarAsync(c.Id, new DatosCategoria("Super", null, null, false, false), default);
+
+        Assert.False(r.Valor!.PredeterminadoGastos);
+    }
 
     [Fact]
     public async Task Crear_ACargoSinPerfil_UsaElPerfilDeCuentaComun()

@@ -9,7 +9,9 @@ namespace MiParte.Core.Application.Categorias;
 /// <param name="CategoriaPadreId">Categoría padre; null en las de primer nivel.</param>
 /// <param name="PerfilRepartoId">Perfil de reparto por defecto; null sin perfil.</param>
 /// <param name="ACargoCuentaComun">Si sus gastos van a cargo de la cuenta común.</param>
-public sealed record DatosCategoria(string? Nombre, Guid? CategoriaPadreId, Guid? PerfilRepartoId, bool ACargoCuentaComun);
+/// <param name="PredeterminadoGastos">Si está marcada «predeterminada para gastos» (la propone el asistente al dar de alta un gasto).</param>
+public sealed record DatosCategoria(
+    string? Nombre, Guid? CategoriaPadreId, Guid? PerfilRepartoId, bool ACargoCuentaComun, bool PredeterminadoGastos = false);
 
 /// <summary>Casos de uso de las categorías de gasto (jerárquicas, con perfil de reparto opcional).</summary>
 public sealed class ServicioCategorias(IRepositorioCategorias repositorio, IRepositorioGastos gastos)
@@ -28,7 +30,7 @@ public sealed class ServicioCategorias(IRepositorioCategorias repositorio, IRepo
         var categoria = new Categoria
         {
             Id = Guid.NewGuid(), HogarId = hogarId, Nombre = v.Nombre, CategoriaPadreId = datos.CategoriaPadreId,
-            PerfilRepartoId = v.PerfilId, ACargoCuentaComun = v.ACargo,
+            PerfilRepartoId = v.PerfilId, ACargoCuentaComun = v.ACargo, PredeterminadoGastos = datos.PredeterminadoGastos,
         };
         repositorio.Anadir(categoria);
         return await repositorio.GuardarAsync(ct) ? Resultado<Categoria>.Ok(categoria) : Resultado<Categoria>.Conflicto(NombreRepetido);
@@ -46,6 +48,7 @@ public sealed class ServicioCategorias(IRepositorioCategorias repositorio, IRepo
         categoria.CategoriaPadreId = datos.CategoriaPadreId;
         categoria.PerfilRepartoId = v.PerfilId;
         categoria.ACargoCuentaComun = v.ACargo;
+        categoria.PredeterminadoGastos = datos.PredeterminadoGastos;
         return await repositorio.GuardarAsync(ct) ? Resultado<Categoria>.Ok(categoria) : Resultado<Categoria>.Conflicto(NombreRepetido);
     }
 

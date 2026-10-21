@@ -68,36 +68,28 @@ Las fases van en orden de prioridad. Cada ítem indica su criterio de hecho.
 
     - Revisión de CSP en el navegador (2026-10-19): sin violaciones en las pantallas visitadas (acceso, resumen, gastos, dashboard, recurrentes, categorías, cuenta común, configuración, historial). Google Fonts bloqueado; Pwned Passwords y Supabase accesibles; sin scripts inline; el único atributo `style` es el que pone el propio runtime de Blazor en `<html>`. Limitación: la consola del navegador integrado no conserva los errores de carga de cada página.
 
-### Fase 3 · Decisiones de producto (las toma la pareja, no el código)
+### Fase 3 · Decisiones de producto (las toma cada hogar, no el código)
 
 12. ~~**Cerrar D1 (alojamiento) y D2 (base de datos y login).**~~ **Hecho** (2026-10-20): D1 y D2 están marcadas como decididas en `docs/diseno-y-decisiones.md` (Render con Docker y Supabase).
-13. **Cerrar D3 y D4 (reparto del hijo y de la alimentación).** El perfil propio ya permite cualquier reparto; basta con que la pareja fije sus perfiles y se anote.
+13. **Cerrar D3 y D4 (reparto del hijo y de la alimentación).** **Resuelto** (2026-10-21): son decisiones de cada hogar, no de la app. La app ofrece los perfiles de reparto y cada hogar fija los suyos al configurarlos. Al crear un hogar, la semilla asigna Alimentación e Hijo al perfil «Por partes», con peso 1 para quien crea el hogar (`SemillaHogar`); son valores editables y cada hogar decide los suyos.
 14. **Cerrar D7 (coste y dominio) y unificar la numeración.** **Parcial** (2026-10-20): la numeración ya es única, porque D7 cubre modelo de lenguaje y dominio en `docs/diseno-y-decisiones.md`. D7 queda decidido de momento: chatbot gratuito con Cloudflare Workers AI y sin dominio propio (la app va en `miparte.pages.dev`). **Aplazado** (2026-10-20): la comprobación de la marca «Mi parte, tu parte» en la OEPM no se hace de momento.
 
 ### Fase 4 · Funcionalidad pendiente (por utilidad)
 
-15. **Notificaciones push del navegador.** *Implementado* (rama `feature/avisos-push`, 2026-10-20), pendiente de desplegar y de comprobar con claves reales. Alcance hecho: aviso al anotar un gasto nuevo (no personal), a los demás miembros con suscripción. **Pendiente del punto:** avisos al cerrar una liquidación (ciclo o periodo) y al registrar un pago; prueba end-to-end con un navegador real y las claves VAPID en Render (ver [despliegue.md](despliegue.md#avisos-del-navegador-claves-vapid)). Diseño y decisiones:
+15. **Notificaciones push del navegador.** *Implementado* (rama `feature/avisos-push`, 2026-10-20), pendiente de desplegar y de comprobar con claves reales. Alcance hecho: aviso al anotar un gasto nuevo (no personal), a los demás miembros con suscripción. Avisos al cerrar un ciclo o un periodo y al registrar un pago **implementados** (2026-10-21, `ServicioLiquidacion` y `ServicioPeriodos`; tests en `ServicioAvisosLiquidacionTests`, sin prueba del periodo). **Pendiente del punto:** prueba end-to-end con un navegador real y las claves VAPID en Render (ver [despliegue.md](despliegue.md#avisos-del-navegador-claves-vapid)). Diseño y decisiones:
     - Tabla `suscripcion_push` en `Estructura/` (RLS sin acceso para `anon` y `authenticated`), `POST`/`DELETE /api/notificaciones/suscripcion` y `GET /api/notificaciones/clave-publica` en Core.Api, ver [api.md](api.md#312-avisos-del-navegador).
     - El caso de uso encola el aviso (`IPublicadorNotificaciones`, sin esperar); el envío es un servicio en segundo plano de Core.Api con la librería `WebPush`. Claves VAPID solo por entorno.
     - El aviso no va al pagador: la API no sabe quién anota el gasto, así que se excluye a quien lo paga. Si lo anota otra persona, el pagador no se entera.
     - Manejador `push` y clic en el service worker (`service-worker.published.js`); el script `js/avisos-push.js` no añade scripts en línea ni cambios de CSP.
     - Límite: en iOS solo con la PWA instalada. La cuenta demo no ve la tarjeta de avisos (`ServicioSesion.EsDemo`), pero un gasto de la demo sí avisaría a otros miembros suscritos de ese hogar.
-16. **Recurrentes que generen gastos personales.** *Implementado* (rama `feature/recurrentes-personales`, 2026-10-20): `gasto_recurrente.es_personal` (la plantilla lo marca; se elige en el formulario de Recurrentes) y la generación crea gastos personales del pagador, sin mirar el perfil ni la cuenta común. Pendiente: comprobar con una plantilla real en la base de datos de Supabase.
+16. **Recurrentes que generen gastos personales.** *Verificado* (2026-10-21; implementado en la rama `feature/recurrentes-personales`, 2026-10-20): `gasto_recurrente.es_personal` (la plantilla lo marca; se elige en el formulario de Recurrentes) y la generación crea gastos personales del pagador, sin mirar el perfil ni la cuenta común. Comprobación en Supabase (solo lectura): la columna `gasto_recurrente.es_personal` existe. Comprobación en PostgreSQL local (`MIPARTE_TEST_DB`, migrado con `--con-auth-stub`): la prueba `GenerarPlantillaPersonal_CreaUnGastoPersonalDelPagador_EnPostgres` crea una plantilla con `personal: true`, genera 2026-11 y comprueba que el gasto es personal, de quien paga y con el reparto íntegro a su nombre; `dotnet test` de Core.Tests pasa (655/655).
 17. **Asistente**: streaming de respuestas y chat en la cuenta demo. *No iniciado* (sin streaming en `Assistant.Api`; el chat en la demo no está comprobado).
 
 18. **Alta de gastos por chat, con confirmación.** *No iniciado* (el asistente solo tiene funciones de lectura). Herramienta de escritura en `Assistant.Api` que propone un gasto (concepto, importe, fecha, categoría, pagador y reparto) y solo lo guarda tras una confirmación explícita de la persona (segunda llamada con botón «Confirmar»). Usa el JWT y el hogar de la persona, así que Core.Api aplica sus permisos. El modelo no fija el importe ni el reparto definitivos: los muestra y los confirma la persona. Decisiones antes de empezar: campos mínimos que pide el chat, si el reparto sale del perfil de la categoría, y si la auditoría registra el alta como hecha por el asistente. Hecho cuando «apunta 12 € de café» deja un borrador, no guarda nada sin «Confirmar» y el gasto aparece en Gastos con el autor correcto.
-19. **Extras del diseño**: presupuestos con alertas y exportación a Excel o PDF; categorización automática de gastos (D6, extra). *No iniciado* (sin código).
-20. **Mejoras «Posterior»** del diseño, cada una con su propio análisis antes de empezar. *No iniciado* en todas; solo el interruptor de Google (fase 2, punto 7) está preparado.
-    - Avisos por correo (resumen mensual y recibos próximos).
-    - Reembolsos y devoluciones ligados a un gasto.
-    - Copia de seguridad y exportación completa.
-    - Resumen anual.
-    - Previsión de gasto fijo.
-    - Foto del ticket adjunta (sin lectura automática).
-    - Etiquetas transversales a las categorías.
-    - Explicación del cambio de balance entre meses.
-    - Simulador de reparto.
-    - Reactivar el acceso con Google (fase 2, punto 7) cuando haya tiempo para revisarlo.
+
+19-20: aplazados por decisión de la pareja.
+
+**Nota pendiente:** el acceso con Google se probó y funcionaba, pero se ocultó por ser de pago (interruptor `FuncionesAcceso.GoogleActivo = false`; ver fase 2, punto 7).
 
 **Pendientes de funciones ya hechas** (vienen de `docs/README.md`; no bloquean la entrega):
 - **Periodo de viaje**: el periodo propio todavía no se fija desde la API; la generación de recurrentes no respeta el periodo cerrado; la regla de gastos no tiene disparador en la base de datos.

@@ -47,6 +47,35 @@ public class RecurrentesPostgresTests
     }
 
     [SkippableFact]
+    public async Task GenerarPlantillaPersonal_CreaUnGastoPersonalDelPagador_EnPostgres()
+    {
+        Skip.If(string.IsNullOrEmpty(ApiPostgresTests.Cadena), "MIPARTE_TEST_DB no definida");
+        await using var e = new Entorno();
+        var user = await e.CrearUsuarioAsync();
+        var hogar = await CrearHogar(e.Cliente(user), "Casa personal", "Ana");
+        var c = e.Cliente(user, hogar.Id);
+
+        var ana = (await Leer<List<MiembroDto>>(await c.GetAsync("/api/miembros"))).Single();
+        var perfil = (await Leer<List<PerfilRepartoDto>>(await c.GetAsync("/api/perfiles"))).First(p => p.Modo != "cuenta_comun");
+        var categoria = (await Leer<List<CategoriaDto>>(await c.GetAsync("/api/categorias"))).First();
+
+        var plantilla = await Leer<GastoRecurrenteResponse>(await c.PostAsJsonAsync("/api/gastos-recurrentes",
+            new GastoRecurrenteRequest(60m, categoria.Id, ana.Id, perfil.Id, 5, "Gimnasio", Personal: true)), HttpStatusCode.Created);
+        Assert.True(plantilla.Personal);
+
+        var generado = await Leer<GenerarRecurrentesResponse>(await c.PostAsync("/api/gastos-recurrentes/generar?mes=2026-11", null));
+        Assert.Equal(1, generado.Creados);
+
+        var gasto = Assert.Single(await Leer<List<GastoResponse>>(await c.GetAsync("/api/gastos?mes=2026-11")),
+            g => g.GastoRecurrenteId == plantilla.Id);
+        Assert.True(gasto.Personal);
+        Assert.Equal(ana.Id, gasto.PagadoPor);
+        Assert.False(gasto.ACargoCuentaComun);
+        var parte = Assert.Single(gasto.Repartos);
+        Assert.Equal((ana.Id, 60m), (parte.MiembroId, parte.ImporteAsumido));
+    }
+
+    [SkippableFact]
     public async Task BorrarUsuarioAceptante_NoFalla_YLaInvitacionQuedaUsada_EnPostgres()
     {
         Skip.If(string.IsNullOrEmpty(ApiPostgresTests.Cadena), "MIPARTE_TEST_DB no definida");

@@ -108,8 +108,39 @@ public class ServicioNotificacionesTests
         Assert.Null(r.Error);
         var aviso = Assert.Single(_publicador.Publicadas);
         Assert.Equal((Hogar, _ana.Id, "/gastos"), (aviso.HogarId, aviso.ExcluirMiembroId, aviso.Ruta));
-        Assert.Equal("Nuevo gasto", aviso.Titulo);
-        Assert.Equal("Café · 12,00 €", aviso.Cuerpo);
+        Assert.Equal("Nuevo gasto realizado por Ana", aviso.Titulo);
+        Assert.Equal("12,00 € · Alimentación · Café", aviso.Cuerpo);
+    }
+
+    [Fact]
+    public async Task Gasto_SinDescripcion_NoPonePuntoVacio()
+    {
+        var gastos = GastosConMiembros();
+        var gastosServicio = new ServicioGastos(gastos.Repositorio, _publicador);
+
+        await gastosServicio.CrearAsync(Hogar, new DatosGasto(Hoy, 1234.5m, gastos.Categoria, _marcos.Id, gastos.Partes, null, false, false), default);
+
+        var aviso = Assert.Single(_publicador.Publicadas);
+        Assert.Equal("Nuevo gasto realizado por Marcos", aviso.Titulo);
+        Assert.Equal("1.234,50 € · Alimentación", aviso.Cuerpo);
+    }
+
+    [Fact]
+    public async Task Gasto_DeLaCuentaComun_LoRecibenTodosAunqueLoPagueUnMiembro()
+    {
+        var gastos = GastosConMiembros();
+        var cuenta = new PerfilReparto { Id = Guid.NewGuid(), HogarId = Hogar, Nombre = "Cuenta común", Modo = ModoReparto.CuentaComun };
+        gastos.Repositorio.Perfiles.Add(cuenta);
+        gastos.Repositorio.CuentaActiva = true;
+        var gastosServicio = new ServicioGastos(gastos.Repositorio, _publicador);
+
+        var r = await gastosServicio.CrearAsync(Hogar, new DatosGasto(Hoy, 40m, gastos.Categoria, _ana.Id, cuenta.Id, "Luz", false, false), default);
+
+        Assert.Null(r.Error);
+        var aviso = Assert.Single(_publicador.Publicadas);
+        Assert.Null(aviso.ExcluirMiembroId);
+        Assert.Equal("Nuevo gasto de la cuenta común", aviso.Titulo);
+        Assert.Equal("40,00 € · Alimentación · Luz", aviso.Cuerpo);
     }
 
     [Fact]
@@ -134,6 +165,7 @@ public class ServicioNotificacionesTests
         partes.Detalles.Add(new PerfilRepartoDetalle { Id = Guid.NewGuid(), HogarId = Hogar, PerfilId = partes.Id, MiembroId = _marcos.Id, Valor = 1m });
         repo.Miembros.AddRange([_ana, _marcos]);
         repo.Categorias.Add(categoria);
+        repo.NombresCategorias[categoria] = "Alimentación";
         repo.Perfiles.Add(partes);
         return (repo, categoria, partes.Id);
     }

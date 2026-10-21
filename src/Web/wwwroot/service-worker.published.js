@@ -54,11 +54,26 @@ async function onFetch(event) {
             && !manifestUrlList.some(url => url === event.request.url);
 
         const request = shouldServeIndexHtml ? 'index.html' : event.request;
-        const cache = await caches.open(cacheName);
-        cachedResponse = await cache.match(request);
+        // Una caché dañada no debe impedir cargar la app: si falla, se pide a la red como si no hubiera caché.
+        try {
+            const cache = await caches.open(cacheName);
+            cachedResponse = await cache.match(request);
+        } catch (error) {
+            console.warn('Service worker: caché no disponible, se usa la red', error);
+        }
     }
 
-    return cachedResponse || fetch(event.request);
+    if (cachedResponse) return cachedResponse;
+    try {
+        return await fetch(event.request);
+    } catch (error) {
+        // Sin red, una navegación cae a la app en caché en vez de la página de error de Chrome (ERR_FAILED).
+        if (event.request.mode === 'navigate') {
+            const indice = await caches.match('index.html').catch(() => undefined);
+            if (indice) return indice;
+        }
+        throw error;
+    }
 }
 
 async function mostrarAviso(event) {

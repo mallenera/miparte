@@ -62,7 +62,8 @@ builder.Services.AddScoped(sp => new ServicioAuditoria(sp.GetRequiredService<IRe
 builder.Services.AddScoped(sp => new ServicioCategorias(
     sp.GetRequiredService<IRepositorioCategorias>(), sp.GetRequiredService<IRepositorioGastos>()));
 builder.Services.AddScoped(sp => new ServicioPeriodos(
-    sp.GetRequiredService<IRepositorioPeriodos>(), sp.GetRequiredService<IRepositorioLiquidacion>(), sp.GetRequiredService<TimeProvider>()));
+    sp.GetRequiredService<IRepositorioPeriodos>(), sp.GetRequiredService<IRepositorioLiquidacion>(), sp.GetRequiredService<TimeProvider>(),
+    sp.GetRequiredService<IPublicadorNotificaciones>()));
 builder.Services.AddScoped(sp => new ServicioCierres(
     sp.GetRequiredService<IRepositorioCierres>(), sp.GetRequiredService<TimeProvider>()));
 builder.Services.AddScoped(sp => new ServicioRecurrentes(
@@ -74,7 +75,7 @@ builder.Services.AddScoped(sp => new ServicioEnlacesGrupo(
 builder.Services.AddScoped(sp => new ServicioCuentaComun(
     sp.GetRequiredService<IRepositorioCuentaComun>(), sp.GetRequiredService<TimeProvider>()));
 builder.Services.AddScoped(sp => new ServicioLiquidacion(
-    sp.GetRequiredService<IRepositorioLiquidacion>(), sp.GetRequiredService<TimeProvider>()));
+    sp.GetRequiredService<IRepositorioLiquidacion>(), sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<IPublicadorNotificaciones>()));
 
 // CORS: orígenes en Cors:OrigenesPermitidos (env Cors__OrigenesPermitidos__0, ...).
 // Sin configuración no se permite ningún origen cruzado.

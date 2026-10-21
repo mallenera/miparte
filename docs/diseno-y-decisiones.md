@@ -15,8 +15,7 @@ Es el proyecto fin de máster de desarrollo en IA (BigSchool). Se usará en un h
 - Acceso desde web y desde Android, sin app nativa.
 - Login con correo y contraseña, y con Google.
 - Nube gratuita o de bajo coste, con dominio propio económico.
-- Quien no tiene hijo (A) ingresa el doble que quien lo tiene (B).
-- Hay gastos que se reparten 2 contra 1.
+- Hay gastos que se reparten 2 contra 1 entre miembros.
 - Stack libre, pero sencillo de manejar.
 
 **Acuerdos posteriores:**
@@ -263,7 +262,7 @@ Siete decisiones condicionan el desarrollo; la D3 y la D4 no dependen de la téc
 |---|---|---|---|---|
 | D1 | Dónde se aloja la app | Render o Railway con Docker; Streamlit Community Cloud (gratis, pero sin dominio propio) | Render o Railway con Docker, porque admiten dominio propio | **Decidida**: Render con Docker para Core.Api y Assistant.Api, Cloudflare Pages para el front (ver [despliegue.md](despliegue.md)) |
 | D2 | Base de datos y login | Supabase (PostgreSQL + login con correo y Google); SQLite local con login propio | Supabase: incluye ambos logins y plan gratuito | **Decidida**: Supabase (PostgreSQL y Auth con correo; el acceso con Google está oculto de momento) |
-| D3 | Cómo se reparten los gastos del hijo | 100 % B; proporcional a ingresos (A asume 2/3); perfil propio | Perfil propio configurable; el porcentaje lo fija cada hogar | **Resuelta por cada hogar**: la app ofrece los perfiles. Un miembro a cargo tiene peso en un perfil de porcentajes o partes, y ese perfil se asigna a una categoría o a un gasto. Cada hogar fija su porcentaje al configurar sus perfiles; la app no fija ninguno |
+| D3 | Cómo se reparten los gastos del hijo | 100 % del miembro con hijo; proporcional a ingresos (el miembro sin hijo asume 2/3); perfil propio | Perfil propio configurable; el porcentaje lo fija cada hogar | **Resuelta por cada hogar**: la app ofrece los perfiles. Un miembro a cargo tiene peso en un perfil de porcentajes o partes, y ese perfil se asigna a una categoría o a un gasto. Cada hogar fija su porcentaje al configurar sus perfiles; la app no fija ninguno |
 | D4 | Reparto de la alimentación | Proporcional a ingresos; por partes contando al hijo | Cada hogar decide si el hijo cuenta como una parte | **Resuelta por cada hogar**: la app permite que el hijo cuente como una parte en un perfil por partes, con el peso que configure cada hogar. Si cuenta o no lo decide cada hogar al configurar sus perfiles |
 | D5 | Interfaz | Streamlit; FastAPI con frontend web instalable (PWA) | Streamlit para el MVP; migrar después reutilizando lógica y base de datos | **Superada**: se optó por Blazor WASM (PWA) + minimal API .NET + Supabase |
 | D6 | Alcance de la IA | Solo chatbot; chatbot más categorización automática de gastos | Chatbot en el MVP; categorización como extra si da tiempo | Chatbot hecho; categorización pendiente |

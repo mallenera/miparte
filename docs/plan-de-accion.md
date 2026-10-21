@@ -68,10 +68,10 @@ Las fases van en orden de prioridad. Cada ítem indica su criterio de hecho.
 
     - Revisión de CSP en el navegador (2026-10-19): sin violaciones en las pantallas visitadas (acceso, resumen, gastos, dashboard, recurrentes, categorías, cuenta común, configuración, historial). Google Fonts bloqueado; Pwned Passwords y Supabase accesibles; sin scripts inline; el único atributo `style` es el que pone el propio runtime de Blazor en `<html>`. Limitación: la consola del navegador integrado no conserva los errores de carga de cada página.
 
-### Fase 3 · Decisiones de producto (las toma la pareja, no el código)
+### Fase 3 · Decisiones de producto (las toma cada hogar, no el código)
 
 12. ~~**Cerrar D1 (alojamiento) y D2 (base de datos y login).**~~ **Hecho** (2026-10-20): D1 y D2 están marcadas como decididas en `docs/diseno-y-decisiones.md` (Render con Docker y Supabase).
-13. **Cerrar D3 y D4 (reparto del hijo y de la alimentación).** El perfil propio ya permite cualquier reparto; basta con que la pareja fije sus perfiles y se anote.
+13. **Cerrar D3 y D4 (reparto del hijo y de la alimentación).** **Resuelto** (2026-10-21): son decisiones de cada hogar, no de la app. La app ofrece los perfiles de reparto y cada hogar fija los suyos al configurarlos. Al crear un hogar, la semilla asigna Alimentación e Hijo al perfil «Por partes», con peso 1 para quien crea el hogar (`SemillaHogar`); son valores editables y cada hogar decide los suyos.
 14. **Cerrar D7 (coste y dominio) y unificar la numeración.** **Parcial** (2026-10-20): la numeración ya es única, porque D7 cubre modelo de lenguaje y dominio en `docs/diseno-y-decisiones.md`. D7 queda decidido de momento: chatbot gratuito con Cloudflare Workers AI y sin dominio propio (la app va en `miparte.pages.dev`). **Aplazado** (2026-10-20): la comprobación de la marca «Mi parte, tu parte» en la OEPM no se hace de momento.
 
 ### Fase 4 · Funcionalidad pendiente (por utilidad)

@@ -64,7 +64,7 @@ El MVP cubre el registro, el reparto y la liquidación mensual; el resto se aña
 | Análisis | Dashboard mensual: gastos por categoría y por persona, entradas y salidas de la cuenta común; comparativa con meses anteriores | MVP |
 | IA | Chatbot de consulta con tool calling | MVP |
 | Control | Presupuestos por categoría con aviso al acercarse al límite | Aplazado (decisión de la pareja) |
-| Control | Gastos anuales prorrateados (seguro, IBI) y objetivos de ahorro | Posterior |
+| Control | Gastos anuales prorrateados (seguro, IBI) y objetivos de ahorro | Aplazado (decisión de la pareja) |
 | Datos | Exportación a Excel/PDF; importación de movimientos bancarios (CSV) | Aplazado (decisión de la pareja) |
 | IA | Categorización automática por descripción; detección de anomalías; previsión del mes siguiente; lectura de tickets (OCR) | Aplazado (decisión de la pareja) |
 
@@ -116,7 +116,7 @@ Tres mejoras entran en el MVP porque hacen utilizable el resumen "A debe a B"; e
 | Previsión de gasto fijo | Recurrentes más gastos prorrateados, para conocer el mínimo del mes | Aplazado (decisión de la pareja) |
 | Foto del ticket | Imagen adjunta al gasto, sin lectura automática | Aplazado (decisión de la pareja) |
 | Avisos por correo | Resumen mensual y recibos próximos | Aplazado (decisión de la pareja) |
-| Invitación al hogar | Alta de la pareja por correo con permisos; la persona a cargo no necesita login | Posterior |
+| Invitación al hogar | Alta de la pareja por correo con permisos; la persona a cargo no necesita login | **Hecho** (invitaciones por enlace, `docs/api.md`) |
 | Historial de cambios | Quién modificó qué y cuándo | **Hecho** (rama `feature/security`; solo lo lee un admin, `docs/api.md` §3.10) |
 | Copia de seguridad y exportación | Descarga completa de los datos del hogar | Aplazado (decisión de la pareja) |
 

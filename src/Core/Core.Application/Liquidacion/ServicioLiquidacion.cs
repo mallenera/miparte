@@ -1,3 +1,4 @@
+using MiParte.Core.Application.Notificaciones;
 using MiParte.Core.Domain;
 using MiParte.Core.Domain.Entidades;
 
@@ -17,7 +18,7 @@ public sealed record RegistrarPago(Guid HogarId, DateOnly Mes, Guid De, Guid A, 
 public sealed record ResumenYLiquidacion(ResumenDelMes Resumen, LiquidacionCalculada Liquidacion);
 
 /// <summary>Casos de uso del resumen mensual, la liquidación y los pagos entre miembros.</summary>
-public sealed class ServicioLiquidacion(IRepositorioLiquidacion repositorio, TimeProvider reloj)
+public sealed class ServicioLiquidacion(IRepositorioLiquidacion repositorio, TimeProvider reloj, IPublicadorNotificaciones? notificaciones = null)
 {
     /// <summary>Resumen del mes que empieza en <paramref name="inicio"/>.</summary>
     public async Task<ResumenDelMes> ResumenAsync(DateOnly inicio, CancellationToken ct)
@@ -114,8 +115,15 @@ public sealed class ServicioLiquidacion(IRepositorioLiquidacion repositorio, Tim
             CerradoEn = reloj.GetUtcNow(), CerradoPor = yo.Id, DesdeGastoFecha = desde, HastaFecha = hasta, Total = total,
         };
         await repositorio.CerrarCicloAsync(ciclo, pendientes.Select(g => g.Id).ToList(), ct);
+        notificaciones?.Publicar(AvisoCicloCerrado(ciclo, yo.Id));
         return Resultado<CicloConAutor>.Ok(new CicloConAutor(ciclo, yo.Nombre));
     }
+
+    /// <summary>Aviso del cierre de un ciclo: total y número, sin quien lo cerró (no lo recibe él).</summary>
+    internal static NotificacionPush AvisoCicloCerrado(CicloLiquidacion ciclo, Guid cerradoPor)
+        => new(ciclo.HogarId, cerradoPor, "Liquidación cerrada", $"Ciclo {ciclo.Numero} · {FormatoAvisos.Importe(ciclo.Total)} €", "/");
+
+    /// <summary>Importe con separador decimal español, como en el resto de avisos.</summary>
 
     /// <summary>
     /// Registra un pago entre dos miembros. Es inválido si el mes no es día 1, los miembros coinciden, el importe o el concepto
@@ -149,7 +157,22 @@ public sealed class ServicioLiquidacion(IRepositorioLiquidacion repositorio, Tim
             Concepto = ReglasMovimiento.NormalizarConcepto(pago.Concepto),
         };
         await repositorio.AnadirPagoAsync(registro, ct);
+        if (notificaciones is not null)
+            notificaciones.Publicar(await AvisoPagoAsync(registro, ct));
         return Resultado<PagoLiquidacionRegistro>.Ok(registro);
+    }
+
+    /// <summary>
+    /// Aviso de un pago registrado, con los nombres de quien paga y quien recibe. No se excluye a nadie: la API no sabe quién lo
+    /// anota, así que lo reciben también los dos implicados.
+    /// </summary>
+    private async Task<NotificacionPush> AvisoPagoAsync(PagoLiquidacionRegistro registro, CancellationToken ct)
+    {
+        var miembros = await repositorio.MiembrosAsync(ct);
+        var de = miembros.FirstOrDefault(m => m.Id == registro.DeMiembroId)?.Nombre ?? "Alguien";
+        var a = miembros.FirstOrDefault(m => m.Id == registro.AMiembroId)?.Nombre ?? "alguien";
+        return new NotificacionPush(
+            registro.HogarId, null, "Pago registrado", $"{de} pagó {FormatoAvisos.Importe(registro.Importe)} € a {a}", "/");
     }
 
     /// <summary>Borra un pago de liquidación; no encontrado si no existe en el hogar.</summary>

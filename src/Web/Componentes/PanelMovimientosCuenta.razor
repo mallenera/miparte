@@ -1,9 +1,15 @@
 @* Movimientos de la cuenta común entre dos fechas, línea a línea y con el saldo tras cada una, para cuadrarlos con el extracto del banco. *@
 @using System.Globalization
+@using Microsoft.JSInterop
 @inject CoreApiClient Api
+@inject IJSRuntime JS
 
 <section class="card" aria-labelledby="t-movimientos">
-    <div class="card-head"><h2 id="t-movimientos">Movimientos</h2></div>
+    <div class="card-head">
+        <h2 id="t-movimientos">Movimientos</h2>
+        <button class="btn btn-ghost btn-sm" type="button" disabled="@(_m.Visibles.Count == 0)" @onclick="ExportarAsync"
+                title="Descarga las líneas que se ven, con los filtros aplicados">Exportar a CSV</button>
+    </div>
     <p class="muted">
         Todo lo que entra y sale de la cuenta, ahorro incluido, para compararlo con el banco. Las aportaciones aparecen el día 1 del mes en que
         tocan; los gastos que adelanta una persona no salen hasta que se le reembolsan.
@@ -117,6 +123,10 @@
 
     /// <summary>Fecha de hoy; los tests la fijan para no depender del reloj.</summary>
     [Parameter] public DateOnly? Hoy { get; set; }
+
+    /// <summary>Descarga las líneas visibles como CSV (lo genera el modelo; el navegador solo guarda el fichero).</summary>
+    private async Task ExportarAsync()
+        => await JS.InvokeVoidAsync("descargarFichero", _m.NombreCsv, _m.GenerarCsv(), "text/csv;charset=utf-8");
 
     protected override Task OnInitializedAsync()
     {

@@ -1,5 +1,6 @@
 using MiParte.Contracts;
 using MiParte.Web.Api;
+using MiParte.Web.Reparto;
 
 namespace MiParte.Web.Modelos;
 
@@ -72,6 +73,13 @@ public sealed class ModeloMovimientosCuenta(CoreApiClient api, DateOnly hoy)
 
     /// <summary>Suma de lo que sale en las líneas visibles (positiva).</summary>
     public decimal SalidasVisibles => -Visibles.Where(m => m.Importe < 0).Sum(m => m.Importe);
+
+    /// <summary>Nombre del fichero CSV del periodo cargado.</summary>
+    public string NombreCsv => CsvMovimientos.NombreFichero(Extracto?.Desde ?? Desde, Extracto?.Hasta ?? Hasta);
+
+    /// <summary>CSV de las líneas visibles (con los filtros aplicados), en orden cronológico.</summary>
+    // Visibles va de lo más reciente a lo más antiguo; se le da la vuelta para conservar el orden del servidor dentro de cada día.
+    public string GenerarCsv() => CsvMovimientos.Generar(Visibles.Reverse(), Descripcion, Miembros);
 
     /// <summary>Carga miembros, categorías y el extracto del periodo.</summary>
     public async Task CargarAsync()

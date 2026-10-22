@@ -1,5 +1,6 @@
 using System.Net;
 using Bunit;
+using Microsoft.JSInterop;
 using Microsoft.Extensions.DependencyInjection;
 using MiParte.Contracts;
 using MiParte.Web.Api;
@@ -119,6 +120,51 @@ public class MovimientosCuentaTests : BunitContext
 
         Assert.Equal("Fecha mala", m.Error);
         Assert.Null(m.Extracto);
+    }
+
+    [Fact]
+    public void Exportar_descarga_un_csv_con_las_lineas_filtradas()
+    {
+        Services.AddSingleton(Cliente(Api()));
+        JSInterop.SetupVoid("descargarFichero", _ => true);
+        var c = Render<PanelMovimientosCuenta>(p => p.Add(x => x.Hoy, Hoy));
+
+        c.Find("select").Change("salidas");
+        c.Find("button.btn-ghost").Click();
+
+        var llamada = Assert.Single(JSInterop.Invocations["descargarFichero"]);
+        Assert.Equal("movimientos-cuenta-comun_2026-10-01_2026-10-15.csv", llamada.Arguments[0]);
+        var csv = (string)llamada.Arguments[1]!;
+        Assert.Equal(3, csv.Split("\r\n", StringSplitOptions.RemoveEmptyEntries).Length); // cabecera + 2 salidas
+        Assert.Contains("Gasto;Gasto: Luz", csv);
+        Assert.Equal("text/csv;charset=utf-8", llamada.Arguments[2]);
+    }
+
+    [Fact]
+    public async Task El_csv_conserva_el_orden_del_extracto_dentro_de_un_mismo_dia()
+    {
+        var dia = new DateOnly(2026, 10, 1);
+        var extracto = new MovimientosCuentaComunResponse(dia, Hoy, 0m, 300m, 0m, 300m,
+        [
+            new("aportacion", null, dia, 100m, AnaId, null, null, 0m, 100m),
+            new("aportacion", null, dia, 200m, LuisId, null, null, 0m, 300m),
+        ]);
+        var m = await Modelo(Api(extracto));
+
+        var lineas = m.GenerarCsv().Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+
+        Assert.EndsWith(";100,00", lineas[1]);
+        Assert.EndsWith(";300,00", lineas[2]);
+    }
+
+    [Fact]
+    public void Sin_lineas_el_boton_de_exportar_esta_desactivado()
+    {
+        Services.AddSingleton(Cliente(Api(new MovimientosCuentaComunResponse(new DateOnly(2026, 10, 1), Hoy, 0m, 0m, 0m, 0m, []))));
+
+        var c = Render<PanelMovimientosCuenta>(p => p.Add(x => x.Hoy, Hoy));
+
+        Assert.True(c.Find("button.btn-ghost").HasAttribute("disabled"));
     }
 
     [Fact]

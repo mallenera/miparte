@@ -83,6 +83,7 @@ public sealed partial class ServidorDemo
             ("hogares", 2, "POST") => Mal(HttpStatusCode.Conflict, "En el modo demo no se pueden crear hogares."),
             ("invitaciones", 3, "POST") when subruta == "aceptar" => Mal(HttpStatusCode.Conflict, "En el modo demo no se pueden aceptar invitaciones."),
             ("enlaces-grupo", 3, "POST") when subruta == "unirse" => Mal(HttpStatusCode.Conflict, "En el modo demo no se pueden usar enlaces de grupo."),
+            ("contacto", 2, "POST") => Mal(HttpStatusCode.Conflict, "En el modo demo no se envían mensajes de contacto. Escríbenos por correo."),
 
             ("miembros", 2, "GET") => Ok((await _miembros.ListarAsync(Consulta(uri, "incluirInactivos") == "true", ct))
                 .Select(m => m.ADto(IdUsuario)).ToList()),
@@ -415,6 +416,7 @@ public sealed partial class ServidorDemo
             HttpStatusCode.Conflict,
             new Dictionary<string, object>(e.Extra ?? new Dictionary<string, object>()) { ["error"] = e.Mensaje }),
         TipoError.Prohibido => Mal(HttpStatusCode.Forbidden, e.Mensaje),
+        TipoError.NoDisponible => Mal(HttpStatusCode.ServiceUnavailable, e.Mensaje),
         _ => Mal(e.Mensaje),
     };
 

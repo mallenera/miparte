@@ -27,13 +27,14 @@ internal static class ApiComun
     /// <summary>Respuesta 400 por una fecha con formato distinto de YYYY-MM-DD; <paramref name="parametro"/> es el nombre del parámetro.</summary>
     public static IResult FechaInvalida(string parametro) => Invalido($"La fecha «{parametro}» debe tener el formato YYYY-MM-DD.");
 
-    /// <summary>Traduce el fallo de un caso de uso a su respuesta HTTP: 400, 404 o 409 (con los datos extra, como lo pendiente).</summary>
+    /// <summary>Traduce el fallo de un caso de uso a su respuesta HTTP: 400, 403, 404, 409 (con los datos extra, como lo pendiente) o 503.</summary>
     public static IResult Respuesta(ErrorAplicacion error) => error.Tipo switch
     {
         TipoError.NoEncontrado => Results.NotFound(),
         TipoError.Conflicto => Results.Conflict(
             new Dictionary<string, object>(error.Extra ?? new Dictionary<string, object>()) { ["error"] = error.Mensaje }),
         TipoError.Prohibido => Results.Json(new { error = error.Mensaje }, statusCode: StatusCodes.Status403Forbidden),
+        TipoError.NoDisponible => Results.Json(new { error = error.Mensaje }, statusCode: StatusCodes.Status503ServiceUnavailable),
         _ => Invalido(error.Mensaje),
     };
 

@@ -15,7 +15,7 @@ Convenciones generales:
 
 ### Autenticación
 
-Todos los endpoints `/api/*` exigen `Authorization: Bearer <access_token>`, el `access_token` de la sesión de Supabase Auth. Sin token válido: **401**. El `sub` del JWT identifica al usuario.
+Todos los endpoints `/api/*` salvo `POST /api/contacto` (§3.13) exigen `Authorization: Bearer <access_token>`, el `access_token` de la sesión de Supabase Auth. Sin token válido: **401**. El `sub` del JWT identifica al usuario.
 
 ### Hogar actual: cabecera `X-Hogar-Id`
 
@@ -36,6 +36,7 @@ Si no hay hogar y el endpoint lo necesita, los de gastos, gastos recurrentes, re
 - `GET /api/hogares`, `POST /api/hogares`, `GET /api/hogares/{id}`
 - `GET /api/yo`
 - `POST /api/invitaciones/aceptar`
+- `POST /api/contacto` (además, anónimo)
 
 El resto de rutas `/api/*` requieren hogar (cabecera o hogar único). Los datos están aislados por hogar (RLS y filtro global por `hogar_id`).
 
@@ -51,6 +52,7 @@ Ventana deslizante de 1 minuto, **por usuario** (`sub` del JWT ya validado) y, s
 |---|---|---|
 | Toda la API (salvo `/health`) | 120/min | `Limites__PeticionesPorMinuto` |
 | Costosas: `POST /api/hogares`, `POST /api/invitaciones`, `POST /api/invitaciones/aceptar`, `POST /api/gastos-recurrentes/generar` | 10/min | `Limites__CostosasPorMinuto` |
+| Formulario de contacto: `POST /api/contacto` (ventana de 1 hora; `Retry-After` indica 60 s, el front no reintenta) | 5/hora | `Limites__ContactoPorHora` |
 | Tamaño del cuerpo de la petición (413 al superarlo) | 65536 bytes | `Limites__MaxCuerpoBytes` |
 
 Detrás de un proxy inverso hay que configurar `ForwardedHeaders`; si no, todos los anónimos comparten la IP del proxy.
@@ -221,7 +223,17 @@ Avisos push a los miembros del hogar cuando alguien anota un gasto nuevo que no 
 
 Además del gasto nuevo, avisan: el cierre de un ciclo y el de un periodo propio (sin el miembro que lo cierra; el periodo incluye el total de su liquidación final si la hubo) y un pago registrado (a todo el hogar, con quién paga y quién recibe). Un gasto nuevo no personal avisa a las suscripciones del hogar salvo a la del pagador (`PagadoPor`). El título dice de dónde sale: quién lo realiza («Nuevo gasto realizado por Ana»), «Nuevo gasto de la cuenta común» o «Nuevo gasto pagado desde el ahorro». Un gasto de la cuenta común o del ahorro lo reciben todos los suscritos, también quien lo paga. El cuerpo es «importe · categoría · descripción», y la descripción solo aparece si la hay. El aviso sale en segundo plano: la respuesta de `POST /api/gastos` no espera al servicio push, y si la cola interna se llena o faltan las claves, el aviso se descarta sin fallar el gasto. Una suscripción que el servicio push da por caducada (404 o 410) se borra. El contenido del aviso es JSON `{ "titulo", "cuerpo", "ruta" }`. Si cambian las claves VAPID, las suscripciones existentes dejan de servir y hay que volver a activar los avisos.
 
-Total: 68 endpoints de negocio (5 hogares/yo, 10 miembros/invitaciones/enlaces de grupo, 4 categorías, 5 perfiles, 5 gastos, 6 recurrentes, 8 resumen/liquidación/pagos/ciclos, 16 cuenta común, 5 cierre de mes, 1 auditoría, 3 avisos del navegador) más `GET /health`.
+### 3.13 Contacto
+
+Formulario de la página pública `/contacto`. Es el único endpoint anónimo además de `/health`: no exige token ni hogar (si llega un token válido, se usa solo para el límite de peticiones). Core.Api envía el mensaje por correo al buzón del proyecto con la API HTTP de Resend (no SMTP: el plan gratuito de Render bloquea esos puertos). El remitente y el destino los fija la configuración (`Correo__Remitente`, `Correo__Destino`), nunca la petición; el correo de quien escribe va como `reply_to`. No se guarda nada en la base de datos.
+
+| Método y ruta | Descripción | Request | Response | Errores | Permisos |
+|---|---|---|---|---|---|
+| `POST /api/contacto` | Envía un mensaje al buzón de contacto. El asunto sale del motivo: `duda`, `mejora` u `otro` | `ContactoRequest` | 204 | 400 motivo desconocido, correo no válido, mensaje de menos de 10 o más de 4000 caracteres o nombre de más de 100; 429 más de 5 por hora; 503 sin `Correo__ResendApiKey` o `Correo__Destino`, o si Resend rechaza el envío | anónimo |
+
+`ContactoRequest`: `{ "motivo": "duda", "email": "ana@ejemplo.es", "mensaje": "...", "nombre": "Ana", "web": null }`. `nombre` es opcional. `web` es un campo trampa que el formulario deja oculto y vacío: si llega relleno, la API responde 204 sin enviar nada. Con 503 el front ofrece escribir directamente a `mipartetuparte@gmail.com`.
+
+Total: 69 endpoints de negocio (5 hogares/yo, 10 miembros/invitaciones/enlaces de grupo, 4 categorías, 5 perfiles, 5 gastos, 6 recurrentes, 8 resumen/liquidación/pagos/ciclos, 16 cuenta común, 5 cierre de mes, 1 auditoría, 3 avisos del navegador, 1 contacto) más `GET /health`.
 
 ## 4. Ejemplos JSON
 

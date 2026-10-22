@@ -404,13 +404,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 
 /* Formularios */
 label { display: grid; gap: 6px; font-size: .8125rem; font-weight: 600; color: var(--ink-2); min-width: 0; }
-input, select {
+input, select, textarea {
     font: inherit; color: var(--ink); background: color-mix(in srgb, var(--bg) 60%, transparent); border: 1px solid var(--line-2);
     border-radius: 12px; padding: 0 14px; height: 44px; width: 100%; min-width: 0;
     transition: border-color var(--ease), box-shadow var(--ease);
 }
-input:hover:not([disabled]), select:hover:not([disabled]) { border-color: var(--ink-2); }
-input:focus-visible, select:focus-visible { outline: 3px solid color-mix(in srgb, var(--cta) 35%, transparent); outline-offset: 1px; border-color: var(--cta); }
+textarea { height: auto; min-height: 140px; padding: 10px 14px; line-height: 1.5; resize: vertical; }
+input:hover:not([disabled]), select:hover:not([disabled]), textarea:hover:not([disabled]) { border-color: var(--ink-2); }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid color-mix(in srgb, var(--cta) 35%, transparent); outline-offset: 1px; border-color: var(--cta); }
 input[disabled], select[disabled] { opacity: .6; }
 input.invalid, input[aria-invalid="true"] { border-color: var(--err); outline: 0; }
 .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
@@ -418,6 +419,8 @@ input.invalid, input[aria-invalid="true"] { border-color: var(--err); outline: 0
 @media (max-width: 430px) { .fields { grid-template-columns: minmax(0, 1fr); } }
 .form { display: grid; gap: 14px; align-content: start; }
 .fieldrow { display: grid; gap: 4px; }
+/* Campo trampa del formulario de contacto: fuera de la vista (no display:none, que algunos bots detectan). */
+.trampa { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
 .ayuda-campo { margin: 0; font-size: .85rem; line-height: 1.4; overflow-wrap: anywhere; }
 .separador { display: flex; align-items: center; justify-content: center; gap: 12px; color: var(--ink-2); font-size: .85rem; }
 .btn-google .g { width: 18px; height: 18px; flex: none; }

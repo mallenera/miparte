@@ -1,7 +1,7 @@
 namespace MiParte.Core.Application;
 
-/// <summary>Clase de fallo de un caso de uso; la capa HTTP la traduce a su código (400, 409, 404, 403).</summary>
-public enum TipoError { Invalido, Conflicto, NoEncontrado, Prohibido }
+/// <summary>Clase de fallo de un caso de uso; la capa HTTP la traduce a su código (400, 409, 404, 403, 503).</summary>
+public enum TipoError { Invalido, Conflicto, NoEncontrado, Prohibido, NoDisponible }
 
 /// <summary>Fallo de un caso de uso, con el mensaje en español y, si hace falta, datos extra para el cliente (p. ej. lo pendiente).</summary>
 public sealed record ErrorAplicacion(TipoError Tipo, string Mensaje, IReadOnlyDictionary<string, object>? Extra = null);

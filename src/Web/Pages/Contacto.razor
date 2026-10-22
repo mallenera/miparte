@@ -1,39 +1,79 @@
 @page "/contacto"
+@using MiParte.Core.Application.Contacto
+@using MiParte.Web.Api
+@using MiParte.Web.Autenticacion
+@using MiParte.Web.Modelos
+@inject CoreApiClient Api
+@inject ServicioSesion Sesion
 
 <PageTitle>Contacto · Mi parte, tu parte</PageTitle>
 
-@* El formulario no envía nada: abre el correo del usuario con el asunto elegido. El mensaje se escribe allí, así que no viaja en la URL. *@
+@* Página pública: el mensaje lo envía Core.Api por correo al buzón del proyecto (POST /api/contacto, sin sesión). *@
 <div class="auth ancho">
     <h1 class="page-title">Contacto</h1>
-    <p class="muted">¿Tienes una duda, una idea de mejora o quieres comentar algo? Escríbenos y lo leeremos.</p>
 
-    <div class="fieldrow">
-        <label for="motivo">Motivo</label>
-        <select id="motivo" @bind="_motivo">
-            @foreach (var (clave, texto, _) in Motivos)
-            {
-                <option value="@clave">@texto</option>
-            }
-        </select>
-    </div>
+    @if (_modelo.Estado == EstadoContacto.Enviado)
+    {
+        <div class="aviso ok" role="status">✓ Mensaje enviado. Te contestaremos a @_modelo.Email.</div>
+        <button class="btn btn-ghost btn-block" type="button" @onclick="_modelo.Nuevo">Escribir otro mensaje</button>
+    }
+    else
+    {
+        <p class="muted">¿Tienes una duda, una idea de mejora o quieres comentar algo? Escríbenos y lo leeremos.</p>
 
-    <a class="btn btn-block" href="@Enlace"><Icono Nombre="message-circle" Tamano="16" />Escribir correo</a>
-    <p class="muted">Se abrirá tu aplicación de correo con el asunto preparado. Dinos qué necesitas en el cuerpo del mensaje.</p>
+        @if (_modelo.Error is not null)
+        {
+            <div class="aviso err" role="alert">
+                @_modelo.Error
+                @if (_modelo.OfrecerCorreo)
+                {
+                    <text> Puedes escribirnos a <a href="@_modelo.EnlaceCorreo">@ModeloContacto.CorreoDirecto</a>.</text>
+                }
+            </div>
+        }
+
+        <form class="form" novalidate @onsubmit="_modelo.EnviarAsync">
+            <div class="fieldrow">
+                <label for="motivo">Motivo</label>
+                <select id="motivo" @bind="_modelo.Motivo">
+                    @foreach (var (clave, texto) in ModeloContacto.Motivos)
+                    {
+                        <option value="@clave">@texto</option>
+                    }
+                </select>
+            </div>
+            <div class="fieldrow">
+                <label for="nombre">Nombre (opcional)</label>
+                <input id="nombre" autocomplete="name" maxlength="@ServicioContacto.MaxLongitudNombre" @bind="_modelo.Nombre" />
+            </div>
+            <div class="fieldrow">
+                <label for="email">Tu correo</label>
+                <input id="email" type="email" autocomplete="email" maxlength="@ServicioContacto.MaxLongitudEmail" @bind="_modelo.Email" />
+            </div>
+            <div class="fieldrow">
+                <label for="mensaje">Mensaje</label>
+                <textarea id="mensaje" rows="6" maxlength="@ServicioContacto.MaxLongitudMensaje" @bind="_modelo.Mensaje"></textarea>
+            </div>
+            @* Trampa para bots: fuera de la vista y del orden de tabulación; una persona nunca la rellena. *@
+            <div class="trampa" aria-hidden="true">
+                <label for="web">Web</label>
+                <input id="web" tabindex="-1" autocomplete="off" @bind="_modelo.Web" />
+            </div>
+            <button class="btn btn-block" type="submit" disabled="@(_modelo.Estado == EstadoContacto.Enviando)">
+                <Icono Nombre="message-circle" Tamano="16" />@(_modelo.Estado == EstadoContacto.Enviando ? "Enviando…" : "Enviar mensaje")
+            </button>
+        </form>
+    }
 </div>
 
 @code {
-    private const string Destino = "mipartetuparte@gmail.com";
+    private ModeloContacto _modelo = null!;
 
-    private static readonly (string Clave, string Texto, string Asunto)[] Motivos =
-    [
-        ("duda", "Tengo una duda", "Mi parte, tu parte: duda"),
-        ("mejora", "Propongo una mejora", "Mi parte, tu parte: propuesta de mejora"),
-        ("otro", "Otro asunto", "Mi parte, tu parte: contacto"),
-    ];
-
-    private string _motivo = "duda";
-
-    /// <summary>Enlace mailto con el asunto del motivo elegido; el cuerpo lo escribe la persona en su correo.</summary>
-    private string Enlace =>
-        $"mailto:{Destino}?subject={Uri.EscapeDataString(Motivos.First(m => m.Clave == _motivo).Asunto)}";
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        // Con sesión se propone su correo; la cuenta demo es compartida y no sirve para contestar.
+        var email = Sesion.EsDemo ? null : Sesion.SesionActual?.Email;
+        _modelo = new ModeloContacto(Api, email);
+    }
 }

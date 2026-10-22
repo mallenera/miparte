@@ -84,7 +84,7 @@ MIPARTE_TEST_DB="Host=localhost;Database=miparte;Username=postgres" dotnet test
 
 ### Core.Api: endpoints y reglas
 
-Endpoints por carpeta en `src/Core/Core.Api`: `Hogares`, `Miembros`, `Reparto` (categorías y perfiles), `Gastos` (gastos, recurrentes, liquidación y cuenta común), `Cierres` (cierre de mes) y `Auditoria` (historial); `Seguridad` reúne los filtros transversales (permisos, límite de peticiones, cabeceras y errores). La referencia completa para el front está en `docs/api.md`; **actualízala al cambiar un endpoint o DTO**. Reglas a recordar:
+Endpoints por carpeta en `src/Core/Core.Api`: `Hogares`, `Miembros`, `Reparto` (categorías y perfiles), `Gastos` (gastos, recurrentes, liquidación y cuenta común), `Cierres` (cierre de mes), `Auditoria` (historial) y `Contacto` (`POST /api/contacto`, el único anónimo: envía el formulario por la API HTTP de Resend, `Correo__*`); `Seguridad` reúne los filtros transversales (permisos, límite de peticiones, cabeceras y errores). La referencia completa para el front está en `docs/api.md`; **actualízala al cambiar un endpoint o DTO**. Reglas a recordar:
 
 - Los endpoints que funcionan sin hogar seleccionado (hogares, `/api/yo`, aceptar invitación) llevan el metadato `SinHogarActual`; el resto exige hogar.
 - Al crear un hogar se siembran 4 perfiles y 6 categorías (`SemillaHogar`); el creador es admin y adulto.

@@ -34,11 +34,22 @@ public sealed class ServicioCuentaComun(IRepositorioCuentaComun repositorio, Tim
         var detalle = await repositorio.HistoricoDetalladoAsync(inicio, ct);
         var h = detalle.Historico;
         var saldoInicial = h.SaldoInicial;
-        var estado = Domain.CuentaComun.Calcular(inicio, h.Vigentes, h.Gastos, h.Reembolsos, h.Retiradas, h.Depositos, saldoInicial);
+        var estado = Domain.CuentaComun.Calcular(inicio, h.Vigentes, h.Gastos, h.Reembolsos, h.Retiradas, h.Depositos, saldoInicial, h.Ingresos);
         var partes = Domain.CuentaComun.PartesPorPersona(inicio, h.Vigentes, estado, h.Depositos);
         var reembolsos = detalle.ReembolsosDelMes.Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe)).ToList();
-        var extracto = Domain.CuentaComun.Extracto(inicio, h.Vigentes, h.GastosDelMes ?? [], reembolsos, saldoInicial, estado);
+        var extracto = Domain.CuentaComun.Extracto(inicio, h.Vigentes, h.GastosDelMes ?? [], reembolsos, saldoInicial, estado, h.Ingresos);
         return new EstadoCuentaDelMes(inicio, estado, partes, detalle, extracto, saldoInicial);
+    }
+
+    /// <summary>
+    /// Extracto bancario de la cuenta (gastos y ahorro juntos) entre dos fechas incluidas, línea a línea y con el saldo tras cada
+    /// movimiento; se devuelve aunque la cuenta no esté activada. Inválido si <paramref name="desde"/> es posterior a <paramref name="hasta"/>.
+    /// </summary>
+    public async Task<Resultado<ExtractoBanco>> MovimientosBancoAsync(DateOnly desde, DateOnly hasta, CancellationToken ct)
+    {
+        if (desde > hasta) return Resultado<ExtractoBanco>.Invalido("La fecha «desde» no puede ser posterior a «hasta».");
+        var datos = await repositorio.MovimientosBancoAsync(hasta, ct);
+        return Resultado<ExtractoBanco>.Ok(MovimientosBanco.Calcular(desde, hasta, datos));
     }
 
     /// <summary>

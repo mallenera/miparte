@@ -165,11 +165,27 @@ public class ApiPostgresTests
         await Leer<JsonElement>(await c.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(luis.Id, new DateOnly(2026, 10, 1), 200m, 0m)));
         await Leer<JsonElement>(await c.PostAsJsonAsync("/api/cuenta-comun/depositos-ahorro", new CrearDepositoAhorroRequest(luis.Id, 7m, new DateOnly(2026, 10, 2), null)), HttpStatusCode.Created);
         await Leer<GastoResponse>(await c.PostAsJsonAsync("/api/gastos", new GastoRequest(new DateOnly(2026, 10, 9), 15m, cat.Id, luis.Id, perfilCuenta.Id, "D")), HttpStatusCode.Created);
+        await Leer<JsonElement>(await c.PostAsJsonAsync("/api/cuenta-comun/ingresos", new CrearIngresoCuentaComunRequest(luis.Id, 25m, new DateOnly(2026, 10, 3), "Cena")), HttpStatusCode.Created);
         foreach (var mes in new[] { "2026-06", "2026-08", "2026-09", "2026-10", "2026-11" })
         {
             await Leer<JsonElement>(await c.GetAsync($"/api/cuenta-comun?mes={mes}"));
             await Leer<JsonElement>(await c.GetAsync($"/api/resumen?mes={mes}"));
         }
+
+        // Extracto bancario de octubre: antes había saldo inicial 1000 + aportación de Ana 300 + depósito 5; el gasto A y el D los
+        // adelanta una persona, así que no salen. El efectivo y el ahorro al final cuadran con el estado de la cuenta del mes.
+        var mov = await Leer<MovimientosCuentaComunResponse>(await c.GetAsync("/api/cuenta-comun/movimientos?desde=2026-10-01&hasta=2026-10-31"));
+        Assert.Equal(1305m, mov.SaldoAnterior);
+        Assert.Equal(["aportacion", "aportacion", "deposito_ahorro", "ingreso", "gasto", "gasto_ahorro", "reembolso", "retirada_ahorro"], mov.Movimientos.Select(m => m.Tipo));
+        Assert.Equal(532m, mov.Entradas);
+        Assert.Equal(100m, mov.Salidas);
+        Assert.Equal(1737m, mov.SaldoFinal);
+        var octubre = await Leer<CuentaComunResponse>(await c.GetAsync("/api/cuenta-comun?mes=2026-10"));
+        Assert.Equal(25m, octubre.Extracto!.Ingresos);
+        Assert.Equal(octubre.Efectivo, mov.EfectivoFinal);
+        Assert.Equal(octubre.AhorroDisponible, mov.AhorroFinal);
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.GetAsync("/api/cuenta-comun/movimientos?desde=2026-10-31&hasta=2026-10-01")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.GetAsync("/api/cuenta-comun/movimientos?desde=2026-10-01")).StatusCode);
     }
 
     [SkippableFact]

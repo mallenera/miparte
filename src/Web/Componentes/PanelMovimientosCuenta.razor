@@ -1,0 +1,136 @@
+@* Movimientos de la cuenta común entre dos fechas, línea a línea y con el saldo tras cada una, para cuadrarlos con el extracto del banco. *@
+@using System.Globalization
+@using Microsoft.JSInterop
+@inject CoreApiClient Api
+@inject IJSRuntime JS
+
+<section class="card" aria-labelledby="t-movimientos">
+    <div class="card-head">
+        <h2 id="t-movimientos">Movimientos</h2>
+        <button class="btn btn-ghost btn-sm" type="button" disabled="@(_m.Visibles.Count == 0)" @onclick="ExportarAsync"
+                title="Descarga las líneas que se ven, con los filtros aplicados">Exportar a CSV</button>
+    </div>
+    <p class="muted">
+        Todo lo que entra y sale de la cuenta, ahorro incluido, para compararlo con el banco. Las aportaciones aparecen el día 1 del mes en que
+        tocan; los gastos que adelanta una persona no salen hasta que se le reembolsan.
+    </p>
+
+    <div class="filtros" role="group" aria-label="Periodo de los movimientos">
+        <label>Desde
+            <input type="date" @bind="_m.Desde" @bind:after="_m.AplicarPeriodoAsync" max="@_m.Hasta.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" />
+        </label>
+        <label>Hasta
+            <input type="date" @bind="_m.Hasta" @bind:after="_m.AplicarPeriodoAsync" min="@_m.Desde.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" />
+        </label>
+    </div>
+    @if (!_m.PeriodoValido)
+    {
+        <div class="aviso err u-mt12" role="alert">La fecha «Desde» no puede ser posterior a «Hasta».</div>
+    }
+
+    <div class="filtros" role="search" aria-label="Filtrar movimientos">
+        <label>Tipo
+            <select @bind="_m.FiltroTipo">
+                @foreach (var (clave, etiqueta) in ModeloMovimientosCuenta.Tipos)
+                {
+                    <option value="@clave">@etiqueta</option>
+                }
+            </select>
+        </label>
+        <label>Persona
+            <select @bind="_m.FiltroMiembro">
+                <option value="">Todas</option>
+                @foreach (var p in _m.Miembros)
+                {
+                    <option value="@p.Id">@p.Nombre</option>
+                }
+            </select>
+        </label>
+        <label>Concepto
+            <input type="search" maxlength="200" placeholder="Buscar…" @bind="_m.FiltroTexto" @bind:event="oninput" />
+        </label>
+        @if (_m.HayFiltros)
+        {
+            <button class="linkbtn" type="button" @onclick="_m.LimpiarFiltros">Quitar filtros</button>
+        }
+    </div>
+
+    @if (_m.Error is not null)
+    {
+        <div class="aviso err u-mt12" role="alert">
+            @_m.Error
+            <button class="linkbtn" type="button" @onclick="_m.AplicarPeriodoAsync">Reintentar</button>
+        </div>
+    }
+    else if (_m.Cargando && _m.Extracto is null)
+    {
+        <div class="spinbox" role="status"><div class="spin"></div><span>Cargando movimientos…</span></div>
+    }
+    else if (_m.Extracto is { } x)
+    {
+        <table class="extracto" id="movimientos-resumen">
+            <tbody>
+                <tr><th scope="row">Saldo al empezar el @x.Desde.ToString("dd/MM/yyyy", Es)</th><td>@Formato.Euros(x.SaldoAnterior)</td></tr>
+                <tr><th scope="row">+ Entradas@(_m.HayFiltros ? " (filtradas)" : "")</th><td>@Formato.Euros(_m.HayFiltros ? _m.EntradasVisibles : x.Entradas)</td></tr>
+                <tr><th scope="row">− Salidas@(_m.HayFiltros ? " (filtradas)" : "")</th><td>@Formato.Euros(_m.HayFiltros ? _m.SalidasVisibles : x.Salidas)</td></tr>
+            </tbody>
+            <tfoot>
+                <tr class="total"><th scope="row">Saldo al terminar el @x.Hasta.ToString("dd/MM/yyyy", Es)</th><td id="movimientos-saldo-final">@Formato.Euros(x.SaldoFinal)</td></tr>
+                <tr><th scope="row">De ello, efectivo para gastos</th><td id="movimientos-efectivo">@Formato.Euros(x.EfectivoFinal)</td></tr>
+                <tr><th scope="row">De ello, ahorro disponible</th><td id="movimientos-ahorro">@Formato.Euros(x.AhorroFinal)</td></tr>
+            </tfoot>
+        </table>
+
+        <div class="u-mt10" id="movimientos-lista">
+            @foreach (var mov in _m.Visibles)
+            {
+                <div class="gastorow">
+                    <div class="g-main">
+                        <div class="g-concepto">@_m.Descripcion(mov)</div>
+                        <div class="muted g-meta">
+                            @mov.Fecha.ToString("dd/MM/yyyy", Es)
+                            @if (mov.Tipo is not ("gasto" or "gasto_ahorro") && !string.IsNullOrWhiteSpace(mov.Concepto))
+                            {
+                                <span> · @mov.Concepto</span>
+                            }
+                            @if (mov.Ahorro > 0)
+                            {
+                                <span> · @Formato.Euros(mov.Ahorro) a ahorro</span>
+                            }
+                            @if (ModeloMovimientosCuenta.EsAhorro(mov))
+                            {
+                                <span class="tag cur">ahorro</span>
+                            }
+                        </div>
+                    </div>
+                    <div class="g-importe saldo @(mov.Importe < 0 ? "neg" : "pos")">@(mov.Importe < 0 ? "−" : "+")@Formato.Euros(Math.Abs(mov.Importe))</div>
+                    <div class="mov-saldo muted">Saldo @Formato.Euros(mov.Saldo)</div>
+                </div>
+            }
+
+            @if (_m.Visibles.Count == 0)
+            {
+                <div class="empty">@(_m.HayFiltros ? "Ningún movimiento del periodo coincide con los filtros." : "No hay movimientos entre estas fechas.")</div>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    private static readonly CultureInfo Es = new("es-ES");
+
+    private ModeloMovimientosCuenta _m = default!;
+
+    /// <summary>Fecha de hoy; los tests la fijan para no depender del reloj.</summary>
+    [Parameter] public DateOnly? Hoy { get; set; }
+
+    /// <summary>Descarga las líneas visibles como CSV (lo genera el modelo; el navegador solo guarda el fichero).</summary>
+    private async Task ExportarAsync()
+        => await JS.InvokeVoidAsync("descargarFichero", _m.NombreCsv, _m.GenerarCsv(), "text/csv;charset=utf-8");
+
+    protected override Task OnInitializedAsync()
+    {
+        _m = new ModeloMovimientosCuenta(Api, Hoy ?? DateOnly.FromDateTime(DateTime.Today));
+        return _m.CargarAsync();
+    }
+}

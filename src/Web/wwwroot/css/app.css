@@ -559,10 +559,12 @@ input.invalid, input[aria-invalid="true"] { border-color: var(--err); outline: 0
 .g-importe { font-weight: 700; font-variant-numeric: tabular-nums; }
 .saldo.pos { color: var(--ok); }
 .saldo.neg { color: var(--err); }
+.mov-saldo { font-size: .85rem; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .gastorow .c-acc { display: flex; gap: 12px; justify-content: flex-end; }
 @media (max-width: 640px) {
     .gastorow { grid-template-columns: minmax(0, 1fr) auto; }
     .gastorow .c-acc { grid-column: 1 / -1; justify-content: flex-start; }
+    .gastorow .mov-saldo { grid-column: 1 / -1; text-align: left; }
 }
 .empty { padding: 28px 8px; text-align: center; display: grid; gap: 14px; justify-items: center; color: var(--ink-2); }
 

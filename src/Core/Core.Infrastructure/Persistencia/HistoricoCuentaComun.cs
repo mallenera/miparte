@@ -13,7 +13,7 @@ namespace MiParte.Core.Infrastructure.Persistencia;
 public sealed class HistoricoCuentaComun
 {
     private const int TipoAportacion = 0, TipoReembolsoMes = 1, TipoRetiradaMes = 2, TipoDepositoMes = 3, TipoReembolsos = 4,
-        TipoGastos = 5, TipoGastosMes = 6, TipoRetiradas = 7, TipoDepositos = 8, TipoNombre = 9, TipoFunciones = 10;
+        TipoGastos = 5, TipoGastosMes = 6, TipoRetiradas = 7, TipoDepositos = 8, TipoNombre = 9, TipoFunciones = 10, TipoIngresos = 11;
 
     /// <summary>
     /// Fila común a todas las partes de la consulta: EF las une con <c>UNION ALL</c> y para eso necesitan la misma forma. Los
@@ -111,6 +111,14 @@ public sealed class HistoricoCuentaComun
                 Tipo = TipoDepositos, Id = vacio, MiembroId = g.Key.MiembroId, Fecha = inicio,
                 Importe = g.Sum(x => x.Importe), Ahorro = 0m, Marca = g.Key.EnMes, Marca2 = false, Texto = "",
             });
+        // Los ingresos sueltos, igual que los depósitos: «del mes» y «anteriores», porque el extracto muestra los del mes.
+        var ingresos = db.IngresosCuentaComun.Where(i => i.Fecha < fin)
+            .GroupBy(i => i.Fecha >= inicio)
+            .Select(g => new Fila
+            {
+                Tipo = TipoIngresos, Id = vacio, MiembroId = vacio, Fecha = inicio,
+                Importe = g.Sum(x => x.Importe), Ahorro = 0m, Marca = g.Key, Marca2 = false, Texto = "",
+            });
         var aportaciones = db.AportacionesCuenta.Select(a => new Fila
         {
             Tipo = TipoAportacion, Id = a.Id, MiembroId = a.MiembroId, Fecha = a.Desde,
@@ -122,7 +130,7 @@ public sealed class HistoricoCuentaComun
             Importe = 0m, Ahorro = 0m, Marca = h.CuentaComunActiva, Marca2 = h.AhorroActivo, Texto = "",
         });
 
-        var consulta = gastos.Concat(gastosMes).Concat(reembolsos).Concat(retiradas).Concat(depositos).Concat(aportaciones).Concat(funciones);
+        var consulta = gastos.Concat(gastosMes).Concat(reembolsos).Concat(retiradas).Concat(depositos).Concat(ingresos).Concat(aportaciones).Concat(funciones);
 
         if (detalleDelMes)
         {
@@ -193,6 +201,10 @@ public sealed class HistoricoCuentaComun
     /// <summary>Depósitos hasta el fin del mes agrupados por miembro; los del mes llevan la fecha del mes y los anteriores, el día previo.</summary>
     public List<DepositoDeAhorro> Depositos => De(TipoDepositos)
         .Select(f => new DepositoDeAhorro(f.Marca ? _inicio : _inicio.AddDays(-1), f.Importe, f.MiembroId)).ToList();
+
+    /// <summary>Ingresos sueltos hasta el fin del mes; los del mes llevan la fecha del mes y los anteriores, el día previo.</summary>
+    public List<IngresoDeCuenta> Ingresos => De(TipoIngresos)
+        .Select(f => new IngresoDeCuenta(f.Marca ? _inicio : _inicio.AddDays(-1), f.Importe)).ToList();
 
     /// <summary>Nombre de cada miembro por id (solo con <c>detalleDelMes</c>).</summary>
     public Dictionary<Guid, string> Nombres => De(TipoNombre).ToDictionary(f => f.Id, f => f.Texto);

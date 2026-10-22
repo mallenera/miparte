@@ -132,6 +132,7 @@ public sealed partial class ServidorDemo
             ("cuenta-comun", 3, "DELETE") when subruta == "saldo-inicial" => Sin(await _cuenta.EliminarSaldoInicialAsync(ct)),
             ("cuenta-comun", 3, "POST") when subruta == "reembolsos" => await CrearReembolso((await Cuerpo<CrearReembolsoRequest>())!, ct),
             ("cuenta-comun", 4, "DELETE") when subruta == "reembolsos" && id is { } i => Sin(await _cuenta.EliminarReembolsoAsync(i, ct)),
+            ("cuenta-comun", 3, "GET") when subruta == "movimientos" => await MovimientosCuentaComun(uri, ct),
             ("cuenta-comun", 3, "GET") when subruta == "ingresos" => Ok((await _cuenta.ListarIngresosAsync(ct)).Select(i => i.ADto()).ToList()),
             ("cuenta-comun", 3, "POST") when subruta == "ingresos" => await CrearIngreso((await Cuerpo<CrearIngresoCuentaComunRequest>())!, ct),
             ("cuenta-comun", 4, "DELETE") when subruta == "ingresos" && id is { } i => Sin(await _cuenta.EliminarIngresoAsync(i, ct)),
@@ -296,6 +297,15 @@ public sealed partial class ServidorDemo
 
     private async Task<HttpResponseMessage> EstadoCuentaComun(string? mes, CancellationToken ct)
         => TryMes(mes, out var inicio) ? Ok((await _cuenta.EstadoAsync(inicio, ct)).ADto()) : MesInvalido();
+
+    private async Task<HttpResponseMessage> MovimientosCuentaComun(Uri uri, CancellationToken ct)
+    {
+        if (ConsultasApi.PeriodoMovimientos(Consulta(uri, "desde"), Consulta(uri, "hasta"), out var desde, out var hasta) is { } error)
+            return Mal(error);
+
+        var res = await _cuenta.MovimientosBancoAsync(desde, hasta, ct);
+        return res.Error is { } e ? Error(e) : Ok(res.Valor!.ADto());
+    }
 
     private async Task<HttpResponseMessage> ActivarAhorro(ActivarAhorroRequest r, CancellationToken ct)
     {

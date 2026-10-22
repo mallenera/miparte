@@ -60,6 +60,22 @@ public static class ConsultasApi
         return null;
     }
 
+    /// <summary>
+    /// Valida el periodo de <c>GET /api/cuenta-comun/movimientos</c>: ambas fechas obligatorias (YYYY-MM-DD), <c>desde</c> no posterior a
+    /// <c>hasta</c>. Devuelve el mensaje de error 400 o null si es válido.
+    /// </summary>
+    /// <param name="desde">Primer día incluido.</param>
+    /// <param name="hasta">Último día incluido.</param>
+    /// <param name="inicio">Primer día si no hay error.</param>
+    /// <param name="fin">Último día si no hay error.</param>
+    public static string? PeriodoMovimientos(string? desde, string? hasta, out DateOnly inicio, out DateOnly fin)
+    {
+        fin = default;
+        if (!FormatosApi.TryFecha(desde, out inicio)) return "La fecha «desde» es obligatoria y debe tener el formato YYYY-MM-DD.";
+        if (!FormatosApi.TryFecha(hasta, out fin)) return "La fecha «hasta» es obligatoria y debe tener el formato YYYY-MM-DD.";
+        return inicio > fin ? "La fecha «desde» no puede ser posterior a «hasta»." : null;
+    }
+
     /// <summary>La fecha más tardía de las dadas (la que más restringe un límite inferior); null si no hay ninguna.</summary>
     private static DateOnly? Mayor(DateOnly? a, DateOnly? b) => a is null ? b : b is null ? a : a > b ? a : b;
 

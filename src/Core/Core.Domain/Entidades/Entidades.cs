@@ -264,7 +264,7 @@ public class DepositoAhorro
 
 /// <summary>
 /// Dinero que entra a la cuenta común fuera de la aportación mensual y del ahorro, por ejemplo lo que pagan las amigas de una cena
-/// que adelantó la cuenta (tabla ingreso_cuenta_comun). Es solo histórico: no mueve el saldo, el ahorro ni los reembolsos pendientes.
+/// que adelantó la cuenta (tabla ingreso_cuenta_comun). Suma al saldo y al efectivo desde su fecha; no toca el ahorro ni los reembolsos pendientes.
 /// </summary>
 public class IngresoCuentaComun
 {

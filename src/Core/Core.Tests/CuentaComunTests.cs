@@ -21,6 +21,25 @@ public class CuentaComunTests
     }
 
     [Fact]
+    public void Ingreso_SumaAlSaldoYAlEfectivoDesdeSuMes_YNoAlAhorro()
+    {
+        var ap = new[] { new AportacionVigente(Ana, D("2026-01-01"), 300, 100) };
+        var ingresos = new[] { new IngresoDeCuenta(D("2026-02-10"), 50) };
+
+        var enero = CuentaComun.Calcular(D("2026-01-01"), ap, [], [], ingresos: ingresos);
+        var febrero = CuentaComun.Calcular(D("2026-02-01"), ap, [], [], ingresos: ingresos);
+        var extracto = CuentaComun.Extracto(D("2026-02-01"), ap, [], [], null, febrero, ingresos);
+
+        Assert.Equal(200m, enero.Efectivo);
+        Assert.Equal(450m, febrero.Saldo);
+        Assert.Equal(450m, febrero.Efectivo);
+        Assert.Equal(50m, febrero.Ingresado);
+        Assert.Equal(200m, febrero.AhorroDisponible);
+        Assert.Equal(50m, extracto.Ingresos);
+        Assert.Equal(enero.Efectivo, extracto.EfectivoInicial);
+    }
+
+    [Fact]
     public void Saldo_AcumulaAportacionesMenosGastosMesAMes()
     {
         var ap = new[] { new AportacionVigente(Ana, D("2026-01-01"), 600), new AportacionVigente(Beto, D("2026-01-01"), 400) };

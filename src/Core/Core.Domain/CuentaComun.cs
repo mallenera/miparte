@@ -21,6 +21,12 @@ public sealed record ReembolsoDeCuenta(Guid MiembroId, DateOnly Fecha, decimal I
 public sealed record RetiradaDeAhorro(DateOnly Fecha, decimal Importe);
 
 /// <summary>
+/// Dinero que entra a la cuenta para gastos fuera de las aportaciones (p. ej. lo que pagan las amigas de una cena): suma al saldo y al
+/// efectivo desde su fecha, como el saldo inicial.
+/// </summary>
+public sealed record IngresoDeCuenta(DateOnly Fecha, decimal Importe);
+
+/// <summary>
 /// Dinero que entra al ahorro de la cuenta común fuera de la aportación mensual (ahorro inicial, lotería...).
 /// <paramref name="MiembroId"/> es quien lo registra y a quien se atribuye en «su parte» (null: no se atribuye a nadie).
 /// </summary>
@@ -37,10 +43,11 @@ public sealed record SaldoInicialCuenta(DateOnly Fecha, decimal Importe);
 /// <paramref name="Aportaciones"/> es lo que entra para gastos; <paramref name="SaldoInicialFijado"/> el saldo inicial si cae en el mes;
 /// <paramref name="GastosCuenta"/> lo que paga la cuenta directamente y <paramref name="Reembolsos"/> lo que devuelve a quien adelantó.
 /// <paramref name="GastosAdelantadosDelAhorro"/> sube el efectivo: lo paga el ahorro, pero la cuenta queda a deber ese importe a quien lo adelantó.
+/// <paramref name="Ingresos"/> son los ingresos sueltos del mes, fuera de las aportaciones.
 /// </summary>
 public sealed record ExtractoCuentaComun(
     decimal EfectivoInicial, decimal Aportaciones, decimal SaldoInicialFijado, decimal GastosCuenta,
-    decimal GastosAdelantadosDelAhorro, decimal Reembolsos, decimal EfectivoFinal);
+    decimal GastosAdelantadosDelAhorro, decimal Reembolsos, decimal EfectivoFinal, decimal Ingresos = 0m);
 
 /// <summary>
 /// Lo que le corresponde a un miembro de la cuenta común: lo que ha puesto y su parte proporcional del saldo y del ahorro.
@@ -58,7 +65,8 @@ public sealed record PendienteMiembro(Guid MiembroId, decimal Importe);
 
 /// <summary>
 /// Estado de la cuenta común al final de un mes. <see cref="Aportado"/> incluye la parte de ahorro;
-/// <see cref="Saldo"/> es lo aportado para gastos (sin ahorro) menos lo gastado, más el saldo inicial fijado si lo hay;
+/// <see cref="Saldo"/> es lo aportado para gastos (sin ahorro) menos lo gastado, más el saldo inicial fijado si lo hay y lo ingresado
+/// aparte (<see cref="Ingresado"/>);
 /// <see cref="Efectivo"/> es el saldo más lo pendiente de reembolsar, es decir, el dinero de gastos que hay en la cuenta
 /// (los gastos que adelanta una persona no bajan el dinero de la cuenta hasta reembolsarlos; los que paga la cuenta directamente sí).
 /// El ahorro va aparte: <see cref="AhorroAcumulado"/> (lo apartado en las aportaciones más lo depositado aparte, <see cref="AhorroDepositado"/>)
@@ -68,7 +76,7 @@ public sealed record EstadoCuentaComun(
     decimal AportadoMes, decimal Aportado, decimal Gastado, decimal Saldo,
     IReadOnlyList<PendienteMiembro> Pendientes, decimal Efectivo,
     decimal AhorroMes, decimal AhorroAcumulado, decimal AhorroRetirado, decimal AhorroDisponible,
-    decimal AhorroDepositado = 0m, decimal AhorroGastado = 0m);
+    decimal AhorroDepositado = 0m, decimal AhorroGastado = 0m, decimal Ingresado = 0m);
 
 /// <summary>Cálculo del saldo acumulado de la cuenta común; no depende de persistencia.</summary>
 public static class CuentaComun
@@ -100,13 +108,13 @@ public static class CuentaComun
 
     /// <summary>
     /// Estado de la cuenta al terminar <paramref name="mes"/> (primer día). Las aportaciones se suman mes a mes
-    /// desde la primera de cada miembro; los gastos, reembolsos y movimientos de ahorro, hasta el último día del mes.
+    /// desde la primera de cada miembro; los gastos, reembolsos, ingresos y movimientos de ahorro, hasta el último día del mes.
     /// </summary>
     public static EstadoCuentaComun Calcular(
         DateOnly mes, IReadOnlyList<AportacionVigente> aportaciones,
         IEnumerable<GastoDeCuenta> gastos, IEnumerable<ReembolsoDeCuenta> reembolsos,
         IEnumerable<RetiradaDeAhorro>? retiradas = null, IEnumerable<DepositoDeAhorro>? depositos = null,
-        SaldoInicialCuenta? saldoInicial = null)
+        SaldoInicialCuenta? saldoInicial = null, IEnumerable<IngresoDeCuenta>? ingresos = null)
     {
         var fin = mes.AddMonths(1);
         var aportado = 0m;
@@ -145,10 +153,12 @@ public static class CuentaComun
             .Where(p => p.Importe != 0).OrderBy(p => p.MiembroId).ToList();
 
         var inicial = saldoInicial is { } si && si.Fecha < fin ? si.Importe : 0m;
-        var saldo = aportado - ahorro - gastado + inicial;
+        var ingresado = (ingresos ?? []).Where(i => i.Fecha < fin).Sum(i => i.Importe);
+        var saldo = aportado - ahorro - gastado + inicial + ingresado;
         return new EstadoCuentaComun(
             aportadoMes, aportado, gastado, saldo, pendientes, saldo + pendientes.Sum(p => p.Importe),
-            ahorroMes + depositadoMes, ahorro + depositado, retirado, ahorro + depositado - retirado - ahorroGastado, depositado, ahorroGastado);
+            ahorroMes + depositadoMes, ahorro + depositado, retirado, ahorro + depositado - retirado - ahorroGastado, depositado, ahorroGastado,
+            ingresado);
     }
 
     /// <summary>
@@ -161,9 +171,11 @@ public static class CuentaComun
     /// <param name="reembolsosDelMes">Reembolsos; solo cuentan los del mes.</param>
     /// <param name="saldoInicial">Saldo inicial fijado, si lo hay.</param>
     /// <param name="estado">Estado de la cuenta al final de <paramref name="mes"/>.</param>
+    /// <param name="ingresosDelMes">Ingresos sueltos; solo cuentan los del mes.</param>
     public static ExtractoCuentaComun Extracto(
         DateOnly mes, IReadOnlyList<AportacionVigente> aportaciones, IEnumerable<GastoDeCuenta> gastosDelMes,
-        IEnumerable<ReembolsoDeCuenta> reembolsosDelMes, SaldoInicialCuenta? saldoInicial, EstadoCuentaComun estado)
+        IEnumerable<ReembolsoDeCuenta> reembolsosDelMes, SaldoInicialCuenta? saldoInicial, EstadoCuentaComun estado,
+        IEnumerable<IngresoDeCuenta>? ingresosDelMes = null)
     {
         var fin = mes.AddMonths(1);
         var aportado = aportaciones.Select(a => a.MiembroId).Distinct()
@@ -173,9 +185,10 @@ public static class CuentaComun
         var adelantadosDelAhorro = gastos.Where(g => g.PagadoPor is not null && g.DesdeAhorro).Sum(g => g.Importe);
         var reembolsado = reembolsosDelMes.Where(r => r.Fecha >= mes && r.Fecha < fin).Sum(r => r.Importe);
         var fijado = saldoInicial is { } si && si.Fecha >= mes && si.Fecha < fin ? si.Importe : 0m;
-        var movimientos = aportado + fijado - directos + adelantadosDelAhorro - reembolsado;
+        var ingresado = (ingresosDelMes ?? []).Where(i => i.Fecha >= mes && i.Fecha < fin).Sum(i => i.Importe);
+        var movimientos = aportado + fijado + ingresado - directos + adelantadosDelAhorro - reembolsado;
         return new ExtractoCuentaComun(
-            estado.Efectivo - movimientos, aportado, fijado, directos, adelantadosDelAhorro, reembolsado, estado.Efectivo);
+            estado.Efectivo - movimientos, aportado, fijado, directos, adelantadosDelAhorro, reembolsado, estado.Efectivo, ingresado);
     }
 
     /// <summary>

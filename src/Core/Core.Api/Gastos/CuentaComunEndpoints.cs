@@ -19,6 +19,7 @@ public static class CuentaComunEndpoints
     public static IEndpointRouteBuilder MapCuentaComun(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/cuenta-comun", EstadoAsync).RequireAuthorization();
+        app.MapGet("/api/cuenta-comun/movimientos", MovimientosAsync).RequireAuthorization();
         app.MapPut("/api/cuenta-comun/activacion", ActivarAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.HogarFunciones);
         app.MapPut("/api/cuenta-comun/ahorro/activacion", ActivarAhorroAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.HogarFunciones);
         app.MapPut("/api/cuenta-comun/aportaciones", FijarAportacionAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
@@ -61,6 +62,21 @@ public static class CuentaComunEndpoints
         if (!ApiComun.TryMes(mes, out var inicio)) return ApiComun.MesInvalido();
 
         return Results.Ok((await servicio.EstadoAsync(inicio, ct)).ADto());
+    }
+
+    /// <summary>
+    /// GET /api/cuenta-comun/movimientos?desde=YYYY-MM-DD&amp;hasta=YYYY-MM-DD: extracto de la cuenta (gastos y ahorro juntos) línea a línea
+    /// con el saldo tras cada movimiento, para cuadrarlo con el banco. 409 sin hogar; 400 si falta una fecha, es inválida o <c>desde</c> es posterior a <c>hasta</c>.
+    /// </summary>
+    private static async Task<IResult> MovimientosAsync(
+        [FromQuery] string? desde, [FromQuery] string? hasta, [FromServices] ServicioCuentaComun servicio, [FromServices] IHogarActual hogar,
+        CancellationToken ct)
+    {
+        if (hogar.HogarId is null) return ApiComun.SinHogar();
+        if (ConsultasApi.PeriodoMovimientos(desde, hasta, out var inicio, out var fin) is { } error) return ApiComun.Invalido(error);
+
+        var r = await servicio.MovimientosBancoAsync(inicio, fin, ct);
+        return r.Error is { } e ? ApiComun.Respuesta(e) : Results.Ok(r.Valor!.ADto());
     }
 
     /// <summary>
@@ -141,7 +157,7 @@ public static class CuentaComunEndpoints
         return Results.Ok(ingresos.Select(i => i.ADto()).ToList());
     }
 
-    /// <summary>POST /api/cuenta-comun/ingresos: registra dinero que entra a la cuenta común fuera de aportaciones y ahorro (solo histórico). 400 si el importe es inválido o el miembro no es del hogar; 409 sin hogar o con la cuenta inactiva. 201 si se crea.</summary>
+    /// <summary>POST /api/cuenta-comun/ingresos: registra dinero que entra a la cuenta común fuera de aportaciones y ahorro; suma al saldo y al efectivo. 400 si el importe es inválido o el miembro no es del hogar; 409 sin hogar o con la cuenta inactiva. 201 si se crea.</summary>
     private static async Task<IResult> CrearIngresoAsync(
         CrearIngresoCuentaComunRequest req, [FromServices] ServicioCuentaComun servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
     {

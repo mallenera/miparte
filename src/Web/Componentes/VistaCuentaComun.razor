@@ -87,6 +87,10 @@ else if (_m.Estado is not null)
                     {
                         <tr><th scope="row">+ Saldo inicial fijado</th><td>@Formato.Euros(x.SaldoInicialFijado)</td></tr>
                     }
+                    @if (x.Ingresos != 0)
+                    {
+                        <tr><th scope="row">+ Ingresos sueltos</th><td>@Formato.Euros(x.Ingresos)</td></tr>
+                    }
                     <tr><th scope="row">− Gastos pagados por la cuenta</th><td>@Formato.Euros(x.GastosCuenta)</td></tr>
                     @if (x.GastosAdelantadosDelAhorro != 0)
                     {
@@ -100,6 +104,8 @@ else if (_m.Estado is not null)
             </table>
         </section>
     }
+
+    <PanelMovimientosCuenta />
 
     <section class="card" aria-labelledby="t-saldo-inicial">
         <div class="card-head"><h2 id="t-saldo-inicial">Saldo inicial</h2></div>
@@ -273,7 +279,7 @@ else if (_m.Estado is not null)
 
     <section class="card" aria-labelledby="t-ingresos">
         <div class="card-head"><h2 id="t-ingresos">Ingresos</h2></div>
-        <p class="muted">Dinero que entra a la cuenta común fuera de las aportaciones y del ahorro, por ejemplo lo que pagan las amigas de una cena. Queda solo en el histórico: no cambia el saldo ni los reembolsos.</p>
+        <p class="muted">Dinero que entra a la cuenta común fuera de las aportaciones y del ahorro, por ejemplo lo que pagan las amigas de una cena. Suma al saldo y al efectivo de la cuenta; no cambia los reembolsos.</p>
 
         @if (_m.IngresosDelMes.Count == 0)
         {

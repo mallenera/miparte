@@ -30,3 +30,28 @@ jobs:
         run: dotnet run --project src/Database/MiParte.Database --configuration Release -- migrar --con-auth-stub --conexion "$MIPARTE_TEST_DB"
       - run: dotnet build --configuration Release
       - run: dotnet test --configuration Release --no-build
+  pwa:
+    # Publica el front y lo prueba con su service worker real servido como Cloudflare Pages (ver tests/pwa).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: dotnet publish src/Web -c Release -o salida
+      - name: Cabeceras y CSP (como en deploy-web.yml, con las URLs del appsettings.json del repositorio)
+        run: |
+          set -euo pipefail
+          pub=salida/wwwroot
+          export SUPABASE_URL=$(jq -r '.Supabase.Url' "$pub/appsettings.json")
+          export CORE_URL=$(jq -r '.Api.CoreUrl' "$pub/appsettings.json")
+          export ASSISTANT_URL=$(jq -r '.Api.AssistantUrl' "$pub/appsettings.json")
+          envsubst '${SUPABASE_URL} ${CORE_URL} ${ASSISTANT_URL}'< src/Web/cloudflare/_headers.template > "$pub/_headers"
+      - name: Prueba de la PWA publicada
+        run: |
+          npm ci --prefix tests/pwa
+          npx --prefix tests/pwa playwright install --with-deps chromium
+          node tests/pwa/probar.mjs salida/wwwroot

@@ -31,6 +31,8 @@ dotnet run --project src/Core/Core.Api                          # GET /health, G
 dotnet run --project src/Assistant/Assistant.Api                 # chatbot; necesita ANTHROPIC_API_KEY en el entorno
 dotnet run --project src/Web
 dotnet run --project src/Database/MiParte.Database -- migrar --conexion "<cadena>"   # migrar; también: pendientes, script, marcar-aplicadas
+npm ci --prefix tests/pwa && npx --prefix tests/pwa playwright install chromium   # una vez, antes de la prueba de la PWA
+node tests/pwa/probar.mjs <publish>/wwwroot                      # PWA publicada como en Cloudflare Pages
 docker compose up --build                                       # web :8080 (nginx sin privilegios), core :5001, assistant :5002
 ```
 

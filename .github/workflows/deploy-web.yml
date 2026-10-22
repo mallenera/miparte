@@ -8,6 +8,7 @@ on:
       - "src/Web/**"
       - "src/Contracts/**"
       - "src/Core/Core.Domain/**"
+      - "tests/pwa/**"
       - ".github/workflows/deploy-web.yml"
   workflow_dispatch:
 concurrency:
@@ -31,19 +32,31 @@ jobs:
           dotnet-version: 10.0.x
       - name: Tests del front
         run: dotnet test src/Web.Tests --configuration Release
-      - run: dotnet publish src/Web -c Release -o salida
-      - name: Configurar appsettings, CSP y cabeceras
+      - name: Configurar appsettings
+        # Antes de publicar, no después: el service worker precarga appsettings.json comprobando el hash del
+        # manifiesto que genera el publish; si se reescribiera tras publicar, el worker no se instalaría.
         run: |
           set -euo pipefail
           test -n "$CORE_URL" || { echo "Falta la variable de repositorio CORE_URL"; exit 1; }
+          conf=src/Web/wwwroot/appsettings.json
+          jq --arg c "$CORE_URL" --arg a "$ASSISTANT_URL" '.Api.CoreUrl = $c | .Api.AssistantUrl = $a' "$conf" > "$conf.tmp"
+          mv "$conf.tmp" "$conf"
+      - run: dotnet publish src/Web -c Release -o salida
+      - name: Cabeceras y CSP
+        run: |
+          set -euo pipefail
           pub=salida/wwwroot
           # Supabase:Url sale del propio appsettings.json para que CSP y configuración no diverjan.
           export SUPABASE_URL=$(jq -r '.Supabase.Url' "$pub/appsettings.json")
-          jq --arg u "$CORE_URL" '.Api.CoreUrl = $u' "$pub/appsettings.json" > "$pub/appsettings.tmp"
-          mv "$pub/appsettings.tmp" "$pub/appsettings.json"
-          jq --arg u "$ASSISTANT_URL" '.Api.AssistantUrl = $u' "$pub/appsettings.json" > "$pub/appsettings.tmp"
-          mv "$pub/appsettings.tmp" "$pub/appsettings.json"
           envsubst '${SUPABASE_URL} ${CORE_URL} ${ASSISTANT_URL}'< src/Web/cloudflare/_headers.template > "$pub/_headers"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Prueba de la PWA publicada (service worker, sin conexión, actualización y CSP)
+        run: |
+          npm ci --prefix tests/pwa
+          npx --prefix tests/pwa playwright install --with-deps chromium
+          node tests/pwa/probar.mjs salida/wwwroot
       - name: Subir a Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:

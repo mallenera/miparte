@@ -5,7 +5,7 @@ namespace MiParte.Core.Api.Seguridad;
 
 /// <summary>
 /// Límites de peticiones de Core.Api, configurables en la sección <c>Limites</c> (variables
-/// <c>Limites__PeticionesPorMinuto</c>, <c>Limites__CostosasPorMinuto</c> y <c>Limites__MaxCuerpoBytes</c>).
+/// <c>Limites__PeticionesPorMinuto</c>, <c>Limites__CostosasPorMinuto</c>, <c>Limites__ContactoPorHora</c> y <c>Limites__MaxCuerpoBytes</c>).
 /// </summary>
 public sealed class OpcionesLimites
 {
@@ -17,6 +17,9 @@ public sealed class OpcionesLimites
 
     /// <summary>Peticiones por minuto y usuario en los endpoints costosos o sensibles a abuso (<see cref="LimitacionPeticiones.Costosa"/>).</summary>
     public int CostosasPorMinuto { get; set; } = 10;
+
+    /// <summary>Mensajes de contacto por hora y usuario (o IP): basta para escribir y frena el spam, que además gasta cuota del proveedor de correo.</summary>
+    public int ContactoPorHora { get; set; } = 5;
 
     /// <summary>Tamaño máximo del cuerpo de una petición; los JSON de la API son de unos pocos KB.</summary>
     public long MaxCuerpoBytes { get; set; } = 64 * 1024;
@@ -30,6 +33,9 @@ public static class LimitacionPeticiones
     /// del mes y crear o aceptar invitaciones (esta última, además, frena el sondeo de tokens).
     /// </summary>
     public const string Costosa = "costosa";
+
+    /// <summary>Política del formulario de contacto: anónimo y con coste por envío, así que su tope es por hora.</summary>
+    public const string Contacto = "contacto";
 
     /// <summary>Límite de peticiones simultáneas en cola: ninguna, se rechaza directamente con 429.</summary>
     private const int SinCola = 0;
@@ -74,17 +80,18 @@ public static class LimitacionPeticiones
                 ctx => Ventana("global:" + Clave(ctx), opciones.PeticionesPorMinuto));
 
             o.AddPolicy(Costosa, ctx => Ventana("costosa:" + Clave(ctx), opciones.CostosasPorMinuto));
+            o.AddPolicy(Contacto, ctx => Ventana("contacto:" + Clave(ctx), opciones.ContactoPorHora, TimeSpan.FromHours(1)));
         });
 
         return builder;
     }
 
-    /// <summary>Ventana deslizante de un minuto (en segmentos) para la clave dada, sin cola de espera.</summary>
-    private static RateLimitPartition<string> Ventana(string clave, int limite)
+    /// <summary>Ventana deslizante (un minuto por defecto, en segmentos) para la clave dada, sin cola de espera.</summary>
+    private static RateLimitPartition<string> Ventana(string clave, int limite, TimeSpan? ventana = null)
         => RateLimitPartition.GetSlidingWindowLimiter(clave, _ => new SlidingWindowRateLimiterOptions
         {
             PermitLimit = limite,
-            Window = TimeSpan.FromSeconds(SegundosVentana),
+            Window = ventana ?? TimeSpan.FromSeconds(SegundosVentana),
             SegmentsPerWindow = Segmentos,
             QueueLimit = SinCola,
         });

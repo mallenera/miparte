@@ -59,6 +59,7 @@ public static class MiembrosEndpoints
             TipoError.Prohibido => StatusCodes.Status403Forbidden,
             TipoError.NoEncontrado => StatusCodes.Status404NotFound,
             TipoError.Conflicto => StatusCodes.Status409Conflict,
+            TipoError.NoDisponible => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status400BadRequest,
         });
 

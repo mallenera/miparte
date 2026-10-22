@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using MiParte.Auth;
 using MiParte.Core.Api.Auditoria;
 using MiParte.Core.Api.Cierres;
+using MiParte.Core.Api.Contacto;
 using MiParte.Core.Api.Gastos;
 using MiParte.Core.Api.Hogares;
 using MiParte.Core.Api.Miembros;
@@ -15,6 +16,7 @@ using MiParte.Core.Application.CuentaComun;
 using MiParte.Core.Application.Auditoria;
 using MiParte.Core.Application.Categorias;
 using MiParte.Core.Application.Cierres;
+using MiParte.Core.Application.Contacto;
 using MiParte.Core.Application.Gastos;
 using MiParte.Core.Application.Hogares;
 using MiParte.Core.Application.Liquidacion;
@@ -24,6 +26,7 @@ using MiParte.Core.Application.Periodos;
 using MiParte.Core.Application.Perfiles;
 using MiParte.Core.Application.Recurrentes;
 using MiParte.Core.Infrastructure;
+using MiParte.Core.Infrastructure.Correo;
 using MiParte.Core.Infrastructure.Persistencia;
 using MiParte.Seguridad;
 
@@ -52,6 +55,14 @@ builder.Services.AddRepositorios();
 // Avisos: la cola es fuera del if (los casos de uso la llenan); sin claves VAPID el envío queda desactivado.
 builder.Services.AddColaNotificacionesPush();
 builder.Services.Configure<OpcionesPush>(builder.Configuration.GetSection(OpcionesPush.Seccion));
+// Contacto: correo por la API HTTP de Resend (Render gratuito bloquea SMTP). Sin clave ni destino el formulario responde 503.
+builder.Services.AddSingleton(builder.Configuration.GetSection(OpcionesCorreo.Seccion).Get<OpcionesCorreo>() ?? new());
+builder.Services.AddHttpClient<IEnviadorCorreo, EnviadorCorreoResend>(http =>
+{
+    http.BaseAddress = EnviadorCorreoResend.UrlBase;
+    http.Timeout = TimeSpan.FromSeconds(10);
+});
+builder.Services.AddScoped(sp => new ServicioContacto(sp.GetRequiredService<IEnviadorCorreo>()));
 builder.Services.AddScoped(sp => new ServicioNotificaciones(
     sp.GetRequiredService<IRepositorioNotificaciones>(), sp.GetRequiredService<IRepositorioMiembros>(), sp.GetRequiredService<TimeProvider>()));
 builder.Services.AddScoped(sp => new ServicioGastos(
@@ -137,6 +148,7 @@ app.MapAuditoria();
 app.MapCierresMes();
 app.MapCierresPeriodo();
 app.MapNotificaciones();
+app.MapContacto();
 
 app.Run();
 

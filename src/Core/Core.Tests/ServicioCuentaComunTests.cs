@@ -116,7 +116,7 @@ public class ServicioCuentaComunTests
     }
 
     [Fact]
-    public async Task CrearIngreso_SeGuardaSoloComoHistorico()
+    public async Task CrearIngreso_SeGuardaSinTocarAhorroNiReembolsos()
     {
         var r = await Servicio.CrearIngresoAsync(new(Hogar, _marcos, 40m, Septiembre.AddDays(5), "Cena amigas"), default);
 
@@ -126,6 +126,22 @@ public class ServicioCuentaComunTests
         Assert.Empty(_repo.Depositos);
         Assert.Empty(_repo.Reembolsos);
         Assert.Empty(_repo.Retiradas);
+    }
+
+    [Fact]
+    public async Task CrearIngreso_SumaAlSaldoAlEfectivoYAlExtractoDelMes()
+    {
+        await Servicio.CrearIngresoAsync(new(Hogar, _ana, 40m, Septiembre.AddDays(5), "Cena amigas"), default);
+
+        var e = await Servicio.EstadoAsync(Septiembre, default);
+        var anterior = await Servicio.EstadoAsync(Septiembre.AddMonths(-1), default);
+
+        Assert.Equal(40m, e.Estado.Saldo);
+        Assert.Equal(40m, e.Estado.Efectivo);
+        Assert.Equal(40m, e.Extracto.Ingresos);
+        Assert.Equal(0m, e.Extracto.EfectivoInicial);
+        Assert.Equal(0m, anterior.Estado.Efectivo);
+        Assert.Equal(0m, e.Estado.AhorroDisponible);
     }
 
     [Fact]
@@ -346,7 +362,8 @@ public class ServicioCuentaComunTests
                 vigentes, [], Reembolsos.Select(r => new ReembolsoDeCuenta(r.MiembroId, inicio, r.Importe)).ToList(),
                 Retiradas.Where(r => r.Fecha < fin).Select(r => new RetiradaDeAhorro(inicio, r.Importe)).ToList(),
                 Depositos.Where(d => d.Fecha < fin).Select(d => new DepositoDeAhorro(d.Fecha, d.Importe, d.MiembroId)).ToList(),
-                Cuenta, 0m, [], Saldo);
+                Cuenta, 0m, [], Saldo, Frecuencia,
+                Ingresos.Where(i => i.Fecha < fin).Select(i => new IngresoDeCuenta(i.Fecha, i.Importe)).ToList());
             return Task.FromResult(new HistoricoCuentaDetallado(
                 historico, Ahorro, Aportaciones.Select(a => new AportacionRegistrada(a.Id, a.MiembroId, a.Desde, a.Importe, a.Ahorro)).ToList(),
                 [], [], [], Miembros.ToDictionary(m => m.Id, m => m.Nombre)));

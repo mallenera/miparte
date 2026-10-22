@@ -34,10 +34,10 @@ public sealed class ServicioCuentaComun(IRepositorioCuentaComun repositorio, Tim
         var detalle = await repositorio.HistoricoDetalladoAsync(inicio, ct);
         var h = detalle.Historico;
         var saldoInicial = h.SaldoInicial;
-        var estado = Domain.CuentaComun.Calcular(inicio, h.Vigentes, h.Gastos, h.Reembolsos, h.Retiradas, h.Depositos, saldoInicial);
+        var estado = Domain.CuentaComun.Calcular(inicio, h.Vigentes, h.Gastos, h.Reembolsos, h.Retiradas, h.Depositos, saldoInicial, h.Ingresos);
         var partes = Domain.CuentaComun.PartesPorPersona(inicio, h.Vigentes, estado, h.Depositos);
         var reembolsos = detalle.ReembolsosDelMes.Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe)).ToList();
-        var extracto = Domain.CuentaComun.Extracto(inicio, h.Vigentes, h.GastosDelMes ?? [], reembolsos, saldoInicial, estado);
+        var extracto = Domain.CuentaComun.Extracto(inicio, h.Vigentes, h.GastosDelMes ?? [], reembolsos, saldoInicial, estado, h.Ingresos);
         return new EstadoCuentaDelMes(inicio, estado, partes, detalle, extracto, saldoInicial);
     }
 

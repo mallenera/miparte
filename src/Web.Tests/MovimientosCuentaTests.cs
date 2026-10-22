@@ -23,7 +23,7 @@ public class MovimientosCuentaTests : BunitContext
             new("deposito_ahorro", Guid.NewGuid(), new DateOnly(2026, 10, 4), 100m, AnaId, null, "Lotería", 0m, 740m),
             new("gasto", Guid.NewGuid(), new DateOnly(2026, 10, 5), -80m, null, Luz.Id, null, 0m, 660m),
             new("retirada_ahorro", Guid.NewGuid(), new DateOnly(2026, 10, 9), -60m, LuisId, null, null, 0m, 600m),
-        ]);
+        ], EfectivoFinal: 460m, AhorroFinal: 140m);
 
     private ApiFalsa Api(MovimientosCuentaComunResponse? extracto = null) => new ApiFalsa()
         .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ApiFalsa.Miembro("Ana", id: AnaId), ApiFalsa.Miembro("Luis", id: LuisId) })
@@ -133,6 +133,8 @@ public class MovimientosCuentaTests : BunitContext
         Assert.Contains("Cena amigas", c.Markup);
         Assert.Contains("−", c.Find(".g-importe.neg").TextContent);
         Assert.Contains("600,00", c.Find("#movimientos-saldo-final").TextContent);
+        Assert.Contains("460,00", c.Find("#movimientos-efectivo").TextContent);
+        Assert.Contains("140,00", c.Find("#movimientos-ahorro").TextContent);
         Assert.Equal(5, c.FindAll("#movimientos-lista .gastorow").Count);
 
         c.Find("select").Change("salidas");

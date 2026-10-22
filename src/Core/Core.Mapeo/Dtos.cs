@@ -119,9 +119,11 @@ public static class Dtos
     public static MovimientosCuentaComunResponse ADto(this ExtractoBanco x) => new(
         x.Desde, x.Hasta, x.SaldoAnterior, x.Entradas, x.Salidas, x.SaldoFinal,
         x.Movimientos.Select(m => new MovimientoCuentaComunDto(
-            MovimientosBanco.ATexto(m.Tipo), m.Id, m.Fecha, m.Importe, m.MiembroId, m.CategoriaId, m.Concepto, m.Ahorro, m.Saldo)).ToList());
+            MovimientosBanco.ATexto(m.Tipo), m.Id, m.Fecha, m.Importe, m.MiembroId, m.CategoriaId, m.Concepto, m.Ahorro, m.Saldo)).ToList(),
+        x.EfectivoFinal, x.AhorroFinal);
 
     /// <summary>Extracto del mes en la forma que devuelve la API.</summary>
     private static ExtractoCuentaComunDto ADto(ExtractoCuentaComun x) => new(
-        x.EfectivoInicial, x.Aportaciones, x.SaldoInicialFijado, x.GastosCuenta, x.GastosAdelantadosDelAhorro, x.Reembolsos, x.EfectivoFinal);
+        x.EfectivoInicial, x.Aportaciones, x.SaldoInicialFijado, x.GastosCuenta, x.GastosAdelantadosDelAhorro, x.Reembolsos, x.EfectivoFinal,
+        x.Ingresos);
 }

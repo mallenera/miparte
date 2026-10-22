@@ -55,7 +55,7 @@ public sealed class RepositorioCuentaComun(MiParteDbContext db) : IRepositorioCu
         // Todo lo que necesita el cálculo en una sola consulta y ya agrupado: el histórico no se trae fila a fila.
         var h = await HistoricoCuentaComun.LeerAsync(db, inicio, detalleDelMes: true, ct);
         return new HistoricoCuentaDetallado(
-            new HistoricoCuenta(h.Vigentes, h.Gastos, h.Reembolsos, h.Retiradas, h.Depositos, h.CuentaActiva, h.GastadoMes, h.GastosDelMes, h.SaldoInicial, h.Frecuencia),
+            new HistoricoCuenta(h.Vigentes, h.Gastos, h.Reembolsos, h.Retiradas, h.Depositos, h.CuentaActiva, h.GastadoMes, h.GastosDelMes, h.SaldoInicial, h.Frecuencia, h.Ingresos),
             h.AhorroActivo,
             h.Aportaciones.Select(a => new AportacionRegistrada(a.Id, a.MiembroId, a.Fecha, a.Importe, a.Ahorro)).ToList(),
             h.ReembolsosDelMes, h.RetiradasDelMes, h.DepositosDelMes, h.Nombres);
@@ -74,8 +74,11 @@ public sealed class RepositorioCuentaComun(MiParteDbContext db) : IRepositorioCu
             .Select(x => new MovimientoCuenta(x.Id, x.MiembroId, x.Fecha, x.Importe, x.Concepto)).ToListAsync(ct);
         var retiradas = await db.RetiradasAhorro.AsNoTracking().Where(x => x.Fecha <= hasta)
             .Select(x => new MovimientoCuenta(x.Id, x.MiembroId, x.Fecha, x.Importe, x.Concepto)).ToListAsync(ct);
+        var adelantados = await db.Gastos.AsNoTracking()
+            .Where(g => g.ACargoCuentaComun && g.PagadoPor != null && g.PagadoDesdeAhorro && g.Fecha <= hasta)
+            .Select(g => new GastoDeCuenta(g.PagadoPor, g.Fecha, g.Importe, true)).ToListAsync(ct);
         return new DatosMovimientosBanco(
-            await AportacionesAsync(ct), await SaldoInicialAsync(ct), gastos, reembolsos, ingresos, depositos, retiradas);
+            await AportacionesAsync(ct), await SaldoInicialAsync(ct), gastos, reembolsos, ingresos, depositos, retiradas, adelantados);
     }
 
     /// <inheritdoc />

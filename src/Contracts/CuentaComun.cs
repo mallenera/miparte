@@ -30,7 +30,7 @@ public record ReembolsoCuentaDto(Guid Id, Guid MiembroId, DateOnly Fecha, decima
 /// <param name="Concepto">Descripción opcional.</param>
 public record CrearReembolsoRequest(Guid MiembroId, decimal Importe, DateOnly? Fecha, string? Concepto);
 
-/// <summary>Dinero que entra a la cuenta común fuera de la aportación mensual y del ahorro (p. ej. lo que pagan las amigas de una cena). Solo histórico: no cambia saldos ni reembolsos.</summary>
+/// <summary>Dinero que entra a la cuenta común fuera de la aportación mensual y del ahorro (p. ej. lo que pagan las amigas de una cena). Suma al saldo y al efectivo de la cuenta desde su fecha; no toca el ahorro ni los reembolsos pendientes.</summary>
 /// <param name="Id">Identificador del ingreso.</param>
 /// <param name="MiembroId">Miembro que lo registra.</param>
 /// <param name="Fecha">Fecha del ingreso.</param>
@@ -148,9 +148,10 @@ public record CuentaComunResponse(
 /// <param name="GastosAdelantadosDelAhorro">Gastos pagados desde el ahorro por un miembro: suben el efectivo porque la cuenta queda a deber ese importe.</param>
 /// <param name="Reembolsos">Reembolsos a quien adelantó gastos este mes.</param>
 /// <param name="EfectivoFinal">Efectivo al final del mes.</param>
+/// <param name="Ingresos">Ingresos sueltos del mes, fuera de las aportaciones.</param>
 public record ExtractoCuentaComunDto(
     decimal EfectivoInicial, decimal Aportaciones, decimal SaldoInicialFijado, decimal GastosCuenta,
-    decimal GastosAdelantadosDelAhorro, decimal Reembolsos, decimal EfectivoFinal);
+    decimal GastosAdelantadosDelAhorro, decimal Reembolsos, decimal EfectivoFinal, decimal Ingresos = 0m);
 
 /// <summary>Saldo inicial de la cuenta común: dinero que ya había en la cuenta para gastos a una fecha.</summary>
 /// <param name="Fecha">Día al que corresponde el saldo.</param>
@@ -181,8 +182,10 @@ public record MovimientoCuentaComunDto(
 /// <param name="SaldoAnterior">Saldo de la cuenta al terminar el día anterior a <paramref name="Desde"/>.</param>
 /// <param name="Entradas">Suma de lo que entra en el periodo.</param>
 /// <param name="Salidas">Suma de lo que sale en el periodo (positiva).</param>
-/// <param name="SaldoFinal">Saldo al terminar <paramref name="Hasta"/>.</param>
+/// <param name="SaldoFinal">Saldo al terminar <paramref name="Hasta"/>: <paramref name="EfectivoFinal"/> más <paramref name="AhorroFinal"/>.</param>
 /// <param name="Movimientos">Líneas del periodo en orden cronológico; en un mismo día, primero las entradas.</param>
+/// <param name="EfectivoFinal">Parte del saldo final que es efectivo para gastos (el mismo cálculo que el efectivo de la cuenta).</param>
+/// <param name="AhorroFinal">Parte del saldo final que es ahorro disponible.</param>
 public record MovimientosCuentaComunResponse(
     DateOnly Desde, DateOnly Hasta, decimal SaldoAnterior, decimal Entradas, decimal Salidas, decimal SaldoFinal,
-    IReadOnlyList<MovimientoCuentaComunDto> Movimientos);
+    IReadOnlyList<MovimientoCuentaComunDto> Movimientos, decimal EfectivoFinal = 0m, decimal AhorroFinal = 0m);

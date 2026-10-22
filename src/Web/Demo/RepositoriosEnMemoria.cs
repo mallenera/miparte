@@ -34,7 +34,8 @@ internal static class RepositoriosEnMemoria
             a.Hogar.CuentaComunActiva,
             gastosDelMes.Sum(g => g.Importe),
             gastosDelMes.Select(g => new GastoDeCuenta(g.PagadoPor, g.Fecha, g.Importe, g.PagadoDesdeAhorro)).ToList(),
-            a.Hogar.SaldoInicialFecha is { } f && a.Hogar.SaldoInicialImporte is { } i ? new SaldoInicialCuenta(f, i) : null, a.Hogar.AportacionFrecuencia);
+            a.Hogar.SaldoInicialFecha is { } f && a.Hogar.SaldoInicialImporte is { } i ? new SaldoInicialCuenta(f, i) : null, a.Hogar.AportacionFrecuencia,
+            a.Ingresos.Where(x => x.Fecha < fin).Select(x => new IngresoDeCuenta(x.Fecha, x.Importe)).ToList());
     }
 
     /// <summary>Datos del ahorro; <paramref name="excluirGasto"/> deja fuera un gasto que se estÃ¡ editando.</summary>
@@ -227,7 +228,9 @@ internal sealed class RepositorioCuentaComunEnMemoria(AlmacenDemo a) : IReposito
             a.Reembolsos.Where(x => x.Fecha <= hasta).Select(x => M(x.Id, x.MiembroId, x.Fecha, x.Importe, x.Concepto)).ToList(),
             a.Ingresos.Where(x => x.Fecha <= hasta).Select(x => M(x.Id, x.MiembroId, x.Fecha, x.Importe, x.Concepto)).ToList(),
             a.Depositos.Where(x => x.Fecha <= hasta).Select(x => M(x.Id, x.MiembroId, x.Fecha, x.Importe, x.Concepto)).ToList(),
-            a.Retiradas.Where(x => x.Fecha <= hasta).Select(x => M(x.Id, x.MiembroId, x.Fecha, x.Importe, x.Concepto)).ToList());
+            a.Retiradas.Where(x => x.Fecha <= hasta).Select(x => M(x.Id, x.MiembroId, x.Fecha, x.Importe, x.Concepto)).ToList(),
+            a.Gastos.Where(g => g.ACargoCuentaComun && g.PagadoPor is not null && g.PagadoDesdeAhorro && g.Fecha <= hasta)
+                .Select(g => new GastoDeCuenta(g.PagadoPor, g.Fecha, g.Importe, true)).ToList());
     }
 
     public Task<SaldoInicialCuenta?> SaldoInicialAsync(CancellationToken ct)

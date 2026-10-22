@@ -114,6 +114,37 @@ public class MovimientosBancoTests
     }
 
     [Fact]
+    public void AlFinalDeMes_ElEfectivoYElAhorroCoincidenConLosDeLaCuenta()
+    {
+        var aportaciones = new[] { new AportacionVigente(Ana, Enero, 500m, 100m), new AportacionVigente(Luis, Enero.AddMonths(1), 300m, 50m) };
+        var saldoInicial = new SaldoInicialCuenta(Enero.AddDays(4), 1000m);
+        var directo = new GastoPagadoPorCuenta(Guid.NewGuid(), Enero.AddDays(9), 120m, Guid.NewGuid(), null, false);
+        var delAhorro = new GastoPagadoPorCuenta(Guid.NewGuid(), Enero.AddMonths(1).AddDays(2), 60m, Guid.NewGuid(), null, true);
+        var adelantado = new GastoDeCuenta(Luis, Enero.AddMonths(1).AddDays(5), 90m);
+        var adelantadoDelAhorro = new GastoDeCuenta(Ana, Enero.AddDays(20), 30m, DesdeAhorro: true);
+        var reembolso = Mov(Enero.AddMonths(1).AddDays(8), 50m, Luis);
+        var ingreso = Mov(Enero.AddDays(12), 40m);
+        var deposito = Mov(Enero.AddDays(15), 200m);
+        var retirada = Mov(Enero.AddMonths(1).AddDays(10), 70m);
+        var d = Datos(aportaciones, saldoInicial, [directo, delAhorro], [reembolso], [ingreso], [deposito], [retirada]) with
+        {
+            AdelantadosDelAhorro = [adelantadoDelAhorro],
+        };
+        var febrero = Enero.AddMonths(1);
+
+        var x = MovimientosBanco.Calcular(Enero, febrero.AddMonths(1).AddDays(-1), d);
+        var cuenta = CuentaComun.Calcular(
+            febrero, aportaciones,
+            [new(null, directo.Fecha, directo.Importe), new(null, delAhorro.Fecha, delAhorro.Importe, true), adelantado, adelantadoDelAhorro],
+            [new(Luis, reembolso.Fecha, reembolso.Importe)], [new(retirada.Fecha, retirada.Importe)],
+            [new(deposito.Fecha, deposito.Importe)], saldoInicial, [new(ingreso.Fecha, ingreso.Importe)]);
+
+        Assert.Equal(cuenta.Efectivo, x.EfectivoFinal);
+        Assert.Equal(cuenta.AhorroDisponible, x.AhorroFinal);
+        Assert.Equal(x.SaldoFinal, x.EfectivoFinal + x.AhorroFinal);
+    }
+
+    [Fact]
     public void HastaAnteriorADesde_LanzaExcepcion()
         => Assert.Throws<ArgumentException>(() => MovimientosBanco.Calcular(Enero.AddDays(1), Enero, Datos()));
 }

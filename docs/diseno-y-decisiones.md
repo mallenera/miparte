@@ -181,7 +181,8 @@ La cuenta común es un pagador más: los gastos que paga no entran en la deuda e
 - El ahorro está en la misma cuenta bancaria que el dinero para gastos, así que hay un único saldo: aportaciones completas (gastos más ahorro), ingresos sueltos, ingresos al ahorro y saldo inicial entran; gastos pagados por la cuenta o desde el ahorro, reembolsos y retiradas de ahorro salen.
 - Las aportaciones no tienen fecha real: cada cobro aparece el día 1 de su mes (en el banco puede caer otro día).
 - Un gasto que adelanta una persona no mueve el banco: solo aparece su reembolso.
-- Los ingresos sueltos sí aparecen, aunque no sumen al saldo de gastos de la cuenta, porque el dinero entra en el banco.
+- Los ingresos sueltos (p. ej. lo que pagan las amigas de una cena) son dinero que entra en la cuenta: suman al saldo y al efectivo desde su fecha, como el saldo inicial, y en «su parte» se reparten en proporción a lo aportado. No tocan el ahorro ni los reembolsos pendientes. (Antes eran solo histórico; se cambió para que el extracto cuadre con el banco.)
+- El saldo final del periodo es el efectivo más el ahorro disponible, y se muestra desglosado: con «Hasta» en el último día de un mes, el efectivo coincide con el del extracto mensual.
 - El efectivo del extracto es el mismo que la pestaña ya llama «Efectivo»: el saldo más lo pendiente de reembolsar. El efectivo al inicio de un mes es el final del anterior por construcción, y así se comprueba en los tests.
 
 - **Aportaciones:** cada adulto aporta un importe fijo al mes, guardado por mes y persona. Es lo único que se guarda del dinero que entra en el hogar.

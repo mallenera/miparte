@@ -273,8 +273,8 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
         });
 
     /// <summary>
-    /// Registra un ingreso a la cuenta común (p. ej. lo que pagan las amigas de una cena). Es solo histórico: no cambia el saldo ni los
-    /// reembolsos. Si el mes mostrado no es el actual, el ingreso se fecha el primer día de ese mes.
+    /// Registra un ingreso a la cuenta común (p. ej. lo que pagan las amigas de una cena). Suma al saldo y al efectivo de la cuenta,
+    /// no a los reembolsos. Si el mes mostrado no es el actual, el ingreso se fecha el primer día de ese mes.
     /// </summary>
     public Task<string?> IngresarAsync() =>
         EjecutarAsync(async () =>

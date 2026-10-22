@@ -157,7 +157,7 @@ public static class CuentaComunEndpoints
         return Results.Ok(ingresos.Select(i => i.ADto()).ToList());
     }
 
-    /// <summary>POST /api/cuenta-comun/ingresos: registra dinero que entra a la cuenta común fuera de aportaciones y ahorro (solo histórico). 400 si el importe es inválido o el miembro no es del hogar; 409 sin hogar o con la cuenta inactiva. 201 si se crea.</summary>
+    /// <summary>POST /api/cuenta-comun/ingresos: registra dinero que entra a la cuenta común fuera de aportaciones y ahorro; suma al saldo y al efectivo. 400 si el importe es inválido o el miembro no es del hogar; 409 sin hogar o con la cuenta inactiva. 201 si se crea.</summary>
     private static async Task<IResult> CrearIngresoAsync(
         CrearIngresoCuentaComunRequest req, [FromServices] ServicioCuentaComun servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
     {

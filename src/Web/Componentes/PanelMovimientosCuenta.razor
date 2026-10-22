@@ -70,6 +70,8 @@
             </tbody>
             <tfoot>
                 <tr class="total"><th scope="row">Saldo al terminar el @x.Hasta.ToString("dd/MM/yyyy", Es)</th><td id="movimientos-saldo-final">@Formato.Euros(x.SaldoFinal)</td></tr>
+                <tr><th scope="row">De ello, efectivo para gastos</th><td id="movimientos-efectivo">@Formato.Euros(x.EfectivoFinal)</td></tr>
+                <tr><th scope="row">De ello, ahorro disponible</th><td id="movimientos-ahorro">@Formato.Euros(x.AhorroFinal)</td></tr>
             </tfoot>
         </table>
 

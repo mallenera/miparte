@@ -30,6 +30,9 @@ public interface IRepositorioCuentaComun
     /// <summary>Histórico de la cuenta con el detalle del mes que empieza en <paramref name="inicio"/>.</summary>
     Task<HistoricoCuentaDetallado> HistoricoDetalladoAsync(DateOnly inicio, CancellationToken ct);
 
+    /// <summary>Todo lo que mueve dinero en el banco de la cuenta hasta <paramref name="hasta"/> (incluido), con las aportaciones completas.</summary>
+    Task<DatosMovimientosBanco> MovimientosBancoAsync(DateOnly hasta, CancellationToken ct);
+
     /// <summary>Si el miembro existe en el hogar, esté activo o no.</summary>
     Task<bool> ExisteMiembroAsync(Guid id, CancellationToken ct);
 

@@ -1,3 +1,4 @@
+using System.Globalization;
 using MiParte.Contracts;
 
 namespace MiParte.Web.Api;
@@ -10,6 +11,14 @@ public sealed partial class CoreApiClient
     /// <param name="ct">Token de cancelación.</param>
     public Task<CuentaComunResponse> ObtenerCuentaComunAsync(string mes, CancellationToken ct = default) =>
         _nucleo.ObtenerAsync<CuentaComunResponse>($"api/cuenta-comun?mes={Uri.EscapeDataString(mes)}", ct);
+
+    /// <summary>Extracto de la cuenta común entre dos fechas incluidas, línea a línea (<c>GET /api/cuenta-comun/movimientos</c>).</summary>
+    /// <param name="desde">Primer día incluido.</param>
+    /// <param name="hasta">Último día incluido.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<MovimientosCuentaComunResponse> MovimientosCuentaComunAsync(DateOnly desde, DateOnly hasta, CancellationToken ct = default) =>
+        _nucleo.ObtenerAsync<MovimientosCuentaComunResponse>(
+            $"api/cuenta-comun/movimientos?desde={desde.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}&hasta={hasta.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}", ct);
 
     /// <summary>Activa o desactiva la cuenta común del hogar; solo un admin (<c>PUT /api/cuenta-comun/activacion</c>).</summary>
     /// <param name="activa">true para usar la cuenta común.</param>

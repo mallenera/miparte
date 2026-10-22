@@ -62,6 +62,23 @@ public sealed class RepositorioCuentaComun(MiParteDbContext db) : IRepositorioCu
     }
 
     /// <inheritdoc />
+    public async Task<DatosMovimientosBanco> MovimientosBancoAsync(DateOnly hasta, CancellationToken ct)
+    {
+        var gastos = await db.Gastos.AsNoTracking().Where(g => g.PagadoPor == null && g.Fecha <= hasta)
+            .Select(g => new GastoPagadoPorCuenta(g.Id, g.Fecha, g.Importe, g.CategoriaId, g.Concepto, g.PagadoDesdeAhorro)).ToListAsync(ct);
+        var reembolsos = await db.ReembolsosCuenta.AsNoTracking().Where(x => x.Fecha <= hasta)
+            .Select(x => new MovimientoCuenta(x.Id, x.MiembroId, x.Fecha, x.Importe, x.Concepto)).ToListAsync(ct);
+        var ingresos = await db.IngresosCuentaComun.AsNoTracking().Where(x => x.Fecha <= hasta)
+            .Select(x => new MovimientoCuenta(x.Id, x.MiembroId, x.Fecha, x.Importe, x.Concepto)).ToListAsync(ct);
+        var depositos = await db.DepositosAhorro.AsNoTracking().Where(x => x.Fecha <= hasta)
+            .Select(x => new MovimientoCuenta(x.Id, x.MiembroId, x.Fecha, x.Importe, x.Concepto)).ToListAsync(ct);
+        var retiradas = await db.RetiradasAhorro.AsNoTracking().Where(x => x.Fecha <= hasta)
+            .Select(x => new MovimientoCuenta(x.Id, x.MiembroId, x.Fecha, x.Importe, x.Concepto)).ToListAsync(ct);
+        return new DatosMovimientosBanco(
+            await AportacionesAsync(ct), await SaldoInicialAsync(ct), gastos, reembolsos, ingresos, depositos, retiradas);
+    }
+
+    /// <inheritdoc />
     public Task<bool> ExisteMiembroAsync(Guid id, CancellationToken ct) => db.Miembros.AnyAsync(m => m.Id == id, ct);
 
     /// <inheritdoc />

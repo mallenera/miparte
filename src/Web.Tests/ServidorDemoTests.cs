@@ -37,6 +37,18 @@ public class ServidorDemoTests
     }
 
     [Fact]
+    public async Task Los_movimientos_de_la_cuenta_comun_cuadran_el_saldo_inicial_y_el_final()
+    {
+        var api = Cliente();
+
+        var x = await api.MovimientosCuentaComunAsync(new DateOnly(2026, 1, 1), new DateOnly(2026, 10, 20));
+
+        Assert.Equal(x.SaldoAnterior + x.Entradas - x.Salidas, x.SaldoFinal);
+        if (x.Movimientos.Count > 0) Assert.Equal(x.SaldoFinal, x.Movimientos[^1].Saldo);
+        await Assert.ThrowsAsync<ApiException>(() => api.MovimientosCuentaComunAsync(new DateOnly(2026, 2, 1), new DateOnly(2026, 1, 1)));
+    }
+
+    [Fact]
     public async Task Los_filtros_de_gastos_por_categoria_miembro_y_texto_se_combinan()
     {
         var api = Cliente();

@@ -42,6 +42,17 @@ public sealed class ServicioCuentaComun(IRepositorioCuentaComun repositorio, Tim
     }
 
     /// <summary>
+    /// Extracto bancario de la cuenta (gastos y ahorro juntos) entre dos fechas incluidas, línea a línea y con el saldo tras cada
+    /// movimiento; se devuelve aunque la cuenta no esté activada. Inválido si <paramref name="desde"/> es posterior a <paramref name="hasta"/>.
+    /// </summary>
+    public async Task<Resultado<ExtractoBanco>> MovimientosBancoAsync(DateOnly desde, DateOnly hasta, CancellationToken ct)
+    {
+        if (desde > hasta) return Resultado<ExtractoBanco>.Invalido("La fecha «desde» no puede ser posterior a «hasta».");
+        var datos = await repositorio.MovimientosBancoAsync(hasta, ct);
+        return Resultado<ExtractoBanco>.Ok(MovimientosBanco.Calcular(desde, hasta, datos));
+    }
+
+    /// <summary>
     /// Fija el saldo inicial de la cuenta para gastos a partir de una fecha, sustituyendo el que hubiera. Es dinero que ya estaba en la
     /// cuenta, así que no puede ser negativo. Es un conflicto si la cuenta común no está activada.
     /// </summary>

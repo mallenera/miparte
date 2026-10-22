@@ -277,6 +277,30 @@ public class ServicioCuentaComunTests
     }
 
     /// <summary>Repositorio en memoria: cada colección es lo que «hay» en el hogar.</summary>
+    [Fact]
+    public async Task MovimientosBanco_ConDesdePosteriorAHasta_EsInvalido()
+    {
+        var r = await Servicio.MovimientosBancoAsync(Septiembre.AddDays(10), Septiembre, default);
+
+        Assert.Equal(TipoError.Invalido, r.Error!.Tipo);
+    }
+
+    [Fact]
+    public async Task MovimientosBanco_JuntaAportacionesIngresosYAhorroConSaldoCorrido()
+    {
+        _repo.Aportaciones.Add(new AportacionCuenta { Id = Guid.NewGuid(), HogarId = Hogar, MiembroId = _ana, Desde = Septiembre, Importe = 500m, Ahorro = 100m });
+        _repo.Ingresos.Add(new IngresoCuentaComun { Id = Guid.NewGuid(), HogarId = Hogar, MiembroId = _ana, Fecha = Septiembre.AddDays(3), Importe = 40m, Concepto = "Cena" });
+        _repo.Retiradas.Add(new RetiradaAhorro { Id = Guid.NewGuid(), HogarId = Hogar, MiembroId = _ana, Fecha = Septiembre.AddDays(20), Importe = 60m });
+
+        var r = await Servicio.MovimientosBancoAsync(Septiembre, Septiembre.AddDays(29), default);
+
+        var x = r.Valor!;
+        Assert.Equal(0m, x.SaldoAnterior);
+        Assert.Equal([TipoMovimientoBanco.Aportacion, TipoMovimientoBanco.Ingreso, TipoMovimientoBanco.RetiradaAhorro], x.Movimientos.Select(m => m.Tipo));
+        Assert.Equal([500m, 540m, 480m], x.Movimientos.Select(m => m.Saldo));
+        Assert.Equal(480m, x.SaldoFinal);
+    }
+
     private sealed class RepositorioFalso : IRepositorioCuentaComun
     {
         public List<Miembro> Miembros { get; } = [];
@@ -327,6 +351,14 @@ public class ServicioCuentaComunTests
                 historico, Ahorro, Aportaciones.Select(a => new AportacionRegistrada(a.Id, a.MiembroId, a.Desde, a.Importe, a.Ahorro)).ToList(),
                 [], [], [], Miembros.ToDictionary(m => m.Id, m => m.Nombre)));
         }
+
+        public Task<DatosMovimientosBanco> MovimientosBancoAsync(DateOnly hasta, CancellationToken ct)
+            => Task.FromResult(new DatosMovimientosBanco(
+                Vigentes(), Saldo, [],
+                Reembolsos.Where(r => r.Fecha <= hasta).Select(r => new MovimientoCuenta(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto)).ToList(),
+                Ingresos.Where(i => i.Fecha <= hasta).Select(i => new MovimientoCuenta(i.Id, i.MiembroId, i.Fecha, i.Importe, i.Concepto)).ToList(),
+                Depositos.Where(d => d.Fecha <= hasta).Select(d => new MovimientoCuenta(d.Id, d.MiembroId, d.Fecha, d.Importe, d.Concepto)).ToList(),
+                Retiradas.Where(r => r.Fecha <= hasta).Select(r => new MovimientoCuenta(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto)).ToList()));
 
         public Task<bool> ExisteMiembroAsync(Guid id, CancellationToken ct) => Task.FromResult(Miembros.Any(m => m.Id == id));
 

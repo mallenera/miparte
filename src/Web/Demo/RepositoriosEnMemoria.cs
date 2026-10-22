@@ -215,6 +215,21 @@ internal sealed class RepositorioCuentaComunEnMemoria(AlmacenDemo a) : IReposito
             a.Nombres()));
     }
 
+    public async Task<DatosMovimientosBanco> MovimientosBancoAsync(DateOnly hasta, CancellationToken ct)
+    {
+        static MovimientoCuenta M(Guid id, Guid miembro, DateOnly fecha, decimal importe, string? concepto)
+            => new(id, miembro, fecha, importe, concepto);
+
+        return new DatosMovimientosBanco(
+            await AportacionesAsync(ct), await SaldoInicialAsync(ct),
+            a.Gastos.Where(g => g.PagadoPor is null && g.Fecha <= hasta)
+                .Select(g => new GastoPagadoPorCuenta(g.Id, g.Fecha, g.Importe, g.CategoriaId, g.Concepto, g.PagadoDesdeAhorro)).ToList(),
+            a.Reembolsos.Where(x => x.Fecha <= hasta).Select(x => M(x.Id, x.MiembroId, x.Fecha, x.Importe, x.Concepto)).ToList(),
+            a.Ingresos.Where(x => x.Fecha <= hasta).Select(x => M(x.Id, x.MiembroId, x.Fecha, x.Importe, x.Concepto)).ToList(),
+            a.Depositos.Where(x => x.Fecha <= hasta).Select(x => M(x.Id, x.MiembroId, x.Fecha, x.Importe, x.Concepto)).ToList(),
+            a.Retiradas.Where(x => x.Fecha <= hasta).Select(x => M(x.Id, x.MiembroId, x.Fecha, x.Importe, x.Concepto)).ToList());
+    }
+
     public Task<SaldoInicialCuenta?> SaldoInicialAsync(CancellationToken ct)
         => Task.FromResult(a.Hogar.SaldoInicialFecha is { } f && a.Hogar.SaldoInicialImporte is { } i ? new SaldoInicialCuenta(f, i) : null);
 

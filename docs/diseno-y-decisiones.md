@@ -176,6 +176,12 @@ La cuenta común es un pagador más: los gastos que paga no entran en la deuda e
 
 **Extracto y saldo inicial** (decisión posterior): la pestaña muestra un extracto del mes como el de un banco (efectivo al inicio, aportaciones, gastos pagados por la cuenta, reembolsos y efectivo al final; el ahorro va aparte) y permite fijar un saldo inicial con su fecha.
 - El saldo inicial es dinero que ya había en la cuenta para gastos a esa fecha (`hogar.saldo_inicial_fecha/importe`, no negativo). Cuenta como un ingreso de esa fecha: suma al saldo y al efectivo desde su mes y lo reparten «su parte» en proporción a lo aportado. No borra ni excluye el histórico, y no toca el ahorro (el ahorro inicial se registra como ingreso de ahorro). La tarjeta «Cuenta común» del resumen mensual usa el mismo saldo.
+
+**Movimientos para cuadrar con el banco** (decisión posterior): la pestaña Cuenta común lista, entre dos fechas, cada entrada y salida de la cuenta con el saldo tras ella, y se filtra por tipo, persona y texto.
+- El ahorro está en la misma cuenta bancaria que el dinero para gastos, así que hay un único saldo: aportaciones completas (gastos más ahorro), ingresos sueltos, ingresos al ahorro y saldo inicial entran; gastos pagados por la cuenta o desde el ahorro, reembolsos y retiradas de ahorro salen.
+- Las aportaciones no tienen fecha real: cada cobro aparece el día 1 de su mes (en el banco puede caer otro día).
+- Un gasto que adelanta una persona no mueve el banco: solo aparece su reembolso.
+- Los ingresos sueltos sí aparecen, aunque no sumen al saldo de gastos de la cuenta, porque el dinero entra en el banco.
 - El efectivo del extracto es el mismo que la pestaña ya llama «Efectivo»: el saldo más lo pendiente de reembolsar. El efectivo al inicio de un mes es el final del anterior por construcción, y así se comprueba en los tests.
 
 - **Aportaciones:** cada adulto aporta un importe fijo al mes, guardado por mes y persona. Es lo único que se guarda del dinero que entra en el hogar.

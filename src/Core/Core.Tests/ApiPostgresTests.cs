@@ -170,6 +170,17 @@ public class ApiPostgresTests
             await Leer<JsonElement>(await c.GetAsync($"/api/cuenta-comun?mes={mes}"));
             await Leer<JsonElement>(await c.GetAsync($"/api/resumen?mes={mes}"));
         }
+
+        // Extracto bancario de octubre: antes había saldo inicial 1000 + aportación de Ana 300 + depósito 5; el gasto A y el D los
+        // adelanta una persona, así que no salen.
+        var mov = await Leer<MovimientosCuentaComunResponse>(await c.GetAsync("/api/cuenta-comun/movimientos?desde=2026-10-01&hasta=2026-10-31"));
+        Assert.Equal(1305m, mov.SaldoAnterior);
+        Assert.Equal(["aportacion", "aportacion", "deposito_ahorro", "gasto", "gasto_ahorro", "reembolso", "retirada_ahorro"], mov.Movimientos.Select(m => m.Tipo));
+        Assert.Equal(507m, mov.Entradas);
+        Assert.Equal(100m, mov.Salidas);
+        Assert.Equal(1712m, mov.SaldoFinal);
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.GetAsync("/api/cuenta-comun/movimientos?desde=2026-10-31&hasta=2026-10-01")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.GetAsync("/api/cuenta-comun/movimientos?desde=2026-10-01")).StatusCode);
     }
 
     [SkippableFact]

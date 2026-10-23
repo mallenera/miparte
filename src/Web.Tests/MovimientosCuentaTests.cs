@@ -188,4 +188,28 @@ public class MovimientosCuentaTests : BunitContext
         Assert.Equal(2, c.FindAll("#movimientos-lista .gastorow").Count);
         Assert.Contains("(filtradas)", c.Markup);
     }
+
+    [Fact]
+    public void El_buscador_de_concepto_filtra_la_lista_al_escribir()
+    {
+        Services.AddSingleton(Cliente(Api()));
+
+        var c = Render<PanelMovimientosCuenta>(p => p.Add(x => x.Hoy, Hoy));
+        c.Find("input[type=search]").Input("cena");
+
+        Assert.Single(c.FindAll("#movimientos-lista .gastorow"));
+        Assert.Contains("Cena amigas", c.Markup);
+    }
+
+    [Fact]
+    public void El_filtro_de_persona_actualiza_la_lista()
+    {
+        Services.AddSingleton(Cliente(Api()));
+
+        var c = Render<PanelMovimientosCuenta>(p => p.Add(x => x.Hoy, Hoy));
+        c.FindAll("select")[1].Change(AnaId.ToString());
+
+        Assert.DoesNotContain("Retirada de ahorro de Luis", c.Markup);
+        Assert.Contains("Aportación de Ana", c.Markup);
+    }
 }

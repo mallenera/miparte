@@ -161,7 +161,6 @@ Sin clave se puede ver el asistente flotante y comprobar el 503; el modo demo de
 ## Pendiente
 
 - Cancelar una pregunta en curso (el streaming no tiene botón de parar).
-- Pruebas con el proveedor de producción (Cloudflare Workers AI): pendientes. Sin ellas, la tarjeta del borrador no está verificada en navegador con el modelo real.
 - Etiqueta `X-Origen` sin verificar: el origen «asistente» lo declara el cliente con el JWT de la persona. Si se quiere una prueba real, haría falta un canal de confianza entre Assistant.Api y Core.Api (decisión pendiente).
 - Streaming: `ClienteWorkersAi` (el proveedor gratuito de producción) no implementa streaming real; la respuesta llega completa de una vez por el respaldo de `ClienteModelo`. El streaming real solo existe con Anthropic (`CreateStreaming`), que compila pero no se ha probado contra la API real.
 - Memoria de la conversación entre sesiones (hoy vive en la página).

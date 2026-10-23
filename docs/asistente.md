@@ -7,7 +7,7 @@ Implementación del chatbot descrito en [diseno-y-decisiones.md](diseno-y-decisi
 ```
 Front (Blazor) ──JWT + X-Hogar-Id──▶ Assistant.Api ──JWT + X-Hogar-Id──▶ Core.Api ──▶ Postgres (RLS + filtro por hogar)
                                           │
-                                          └──▶ API de Anthropic (Messages, modelo configurable)
+                                          └──▶ Proveedor de modelo: Cloudflare Workers AI (producción) o API de Anthropic (Messages)
 ```
 
 - **Sin acceso propio a la base de datos.** Assistant.Api no tiene cadena de conexión: consulta `GET /api/miembros`, `/api/categorias`, `/api/gastos`, `/api/resumen` y `/api/liquidacion` de Core.Api reenviando el JWT de la persona y su `X-Hogar-Id`. La multitenencia (RLS y filtro global por `hogar_id`) la sigue aplicando Core.Api; el asistente nunca ve datos de otro hogar aunque el modelo lo pidiera.
@@ -161,9 +161,9 @@ Sin clave se puede ver el asistente flotante y comprobar el 503; el modo demo de
 ## Pendiente
 
 - Cancelar una pregunta en curso (el streaming no tiene botón de parar).
-- Pruebas con la API real de Anthropic y con una clave de desarrollo: pendientes. Sin ellas, el streaming real y la tarjeta del borrador no están verificados en navegador.
+- Pruebas con el proveedor de producción (Cloudflare Workers AI): pendientes. Sin ellas, la tarjeta del borrador no está verificada en navegador con el modelo real.
 - Etiqueta `X-Origen` sin verificar: el origen «asistente» lo declara el cliente con el JWT de la persona. Si se quiere una prueba real, haría falta un canal de confianza entre Assistant.Api y Core.Api (decisión pendiente).
-- Streaming con Anthropic: el código de `CreateStreaming` compila, pero no se ha probado contra la API real (no hay clave en el entorno de desarrollo); el test cubre solo el respaldo sin streaming.
+- Streaming: `ClienteWorkersAi` (el proveedor gratuito de producción) no implementa streaming real; la respuesta llega completa de una vez por el respaldo de `ClienteModelo`. El streaming real solo existe con Anthropic (`CreateStreaming`), que compila pero no se ha probado contra la API real.
 - Memoria de la conversación entre sesiones (hoy vive en la página).
 - Pruebas manuales con el modelo real, evaluación de calidad de las respuestas y ajuste del prompt.
 - Límite diario de coste por hogar.

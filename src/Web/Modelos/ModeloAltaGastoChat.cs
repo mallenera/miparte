@@ -13,6 +13,9 @@ public sealed class ModeloAltaGastoChat
     /// <summary>Longitud máxima del concepto; coincide con el límite de <c>proponer_gasto</c> en Assistant.Api.</summary>
     public const int MaxConcepto = 200;
 
+    /// <summary>Importe máximo admitido; coincide con el límite de <c>proponer_gasto</c> en Assistant.Api.</summary>
+    public const decimal MaxImporte = 9_999_999_999.99m;
+
     /// <summary>Formato de fecha que se pide y se acepta: día, mes y año de dos cifras.</summary>
     public const string FormatoFecha = "dd/MM/yy";
 
@@ -51,6 +54,7 @@ public sealed class ModeloAltaGastoChat
         {
             case Paso.Importe:
                 if (!EntradaImporte.TryParse(texto, out var importe)) return EntradaImporte.MensajeInvalido;
+                if (importe > MaxImporte) return "El importe es demasiado grande.";
                 Importe = importe;
                 PasoActual = Paso.Concepto;
                 return null;

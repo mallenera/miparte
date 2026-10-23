@@ -296,6 +296,25 @@ public class AsistenteTests : BunitContext
     }
 
     [Fact]
+    public void Las_respuestas_de_un_alta_cancelada_no_se_envian_al_asistente()
+    {
+        var api = Chat(new ChatResponse("Ok.", []));
+        Registrar(api);
+        var c = Render<VistaAsistente>();
+        c.Find("button.alta-gasto").Click();
+        c.Find("#pregunta").Input("12");
+        c.Find("form.chatform").Submit();
+        c.FindAll("button.linkbtn").Single(b => b.TextContent.Contains("Cancelar el gasto")).Click();
+
+        c.Find("#pregunta").Input("Hola");
+        c.Find("form.chatform").Submit();
+
+        var enviados = Enviado(api).Mensajes;
+        Assert.Single(enviados);
+        Assert.Equal("Hola", enviados[0].Texto);
+    }
+
+    [Fact]
     public void Una_fecha_mal_escrita_vuelve_a_preguntar_sin_enviar_nada_al_asistente()
     {
         var api = Chat(new ChatResponse("Ok.", []));

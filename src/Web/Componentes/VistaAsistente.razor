@@ -4,6 +4,7 @@
 @inject EstadoHogar Hogar
 @inject ServicioSesion Sesion
 @inject MiParte.Web.Configuracion.OpcionesWeb Opciones
+@using System.Globalization
 @using MiParte.Web.Modelos
 
 <div class="asist">
@@ -54,7 +55,7 @@
                     {
                         <div class="borrador" role="group" aria-label="Gasto propuesto">
                             <strong>Gasto propuesto (sin guardar)</strong>
-                            <div>@b.Concepto · @Formato.Euros(b.Importe) · @b.Fecha.ToString(ModeloAltaGastoChat.FormatoFecha)</div>
+                            <div>@b.Concepto · @Formato.Euros(b.Importe) · @b.Fecha.ToString(ModeloAltaGastoChat.FormatoFecha, CultureInfo.InvariantCulture)</div>
                             <div class="muted">Categoría: @b.Categoria · Perfil: @b.Perfil</div>
                             @if (m.EstadoBorrador == EstadoBorrador.Pendiente)
                             {
@@ -139,6 +140,9 @@
         public EstadoBorrador EstadoBorrador { get; set; } = EstadoBorrador.Pendiente;
         public string Pagador { get; set; } = "";
         public string? Aviso { get; set; }
+
+        /// <summary>Mensaje del alta guiada: no se envía al asistente en el historial, solo el gasto completo al terminar.</summary>
+        public bool DeAlta { get; init; }
     }
 
     private readonly List<Burbuja> _mensajes = [];
@@ -178,14 +182,14 @@
         _error = null;
         _texto = "";
         _alta = new ModeloAltaGastoChat();
-        _mensajes.Add(new Burbuja(false, _alta.Pregunta, []));
+        _mensajes.Add(new Burbuja(false, _alta.Pregunta, []) { DeAlta = true });
     }
 
     private void CancelarAlta()
     {
         _alta = null;
         _texto = "";
-        _mensajes.Add(new Burbuja(false, "Gasto cancelado. No se ha guardado nada.", []));
+        _mensajes.Add(new Burbuja(false, "Gasto cancelado. No se ha guardado nada.", []) { DeAlta = true });
     }
 
     /// <summary>Envía el formulario: una respuesta del alta guiada, o una pregunta normal al asistente.</summary>
@@ -200,18 +204,18 @@
         var respuesta = _texto.Trim();
         if (respuesta.Length == 0) return;
 
-        var usuario = new Burbuja(true, respuesta, []);
+        var usuario = new Burbuja(true, respuesta, []) { DeAlta = true };
         _mensajes.Add(usuario);
         _texto = "";
         var error = _alta.Responder(respuesta);
         if (error is not null)
         {
-            _mensajes.Add(new Burbuja(false, error, []));
+            _mensajes.Add(new Burbuja(false, error, []) { DeAlta = true });
             return;
         }
         if (_alta.PasoActual != ModeloAltaGastoChat.Paso.Completa)
         {
-            _mensajes.Add(new Burbuja(false, _alta.Pregunta, []));
+            _mensajes.Add(new Burbuja(false, _alta.Pregunta, []) { DeAlta = true });
             return;
         }
 
@@ -232,6 +236,7 @@
         _mensajes.Add(usuario);
         _texto = "";
         var historial = _mensajes
+            .Where(m => !m.DeAlta)
             .TakeLast(MaxHistorial)
             .Select(m => new MensajeChatDto(m.EsMio ? "user" : "assistant", m.Texto))
             .ToList();

@@ -34,6 +34,17 @@ public class ModeloAltaGastoChatTests
     }
 
     [Fact]
+    public void Un_importe_mayor_que_el_maximo_del_asistente_no_avanza()
+    {
+        var alta = new ModeloAltaGastoChat();
+
+        var error = alta.Responder("10000000000");
+
+        Assert.NotNull(error);
+        Assert.Equal(ModeloAltaGastoChat.Paso.Importe, alta.PasoActual);
+    }
+
+    [Fact]
     public void Un_concepto_vacio_o_demasiado_largo_no_avanza()
     {
         var alta = new ModeloAltaGastoChat();

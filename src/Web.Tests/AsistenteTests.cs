@@ -272,6 +272,49 @@ public class AsistenteTests : BunitContext
     }
 
     [Fact]
+    public void Añadir_gasto_pregunta_uno_a_uno_y_envia_el_gasto_completo_al_asistente()
+    {
+        var api = Chat(new ChatResponse("Te lo dejo preparado.", ["proponer_gasto"]));
+        Registrar(api);
+        var c = Render<VistaAsistente>();
+
+        c.Find("button.alta-gasto").Click();
+        Assert.Contains("¿Cuánto ha sido?", c.Markup);
+        c.Find("#pregunta").Input("12,5");
+        c.Find("form.chatform").Submit();
+        Assert.Contains("¿Qué se ha pagado?", c.Markup);
+        c.Find("#pregunta").Input("Café");
+        c.Find("form.chatform").Submit();
+        Assert.Contains("¿De qué fecha es?", c.Markup);
+        c.Find("#pregunta").Input("23/10/26");
+        c.Find("form.chatform").Submit();
+
+        var mensaje = Enviado(api).Mensajes[^1].Texto;
+        Assert.Contains("importe 12.5 €", mensaje);
+        Assert.Contains("concepto «Café»", mensaje);
+        Assert.Contains("fecha 2026-10-23", mensaje);
+    }
+
+    [Fact]
+    public void Una_fecha_mal_escrita_vuelve_a_preguntar_sin_enviar_nada_al_asistente()
+    {
+        var api = Chat(new ChatResponse("Ok.", []));
+        Registrar(api);
+        var c = Render<VistaAsistente>();
+        c.Find("button.alta-gasto").Click();
+        c.Find("#pregunta").Input("12");
+        c.Find("form.chatform").Submit();
+        c.Find("#pregunta").Input("Café");
+        c.Find("form.chatform").Submit();
+
+        c.Find("#pregunta").Input("2026-10-23");
+        c.Find("form.chatform").Submit();
+
+        Assert.Contains("La fecha no es válida", c.Markup);
+        Assert.DoesNotContain(api.Recibidas, r => r.Contains("chat/stream"));
+    }
+
+    [Fact]
     public async Task LectorSse_entregaLosEventosConSusDatosEnOrden()
     {
         const string cuerpo = "event: texto\ndata: {\"texto\":\"Hola\"}\n\nevent: texto\ndata: {\"texto\":\"qué tal\"}\n\nevent: fin\ndata: {}\n\n";

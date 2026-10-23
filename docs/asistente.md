@@ -85,6 +85,8 @@ La conversación no se guarda en el servidor; el historial lo manda el cliente i
 ### `POST /api/chat/confirmar-gasto`
 La única escritura del asistente; la llama el front solo cuando la persona pulsa «Confirmar» en la tarjeta del borrador.
 
+El front tiene además un alta guiada («Añadir gasto» en la carátula del chat): pregunta importe, concepto y fecha de uno en uno (la fecha como `DD/MM/YY`) sin llamar a la API, y al completarla envía al asistente un mensaje con los datos en formato técnico (importe con punto, fecha `AAAA-MM-DD`) para que proponga el borrador con `proponer_gasto`. El contrato HTTP no cambia; la lógica está en `ModeloAltaGastoChat` (`src/Web/Modelos`).
+
 ```json
 { "importe": 12.00, "concepto": "Café", "fecha": "2026-10-06", "pagadoPor": "b0000000-0000-4000-8000-0000000000aa",
   "categoriaId": "d0000000-0000-4000-8000-000000000009", "perfilRepartoId": "e0000000-0000-4000-8000-000000000001",

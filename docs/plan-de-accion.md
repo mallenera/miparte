@@ -76,7 +76,7 @@ Las fases van en orden de prioridad. Cada ítem indica su criterio de hecho.
 
 ### Fase 4 · Funcionalidad pendiente (por utilidad)
 
-15. **Notificaciones push del navegador.** *Implementado* (rama `feature/avisos-push`, 2026-10-20), pendiente de desplegar y de comprobar con claves reales. Alcance hecho: aviso al anotar un gasto nuevo (no personal), a los demás miembros con suscripción. Avisos al cerrar un ciclo o un periodo y al registrar un pago **implementados** (2026-10-21, `ServicioLiquidacion` y `ServicioPeriodos`; tests en `ServicioAvisosLiquidacionTests`, sin prueba del periodo). **Pendiente del punto:** prueba end-to-end con un navegador real y las claves VAPID en Render (ver [despliegue.md](despliegue.md#avisos-del-navegador-claves-vapid)). Diseño y decisiones:
+15. **Notificaciones push del navegador.** *Implementado* (rama `feature/avisos-push`, 2026-10-20), pendiente de desplegar y de comprobar con claves reales. Alcance hecho: aviso al anotar un gasto nuevo (no personal), a los demás miembros con suscripción. Avisos al cerrar un ciclo o un periodo y al registrar un pago **implementados** (2026-10-21, `ServicioLiquidacion` y `ServicioPeriodos`; tests en `ServicioAvisosLiquidacionTests`, sin prueba del periodo). Claves VAPID en Render **verificadas** (2026-10-21, pruebas hechas por la pareja). **Pendiente del punto:** prueba end-to-end con un navegador real con sesión iniciada (ver [despliegue.md](despliegue.md#avisos-del-navegador-claves-vapid)). Diseño y decisiones:
     - Tabla `suscripcion_push` en `Estructura/` (RLS sin acceso para `anon` y `authenticated`), `POST`/`DELETE /api/notificaciones/suscripcion` y `GET /api/notificaciones/clave-publica` en Core.Api, ver [api.md](api.md#312-avisos-del-navegador).
     - El caso de uso encola el aviso (`IPublicadorNotificaciones`, sin esperar); el envío es un servicio en segundo plano de Core.Api con la librería `WebPush`. Claves VAPID solo por entorno.
     - El aviso no va al pagador: la API no sabe quién anota el gasto, así que se excluye a quien lo paga. Si lo anota otra persona, el pagador no se entera.
@@ -97,12 +97,25 @@ Las fases van en orden de prioridad. Cada ítem indica su criterio de hecho.
 
 Fuera de alcance declarado: objetivos de ahorro e intereses.
 
-### Fase 5 · Entrega del proyecto fin de máster
+### Fase 5 · Entrega del proyecto fin de máster · **Hecha** (2026-10-23, verificada por la pareja)
 
 21. **Memoria**: incluir arquitectura por capas, decisiones D1-D7, pruebas (unitarias, PostgreSQL real, bUnit) y las líneas futuras de la fase 4. *Estado (refactor/entrega-calidad)*: borrador en `docs/memoria.md` (Markdown, solo con contenido del repo). Quedan marcados como **[PENDIENTE]** los datos de presentación (título oficial, autoría, tutor, fecha y formato del centro) y las pruebas en navegador real con el proyecto de producción.
 22. **Reproducibilidad**: README de despliegue y de arranque local (`docs/despliegue.md`, `docs/demo.md`) revisado contra lo que se haya probado en la fase 1. *Estado (refactor/entrega-calidad)*: revisado contra el código, scripts, `docker-compose.yml`, `render.yaml` y workflows. Corregido: enlace roto a una fila inexistente del README en `demo.md`; `despliegue.md` no describía `miparte-assistant` ni `ASSISTANT_URL`; README raíz con ruta de `supabase/` obsoleta y «ingresos» en la descripción. Sin verificar: despliegue real en Render, Cloudflare Pages, `pg_cron` y workflows (requieren cuentas y secretos); pruebas de fase 1 no revisadas.
 23. **Calidad final**: `dotnet test` completo y revisión de los comentarios XML de producción según `.claude/rules/idioma-y-documentacion.md`. *Estado (refactor/entrega-calidad)*: `dotnet build` sin errores (3 advertencias en tests). `dotnet test` con PostgreSQL 18 local (`MIPARTE_TEST_DB`, esquema migrado con `--con-auth-stub`): 1187 correctas, 0 omitidas, 0 fallidas. Sin esa variable: 1136 correctas, 51 omitidas, 0 fallidas. Comentarios XML: 1660 de 1660 miembros públicos de producción con `///` (100 %; se han añadido los 14 de tipos privados anidados de `Herramientas.cs` y `ClienteWorkersAi.cs`). Clean code: sin TODO ni código comentado; propuesta de división de `CoreApiClient.cs` pendiente de aprobación.
 
+### Fase 6 · Puesta en PRO con las últimas PR (prioridad alta, antes de dar el despliegue por bueno) · **Hecha** (2026-10-23)
+
+Verificada por la pareja el 2026-10-23: los puntos 24 a 31 funcionan correctamente en producción, incluidas las pruebas 403 con tokens reales (punto 30). Estado a 2026-10-21: todas las PR (#61 a #66 y la rama de avisos push) están en `origin/master`; no hay PR abiertas. El proyecto Supabase de producción es `miparte` (ref `jbacepjpayfreuokanvw`, eu-west-1). Su registro de `supabase/migrations` llega hasta `20261027120000_permiso_eliminar_hogar`; el journal de DbUp (`miparte_migraciones`) no se ha comprobado todavía y el esquema de `Scripts/` puede tener pendientes.
+
+24. **Copia de seguridad y esquema de producción.** Volcado previo con `pg_dump -Fc` y después `pendientes` y `migrar` con la cadena del Session pooler (puerto 5432). Novedades: scripts de `Scripts/` desde `20261015120000` hasta `20261024130000` y cambios de `Estructura/` en `auditoria`, `categoria` y `perfil_reparto`. Hecho cuando `pendientes` da 0 y los advisors no muestran nada nuevo.
+25. **Compilación y pruebas en local.** `dotnet build`, `dotnet test`, `dotnet test src/Web.Tests` y `dotnet test src/Assistant/Assistant.Tests`, con `MIPARTE_TEST_DB` para las pruebas de PostgreSQL. Hecho cuando todo pasa.
+26. **Render (Core.Api y Assistant.Api).** Se redespliegan al pasar CI en `master`. Hecho cuando `/health` y `GET /api/notificaciones/clave-publica` responden, `Asistente__Proveedor=cloudflare` sigue configurado y `scripts/probar-api.ps1` pasa contra Supabase real.
+27. **Cloudflare Pages (front).** `deploy-web.yml` al hacer push a `master`. Hecho cuando `https://miparte.pages.dev` carga sin violaciones de CSP y el service worker ofrece la actualización.
+28. **Pruebas manuales en producción.** Avisos push (punto 15: dos miembros suscritos, alta de gasto, cierre y pago), recurrentes personales (punto 16: plantilla real) y alta de gastos por chat (punto 18: borrador sin guardar hasta «Confirmar»). Hecho cuando los tres funcionan con datos reales.
+29. **Cuenta demo.** Comprobar en `cron.job_run_details` que `restablecer-demo` sigue funcionando; si la semilla falla, ejecutar `supabase/seed/demo.sql`. Hecho cuando la última ejecución es correcta.
+30. **Seguridad.** Advisors de Supabase y pruebas 403 con tokens reales (punto 6, recomendadas antes de PRO aunque sean opcionales). Hecho cuando no quedan avisos sin justificar.
+31. **Documentación.** Actualizar `docs/README.md` (tabla de estado) y este documento al cerrar cada punto. Hecho cuando reflejan lo probado.
+
 ## 3. Orden sugerido
 
-Fase 1 (cerrada; quedan opcionales las pruebas del punto 6) → fase 3 en paralelo, porque son decisiones y no dependen del código → fase 2 → fase 4 según tiempo → fase 5 al final.
+Fase 1 (cerrada; quedan opcionales las pruebas del punto 6) → fase 6 (puesta en PRO) → fase 3 en paralelo, porque son decisiones y no dependen del código → fase 2 → fase 4 según tiempo → fase 5 al final.

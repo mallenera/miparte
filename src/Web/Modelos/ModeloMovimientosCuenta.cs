@@ -6,7 +6,7 @@ namespace MiParte.Web.Modelos;
 
 /// <summary>
 /// Estado del extracto de movimientos de la cuenta común entre dos fechas, para cuadrarlo con el banco: lo pide a Core.Api y lo filtra
-/// en el cliente por tipo, persona y texto. Los filtros no recalculan el saldo: cada línea conserva el saldo real de la cuenta tras ella,
+/// en el cliente por tipo, cuenta (cuenta común o su ahorro), persona y texto. Los filtros no recalculan el saldo: cada línea conserva el saldo real de la cuenta tras ella,
 /// como en el banco. No depende de Blazor.
 /// </summary>
 /// <param name="api">Cliente de Core.Api.</param>
@@ -21,9 +21,17 @@ public sealed class ModeloMovimientosCuenta(CoreApiClient api, DateOnly hoy)
         ("salidas", "Solo salidas"),
         ("aportacion", "Aportaciones"),
         ("ingreso", "Ingresos sueltos"),
-        ("gasto", "Gastos pagados por la cuenta"),
+        ("gasto", "Gastos"),
         ("reembolso", "Reembolsos"),
-        ("ahorro", "Ahorro (ingresos, retiradas y gastos)"),
+        ("deposito_ahorro", "Ingresos al ahorro"),
+    ];
+
+    /// <summary>Filtros de cuenta: la cuenta común (dinero para gastos) o su ahorro; la clave vacía es «todas».</summary>
+    public static readonly IReadOnlyList<(string Clave, string Etiqueta)> Cuentas =
+    [
+        ("", "Todas"),
+        ("cuenta_comun", "Cuenta común"),
+        ("ahorro", "Cuenta común (ahorro)"),
     ];
 
     private int _version;
@@ -46,6 +54,9 @@ public sealed class ModeloMovimientosCuenta(CoreApiClient api, DateOnly hoy)
     /// <summary>Clave del filtro de tipo (ver <see cref="Tipos"/>); vacía para todos.</summary>
     public string FiltroTipo { get; set; } = "";
 
+    /// <summary>Clave del filtro de cuenta (ver <see cref="Cuentas"/>); vacía para todas.</summary>
+    public string FiltroCuenta { get; set; } = "";
+
     /// <summary>Id del miembro por el que se filtra (aporta, recibe o registra); vacío para todos.</summary>
     public string FiltroMiembro { get; set; } = "";
 
@@ -62,7 +73,7 @@ public sealed class ModeloMovimientosCuenta(CoreApiClient api, DateOnly hoy)
     public bool PeriodoValido => Desde <= Hasta;
 
     /// <summary>Si hay algún filtro aparte de las fechas.</summary>
-    public bool HayFiltros => FiltroTipo != "" || FiltroMiembro != "" || !string.IsNullOrWhiteSpace(FiltroTexto);
+    public bool HayFiltros => FiltroTipo != "" || FiltroCuenta != "" || FiltroMiembro != "" || !string.IsNullOrWhiteSpace(FiltroTexto);
 
     /// <summary>Líneas que pasan los filtros, de la más reciente a la más antigua (como la app del banco).</summary>
     public IReadOnlyList<MovimientoCuentaComunDto> Visibles =>
@@ -132,10 +143,11 @@ public sealed class ModeloMovimientosCuenta(CoreApiClient api, DateOnly hoy)
         Cargando = false;
     }
 
-    /// <summary>Quita los filtros de tipo, persona y texto (no cambia las fechas).</summary>
+    /// <summary>Quita los filtros de tipo, cuenta, persona y texto (no cambia las fechas).</summary>
     public void LimpiarFiltros()
     {
         FiltroTipo = "";
+        FiltroCuenta = "";
         FiltroMiembro = "";
         FiltroTexto = "";
     }
@@ -152,21 +164,34 @@ public sealed class ModeloMovimientosCuenta(CoreApiClient api, DateOnly hoy)
             "deposito_ahorro" => $"Ingreso al ahorro de {quien}",
             "gasto" => $"Gasto: {Nombre(m)}",
             "gasto_ahorro" => $"Gasto desde el ahorro: {Nombre(m)}",
+            "gasto_ahorro_adelantado" => $"Gasto desde el ahorro adelantado por {quien}: {Nombre(m)}",
             "reembolso" => $"Reembolso a {quien}",
             "retirada_ahorro" => $"Retirada de ahorro de {quien}",
             _ => m.Tipo,
         };
     }
 
-    /// <summary>Si la línea toca el ahorro (para marcarla en la lista).</summary>
-    public static bool EsAhorro(MovimientoCuentaComunDto m) => m.Tipo is "deposito_ahorro" or "gasto_ahorro" or "retirada_ahorro";
+    /// <summary>Si la línea es del ahorro de la cuenta común (para marcarla en la lista).</summary>
+    public static bool EsAhorro(MovimientoCuentaComunDto m)
+        => m.Tipo is "deposito_ahorro" or "gasto_ahorro" or "gasto_ahorro_adelantado" or "retirada_ahorro";
+
+    /// <summary>
+    /// Si la línea pasa el filtro de cuenta. Una aportación con parte de ahorro es de las dos: lleva dinero a la cuenta común y a su
+    /// ahorro.
+    /// </summary>
+    private bool PasaCuenta(MovimientoCuentaComunDto m) => FiltroCuenta switch
+    {
+        "cuenta_comun" => !EsAhorro(m),
+        "ahorro" => EsAhorro(m) || m.Tipo == "aportacion" && m.Ahorro > 0,
+        _ => true,
+    };
 
     /// <summary>Concepto del gasto o, si no tiene, el nombre de su categoría.</summary>
     private string Nombre(MovimientoCuentaComunDto m) =>
         !string.IsNullOrWhiteSpace(m.Concepto) ? m.Concepto
         : Categorias.FirstOrDefault(c => c.Id == m.CategoriaId)?.Nombre ?? "sin categoría";
 
-    /// <summary>Si la línea pasa los filtros de tipo, persona y texto.</summary>
+    /// <summary>Si la línea pasa los filtros de tipo, cuenta, persona y texto.</summary>
     private bool Pasa(MovimientoCuentaComunDto m)
     {
         var tipo = FiltroTipo switch
@@ -174,11 +199,10 @@ public sealed class ModeloMovimientosCuenta(CoreApiClient api, DateOnly hoy)
             "" => true,
             "entradas" => m.Importe > 0,
             "salidas" => m.Importe < 0,
-            "gasto" => m.Tipo is "gasto" or "gasto_ahorro",
-            "ahorro" => EsAhorro(m),
+            "gasto" => m.Tipo is "gasto" or "gasto_ahorro" or "gasto_ahorro_adelantado",
             var t => m.Tipo == t,
         };
-        if (!tipo) return false;
+        if (!tipo || !PasaCuenta(m)) return false;
         if (Guid.TryParse(FiltroMiembro, out var id) && m.MiembroId != id) return false;
 
         var texto = FiltroTexto.Trim();

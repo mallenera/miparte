@@ -164,14 +164,14 @@ public record SaldoInicialDto(DateOnly Fecha, decimal Importe);
 public record FijarSaldoInicialRequest(DateOnly Fecha, decimal Importe);
 
 /// <summary>Una línea del extracto bancario de la cuenta común (gastos y ahorro juntos).</summary>
-/// <param name="Tipo">saldo_inicial, aportacion, ingreso, deposito_ahorro, gasto, gasto_ahorro, reembolso o retirada_ahorro.</param>
+/// <param name="Tipo">saldo_inicial, aportacion, ingreso, deposito_ahorro, gasto, gasto_ahorro, gasto_ahorro_adelantado, reembolso o retirada_ahorro.</param>
 /// <param name="Id">Registro de origen (gasto, reembolso, ingreso, depósito o retirada); null en aportaciones y saldo inicial.</param>
 /// <param name="Fecha">Fecha del movimiento; las aportaciones se fechan el día 1 del mes en que cobran.</param>
 /// <param name="Importe">Importe con signo: positivo si entra en la cuenta, negativo si sale.</param>
-/// <param name="MiembroId">Miembro que aporta, recibe el reembolso o registra el movimiento; null en gastos y saldo inicial.</param>
+/// <param name="MiembroId">Miembro que aporta, recibe el reembolso, registra el movimiento o adelanta un gasto del ahorro; null en los gastos que paga la cuenta y en el saldo inicial.</param>
 /// <param name="CategoriaId">Categoría del gasto; null en el resto.</param>
 /// <param name="Concepto">Nota del movimiento, si la tiene.</param>
-/// <param name="Ahorro">Parte de una aportación que va a ahorro; 0 en el resto.</param>
+/// <param name="Ahorro">Lo que la línea cambia el ahorro sin verse en el importe: la parte de una aportación que va a ahorro (positiva) o lo que un gasto del ahorro adelantado (<c>gasto_ahorro_adelantado</c>, importe 0) saca de él para pasarlo al efectivo (negativo); 0 en el resto.</param>
 /// <param name="Saldo">Saldo de la cuenta tras el movimiento.</param>
 public record MovimientoCuentaComunDto(
     string Tipo, Guid? Id, DateOnly Fecha, decimal Importe, Guid? MiembroId, Guid? CategoriaId, string? Concepto, decimal Ahorro, decimal Saldo);

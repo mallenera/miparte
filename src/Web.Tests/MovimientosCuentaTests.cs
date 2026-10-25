@@ -23,6 +23,7 @@ public class MovimientosCuentaTests : BunitContext
             new("ingreso", Guid.NewGuid(), new DateOnly(2026, 10, 3), 40m, LuisId, null, "Cena amigas", 0m, 640m),
             new("deposito_ahorro", Guid.NewGuid(), new DateOnly(2026, 10, 4), 100m, AnaId, null, "Lotería", 0m, 740m),
             new("gasto", Guid.NewGuid(), new DateOnly(2026, 10, 5), -80m, null, Luz.Id, null, 0m, 660m),
+            new("gasto_ahorro_adelantado", Guid.NewGuid(), new DateOnly(2026, 10, 7), 0m, AnaId, Luz.Id, "Fianza", -30m, 660m),
             new("retirada_ahorro", Guid.NewGuid(), new DateOnly(2026, 10, 9), -60m, LuisId, null, null, 0m, 600m),
         ], EfectivoFinal: 460m, AhorroFinal: 140m);
 
@@ -48,16 +49,16 @@ public class MovimientosCuentaTests : BunitContext
         var m = await Modelo(api);
 
         Assert.Contains("/api/cuenta-comun/movimientos?desde=2026-10-01&hasta=2026-10-15", api.Consultas);
-        Assert.Equal(5, m.Visibles.Count);
+        Assert.Equal(6, m.Visibles.Count);
         Assert.Equal("retirada_ahorro", m.Visibles[0].Tipo);
     }
 
     [Theory]
     [InlineData("entradas", 3)]
     [InlineData("salidas", 2)]
-    [InlineData("ahorro", 2)]
     [InlineData("ingreso", 1)]
-    [InlineData("gasto", 1)]
+    [InlineData("gasto", 2)]
+    [InlineData("deposito_ahorro", 1)]
     public async Task El_filtro_de_tipo_se_aplica_sin_volver_a_pedir(string tipo, int lineas)
     {
         var api = Api();
@@ -68,6 +69,35 @@ public class MovimientosCuentaTests : BunitContext
 
         Assert.Equal(lineas, m.Visibles.Count);
         Assert.Equal(pedidas, api.Recibidas.Count);
+    }
+
+    [Theory]
+    [InlineData("cuenta_comun", new[] { "gasto", "ingreso", "aportacion" })]
+    [InlineData("ahorro", new[] { "retirada_ahorro", "gasto_ahorro_adelantado", "deposito_ahorro", "aportacion" })]
+    public async Task El_filtro_de_cuenta_separa_la_cuenta_comun_de_su_ahorro(string cuenta, string[] tipos)
+    {
+        var m = await Modelo(Api());
+
+        m.FiltroCuenta = cuenta;
+
+        // La aportación con parte de ahorro es de las dos cuentas.
+        Assert.Equal(tipos, m.Visibles.Select(v => v.Tipo));
+        Assert.True(m.HayFiltros);
+        m.LimpiarFiltros();
+        Assert.Equal("", m.FiltroCuenta);
+    }
+
+    [Fact]
+    public async Task Un_gasto_del_ahorro_adelantado_se_describe_con_quien_lo_adelanta_y_no_cuenta_en_entradas_ni_salidas()
+    {
+        var m = await Modelo(Api());
+
+        m.FiltroTipo = "gasto";
+
+        var adelantado = Assert.Single(m.Visibles, v => v.Tipo == "gasto_ahorro_adelantado");
+        Assert.Equal("Gasto desde el ahorro adelantado por Ana: Fianza", m.Descripcion(adelantado));
+        Assert.True(ModeloMovimientosCuenta.EsAhorro(adelantado));
+        Assert.Equal(80m, m.SalidasVisibles);
     }
 
     [Fact]
@@ -94,7 +124,7 @@ public class MovimientosCuentaTests : BunitContext
 
         m.FiltroTipo = "gasto";
 
-        Assert.Equal("Gasto: Luz", m.Descripcion(m.Visibles[0]));
+        Assert.Equal("Gasto: Luz", m.Descripcion(m.Visibles.Single(v => v.Tipo == "gasto")));
     }
 
     [Fact]
@@ -181,7 +211,9 @@ public class MovimientosCuentaTests : BunitContext
         Assert.Contains("600,00", c.Find("#movimientos-saldo-final").TextContent);
         Assert.Contains("460,00", c.Find("#movimientos-efectivo").TextContent);
         Assert.Contains("140,00", c.Find("#movimientos-ahorro").TextContent);
-        Assert.Equal(5, c.FindAll("#movimientos-lista .gastorow").Count);
+        Assert.Equal(6, c.FindAll("#movimientos-lista .gastorow").Count);
+        Assert.Contains("del ahorro al efectivo, pendiente de reembolso", c.Markup); // el adelantado, sin mover el saldo
+        Assert.Contains("cuenta común (ahorro)", c.Markup);
 
         c.Find("select").Change("salidas");
 
@@ -207,9 +239,10 @@ public class MovimientosCuentaTests : BunitContext
         Services.AddSingleton(Cliente(Api()));
 
         var c = Render<PanelMovimientosCuenta>(p => p.Add(x => x.Hoy, Hoy));
-        c.FindAll("select")[1].Change(AnaId.ToString());
+        c.FindAll("select")[2].Change(AnaId.ToString());
 
         Assert.DoesNotContain("Retirada de ahorro de Luis", c.Markup);
+        Assert.Contains("adelantado por Ana", c.Markup);
         Assert.Contains("Aportación de Ana", c.Markup);
     }
 }

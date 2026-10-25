@@ -121,7 +121,7 @@ public class MovimientosBancoTests
         var directo = new GastoPagadoPorCuenta(Guid.NewGuid(), Enero.AddDays(9), 120m, Guid.NewGuid(), null, false);
         var delAhorro = new GastoPagadoPorCuenta(Guid.NewGuid(), Enero.AddMonths(1).AddDays(2), 60m, Guid.NewGuid(), null, true);
         var adelantado = new GastoDeCuenta(Luis, Enero.AddMonths(1).AddDays(5), 90m);
-        var adelantadoDelAhorro = new GastoDeCuenta(Ana, Enero.AddDays(20), 30m, DesdeAhorro: true);
+        var adelantadoDelAhorro = new GastoPagadoPorCuenta(Guid.NewGuid(), Enero.AddDays(20), 30m, Guid.NewGuid(), null, true, Ana);
         var reembolso = Mov(Enero.AddMonths(1).AddDays(8), 50m, Luis);
         var ingreso = Mov(Enero.AddDays(12), 40m);
         var deposito = Mov(Enero.AddDays(15), 200m);
@@ -135,13 +135,32 @@ public class MovimientosBancoTests
         var x = MovimientosBanco.Calcular(Enero, febrero.AddMonths(1).AddDays(-1), d);
         var cuenta = CuentaComun.Calcular(
             febrero, aportaciones,
-            [new(null, directo.Fecha, directo.Importe), new(null, delAhorro.Fecha, delAhorro.Importe, true), adelantado, adelantadoDelAhorro],
+            [new(null, directo.Fecha, directo.Importe), new(null, delAhorro.Fecha, delAhorro.Importe, true), adelantado,
+                new(Ana, adelantadoDelAhorro.Fecha, adelantadoDelAhorro.Importe, true)],
             [new(Luis, reembolso.Fecha, reembolso.Importe)], [new(retirada.Fecha, retirada.Importe)],
             [new(deposito.Fecha, deposito.Importe)], saldoInicial, [new(ingreso.Fecha, ingreso.Importe)]);
 
         Assert.Equal(cuenta.Efectivo, x.EfectivoFinal);
         Assert.Equal(cuenta.AhorroDisponible, x.AhorroFinal);
         Assert.Equal(x.SaldoFinal, x.EfectivoFinal + x.AhorroFinal);
+    }
+
+    [Fact]
+    public void UnGastoDelAhorroAdelantado_SaleComoLineaSinImporte_YPasaDelAhorroAlEfectivo()
+    {
+        var aportaciones = new[] { new AportacionVigente(Ana, Enero, 500m, 100m) };
+        var cat = Guid.NewGuid();
+        var adelantado = new GastoPagadoPorCuenta(Guid.NewGuid(), Enero.AddDays(9), 60m, cat, "Fianza", true, Ana);
+        var d = Datos(aportaciones) with { AdelantadosDelAhorro = [adelantado] };
+
+        var x = MovimientosBanco.Calcular(Enero, Enero.AddDays(30), d);
+
+        var linea = Assert.Single(x.Movimientos, m => m.Tipo == TipoMovimientoBanco.GastoAhorroAdelantado);
+        Assert.Equal((adelantado.Id, 0m, -60m, Ana, cat, "Fianza"), (linea.Id!.Value, linea.Importe, linea.Ahorro, linea.MiembroId!.Value, linea.CategoriaId!.Value, linea.Concepto));
+        Assert.Equal(500m, linea.Saldo); // el banco no cambia
+        Assert.Equal((0m, 500m), (x.Salidas, x.SaldoFinal));
+        Assert.Equal((460m, 40m), (x.EfectivoFinal, x.AhorroFinal)); // 400 + 60 que la cuenta debe a Ana; 100 - 60 de ahorro
+        Assert.Equal("gasto_ahorro_adelantado", MovimientosBanco.ATexto(linea.Tipo));
     }
 
     [Fact]

@@ -12,7 +12,8 @@
     </div>
     <p class="muted">
         Todo lo que entra y sale de la cuenta, ahorro incluido, para compararlo con el banco. Las aportaciones aparecen el día 1 del mes en que
-        tocan; los gastos que adelanta una persona no salen hasta que se le reembolsan.
+        tocan; los gastos de la cuenta común que adelanta una persona no salen hasta que se le reembolsan. Los de la cuenta común (ahorro)
+        adelantados sí salen, sin mover el saldo: pasan su importe del ahorro al efectivo hasta reembolsarlos.
     </p>
 
     <div class="filtros" role="group" aria-label="Periodo de los movimientos">
@@ -32,6 +33,14 @@
         <label>Tipo
             <select @bind="_m.FiltroTipo">
                 @foreach (var (clave, etiqueta) in ModeloMovimientosCuenta.Tipos)
+                {
+                    <option value="@clave">@etiqueta</option>
+                }
+            </select>
+        </label>
+        <label>Cuenta
+            <select @bind="_m.FiltroCuenta">
+                @foreach (var (clave, etiqueta) in ModeloMovimientosCuenta.Cuentas)
                 {
                     <option value="@clave">@etiqueta</option>
                 }
@@ -89,7 +98,7 @@
                         <div class="g-concepto">@_m.Descripcion(mov)</div>
                         <div class="muted g-meta">
                             @mov.Fecha.ToString("dd/MM/yyyy", Es)
-                            @if (mov.Tipo is not ("gasto" or "gasto_ahorro") && !string.IsNullOrWhiteSpace(mov.Concepto))
+                            @if (mov.Tipo is not ("gasto" or "gasto_ahorro" or "gasto_ahorro_adelantado") && !string.IsNullOrWhiteSpace(mov.Concepto))
                             {
                                 <span> · @mov.Concepto</span>
                             }
@@ -97,13 +106,24 @@
                             {
                                 <span> · @Formato.Euros(mov.Ahorro) a ahorro</span>
                             }
+                            else if (mov.Ahorro < 0)
+                            {
+                                <span> · @Formato.Euros(-mov.Ahorro) del ahorro al efectivo, pendiente de reembolso</span>
+                            }
                             @if (ModeloMovimientosCuenta.EsAhorro(mov))
                             {
-                                <span class="tag cur">ahorro</span>
+                                <span class="tag cur">cuenta común (ahorro)</span>
                             }
                         </div>
                     </div>
-                    <div class="g-importe saldo @(mov.Importe < 0 ? "neg" : "pos")">@(mov.Importe < 0 ? "−" : "+")@Formato.Euros(Math.Abs(mov.Importe))</div>
+                    @if (mov.Tipo == "gasto_ahorro_adelantado")
+                    {
+                        <div class="g-importe muted" title="No mueve el saldo del banco">@Formato.Euros(-mov.Ahorro)</div>
+                    }
+                    else
+                    {
+                        <div class="g-importe saldo @(mov.Importe < 0 ? "neg" : "pos")">@(mov.Importe < 0 ? "−" : "+")@Formato.Euros(Math.Abs(mov.Importe))</div>
+                    }
                     <div class="mov-saldo muted">Saldo @Formato.Euros(mov.Saldo)</div>
                 </div>
             }

@@ -25,6 +25,7 @@ public static class CsvMovimientos
         "deposito_ahorro" => "Ingreso al ahorro",
         "gasto" => "Gasto",
         "gasto_ahorro" => "Gasto desde el ahorro",
+        "gasto_ahorro_adelantado" => "Gasto desde el ahorro adelantado",
         "reembolso" => "Reembolso",
         "retirada_ahorro" => "Retirada de ahorro",
         _ => tipo,

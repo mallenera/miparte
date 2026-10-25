@@ -21,6 +21,12 @@ public enum TipoMovimientoBanco
     /// <summary>Gasto que paga la cuenta con el ahorro (salida).</summary>
     GastoAhorro,
 
+    /// <summary>
+    /// Gasto del ahorro que adelanta una persona: no mueve el banco (importe 0), pero pasa su importe del ahorro al efectivo, que se
+    /// lo debe hasta reembolsarlo.
+    /// </summary>
+    GastoAhorroAdelantado,
+
     /// <summary>Reembolso a quien adelantó un gasto de la cuenta (salida).</summary>
     Reembolso,
 
@@ -28,24 +34,31 @@ public enum TipoMovimientoBanco
     RetiradaAhorro,
 }
 
-/// <summary>Gasto pagado directamente por la cuenta común (sin nadie que lo adelante), con lo que hace falta para reconocerlo en el banco.</summary>
-public sealed record GastoPagadoPorCuenta(Guid Id, DateOnly Fecha, decimal Importe, Guid CategoriaId, string? Concepto, bool DesdeAhorro);
+/// <summary>
+/// Gasto a cargo de la cuenta común con lo que hace falta para reconocerlo en el banco: lo paga la cuenta directamente
+/// (<paramref name="PagadoPor"/> null) o, en los gastos del ahorro, puede haberlo adelantado <paramref name="PagadoPor"/>.
+/// </summary>
+public sealed record GastoPagadoPorCuenta(
+    Guid Id, DateOnly Fecha, decimal Importe, Guid CategoriaId, string? Concepto, bool DesdeAhorro, Guid? PagadoPor = null);
 
 /// <summary>
-/// Todo lo que mueve dinero en el banco de la cuenta común hasta una fecha. Los gastos que adelanta una persona no están: el banco
-/// no los ve hasta que se le reembolsan. <paramref name="AdelantadosDelAhorro"/> son los gastos del ahorro que adelantó una persona
-/// (datos antiguos): no mueven el banco, pero pasan dinero del ahorro al efectivo, así que hacen falta para repartir el saldo.
+/// Todo lo que mueve dinero en el banco de la cuenta común hasta una fecha. Los gastos de la cuenta que adelanta una persona no están:
+/// el banco no los ve hasta que se le reembolsan. <paramref name="AdelantadosDelAhorro"/> son los gastos del ahorro que adelantó una
+/// persona (con su <c>PagadoPor</c>): tampoco mueven el banco, pero pasan dinero del ahorro al efectivo, así que salen como línea
+/// propia (sin importe) para que se vean y para repartir el saldo.
 /// </summary>
 public sealed record DatosMovimientosBanco(
     IReadOnlyList<AportacionVigente> Aportaciones, SaldoInicialCuenta? SaldoInicial, IReadOnlyList<GastoPagadoPorCuenta> Gastos,
     IReadOnlyList<MovimientoCuenta> Reembolsos, IReadOnlyList<MovimientoCuenta> Ingresos,
     IReadOnlyList<MovimientoCuenta> Depositos, IReadOnlyList<MovimientoCuenta> Retiradas,
-    IReadOnlyList<GastoDeCuenta>? AdelantadosDelAhorro = null);
+    IReadOnlyList<GastoPagadoPorCuenta>? AdelantadosDelAhorro = null);
 
 /// <summary>
 /// Una línea del extracto bancario de la cuenta común. <paramref name="Importe"/> lleva signo (entradas positivas, salidas negativas) y
 /// <paramref name="Saldo"/> es el saldo de la cuenta (gastos y ahorro juntos) tras el movimiento. <paramref name="Id"/> es null en las
-/// líneas que no son un registro propio (aportaciones y saldo inicial); <paramref name="Ahorro"/> es la parte de una aportación que va a ahorro.
+/// líneas que no son un registro propio (aportaciones y saldo inicial). <paramref name="Ahorro"/> es lo que la línea cambia el ahorro
+/// sin que se vea en el importe: la parte de una aportación que va a ahorro (positiva) o lo que un gasto del ahorro adelantado saca de él
+/// (negativo); 0 en el resto.
 /// </summary>
 public sealed record MovimientoBanco(
     TipoMovimientoBanco Tipo, Guid? Id, DateOnly Fecha, decimal Importe, Guid? MiembroId, Guid? CategoriaId, string? Concepto,
@@ -76,6 +89,7 @@ public static class MovimientosBanco
         TipoMovimientoBanco.DepositoAhorro => "deposito_ahorro",
         TipoMovimientoBanco.Gasto => "gasto",
         TipoMovimientoBanco.GastoAhorro => "gasto_ahorro",
+        TipoMovimientoBanco.GastoAhorroAdelantado => "gasto_ahorro_adelantado",
         TipoMovimientoBanco.Reembolso => "reembolso",
         TipoMovimientoBanco.RetiradaAhorro => "retirada_ahorro",
         _ => throw new ArgumentOutOfRangeException(nameof(tipo)),
@@ -109,9 +123,6 @@ public static class MovimientosBanco
             else lineas.Add(l with { Saldo = saldo });
         }
 
-        // Un gasto del ahorro adelantado por alguien no toca el banco: el ahorro baja y el efectivo sube lo mismo (la cuenta se lo debe).
-        ahorro -= (d.AdelantadosDelAhorro ?? []).Where(g => g.Fecha <= hasta).Sum(g => g.Importe);
-
         var entradas = lineas.Where(l => l.Importe > 0).Sum(l => l.Importe);
         var salidas = -lineas.Where(l => l.Importe < 0).Sum(l => l.Importe);
         var final = anterior + entradas - salidas;
@@ -121,7 +132,8 @@ public static class MovimientosBanco
     /// <summary>Lo que una línea suma (o resta) al ahorro; el resto de su importe es efectivo.</summary>
     private static decimal ParteAhorro(MovimientoBanco l) => l.Tipo switch
     {
-        TipoMovimientoBanco.Aportacion => l.Ahorro,
+        // Un gasto del ahorro adelantado no toca el banco: el ahorro baja y el efectivo sube lo mismo (la cuenta se lo debe).
+        TipoMovimientoBanco.Aportacion or TipoMovimientoBanco.GastoAhorroAdelantado => l.Ahorro,
         TipoMovimientoBanco.DepositoAhorro or TipoMovimientoBanco.GastoAhorro or TipoMovimientoBanco.RetiradaAhorro => l.Importe,
         _ => 0m,
     };
@@ -150,6 +162,8 @@ public static class MovimientosBanco
         foreach (var g in d.Gastos)
             yield return new(g.DesdeAhorro ? TipoMovimientoBanco.GastoAhorro : TipoMovimientoBanco.Gasto, g.Id, g.Fecha, -g.Importe,
                 null, g.CategoriaId, g.Concepto, 0m, 0m);
+        foreach (var g in d.AdelantadosDelAhorro ?? [])
+            yield return new(TipoMovimientoBanco.GastoAhorroAdelantado, g.Id, g.Fecha, 0m, g.PagadoPor, g.CategoriaId, g.Concepto, -g.Importe, 0m);
         foreach (var x in d.Reembolsos) yield return Suelto(TipoMovimientoBanco.Reembolso, x, -1);
         foreach (var x in d.Retiradas) yield return Suelto(TipoMovimientoBanco.RetiradaAhorro, x, -1);
     }

@@ -412,40 +412,27 @@ public class ComponentesTests : BunitContext
     }
 
     [Fact]
-    public void Cuenta_comun_retirada_de_ahorro_solo_se_ofrece_con_ahorro_disponible_y_envia_importe()
+    public void Cuenta_comun_ya_no_muestra_retiradas_y_remite_a_gastos_para_gastar_del_ahorro()
     {
         var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
-        var conAhorro = Cuenta(0m) with { AhorroAcumulado = 300m, AhorroDisponible = 300m };
+        var conAhorro = Cuenta(0m) with
+        {
+            AhorroAcumulado = 300m, AhorroDisponible = 180m, AhorroGastado = 120m, AhorroActivo = true,
+            RetiradasAhorro = [new RetiradaAhorroDto(Guid.NewGuid(), AnaId, DateOnly.FromDateTime(DateTime.Today), 50m, "Antigua")],
+        };
         var api = new ApiFalsa()
             .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
-            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, conAhorro)
-            .Responde("POST /api/cuenta-comun/retiradas-ahorro", HttpStatusCode.Created,
-                new RetiradaAhorroDto(Guid.NewGuid(), AnaId, DateOnly.FromDateTime(DateTime.Today), 120m, null));
-        Registrar(api);
-        var c = Render<VistaCuentaComun>();
-
-        Assert.Contains("300,00", c.Find("#ahorro").TextContent);
-        c.Find("#form-retirada input").Input("120");
-        c.Find("#form-retirada").Submit();
-
-        var cuerpo = api.Cuerpos["POST /api/cuenta-comun/retiradas-ahorro"];
-        Assert.Contains(AnaId.ToString(), cuerpo);
-        Assert.Contains("\"importe\":120", cuerpo);
-    }
-
-    [Fact]
-    public void Cuenta_comun_sin_ahorro_no_ofrece_retirar()
-    {
-        var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
-        var api = new ApiFalsa()
-            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
-            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, Cuenta(0m));
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, conAhorro);
         Registrar(api);
 
         var c = Render<VistaCuentaComun>();
 
+        Assert.Contains("180,00", c.Find("#ahorro").TextContent);
         Assert.Empty(c.FindAll("#form-retirada"));
-        Assert.Contains("No hay ahorro disponible", c.Markup);
+        Assert.DoesNotContain("Retirado", c.Markup);
+        Assert.DoesNotContain("Retirada de", c.Markup);
+        Assert.Contains("Gastado del ahorro", c.Markup);
+        Assert.Contains("Anotar un gasto del ahorro", c.Markup);
     }
 
     [Fact]

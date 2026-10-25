@@ -230,7 +230,7 @@ internal sealed class RepositorioCuentaComunEnMemoria(AlmacenDemo a) : IReposito
             a.Depositos.Where(x => x.Fecha <= hasta).Select(x => M(x.Id, x.MiembroId, x.Fecha, x.Importe, x.Concepto)).ToList(),
             a.Retiradas.Where(x => x.Fecha <= hasta).Select(x => M(x.Id, x.MiembroId, x.Fecha, x.Importe, x.Concepto)).ToList(),
             a.Gastos.Where(g => g.ACargoCuentaComun && g.PagadoPor is not null && g.PagadoDesdeAhorro && g.Fecha <= hasta)
-                .Select(g => new GastoDeCuenta(g.PagadoPor, g.Fecha, g.Importe, true)).ToList());
+                .Select(g => new GastoPagadoPorCuenta(g.Id, g.Fecha, g.Importe, g.CategoriaId, g.Concepto, true, g.PagadoPor)).ToList());
     }
 
     public Task<SaldoInicialCuenta?> SaldoInicialAsync(CancellationToken ct)

@@ -14,7 +14,8 @@ public static class GeneracionRecurrente
 
     /// <summary>
     /// Crea el gasto de un mes a partir de una plantilla, con su reparto calculado según el perfil. Devuelve null y el
-    /// motivo en <paramref name="error"/> si no se puede repartir. El gasto queda a cargo de la cuenta común si el perfil lo es.
+    /// motivo en <paramref name="error"/> si no se puede repartir. El gasto queda a cargo de la cuenta común si el perfil lo es, y
+    /// se paga desde el ahorro si el perfil es el de cuenta común (ahorro).
     /// Una plantilla personal asume el importe íntegro quien paga, como un gasto personal anotado a mano, sin mirar el perfil.
     /// </summary>
     public static Gasto? CrearGasto(
@@ -31,7 +32,8 @@ public static class GeneracionRecurrente
             Id = Guid.NewGuid(), HogarId = plantilla.HogarId, Fecha = new DateOnly(inicioMes.Year, inicioMes.Month, plantilla.DiaMes),
             Importe = plantilla.Importe, CategoriaId = plantilla.CategoriaId, PagadoPor = plantilla.PagadoPor,
             PerfilRepartoId = plantilla.PerfilRepartoId, Concepto = plantilla.Concepto, GastoRecurrenteId = plantilla.Id,
-            ACargoCuentaComun = !plantilla.EsPersonal && perfil.Modo == ModoReparto.CuentaComun, EsPersonal = plantilla.EsPersonal,
+            ACargoCuentaComun = !plantilla.EsPersonal && ModosDeCuenta.EsDeCuentaComun(perfil.Modo), EsPersonal = plantilla.EsPersonal,
+            PagadoDesdeAhorro = !plantilla.EsPersonal && perfil.Modo == ModoReparto.CuentaComunAhorro,
         };
         RepartoGasto.Aplicar(gasto, partes);
         return gasto;

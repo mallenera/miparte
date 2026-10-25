@@ -492,10 +492,10 @@ public class ComponentesTests : BunitContext
     }
 
     [Fact]
-    public void Gasto_ofrece_pagar_desde_el_ahorro_y_lo_envia_sin_pagador()
+    public void Gasto_ofrece_el_perfil_de_ahorro_y_lo_envia_sin_pagador_si_lo_paga_el_ahorro()
     {
         var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
-        var perfil = new PerfilRepartoDto(Guid.NewGuid(), "Cuenta común", "cuenta_comun", []);
+        var perfil = new PerfilRepartoDto(Guid.NewGuid(), "Cuenta común (ahorro)", "cuenta_comun_ahorro", []);
         var cat = new CategoriaDto(Guid.NewGuid(), "Casa", null, null);
         var api = new ApiFalsa()
             .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
@@ -509,9 +509,11 @@ public class ComponentesTests : BunitContext
         Registrar(api, new HogarResumen(Casa.Id, "Casa", true, true));
         var c = Render<VistaGastos>();
 
-        // Solo hay ahorro (sin aportaciones): aun así se ofrece pagar desde él.
-        Assert.Contains("Ahorro (se descuenta del ahorro)", c.Markup);
-        c.FindAll("form.addcat select")[1].Change("ahorro");
+        // Solo hay ahorro (sin aportaciones): aun así se ofrece su perfil, y con él, que lo pague el propio ahorro.
+        Assert.Contains("Cuenta común (ahorro)", c.Markup);
+        Assert.Contains("El ahorro (lo paga directamente)", c.Markup);
+        Assert.Contains("Se descuenta del ahorro", c.Markup);
+        c.FindAll("form.addcat select")[1].Change("");
         c.Find("form.addcat input[inputmode=decimal]").Input("80");
         c.Find("form.addcat").Submit();
 

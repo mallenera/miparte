@@ -94,7 +94,7 @@ public sealed class ServicioCategorias(IRepositorioCategorias repositorio, IRepo
     /// <summary>
     /// Valida los datos y devuelve el nombre normalizado, el perfil definitivo y si va a cargo de la cuenta común.
     /// «A cargo de la cuenta común» y el perfil de cuenta común son la misma decisión: uno implica el otro, y sin perfil se asigna el
-    /// de cuenta común del hogar.
+    /// de cuenta común del hogar. El perfil de cuenta común (ahorro) también deja la categoría a cargo de la cuenta (de su ahorro).
     /// </summary>
     private async Task<Validada> ValidarAsync(DatosCategoria d, Guid? idActual, CancellationToken ct)
     {
@@ -109,7 +109,7 @@ public sealed class ServicioCategorias(IRepositorioCategorias repositorio, IRepo
             if (perfil is null) return Mal("El perfil de reparto no existe en este hogar.");
         }
 
-        var aCargo = d.ACargoCuentaComun || perfil?.Modo == ModoReparto.CuentaComun;
+        var aCargo = d.ACargoCuentaComun || (perfil is not null && ModosDeCuenta.EsDeCuentaComun(perfil.Modo));
         if (aCargo)
         {
             if (perfil is null)
@@ -117,7 +117,7 @@ public sealed class ServicioCategorias(IRepositorioCategorias repositorio, IRepo
                 perfil = await repositorio.PerfilDeCuentaComunAsync(ct);
                 if (perfil is null) return Mal("El hogar no tiene un perfil de cuenta común: créalo antes de marcar la categoría.");
             }
-            else if (perfil.Modo != ModoReparto.CuentaComun)
+            else if (!ModosDeCuenta.EsDeCuentaComun(perfil.Modo))
             {
                 return Mal("Una categoría a cargo de la cuenta común debe usar el perfil de cuenta común.");
             }

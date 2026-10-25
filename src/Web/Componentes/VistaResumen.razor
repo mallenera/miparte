@@ -203,6 +203,10 @@ else if (_m.Resumen is not null && _m.Liquidacion is not null)
                 <span class="chip">Efectivo&nbsp;<b>@Formato.Euros(cuenta.Efectivo)</b></span>
                 <span class="chip">Aportado este mes&nbsp;<b>@Formato.Euros(cuenta.AportadoMes)</b></span>
                 <span class="chip">Gastado este mes&nbsp;<b>@Formato.Euros(cuenta.GastadoMes)</b></span>
+                @if (cuenta.GastadoAhorroMes > 0)
+                {
+                    <span class="chip">Gastado del ahorro este mes&nbsp;<b>@Formato.Euros(cuenta.GastadoAhorroMes)</b></span>
+                }
                 <span class="chip">Ahorro disponible&nbsp;<b>@Formato.Euros(cuenta.AhorroDisponible)</b></span>
                 @if (cuenta.Pendiente > 0)
                 {

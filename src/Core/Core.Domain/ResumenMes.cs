@@ -18,10 +18,13 @@ public sealed record ResumenMiembro(Guid MiembroId, string Nombre, decimal Pagad
 /// <summary>Gasto de una categoría en el mes y lo que asume cada miembro.</summary>
 public sealed record ResumenCategoria(Guid CategoriaId, string Nombre, decimal Total, IReadOnlyList<ImporteMiembro> PorMiembro);
 
-/// <summary>Saldos de la cuenta común al final del mes.</summary>
+/// <summary>
+/// Saldos de la cuenta común al final del mes. <paramref name="GastadoMes"/> es lo gastado de la cuenta en el mes sin lo pagado
+/// desde el ahorro, que va aparte en <paramref name="GastadoAhorroMes"/>.
+/// </summary>
 public sealed record ResumenCuenta(
     decimal AportadoMes, decimal GastadoMes, decimal Saldo, decimal Efectivo, decimal PendienteReembolso,
-    decimal AhorroMes, decimal AhorroDisponible);
+    decimal AhorroMes, decimal AhorroDisponible, decimal GastadoAhorroMes = 0m);
 
 /// <summary>Resumen mensual del hogar; <see cref="Cuenta"/> es null si el hogar no tiene activada la cuenta común.</summary>
 public sealed record ResumenDelMes(
@@ -76,10 +79,12 @@ public static class ResumenMes
             var estado = CuentaComun.Calcular(
                 inicio, historico.Vigentes, historico.Gastos, historico.Reembolsos, historico.Retiradas, historico.Depositos,
                 historico.SaldoInicial, historico.Ingresos);
+            // Lo gastado de la cuenta y lo gastado del ahorro se informan por separado.
+            var delAhorro = (historico.GastosDelMes ?? []).Where(g => g.DesdeAhorro).Sum(g => g.Importe);
             resumenCuenta = new ResumenCuenta(
-                estado.AportadoMes, historico.GastadoMes, estado.Saldo,
+                estado.AportadoMes, historico.GastadoMes - delAhorro, estado.Saldo,
                 estado.Efectivo, estado.Pendientes.Where(p => p.Importe > 0m).Sum(p => p.Importe),
-                estado.AhorroMes, estado.AhorroDisponible);
+                estado.AhorroMes, estado.AhorroDisponible, delAhorro);
         }
 
         return new ResumenDelMes(inicio, gastosTotales, porMiembro, porCategoria, resumenCuenta, personales.Sum(g => g.Importe));

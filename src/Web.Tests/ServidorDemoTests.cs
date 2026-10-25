@@ -1,6 +1,7 @@
 using MiParte.Contracts;
 using MiParte.Web.Api;
 using MiParte.Web.Demo;
+using MiParte.Web.Reparto;
 
 namespace MiParte.Web.Tests;
 
@@ -149,7 +150,7 @@ public class ServidorDemoTests
         var api = Cliente();
         var perfiles = await api.ListarPerfilesAsync();
         var origen = perfiles.First(p => p.Modo == "partes");
-        var destino = perfiles.First(p => p.Modo != "cuenta_comun" && p.Id != origen.Id);
+        var destino = perfiles.First(p => !ModosReparto.EsDeCuentaComun(p.Modo) && p.Id != origen.Id);
 
         var enUso = await Assert.ThrowsAsync<ApiException>(() => api.EliminarPerfilAsync(origen.Id));
         Assert.True(enUso.EnUso);

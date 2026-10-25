@@ -60,6 +60,10 @@ else if (_m.Estado is not null)
             <span class="chip">Aportado este mes&nbsp;<b>@Formato.Euros(_m.Estado.AportadoMes)</b></span>
             <span class="chip">Aportado en total&nbsp;<b>@Formato.Euros(_m.Estado.Aportado)</b></span>
             <span class="chip">Gastado en total&nbsp;<b>@Formato.Euros(_m.Estado.Gastado)</b></span>
+            @if (_m.Estado.AhorroActivo || _m.Estado.AhorroGastado != 0)
+            {
+                <span class="chip">Gastado del ahorro&nbsp;<b>@Formato.Euros(_m.Estado.AhorroGastado)</b></span>
+            }
             @if (_m.Estado.AhorroActivo)
             {
                 <span class="chip">Ahorro disponible&nbsp;<b id="ahorro">@Formato.Euros(_m.Estado.AhorroDisponible)</b></span>

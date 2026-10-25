@@ -39,7 +39,8 @@ public static class RepartoGasto
         PerfilReparto perfil, IReadOnlyList<Miembro> miembros, decimal importe, Guid pagadoPor, out string? error)
     {
         error = null;
-        if (perfil.Modo == ModoReparto.CuentaComun) return new ResultadoReparto([], []); // lo asume la cuenta común: sin reparto entre personas
+        // Lo asume la cuenta común (o su ahorro): sin reparto entre personas.
+        if (ModosDeCuenta.EsDeCuentaComun(perfil.Modo)) return new ResultadoReparto([], []);
 
         var adultos = miembros.Where(m => m.Tipo == TipoMiembro.Adulto).ToList();
         if (adultos.Count == 0) { error = "El hogar no tiene adultos activos entre los que repartir."; return null; }

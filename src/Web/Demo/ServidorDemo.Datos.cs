@@ -14,6 +14,7 @@ public sealed partial class ServidorDemo
     private static readonly Guid PerfilPartes = Id(21);
     private static readonly Guid PerfilPorcentaje = Id(22);
     private static readonly Guid PerfilIndividual = Id(23);
+    private static readonly Guid PerfilCuentaComunAhorro = Id(24);
     private static readonly Guid CatHipoteca = Id(30);
     private static readonly Guid CatAlimentacion = Id(31);
     private static readonly Guid CatSuministros = Id(32);
@@ -27,7 +28,7 @@ public sealed partial class ServidorDemo
     private static Guid Id(int n) => new(n, 0, 0, new byte[8]);
 
     /// <summary>
-    /// Hogar de ejemplo: dos adultos (Ana, que es quien usa la demo y administra, y Marcos), una hija a cargo, los cuatro perfiles de
+    /// Hogar de ejemplo: dos adultos (Ana, que es quien usa la demo y administra, y Marcos), una hija a cargo, los cinco perfiles de
     /// siempre y dos meses de gastos. Las entidades son las del dominio, no una copia para la demo.
     /// </summary>
     private static AlmacenDemo Sembrar(DateOnly hoy)
@@ -60,6 +61,7 @@ public sealed partial class ServidorDemo
             Perfil(PerfilPartes, "Por partes", ModoReparto.Partes, (Ana, 3), (Marcos, 2)),
             Perfil(PerfilPorcentaje, "Porcentaje fijo", ModoReparto.Porcentaje, (Ana, 50), (Marcos, 50)),
             Perfil(PerfilIndividual, "Individual", ModoReparto.Individual),
+            Perfil(PerfilCuentaComunAhorro, "Cuenta común (ahorro)", ModoReparto.CuentaComunAhorro),
         ]);
 
         Categoria Cat(Guid id, string nombre, Guid? padre, Guid perfil)

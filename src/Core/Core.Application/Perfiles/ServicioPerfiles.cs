@@ -3,7 +3,7 @@ using MiParte.Core.Domain.Entidades;
 
 namespace MiParte.Core.Application.Perfiles;
 
-/// <summary>Casos de uso de los perfiles de reparto (porcentaje, partes, cuenta común o individual).</summary>
+/// <summary>Casos de uso de los perfiles de reparto (porcentaje, partes, cuenta común, cuenta común (ahorro) o individual).</summary>
 public sealed class ServicioPerfiles(IRepositorioPerfiles repositorio)
 {
     private const string NombreRepetido = "Ya existe un perfil con ese nombre.";
@@ -59,7 +59,8 @@ public sealed class ServicioPerfiles(IRepositorioPerfiles repositorio)
     /// Borra el perfil y su detalle. Si lo usan categorías, gastos o gastos recurrentes hace falta <paramref name="moverAId"/>: sin
     /// él es conflicto (con <c>enUso</c> entre los datos extra, para que el cliente pregunte a qué perfil moverlos); con él, todo
     /// pasa al perfil de destino en el mismo guardado. El destino debe ser otro perfil y, como las categorías a cargo de la cuenta
-    /// común exigen su perfil, o ambos son de cuenta común o ninguno lo es.
+    /// común exigen su perfil y los gastos del ahorro el suyo, si alguno de los dos es de cuenta común (o de su ahorro) ambos
+    /// deben tener el mismo modo.
     /// </summary>
     public async Task<Resultado<bool>> EliminarAsync(Guid id, Guid? moverAId, CancellationToken ct)
     {
@@ -75,8 +76,9 @@ public sealed class ServicioPerfiles(IRepositorioPerfiles repositorio)
             if (destinoId == id) return Resultado<bool>.Invalido("El perfil de destino debe ser otro.");
             var destino = await repositorio.ObtenerAsync(destinoId, ct);
             if (destino is null) return Resultado<bool>.Invalido("El perfil de destino no existe en este hogar.");
-            if ((destino.Modo == ModoReparto.CuentaComun) != (perfil.Modo == ModoReparto.CuentaComun))
-                return Resultado<bool>.Invalido("El perfil de destino debe ser de cuenta común si el que se borra lo es, y no serlo si no.");
+            if ((ModosDeCuenta.EsDeCuentaComun(destino.Modo) || ModosDeCuenta.EsDeCuentaComun(perfil.Modo)) && destino.Modo != perfil.Modo)
+                return Resultado<bool>.Invalido(
+                    "El perfil de destino debe ser del mismo tipo de cuenta común (o de su ahorro) si el que se borra lo es, y no serlo si no.");
 
             await repositorio.ReasignarUsoAsync(id, destinoId, ct);
             movidos = true;
@@ -98,7 +100,7 @@ public sealed class ServicioPerfiles(IRepositorioPerfiles repositorio)
 
     /// <summary>
     /// Valida nombre, modo y detalle: porcentaje y partes exigen adultos activos sin repetir y valores no negativos, con
-    /// porcentajes que suman 100 o alguna parte mayor que 0; cuenta común e individual no admiten detalle. El nombre no puede repetirse.
+    /// porcentajes que suman 100 o alguna parte mayor que 0; cuenta común, cuenta común (ahorro) e individual no admiten detalle. El nombre no puede repetirse.
     /// </summary>
     private async Task<Validado> ValidarAsync(
         string? nombreTexto, string? modoTexto, IReadOnlyList<ValorMiembro>? detalleTexto, Guid? idActual, CancellationToken ct)
@@ -107,7 +109,7 @@ public sealed class ServicioPerfiles(IRepositorioPerfiles repositorio)
 
         if (ReglasPerfil.ValidarNombre(nombreTexto, out var nombre) is { } e) return Mal(e);
         if (!TextoModoReparto.TryParse(modoTexto, out var modo))
-            return Mal("Modo no válido: use porcentaje, partes, cuenta_comun o individual.");
+            return Mal("Modo no válido: use porcentaje, partes, cuenta_comun, cuenta_comun_ahorro o individual.");
 
         var detalle = detalleTexto ?? [];
         if (ReglasPerfil.ValidarEstructura(modo, detalle) is { } estructura) return Mal(estructura);

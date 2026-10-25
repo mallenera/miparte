@@ -289,6 +289,7 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
         ModoReparto.Porcentaje => "porcentaje",
         ModoReparto.Partes => "partes",
         ModoReparto.CuentaComun => "cuenta_comun",
+        ModoReparto.CuentaComunAhorro => "cuenta_comun_ahorro",
         ModoReparto.Individual => "individual",
         _ => throw new ArgumentOutOfRangeException(nameof(m)),
     };
@@ -299,6 +300,7 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
         "porcentaje" => ModoReparto.Porcentaje,
         "partes" => ModoReparto.Partes,
         "cuenta_comun" => ModoReparto.CuentaComun,
+        "cuenta_comun_ahorro" => ModoReparto.CuentaComunAhorro,
         "individual" => ModoReparto.Individual,
         _ => throw new InvalidOperationException($"Modo de reparto desconocido: {t}"),
     };

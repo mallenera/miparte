@@ -58,7 +58,7 @@ public sealed class RepositorioHogares(MiParteDbContext db) : IRepositorioHogare
         if (tx is not null) await tx.CommitAsync(ct);
     }
 
-    /// <summary>Crea los 4 perfiles, los detalles del creador y las categorías de ejemplo del tipo, guardando por etapas.</summary>
+    /// <summary>Crea los 5 perfiles, los detalles del creador y las categorías de ejemplo del tipo, guardando por etapas.</summary>
     private async Task SembrarAsync(Guid hogarId, TipoGrupo tipo, Guid creadorId, CancellationToken ct)
     {
         PerfilReparto Perfil(string nombre, ModoReparto modo)
@@ -71,6 +71,7 @@ public sealed class RepositorioHogares(MiParteDbContext db) : IRepositorioHogare
         var porNombre = new Dictionary<string, PerfilReparto>
         {
             [SemillaHogar.PerfilCuentaComun] = Perfil(SemillaHogar.PerfilCuentaComun, ModoReparto.CuentaComun),
+            [SemillaHogar.PerfilCuentaComunAhorro] = Perfil(SemillaHogar.PerfilCuentaComunAhorro, ModoReparto.CuentaComunAhorro),
             [SemillaHogar.PerfilPartes] = Perfil(SemillaHogar.PerfilPartes, ModoReparto.Partes),
             [SemillaHogar.PerfilPorcentaje] = Perfil(SemillaHogar.PerfilPorcentaje, ModoReparto.Porcentaje),
             [SemillaHogar.PerfilIndividual] = Perfil(SemillaHogar.PerfilIndividual, ModoReparto.Individual),

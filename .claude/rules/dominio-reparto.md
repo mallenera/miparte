@@ -8,7 +8,7 @@ paths:
 Reglas de `docs/diseno-y-decisiones.md` (§ Reglas de reparto) que el código no puede romper:
 
 - Importes en `decimal` (o céntimos enteros), **nunca** `float`/`double`. Redondeo a 2 decimales y el **último miembro absorbe el céntimo sobrante**: la suma del reparto siempre es el importe del gasto.
-- Modos: `porcentaje` (suma 100), `partes` (pesos), `cuenta_comun` (el gasto lo asume la cuenta común: sin reparto entre personas, sin deuda y fuera de la liquidación) e `individual` (100 % de quien paga). No se guardan ingresos.
+- Modos: `porcentaje` (suma 100), `partes` (pesos), `cuenta_comun` (el gasto lo asume la cuenta común: sin reparto entre personas, sin deuda y fuera de la liquidación), `cuenta_comun_ahorro` (igual, pero sale del ahorro y no del saldo de gastos; `ModosDeCuenta.EsDeCuentaComun` cubre ambos) e `individual` (100 % de quien paga). No se guardan ingresos.
 - Quién **paga** y quién **asume** son datos distintos; la diferencia genera la deuda. Gastos de la cuenta común (cuando exista) no generan deuda entre personas.
 - Solo adultos activos pagan. El reparto cuenta a los adultos y a los `a_cargo` con peso del perfil; la parte de cada `a_cargo` se suma al total de su responsable (`RepartoGasto.RepartirConDependientes`) y el desglose queda en `gasto_reparto_a_cargo`.
 - Un gasto guardado **no se recalcula** al cambiar % o perfiles; solo con `PUT` del gasto.

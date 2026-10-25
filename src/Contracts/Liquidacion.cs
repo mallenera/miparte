@@ -24,15 +24,16 @@ public record ResumenCategoriaDto(
 
 /// <summary>Saldos de la cuenta común dentro del resumen mensual (solo con la cuenta común activada).</summary>
 /// <param name="AportadoMes">Aportaciones del mes (incluido el ahorro).</param>
-/// <param name="GastadoMes">Gastos cargados a la cuenta en el mes, también los pagados desde el ahorro.</param>
+/// <param name="GastadoMes">Gastos cargados a la cuenta en el mes, sin los pagados desde el ahorro (van en <paramref name="GastadoAhorroMes"/>).</param>
 /// <param name="Saldo">Saldo de gastos al final del mes (aportado sin ahorro menos gastado), acumulado.</param>
 /// <param name="Efectivo">Dinero de gastos que hay en la cuenta al final del mes (saldo más lo pendiente de reembolsar).</param>
 /// <param name="Pendiente">Total que la cuenta debe a quienes adelantaron gastos.</param>
 /// <param name="AhorroMes">Ahorro del mes (parte de ahorro de las aportaciones y depósitos).</param>
 /// <param name="AhorroDisponible">Ahorro disponible al final del mes.</param>
+/// <param name="GastadoAhorroMes">Gastos del mes pagados desde el ahorro (con el perfil de cuenta común (ahorro)), también los que adelantó un miembro.</param>
 public record ResumenCuentaComunDto(
     decimal AportadoMes, decimal GastadoMes, decimal Saldo, decimal Efectivo, decimal Pendiente,
-    decimal AhorroMes, decimal AhorroDisponible);
+    decimal AhorroMes, decimal AhorroDisponible, decimal GastadoAhorroMes = 0m);
 
 /// <summary>GET /api/resumen?mes=YYYY-MM.</summary>
 /// <param name="Mes">Mes consultado, en formato YYYY-MM.</param>

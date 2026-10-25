@@ -12,6 +12,9 @@ public static class SemillaHogar
     /// <summary>Nombre del perfil de reparto a cargo de la cuenta común (sin reparto entre personas).</summary>
     public const string PerfilCuentaComun = "Cuenta común";
 
+    /// <summary>Nombre del perfil de reparto a cargo del ahorro de la cuenta común (sin reparto entre personas; descuenta del ahorro).</summary>
+    public const string PerfilCuentaComunAhorro = "Cuenta común (ahorro)";
+
     /// <summary>Nombre del perfil de reparto por partes.</summary>
     public const string PerfilPartes = "Por partes";
 

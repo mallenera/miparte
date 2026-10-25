@@ -77,6 +77,10 @@ public sealed class ModeloCategorias(CoreApiClient api)
     /// <summary>Si la categoría nueva se marca «predeterminada para gastos».</summary>
     public bool NuevoPredeterminado { get; set; }
 
+    /// <summary>Si la categoría va a cargo del ahorro de la cuenta común: su perfil es el de cuenta común (ahorro).</summary>
+    public bool DelAhorro(CategoriaDto c)
+        => c.PerfilRepartoId is { } id && Perfiles.FirstOrDefault(p => p.Id == id)?.Modo == ModosReparto.CuentaComunAhorro;
+
     /// <summary>Nombre del perfil, «—» si no existe o «Sin perfil» si no tiene.</summary>
     public string NombrePerfil(Guid? id)
         => id is { } g ? Perfiles.FirstOrDefault(p => p.Id == g)?.Nombre ?? "—" : "Sin perfil";

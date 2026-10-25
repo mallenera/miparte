@@ -15,13 +15,14 @@ public class ModeloGastosTests
     private readonly CategoriaDto _casa = new(Guid.NewGuid(), "Casa", null, null);
     private readonly PerfilRepartoDto _individual = new(Guid.NewGuid(), "Individual", ModosReparto.Individual, []);
     private readonly PerfilRepartoDto _cuenta = new(Guid.NewGuid(), "Cuenta", ModosReparto.CuentaComun, []);
+    private readonly PerfilRepartoDto _ahorro = new(Guid.NewGuid(), "Cuenta común (ahorro)", ModosReparto.CuentaComunAhorro, []);
 
     private (ModeloGastos Modelo, ApiFalsa Api) Crear(params GastoResponse[] gastos)
     {
         var api = new ApiFalsa()
             .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { _ana })
             .Responde("GET /api/categorias", HttpStatusCode.OK, new[] { _casa })
-            .Responde("GET /api/perfiles", HttpStatusCode.OK, new[] { _individual, _cuenta })
+            .Responde("GET /api/perfiles", HttpStatusCode.OK, new[] { _individual, _cuenta, _ahorro })
             .Responde("GET /api/gastos", HttpStatusCode.OK, gastos)
             .Responde("GET /api/cierres-mes", HttpStatusCode.OK, Array.Empty<MesCerradoDto>());
         var cliente = new CoreApiClient(new HttpClient(api) { BaseAddress = new Uri("http://localhost:5001/") });
@@ -87,16 +88,52 @@ public class ModeloGastosTests
     }
 
     [Fact]
-    public async Task Pagar_desde_el_ahorro_deja_sin_pagador_y_con_la_marca()
+    public async Task El_perfil_de_ahorro_marca_el_gasto_del_ahorro_con_quien_lo_adelanta_o_sin_pagador()
     {
-        var (m, _) = Crear();
+        var (m, api) = Crear();
         await m.CargarAsync(true, true);
 
-        m.OrigenPago = "ahorro";
-
+        m.Perfil = _ahorro.Id;
         Assert.True(m.DesdeAhorro);
+        Assert.Equal(_ana.Id, m.Pagador); // lo adelanta Ana
+
+        // Que lo pague el propio ahorro mantiene el perfil (ya es de cuenta común).
+        m.OrigenPago = "";
+        m.AlCambiarPagador();
         Assert.Null(m.Pagador);
-        Assert.Equal("ahorro", m.OrigenPago);
+        Assert.Equal(_ahorro.Id, m.Perfil);
+        Assert.True(m.DesdeAhorro);
+
+        m.Importe = "20";
+        api.Responde("POST /api/gastos", HttpStatusCode.Created, Gasto(20m));
+        await m.GuardarAsync();
+        Assert.Contains("\"pagadoDesdeAhorro\":true", api.Cuerpos["POST /api/gastos"]);
+
+        m.Perfil = _cuenta.Id;
+        Assert.False(m.DesdeAhorro);
+    }
+
+    [Fact]
+    public async Task Sin_el_ahorro_activado_no_se_ofrece_el_perfil_de_ahorro()
+    {
+        var (m, _) = Crear();
+        await m.CargarAsync(cuentaActiva: true, ahorroActivo: false);
+
+        Assert.DoesNotContain(m.PerfilesOfrecidos, p => p.Id == _ahorro.Id);
+        Assert.Contains(m.PerfilesOfrecidos, p => p.Id == _cuenta.Id);
+    }
+
+    [Fact]
+    public async Task Editar_un_gasto_del_ahorro_con_el_perfil_de_cuenta_comun_muestra_el_perfil_de_ahorro()
+    {
+        var antiguo = Gasto(15m) with { PagadoPor = null, PerfilRepartoId = _cuenta.Id, ACargoCuentaComun = true, PagadoDesdeAhorro = true };
+        var (m, _) = Crear(antiguo);
+        await m.CargarAsync(true, true);
+
+        m.EmpezarEdicion(antiguo);
+
+        Assert.Equal(_ahorro.Id, m.Perfil);
+        Assert.True(m.DesdeAhorro);
     }
 
     [Fact]

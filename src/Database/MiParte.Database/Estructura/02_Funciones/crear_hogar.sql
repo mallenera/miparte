@@ -27,6 +27,8 @@ begin
     insert into public.perfil_reparto (hogar_id, nombre, modo)
     values (v_hogar, 'Cuenta común', 'cuenta_comun') returning id into v_cuenta;
     insert into public.perfil_reparto (hogar_id, nombre, modo)
+    values (v_hogar, 'Cuenta común (ahorro)', 'cuenta_comun_ahorro');
+    insert into public.perfil_reparto (hogar_id, nombre, modo)
     values (v_hogar, 'Por partes', 'partes') returning id into v_partes;
     insert into public.perfil_reparto (hogar_id, nombre, modo)
     values (v_hogar, 'Porcentaje fijo', 'porcentaje') returning id into v_porcent;

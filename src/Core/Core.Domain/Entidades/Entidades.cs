@@ -3,8 +3,11 @@ namespace MiParte.Core.Domain.Entidades;
 /// <summary>Tipo de miembro: adulto con cuenta propia o persona a cargo de un responsable.</summary>
 public enum TipoMiembro { Adulto, ACargo }
 
-/// <summary>Modo en que se reparte un gasto: por porcentaje, partes, a cargo de la cuenta común (sin reparto entre personas) o íntegro a quien paga.</summary>
-public enum ModoReparto { Porcentaje, Partes, CuentaComun, Individual }
+/// <summary>
+/// Modo en que se reparte un gasto: por porcentaje, partes, a cargo de la cuenta común (sin reparto entre personas), íntegro a quien
+/// paga o a cargo del ahorro de la cuenta común (como la cuenta común, pero se descuenta del ahorro y no del saldo de gastos).
+/// </summary>
+public enum ModoReparto { Porcentaje, Partes, CuentaComun, Individual, CuentaComunAhorro }
 
 /// <summary>Rol de un miembro dentro del hogar.</summary>
 public enum RolMiembro { Admin, Miembro }

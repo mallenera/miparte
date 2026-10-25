@@ -25,6 +25,10 @@
     {
         <p class="muted">Lo asume la cuenta común: no se reparte entre personas ni genera deuda. No lleva valores.</p>
     }
+    else if (_edicion.Modo == ModosReparto.CuentaComunAhorro)
+    {
+        <p class="muted">Lo asume el ahorro de la cuenta común: se descuenta del ahorro, no del saldo de gastos, y no se reparte entre personas ni genera deuda. No lleva valores.</p>
+    }
     else if (_edicion.Modo == ModosReparto.Individual)
     {
         <p class="muted">Lo asume por completo quien paga el gasto. No lleva valores.</p>
@@ -116,9 +120,13 @@
     private bool _enviando, _confirmando, _moviendo;
     private string _destino = "";
 
-    /// <summary>Otros perfiles que pueden recibir lo del que se borra: la cuenta común solo puede pasar a otra cuenta común, y al revés.</summary>
+    /// <summary>
+    /// Otros perfiles que pueden recibir lo del que se borra: uno de cuenta común (o de su ahorro) solo puede pasar a otro del mismo
+    /// modo, y los demás solo a perfiles que no sean de cuenta común.
+    /// </summary>
     private IEnumerable<PerfilRepartoDto> Destinos => Todos.Where(p =>
-        p.Id != Perfil?.Id && (p.Modo == ModosReparto.CuentaComun) == (Perfil?.Modo == ModosReparto.CuentaComun));
+        p.Id != Perfil?.Id
+        && (p.Modo == Perfil?.Modo || !ModosReparto.EsDeCuentaComun(p.Modo) && !ModosReparto.EsDeCuentaComun(Perfil?.Modo)));
 
     protected override void OnInitialized()
     {

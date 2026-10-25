@@ -8,10 +8,10 @@ namespace MiParte.Core.Application.Gastos;
 /// <param name="Fecha">Fecha del gasto.</param>
 /// <param name="Importe">Importe total.</param>
 /// <param name="CategoriaId">Categoría del hogar.</param>
-/// <param name="PagadoPor">Adulto activo que adelanta el pago; null si lo paga la cuenta común o el ahorro.</param>
+/// <param name="PagadoPor">Adulto activo que adelanta el pago (también si va a cargo de la cuenta común o del ahorro, que se lo deben); null si lo paga la cuenta común o el ahorro directamente.</param>
 /// <param name="PerfilRepartoId">Perfil con el que se reparte.</param>
 /// <param name="Concepto">Descripción opcional.</param>
-/// <param name="PagadoDesdeAhorro">Si se paga con el ahorro de la cuenta común.</param>
+/// <param name="PagadoDesdeAhorro">Si se paga con el ahorro de la cuenta común; el perfil de cuenta común (ahorro) lo implica.</param>
 /// <param name="Personal">Si lo asume íntegro quien lo paga y queda fuera de la liquidación.</param>
 public sealed record DatosGasto(
     DateOnly Fecha, decimal Importe, Guid CategoriaId, Guid? PagadoPor, Guid PerfilRepartoId, string? Concepto,
@@ -38,14 +38,14 @@ public sealed class ServicioGastos(IRepositorioGastos repositorio, IPublicadorNo
         if (AjenoAlPersonal(datos, quien)) return Resultado<Gasto>.Invalido(PersonalDeOtro);
         var preparado = await PrepararAsync(datos, ct);
         if (preparado.Error is { } invalido) return Resultado<Gasto>.Invalido(invalido);
-        if (await ComprobarAsync(datos, preparado.CuentaComun, excluir: null, [datos.Fecha], ct) is { } fallo) return fallo;
+        if (await ComprobarAsync(datos, preparado, excluir: null, [datos.Fecha], ct) is { } fallo) return fallo;
 
         var gasto = new Gasto
         {
             Id = Guid.NewGuid(), HogarId = hogarId, Fecha = datos.Fecha, Importe = datos.Importe,
             CategoriaId = datos.CategoriaId, PagadoPor = datos.PagadoPor, PerfilRepartoId = datos.PerfilRepartoId,
             Concepto = ReglasMovimiento.NormalizarConcepto(datos.Concepto), ACargoCuentaComun = preparado.CuentaComun,
-            PagadoDesdeAhorro = datos.PagadoDesdeAhorro, EsPersonal = datos.Personal,
+            PagadoDesdeAhorro = preparado.DesdeAhorro, EsPersonal = datos.Personal,
         };
         RepartoGasto.Aplicar(gasto, preparado.Partes!);
         repositorio.Anadir(gasto);
@@ -110,7 +110,7 @@ public sealed class ServicioGastos(IRepositorioGastos repositorio, IPublicadorNo
             var preparado = await PrepararAsync(datos, ct);
             if (preparado.Error is { } invalido) return Resultado<Gasto>.Invalido(invalido);
             // Ni sacarlo de un mes cerrado ni meterlo en uno.
-            if (await ComprobarAsync(datos, preparado.CuentaComun, excluir: id, [gasto.Fecha, datos.Fecha], ct) is { } fallo) return fallo;
+            if (await ComprobarAsync(datos, preparado, excluir: id, [gasto.Fecha, datos.Fecha], ct) is { } fallo) return fallo;
 
             gasto.Fecha = datos.Fecha;
             gasto.Importe = datos.Importe;
@@ -119,7 +119,7 @@ public sealed class ServicioGastos(IRepositorioGastos repositorio, IPublicadorNo
             gasto.PerfilRepartoId = datos.PerfilRepartoId;
             gasto.Concepto = ReglasMovimiento.NormalizarConcepto(datos.Concepto);
             gasto.ACargoCuentaComun = preparado.CuentaComun;
-            gasto.PagadoDesdeAhorro = datos.PagadoDesdeAhorro;
+            gasto.PagadoDesdeAhorro = preparado.DesdeAhorro;
             gasto.EsPersonal = datos.Personal;
             RepartoGasto.Aplicar(gasto, preparado.Partes!);
             return await repositorio.GuardarAsync(ct) ? Resultado<Gasto>.Ok(gasto) : Resultado<Gasto>.Conflicto(Mensajes.MesCerrado);
@@ -139,12 +139,13 @@ public sealed class ServicioGastos(IRepositorioGastos repositorio, IPublicadorNo
             return await repositorio.GuardarAsync(ct) ? Resultado<bool>.Ok(true) : Resultado<bool>.Conflicto(Mensajes.MesCerrado);
         }, ct);
 
-    /// <summary>Resultado de validar los datos: el reparto y si va a cargo de la cuenta común, o el mensaje de error.</summary>
-    private sealed record Preparado(ResultadoReparto? Partes, string? Error, bool CuentaComun);
+    /// <summary>Resultado de validar los datos: el reparto, si va a cargo de la cuenta común y si sale del ahorro, o el mensaje de error.</summary>
+    private sealed record Preparado(ResultadoReparto? Partes, string? Error, bool CuentaComun, bool DesdeAhorro = false);
 
     /// <summary>
-    /// Valida los datos y calcula el reparto: vacío y marcado a cargo de la cuenta común si el perfil es de cuenta común;
-    /// el 100 % del pagador si el gasto es personal.
+    /// Valida los datos y calcula el reparto: vacío y marcado a cargo de la cuenta común si el perfil es de cuenta común (o de
+    /// cuenta común (ahorro), que además lo paga desde el ahorro); el 100 % del pagador si el gasto es personal. Un gasto a cargo
+    /// de la cuenta o del ahorro puede adelantarlo un adulto: queda pendiente de reembolso, como en la cuenta común.
     /// </summary>
     private async Task<Preparado> PrepararAsync(DatosGasto d, CancellationToken ct)
     {
@@ -154,21 +155,22 @@ public sealed class ServicioGastos(IRepositorioGastos repositorio, IPublicadorNo
         if (!await repositorio.CategoriaExisteAsync(d.CategoriaId, ct)) return new(null, "La categoría no existe en el hogar.", false);
         if (d.PagadoPor is { } pagador && !await repositorio.EsAdultoActivoAsync(pagador, ct))
             return new(null, "Quien paga debe ser un adulto activo del hogar.", false);
-        if (d.PagadoDesdeAhorro && d.PagadoPor is not null)
-            return new(null, "Un gasto pagado desde el ahorro no lo adelanta nadie: déjalo sin pagador.", false);
         if (d.Personal && (d.PagadoPor is null || d.PagadoDesdeAhorro))
             return new(null, "Un gasto personal lo paga un miembro del hogar, no la cuenta común ni el ahorro.", false);
         var perfil = await repositorio.ObtenerPerfilAsync(d.PerfilRepartoId, ct);
         if (perfil is null) return new(null, "El perfil de reparto no existe en el hogar.", false);
-        if (d.PagadoPor is null && perfil.Modo != ModoReparto.CuentaComun)
+        var deCuenta = ModosDeCuenta.EsDeCuentaComun(perfil.Modo);
+        if (d.PagadoPor is null && !deCuenta)
             return new(null, "La cuenta común solo paga gastos con el perfil de cuenta común.", false);
+        if (d.PagadoDesdeAhorro && !deCuenta)
+            return new(null, "Un gasto pagado desde el ahorro debe usar el perfil de cuenta común (ahorro).", false);
 
         // Un gasto personal lo asume íntegro quien lo paga, sea cual sea el modo del perfil, y no es de la cuenta común.
         if (d.Personal) return new(new ResultadoReparto([new ParteAsumida(d.PagadoPor!.Value, d.Importe)], []), null, false);
 
         var miembros = await repositorio.MiembrosActivosAsync(ct);
         var partes = RepartoGasto.RepartirConDependientes(perfil, miembros, d.Importe, d.PagadoPor ?? Guid.Empty, out var error);
-        return new(partes, error, perfil.Modo == ModoReparto.CuentaComun);
+        return new(partes, error, deCuenta, d.PagadoDesdeAhorro || perfil.Modo == ModoReparto.CuentaComunAhorro);
     }
 
     /// <summary>
@@ -176,9 +178,9 @@ public sealed class ServicioGastos(IRepositorioGastos repositorio, IPublicadorNo
     /// suficiente si se paga desde él. Devuelve el conflicto o null si se puede seguir.
     /// </summary>
     private async Task<Resultado<Gasto>?> ComprobarAsync(
-        DatosGasto d, bool cuentaComun, Guid? excluir, IEnumerable<DateOnly> fechas, CancellationToken ct)
+        DatosGasto d, Preparado preparado, Guid? excluir, IEnumerable<DateOnly> fechas, CancellationToken ct)
     {
-        if (cuentaComun && !await repositorio.CuentaComunActivaAsync(ct))
+        if (preparado.CuentaComun && !await repositorio.CuentaComunActivaAsync(ct))
             return Resultado<Gasto>.Conflicto(Mensajes.CuentaInactiva);
         foreach (var f in fechas.Distinct())
         {
@@ -186,7 +188,7 @@ public sealed class ServicioGastos(IRepositorioGastos repositorio, IPublicadorNo
             if (await repositorio.FechaEnPeriodoCerradoAsync(f, ct)) return Resultado<Gasto>.Conflicto(Mensajes.PeriodoCerrado);
         }
 
-        if (!d.PagadoDesdeAhorro) return null;
+        if (!preparado.DesdeAhorro) return null;
         if (!await repositorio.CuentaComunActivaAsync(ct)) return Resultado<Gasto>.Conflicto(Mensajes.CuentaInactiva);
         if (!await repositorio.AhorroActivoAsync(ct)) return Resultado<Gasto>.Conflicto(Mensajes.AhorroInactivo);
         var disponible = Math.Max(0m, AhorroCuenta.Disponible(d.Fecha, await repositorio.DatosAhorroAsync(excluir, ct)));

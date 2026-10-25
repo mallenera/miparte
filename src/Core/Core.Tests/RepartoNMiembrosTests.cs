@@ -53,7 +53,7 @@ public class RepartoNMiembrosTests
     [Fact]
     public void Monopersonal_100PorCiento()
     {
-        foreach (var modo in Enum.GetValues<ModoReparto>().Where(m => m != ModoReparto.CuentaComun))
+        foreach (var modo in Enum.GetValues<ModoReparto>().Where(m => !ModosDeCuenta.EsDeCuentaComun(m)))
         {
             var r = RepartoMiembros.Repartir(57.31m, modo, [new(A, 0m)], A);
             Assert.Equal([57.31m], Importes(r));

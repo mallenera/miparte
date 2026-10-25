@@ -41,7 +41,7 @@ public sealed class ModeloGastos(CoreApiClient api, DateOnly hoy)
     /// <summary>Si el hogar tiene activada la cuenta común (se ofrece su perfil y el pagador «cuenta común»).</summary>
     public bool CuentaActiva { get; private set; }
 
-    /// <summary>Si el hogar tiene activado el ahorro (se ofrece pagar desde él).</summary>
+    /// <summary>Si el hogar tiene activado el ahorro (se ofrece el perfil de cuenta común (ahorro)).</summary>
     public bool AhorroActivo { get; private set; }
 
     // ───── Estado de pantalla ─────
@@ -120,24 +120,31 @@ public sealed class ModeloGastos(CoreApiClient api, DateOnly hoy)
     /// <summary>Perfil de reparto elegido.</summary>
     public Guid Perfil { get; set; }
 
-    /// <summary>Quién adelanta el pago; null si lo paga la cuenta común o el ahorro.</summary>
+    /// <summary>Quién adelanta el pago; null si lo paga la cuenta común o el ahorro directamente.</summary>
     public Guid? Pagador { get; private set; }
 
-    /// <summary>Si se paga desde el ahorro.</summary>
-    public bool DesdeAhorro { get; private set; }
+    /// <summary>
+    /// Gasto en edición pagado desde el ahorro con el perfil de cuenta común porque el hogar no tiene perfil de cuenta común (ahorro):
+    /// se conserva el origen mientras siga con ese perfil.
+    /// </summary>
+    private bool _ahorroSinPerfil;
+
+    /// <summary>Si se paga desde el ahorro: lo decide el perfil de cuenta común (ahorro).</summary>
+    public bool DesdeAhorro
+        => Perfiles.FirstOrDefault(p => p.Id == Perfil)?.Modo is { } modo
+           && (modo == ModosReparto.CuentaComunAhorro || _ahorroSinPerfil && modo == ModosReparto.CuentaComun);
 
     /// <summary>Si es un gasto personal de quien paga.</summary>
     public bool Personal { get; private set; }
 
-    /// <summary>Quién paga en el selector: un adulto (su id), la cuenta común ("") o el ahorro ("ahorro").</summary>
+    /// <summary>
+    /// Quién paga en el selector: un adulto (su id), que lo adelanta, o la propia cuenta ("": la cuenta común o el ahorro, según el
+    /// perfil).
+    /// </summary>
     public string OrigenPago
     {
-        get => DesdeAhorro ? "ahorro" : Pagador?.ToString() ?? "";
-        set
-        {
-            DesdeAhorro = value == "ahorro";
-            Pagador = DesdeAhorro || value == "" ? null : Guid.Parse(value);
-        }
+        get => Pagador?.ToString() ?? "";
+        set => Pagador = value == "" ? null : Guid.Parse(value);
     }
 
     /// <summary>Tipo de gasto en el selector: «hogar» (se reparte y entra en la liquidación) o «personal» (solo de quien paga).</summary>
@@ -147,12 +154,18 @@ public sealed class ModeloGastos(CoreApiClient api, DateOnly hoy)
         set => Personal = value == "personal";
     }
 
-    /// <summary>Perfil de modo cuenta común del hogar, el único con el que puede pagar la cuenta directamente.</summary>
+    /// <summary>Perfil de modo cuenta común del hogar, el que se propone cuando paga la cuenta directamente.</summary>
     public PerfilRepartoDto? PerfilCuentaComun => Perfiles.FirstOrDefault(p => p.Modo == ModosReparto.CuentaComun);
+
+    /// <summary>Si el perfil elegido va a cargo de la cuenta común (o de su ahorro): solo con él puede pagar la cuenta directamente.</summary>
+    public bool PerfilDeCuenta => ModosReparto.EsDeCuentaComun(Perfiles.FirstOrDefault(p => p.Id == Perfil)?.Modo);
+
+    /// <summary>Se puede elegir que pague la propia cuenta: está activada y hay algún perfil de cuenta común entre los ofrecidos.</summary>
+    public bool OfreceCuentaComoPagador => CuentaActiva && PerfilesOfrecidos.Any(p => ModosReparto.EsDeCuentaComun(p.Modo));
 
     /// <summary>Perfiles que se ofrecen en el formulario.</summary>
     public IReadOnlyList<PerfilRepartoDto> PerfilesOfrecidos
-        => ListaGastos.PerfilesOfrecidos(Perfiles, CuentaActiva, Editando is not null ? Perfil : null);
+        => ListaGastos.PerfilesOfrecidos(Perfiles, CuentaActiva, Editando is not null ? Perfil : null, AhorroActivo);
 
     /// <summary>La categoría elegida está marcada «a cargo de la cuenta común» y la cuenta está activada.</summary>
     public bool CategoriaACargoDeLaCuenta
@@ -340,7 +353,7 @@ public sealed class ModeloGastos(CoreApiClient api, DateOnly hoy)
         Concepto = "";
         Categoria = Arbol.Count > 0 ? Arbol[0].Categoria.Id : Guid.Empty;
         Pagador = (Adultos.FirstOrDefault(m => m.EsYo) ?? Adultos.FirstOrDefault())?.Id ?? Guid.Empty;
-        DesdeAhorro = false;
+        _ahorroSinPerfil = false;
         Personal = false;
         Perfil = PerfilesOfrecidos.FirstOrDefault()?.Id ?? Guid.Empty;
         AlCambiarCategoria();
@@ -348,21 +361,26 @@ public sealed class ModeloGastos(CoreApiClient api, DateOnly hoy)
 
     /// <summary>
     /// Al elegir una categoría se propone su perfil de reparto por defecto; si va a cargo de la cuenta común (y está activada),
-    /// el de cuenta común. Sin la cuenta activada no se propone un perfil de cuenta común.
+    /// su perfil si es de cuenta común (o de su ahorro) y se ofrece, y si no el de cuenta común. Sin la cuenta activada no se
+    /// propone un perfil de cuenta común.
     /// </summary>
     public void AlCambiarCategoria()
     {
         if (Editando is not null) return;
         var categoria = Categorias.FirstOrDefault(c => c.Id == Categoria);
-        if (CategoriaACargoDeLaCuenta && PerfilCuentaComun is { } cuenta) Perfil = cuenta.Id;
-        else if (categoria?.PerfilRepartoId is { } p && PerfilesOfrecidos.Any(x => x.Id == p)) Perfil = p;
+        var propio = categoria?.PerfilRepartoId is { } p ? PerfilesOfrecidos.FirstOrDefault(x => x.Id == p) : null;
+        if (CategoriaACargoDeLaCuenta && !ModosReparto.EsDeCuentaComun(propio?.Modo) && PerfilCuentaComun is { } cuenta) Perfil = cuenta.Id;
+        else if (propio is not null) Perfil = propio.Id;
     }
 
-    /// <summary>La cuenta común solo paga gastos con su perfil: al elegirla como pagador se selecciona ese perfil.</summary>
+    /// <summary>
+    /// La cuenta solo paga gastos con un perfil de cuenta común (o de su ahorro): al elegirla como pagador, si el perfil elegido no
+    /// lo es, se selecciona el de cuenta común.
+    /// </summary>
     public void AlCambiarPagador()
     {
         if (Pagador is null) Personal = false; // un gasto personal siempre lo paga una persona
-        if (Pagador is null && PerfilCuentaComun is { } p) Perfil = p.Id;
+        if (Pagador is null && !PerfilDeCuenta && PerfilCuentaComun is { } p) Perfil = p.Id;
     }
 
     /// <summary>Carga un gasto en el formulario para editarlo.</summary>
@@ -373,9 +391,13 @@ public sealed class ModeloGastos(CoreApiClient api, DateOnly hoy)
         Importe = g.Importe.ToString(CultureInfo.InvariantCulture);
         Categoria = g.CategoriaId;
         Pagador = g.PagadoPor;
-        DesdeAhorro = g.PagadoDesdeAhorro;
         Personal = g.Personal;
         Perfil = g.PerfilRepartoId;
+        // Un gasto del ahorro anotado con el perfil de cuenta común (antes del perfil de ahorro) se muestra con el perfil de ahorro.
+        var deCuentaYDelAhorro = g.PagadoDesdeAhorro && Perfiles.FirstOrDefault(p => p.Id == Perfil)?.Modo == ModosReparto.CuentaComun;
+        var ahorro = Perfiles.FirstOrDefault(p => p.Modo == ModosReparto.CuentaComunAhorro);
+        if (deCuentaYDelAhorro && ahorro is not null) Perfil = ahorro.Id;
+        _ahorroSinPerfil = deCuentaYDelAhorro && ahorro is null;
         Concepto = g.Concepto ?? "";
         Error = null;
     }
@@ -393,7 +415,8 @@ public sealed class ModeloGastos(CoreApiClient api, DateOnly hoy)
             if (!EntradaImporte.TryParse(Importe, out var importe))
                 throw new ApiException(System.Net.HttpStatusCode.BadRequest, EntradaImporte.MensajeInvalido);
             var peticion = new GastoRequest(Fecha, importe, Categoria, Pagador, Perfil,
-                string.IsNullOrWhiteSpace(Concepto) ? null : Concepto.Trim(), DesdeAhorro, Personal && Pagador is not null);
+                string.IsNullOrWhiteSpace(Concepto) ? null : Concepto.Trim(), DesdeAhorro && !(Personal && Pagador is not null),
+                Personal && Pagador is not null);
             if (Editando is { } id)
             {
                 await api.GuardarGastoAsync(id, peticion);

@@ -81,7 +81,7 @@ public static class Dtos
         r.PorCategoria.Select(c => new ResumenCategoriaDto(
             c.CategoriaId, c.Nombre, c.Total, c.PorMiembro.Select(x => new ImporteMiembroDto(x.MiembroId, x.Importe)).ToList())).ToList(),
         r.Cuenta is { } c2
-            ? new ResumenCuentaComunDto(c2.AportadoMes, c2.GastadoMes, c2.Saldo, c2.Efectivo, c2.PendienteReembolso, c2.AhorroMes, c2.AhorroDisponible)
+            ? new ResumenCuentaComunDto(c2.AportadoMes, c2.GastadoMes, c2.Saldo, c2.Efectivo, c2.PendienteReembolso, c2.AhorroMes, c2.AhorroDisponible, c2.GastadoAhorroMes)
             : null,
         r.Personales);
 

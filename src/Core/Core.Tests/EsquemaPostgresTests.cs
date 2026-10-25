@@ -248,8 +248,10 @@ public class EsquemaPostgresTests
 
         Assert.Equal("admin", await EscalarComoAsync(conn, tx, user,
             "select rol from public.miembro where hogar_id = @h", ("h", hogar)));
-        Assert.Equal(4L, await EscalarComoAsync(conn, tx, user,
+        Assert.Equal(5L, await EscalarComoAsync(conn, tx, user,
             "select count(*) from public.perfil_reparto where hogar_id = @h", ("h", hogar)));
+        Assert.Equal(1L, await EscalarComoAsync(conn, tx, user,
+            "select count(*) from public.perfil_reparto where hogar_id = @h and modo = 'cuenta_comun_ahorro'", ("h", hogar)));
         Assert.Equal(6L, await EscalarComoAsync(conn, tx, user,
             "select count(*) from public.categoria where hogar_id = @h and perfil_reparto_id is not null", ("h", hogar)));
         Assert.Equal(1L, await EscalarComoAsync(conn, tx, user,

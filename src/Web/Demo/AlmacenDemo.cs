@@ -82,7 +82,7 @@ internal sealed class AlmacenDemo
         {
             Id = Guid.NewGuid(), HogarId = hogarId, Fecha = fecha, Importe = importe, CategoriaId = categoria, PagadoPor = pagador,
             PerfilRepartoId = perfil, Concepto = concepto, GastoRecurrenteId = recurrente,
-            ACargoCuentaComun = p.Modo == ModoReparto.CuentaComun,
+            ACargoCuentaComun = ModosDeCuenta.EsDeCuentaComun(p.Modo), PagadoDesdeAhorro = p.Modo == ModoReparto.CuentaComunAhorro,
         };
         RepartoGasto.Aplicar(gasto, RepartoGasto.Repartir(p, AdultosActivos(), importe, pagador ?? Guid.Empty, out _) ?? []);
         Gastos.Add(gasto);

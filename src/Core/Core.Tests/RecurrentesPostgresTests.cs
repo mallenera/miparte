@@ -22,7 +22,7 @@ public class RecurrentesPostgresTests
         var c = e.Cliente(user, hogar.Id);
 
         var ana = (await Leer<List<MiembroDto>>(await c.GetAsync("/api/miembros"))).Single();
-        var perfil = (await Leer<List<PerfilRepartoDto>>(await c.GetAsync("/api/perfiles"))).First(p => p.Modo != "cuenta_comun");
+        var perfil = (await Leer<List<PerfilRepartoDto>>(await c.GetAsync("/api/perfiles"))).First(p => !p.Modo.StartsWith("cuenta_comun", StringComparison.Ordinal));
         var categoria = (await Leer<List<CategoriaDto>>(await c.GetAsync("/api/categorias"))).First();
 
         var plantilla = await Leer<GastoRecurrenteResponse>(await c.PostAsJsonAsync("/api/gastos-recurrentes",
@@ -56,7 +56,7 @@ public class RecurrentesPostgresTests
         var c = e.Cliente(user, hogar.Id);
 
         var ana = (await Leer<List<MiembroDto>>(await c.GetAsync("/api/miembros"))).Single();
-        var perfil = (await Leer<List<PerfilRepartoDto>>(await c.GetAsync("/api/perfiles"))).First(p => p.Modo != "cuenta_comun");
+        var perfil = (await Leer<List<PerfilRepartoDto>>(await c.GetAsync("/api/perfiles"))).First(p => !p.Modo.StartsWith("cuenta_comun", StringComparison.Ordinal));
         var categoria = (await Leer<List<CategoriaDto>>(await c.GetAsync("/api/categorias"))).First();
 
         var plantilla = await Leer<GastoRecurrenteResponse>(await c.PostAsJsonAsync("/api/gastos-recurrentes",

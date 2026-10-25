@@ -190,18 +190,18 @@ public class ModeloCuentaComunTests
     }
 
     [Fact]
-    public async Task Un_error_de_la_api_al_retirar_queda_en_Error_y_cancela_la_confirmacion()
+    public async Task Un_error_de_la_api_al_ingresar_al_ahorro_queda_en_Error_y_cancela_la_confirmacion()
     {
         var (m, api) = Crear(Estado());
-        api.Error("POST /api/cuenta-comun/retiradas-ahorro", HttpStatusCode.Conflict, "El importe supera el ahorro disponible (100,00).");
+        api.Error("POST /api/cuenta-comun/depositos-ahorro", HttpStatusCode.Conflict, "El ahorro no está activado en este hogar.");
         await m.CargarAsync();
-        m.ImporteRetirada = "500";
+        m.ImporteDeposito = "500";
         m.ConfirmandoEliminar = Guid.NewGuid();
 
-        var aviso = await m.RetirarAhorroAsync();
+        var aviso = await m.IngresarAhorroAsync();
 
         Assert.Null(aviso);
-        Assert.Contains("ahorro disponible", m.Error);
+        Assert.Contains("ahorro no está activado", m.Error);
         Assert.Null(m.ConfirmandoEliminar);
         Assert.False(m.Enviando);
     }

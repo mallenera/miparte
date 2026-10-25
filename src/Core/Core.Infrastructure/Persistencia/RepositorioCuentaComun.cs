@@ -76,7 +76,7 @@ public sealed class RepositorioCuentaComun(MiParteDbContext db) : IRepositorioCu
             .Select(x => new MovimientoCuenta(x.Id, x.MiembroId, x.Fecha, x.Importe, x.Concepto)).ToListAsync(ct);
         var adelantados = await db.Gastos.AsNoTracking()
             .Where(g => g.ACargoCuentaComun && g.PagadoPor != null && g.PagadoDesdeAhorro && g.Fecha <= hasta)
-            .Select(g => new GastoDeCuenta(g.PagadoPor, g.Fecha, g.Importe, true)).ToListAsync(ct);
+            .Select(g => new GastoPagadoPorCuenta(g.Id, g.Fecha, g.Importe, g.CategoriaId, g.Concepto, true, g.PagadoPor)).ToListAsync(ct);
         return new DatosMovimientosBanco(
             await AportacionesAsync(ct), await SaldoInicialAsync(ct), gastos, reembolsos, ingresos, depositos, retiradas, adelantados);
     }

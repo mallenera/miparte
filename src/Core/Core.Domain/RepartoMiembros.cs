@@ -28,7 +28,7 @@ public static class RepartoMiembros
             throw new ArgumentException("Quien paga debe ser uno de los miembros.", nameof(pagadoPor));
 
         // Antes del caso monopersonal: la cuenta común nunca se reparte entre personas.
-        if (modo == ModoReparto.CuentaComun)
+        if (ModosDeCuenta.EsDeCuentaComun(modo))
             throw new ArgumentException("Un gasto de la cuenta común no se reparte entre personas.", nameof(modo));
 
         // Hogar monopersonal: 100% para el único miembro, salvo cuenta común.

@@ -1,6 +1,7 @@
 using MiParte.Contracts;
 using MiParte.Web.Api;
 using MiParte.Web.Demo;
+using MiParte.Web.Reparto;
 
 namespace MiParte.Web.Tests;
 
@@ -149,7 +150,7 @@ public class ServidorDemoTests
         var api = Cliente();
         var perfiles = await api.ListarPerfilesAsync();
         var origen = perfiles.First(p => p.Modo == "partes");
-        var destino = perfiles.First(p => p.Modo != "cuenta_comun" && p.Id != origen.Id);
+        var destino = perfiles.First(p => !ModosReparto.EsDeCuentaComun(p.Modo) && p.Id != origen.Id);
 
         var enUso = await Assert.ThrowsAsync<ApiException>(() => api.EliminarPerfilAsync(origen.Id));
         Assert.True(enUso.EnUso);
@@ -196,7 +197,7 @@ public class ServidorDemoTests
     }
 
     [Fact]
-    public async Task El_ahorro_de_la_demo_admite_depositos_y_retiradas_con_las_reglas_del_servidor()
+    public async Task El_ahorro_de_la_demo_admite_depositos_y_gastos_del_ahorro_con_las_reglas_del_servidor()
     {
         var api = Cliente();
         var ana = (await api.ListarMiembrosAsync()).First(m => m.EsYo);
@@ -206,12 +207,15 @@ public class ServidorDemoTests
         var tras = await api.ObtenerCuentaComunAsync("2026-10");
         Assert.Equal(200m, tras.AhorroDisponible);
 
-        // Igual que Core.Api: no se retira más de lo que hay y, si se retira, no se puede quitar el ingreso que lo respalda.
+        // Igual que Core.Api: no se gasta del ahorro más de lo que hay y, si se gasta, no se puede quitar el ingreso que lo respalda.
+        var categoria = (await api.ListarCategoriasAsync()).First();
+        var ahorro = (await api.ListarPerfilesAsync()).Single(p => p.Modo == ModosReparto.CuentaComunAhorro);
         var demasiado = await Assert.ThrowsAsync<ApiException>(
-            () => api.CrearRetiradaAhorroAsync(new CrearRetiradaAhorroRequest(ana.Id, 200.01m, fecha, null)));
+            () => api.CrearGastoAsync(new GastoRequest(fecha, 200.01m, categoria.Id, ana.Id, ahorro.Id, null)));
         Assert.Contains("ahorro disponible", demasiado.Message);
 
-        await api.CrearRetiradaAhorroAsync(new CrearRetiradaAhorroRequest(ana.Id, 150m, fecha, null));
+        var gasto = await api.CrearGastoAsync(new GastoRequest(fecha, 150m, categoria.Id, ana.Id, ahorro.Id, "Fianza"));
+        Assert.True(gasto.PagadoDesdeAhorro);
         var sinRespaldo = await Assert.ThrowsAsync<ApiException>(() => api.EliminarDepositoAhorroAsync(deposito.Id));
         Assert.Contains("faltarían", sinRespaldo.Message);
     }

@@ -14,17 +14,21 @@ public static class ModosReparto
     /// <summary>Lo asume la cuenta común: sin reparto entre personas ni deuda; sin detalle.</summary>
     public const string CuentaComun = "cuenta_comun";
 
+    /// <summary>Lo asume el ahorro de la cuenta común: como la cuenta común, pero se descuenta del ahorro; sin detalle.</summary>
+    public const string CuentaComunAhorro = "cuenta_comun_ahorro";
+
     /// <summary>Lo asume quien paga; sin detalle.</summary>
     public const string Individual = "individual";
 
     /// <summary>Modos en el orden en que se ofrecen.</summary>
-    public static readonly IReadOnlyList<string> Todos = [Individual, Porcentaje, Partes, CuentaComun];
+    public static readonly IReadOnlyList<string> Todos = [Individual, Porcentaje, Partes, CuentaComun, CuentaComunAhorro];
 
     /// <summary>Texto del modo para mostrar al usuario.</summary>
     /// <param name="modo">Modo de la API.</param>
     public static string Texto(string modo) => modo switch
     {
         CuentaComun => "Cuenta común",
+        CuentaComunAhorro => "Cuenta común (ahorro)",
         Partes => "Por personas (partes)",
         Porcentaje => "Por porcentajes",
         Individual => "Individual (quien paga)",
@@ -34,6 +38,10 @@ public static class ModosReparto
     /// <summary>Indica si el modo lleva un valor por miembro.</summary>
     /// <param name="modo">Modo de la API.</param>
     public static bool LlevaDetalle(string modo) => modo is Porcentaje or Partes;
+
+    /// <summary>Indica si el modo va a cargo de la cuenta común (de su saldo de gastos o de su ahorro).</summary>
+    /// <param name="modo">Modo de la API.</param>
+    public static bool EsDeCuentaComun(string? modo) => modo is CuentaComun or CuentaComunAhorro;
 }
 
 /// <summary>

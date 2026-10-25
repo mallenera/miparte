@@ -194,7 +194,9 @@ public class CuentaComunAgregadaTests
 
         var cuenta = r.CuentaComun!;
         Assert.Equal(estado.AportadoMes, cuenta.AportadoMes);
-        Assert.Equal(d.Gastos.Where(g => g.Fecha >= inicio && g.Fecha < fin).Sum(g => g.Importe), cuenta.GastadoMes);
+        var delMes = d.Gastos.Where(g => g.Fecha >= inicio && g.Fecha < fin).ToList();
+        Assert.Equal(delMes.Where(g => !g.DesdeAhorro).Sum(g => g.Importe), cuenta.GastadoMes);
+        Assert.Equal(delMes.Where(g => g.DesdeAhorro).Sum(g => g.Importe), cuenta.GastadoAhorroMes);
         Assert.Equal(estado.Saldo, cuenta.Saldo);
         Assert.Equal(estado.Efectivo, cuenta.Efectivo);
         Assert.Equal(estado.Pendientes.Where(p => p.Importe > 0m).Sum(p => p.Importe), cuenta.Pendiente);
@@ -283,7 +285,9 @@ public class CuentaComunAgregadaTests
         Assert.Equal(esperado.Saldo, resumen.Saldo);
         Assert.Equal(esperado.Efectivo, resumen.Efectivo);
         Assert.Equal(esperado.AportadoMes, resumen.AportadoMes);
-        Assert.Equal(gastos.Where(g => g.Fecha >= inicio && g.Fecha < fin).Sum(g => g.Importe), resumen.GastadoMes);
+        var gastosMes = gastos.Where(g => g.Fecha >= inicio && g.Fecha < fin).ToList();
+        Assert.Equal(gastosMes.Where(g => !g.DesdeAhorro).Sum(g => g.Importe), resumen.GastadoMes);
+        Assert.Equal(gastosMes.Where(g => g.DesdeAhorro).Sum(g => g.Importe), resumen.GastadoAhorroMes);
         Assert.Equal(esperado.Pendientes.Where(p => p.Importe > 0m).Sum(p => p.Importe), resumen.Pendiente);
         Assert.Equal(esperado.AhorroDisponible, resumen.AhorroDisponible);
 

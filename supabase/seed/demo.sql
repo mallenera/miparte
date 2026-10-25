@@ -87,6 +87,8 @@ begin
         (p_partes, v_hogar, 'Por partes',     'partes'),
         (p_porc,   v_hogar, 'Porcentaje fijo', 'porcentaje'),
         (p_indiv,  v_hogar, 'Individual',     'individual');
+    insert into public.perfil_reparto (hogar_id, nombre, modo) values
+        (v_hogar, 'Cuenta común (ahorro)', 'cuenta_comun_ahorro');
     insert into public.perfil_reparto_detalle (hogar_id, perfil_id, miembro_id, valor) values
         (v_hogar, p_partes, v_ana, 3), (v_hogar, p_partes, v_marcos, 2),
         (v_hogar, p_porc,   v_ana, 50), (v_hogar, p_porc,  v_marcos, 50);

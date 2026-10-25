@@ -44,16 +44,23 @@ public static class ListaGastos
     }
 
     /// <summary>
-    /// Perfiles que se ofrecen en el formulario: el de cuenta común solo con la cuenta activada (si no, la API rechazaría el
-    /// gasto). Al editar un gasto cuyo perfil ya no se ofrece se mantiene como opción, para que el formulario muestre lo que envía.
+    /// Perfiles que se ofrecen en el formulario: el de cuenta común solo con la cuenta activada y el de cuenta común (ahorro)
+    /// solo con el ahorro activado (si no, la API rechazaría el gasto). Al editar un gasto cuyo perfil ya no se ofrece se mantiene
+    /// como opción, para que el formulario muestre lo que envía.
     /// </summary>
     /// <param name="perfiles">Perfiles del hogar.</param>
     /// <param name="cuentaActiva">Si el hogar tiene activada la cuenta común.</param>
     /// <param name="perfilEnEdicion">Perfil del gasto que se está editando; null al crear.</param>
+    /// <param name="ahorroActivo">Si el hogar tiene activado el ahorro (exige además la cuenta activa).</param>
     public static IReadOnlyList<PerfilRepartoDto> PerfilesOfrecidos(
-        IReadOnlyList<PerfilRepartoDto> perfiles, bool cuentaActiva, Guid? perfilEnEdicion)
+        IReadOnlyList<PerfilRepartoDto> perfiles, bool cuentaActiva, Guid? perfilEnEdicion, bool ahorroActivo = false)
     {
-        var ofrecidos = cuentaActiva ? perfiles.ToList() : perfiles.Where(p => p.Modo != ModosReparto.CuentaComun).ToList();
+        var ofrecidos = perfiles.Where(p => p.Modo switch
+        {
+            ModosReparto.CuentaComun => cuentaActiva,
+            ModosReparto.CuentaComunAhorro => cuentaActiva && ahorroActivo,
+            _ => true,
+        }).ToList();
         if (perfilEnEdicion is { } id && perfiles.FirstOrDefault(p => p.Id == id) is { } actual && !ofrecidos.Contains(actual))
             ofrecidos.Add(actual);
         return ofrecidos;

@@ -130,7 +130,7 @@ else
                     <div class="g-main">
                         <div class="g-concepto">@(string.IsNullOrWhiteSpace(g.Concepto) ? _m.NombreCategoria(g.CategoriaId) : g.Concepto)</div>
                         <div class="muted g-meta">
-                            @g.Fecha.ToString("dd/MM/yyyy", Es) · @_m.NombreCategoria(g.CategoriaId) · paga @(g.PagadoDesdeAhorro ? "el ahorro" : g.PagadoPor is { } quien ? Formato.NombreMiembro(quien, _m.Miembros) : "la cuenta común")
+                            @g.Fecha.ToString("dd/MM/yyyy", Es) · @_m.NombreCategoria(g.CategoriaId) · paga @(g.PagadoPor is { } quien ? Formato.NombreMiembro(quien, _m.Miembros) : g.PagadoDesdeAhorro ? "el ahorro" : "la cuenta común")
                             @if (g.GastoRecurrenteId is not null) { <span class="tag off">recurrente</span> }
                         </div>
                         <div class="g-reparto">
@@ -138,13 +138,17 @@ else
                             {
                                 <span class="tag admin">Personal: no entra en la liquidación</span>
                             }
-                            @if (g.ACargoCuentaComun)
+                            @if (g.PagadoDesdeAhorro)
+                            {
+                                <span class="tag cur">Cuenta común (ahorro): descontado del ahorro, sin reparto entre personas</span>
+                            }
+                            else if (g.ACargoCuentaComun)
                             {
                                 <span class="tag cur">Cuenta común: sin reparto entre personas</span>
                             }
-                            @if (g.PagadoDesdeAhorro)
+                            @if (g.ACargoCuentaComun && g.PagadoPor is not null)
                             {
-                                <span class="tag cur">Descontado del ahorro</span>
+                                <span class="tag off">Adelantado: la cuenta se lo debe hasta reembolsarlo</span>
                             }
                             @foreach (var r in g.Repartos)
                             {
@@ -221,13 +225,9 @@ else
                         {
                             <option value="@m.Id">@m.Nombre</option>
                         }
-                        @if (_m.CuentaActiva && _m.PerfilCuentaComun is not null)
+                        @if (_m.OfreceCuentaComoPagador || _m.Pagador is null)
                         {
-                            <option value="">Cuenta común (la paga directamente)</option>
-                            @if (_m.AhorroActivo || _m.DesdeAhorro)
-                            {
-                                <option value="ahorro">Ahorro (se descuenta del ahorro)</option>
-                            }
+                            <option value="">@(_m.DesdeAhorro ? "El ahorro (lo paga directamente)" : "Cuenta común (la paga directamente)")</option>
                         }
                     </select>
                 </label>
@@ -250,6 +250,10 @@ else
                     @if (_m.CategoriaACargoDeLaCuenta)
                     {
                         <span class="muted">Esta categoría va por defecto a cargo de la cuenta común.</span>
+                    }
+                    @if (_m.DesdeAhorro && !(_m.Personal && _m.Pagador is not null))
+                    {
+                        <span class="muted">Se descuenta del ahorro, no del saldo de gastos@(_m.Pagador is not null ? "; quien lo adelanta queda pendiente de reembolso" : "").</span>
                     }
                 </label>
                 <label>Concepto

@@ -81,9 +81,10 @@ public class HogaresTests
         Assert.Equal(RolMiembro.Admin, miembro.Rol);
 
         var perfiles = await db.PerfilesReparto.IgnoreQueryFilters().Where(p => p.HogarId == creado!.Id).ToListAsync();
-        Assert.Equal(4, perfiles.Count);
+        Assert.Equal(5, perfiles.Count);
         var porNombre = perfiles.ToDictionary(p => p.Nombre);
         Assert.Equal(ModoReparto.CuentaComun, porNombre[SemillaHogar.PerfilCuentaComun].Modo);
+        Assert.Equal(ModoReparto.CuentaComunAhorro, porNombre[SemillaHogar.PerfilCuentaComunAhorro].Modo);
         Assert.Equal(ModoReparto.Partes, porNombre[SemillaHogar.PerfilPartes].Modo);
         Assert.Equal(ModoReparto.Porcentaje, porNombre[SemillaHogar.PerfilPorcentaje].Modo);
         Assert.Equal(ModoReparto.Individual, porNombre[SemillaHogar.PerfilIndividual].Modo);

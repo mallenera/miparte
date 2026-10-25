@@ -25,7 +25,7 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
     /// <summary>Todos los miembros.</summary>
     public List<MiembroDto> Miembros { get; private set; } = [];
 
-    /// <summary>Adultos activos, los únicos que aportan, ingresan y retiran.</summary>
+    /// <summary>Adultos activos, los únicos que aportan e ingresan al ahorro.</summary>
     public List<MiembroDto> Adultos { get; private set; } = [];
 
     /// <summary>Todos los ingresos a la cuenta común del hogar, del más reciente al más antiguo.</summary>
@@ -69,9 +69,6 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
     /// <summary>Miembro al que se reembolsa.</summary>
     public Guid Reembolsado { get; set; }
 
-    /// <summary>Adulto que retira del ahorro.</summary>
-    public Guid Retirante { get; set; }
-
     /// <summary>Adulto que ingresa al ahorro.</summary>
     public Guid Depositante { get; set; }
 
@@ -86,12 +83,6 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
 
     /// <summary>Concepto del reembolso.</summary>
     public string ConceptoReembolso { get; set; } = "";
-
-    /// <summary>Importe de la retirada.</summary>
-    public string ImporteRetirada { get; set; } = "";
-
-    /// <summary>Concepto de la retirada.</summary>
-    public string ConceptoRetirada { get; set; } = "";
 
     /// <summary>Miembro que hace el ingreso a la cuenta común.</summary>
     public Guid Ingresante { get; set; }
@@ -126,9 +117,6 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
 
     /// <summary>El importe del ingreso es válido.</summary>
     public bool DepositoValido => EntradaImporte.TryParse(ImporteDeposito, out _);
-
-    /// <summary>El importe de la retirada es válido.</summary>
-    public bool RetiradaValida => EntradaImporte.TryParse(ImporteRetirada, out _);
 
     /// <summary>El importe del reembolso es válido.</summary>
     public bool ReembolsoValido => EntradaImporte.TryParse(ImporteReembolso, out _);
@@ -167,7 +155,7 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
         {
             Miembros = await api.ListarMiembrosAsync();
             Adultos = Miembros.Where(m => m.Tipo == TiposMiembro.Adulto && m.Activo).ToList();
-            Aportante = Retirante = Depositante = (Adultos.FirstOrDefault(m => m.EsYo) ?? Adultos.FirstOrDefault())?.Id ?? Guid.Empty;
+            Aportante = Depositante = (Adultos.FirstOrDefault(m => m.EsYo) ?? Adultos.FirstOrDefault())?.Id ?? Guid.Empty;
             Ingresante = (Miembros.FirstOrDefault(m => m.EsYo) ?? Miembros.FirstOrDefault())?.Id ?? Guid.Empty;
             await RecargarAsync();
         }
@@ -307,17 +295,6 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
             return "Ahorro añadido";
         });
 
-    /// <summary>Retira dinero del ahorro.</summary>
-    public Task<string?> RetirarAhorroAsync() =>
-        EjecutarAsync(async () =>
-        {
-            var importe = Importe(ImporteRetirada);
-            await api.CrearRetiradaAhorroAsync(new CrearRetiradaAhorroRequest(Retirante, importe, null, Texto(ConceptoRetirada)));
-            ImporteRetirada = "";
-            ConceptoRetirada = "";
-            return "Retirada registrada";
-        });
-
     /// <summary>Fija el saldo inicial de la cuenta a partir de la fecha y el importe escritos (sustituye el que hubiera).</summary>
     public Task<string?> FijarSaldoInicialAsync() =>
         EjecutarAsync(async () =>
@@ -345,15 +322,6 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
             await api.EliminarDepositoAhorroAsync(d.Id);
             ConfirmandoEliminar = null;
             return "Ingreso eliminado";
-        });
-
-    /// <summary>Elimina una retirada del ahorro.</summary>
-    public Task<string?> EliminarRetiradaAsync(RetiradaAhorroDto r) =>
-        EjecutarAsync(async () =>
-        {
-            await api.EliminarRetiradaAhorroAsync(r.Id);
-            ConfirmandoEliminar = null;
-            return "Retirada eliminada";
         });
 
     /// <summary>Elimina un reembolso.</summary>

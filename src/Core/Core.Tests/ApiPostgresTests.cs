@@ -97,7 +97,7 @@ public class ApiPostgresTests
         var hogar = await CrearHogar(e.Cliente(user), "Casa integración", "Ana");
 
         var c = e.Cliente(user, hogar.Id);
-        Assert.Equal(4, (await Leer<List<PerfilRepartoDto>>(await c.GetAsync("/api/perfiles"))).Count);
+        Assert.Equal(5, (await Leer<List<PerfilRepartoDto>>(await c.GetAsync("/api/perfiles"))).Count);
         Assert.Equal(6, (await Leer<List<CategoriaDto>>(await c.GetAsync("/api/categorias"))).Count);
         var miembros = await Leer<List<MiembroDto>>(await c.GetAsync("/api/miembros"));
         var ana = Assert.Single(miembros);

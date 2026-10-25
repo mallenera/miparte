@@ -24,12 +24,12 @@ public static class ReglasPerfil
     }
 
     /// <summary>
-    /// Valida la forma del detalle según el modo: cuenta común e individual no llevan detalle; porcentaje y partes lo exigen,
+    /// Valida la forma del detalle según el modo: cuenta común (también la del ahorro) e individual no llevan detalle; porcentaje y partes lo exigen,
     /// sin miembros repetidos. Devuelve el error o null.
     /// </summary>
     public static string? ValidarEstructura(ModoReparto modo, IReadOnlyList<ValorMiembro> detalle)
     {
-        if (modo is ModoReparto.CuentaComun or ModoReparto.Individual)
+        if (ModosDeCuenta.EsDeCuentaComun(modo) || modo == ModoReparto.Individual)
             return detalle.Count > 0 ? $"El modo {TextoModoReparto.ATexto(modo)} no lleva detalle." : null;
 
         if (detalle.Count == 0) return "El detalle es obligatorio en este modo.";
@@ -40,7 +40,7 @@ public static class ReglasPerfil
     /// <summary>Valida los valores: no negativos; los porcentajes suman 100 y con partes alguna es mayor que 0. Devuelve el error o null.</summary>
     public static string? ValidarValores(ModoReparto modo, IReadOnlyList<ValorMiembro> detalle)
     {
-        if (modo is ModoReparto.CuentaComun or ModoReparto.Individual) return null;
+        if (ModosDeCuenta.EsDeCuentaComun(modo) || modo == ModoReparto.Individual) return null;
         if (detalle.Any(d => d.Valor < 0)) return "Los valores no pueden ser negativos.";
         if (modo == ModoReparto.Porcentaje)
             return Math.Abs(detalle.Sum(d => d.Valor) - 100m) > ToleranciaPorcentaje ? "Los porcentajes deben sumar 100." : null;

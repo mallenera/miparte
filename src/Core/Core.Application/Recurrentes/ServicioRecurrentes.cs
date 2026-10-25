@@ -96,8 +96,8 @@ public sealed class ServicioRecurrentes(IRepositorioRecurrentes recurrentes, IRe
     /// <summary>
     /// Crea los gastos del mes que empieza en <paramref name="inicio"/> para las plantillas activas que aún no tengan uno. Es
     /// idempotente: o se generan todos los pendientes o ninguno. Conflicto si el hogar tiene desactivados los gastos recurrentes, si el
-    /// mes está cerrado o si una plantilla va a cargo de la cuenta común y el hogar no la ha activado; inválido si algún gasto no se
-    /// puede repartir.
+    /// mes está cerrado, si una plantilla va a cargo de la cuenta común y el hogar no la ha activado, o si va a cargo del ahorro y
+    /// este no está activado o no alcanza; inválido si algún gasto no se puede repartir.
     /// </summary>
     public async Task<Resultado<GeneracionDelMes>> GenerarAsync(DateOnly inicio, CancellationToken ct)
     {
@@ -118,9 +118,22 @@ public sealed class ServicioRecurrentes(IRepositorioRecurrentes recurrentes, IRe
                 var perfiles = await recurrentes.PerfilesAsync(ct);
 
                 // Una plantilla a cargo de la cuenta común no genera gastos mientras el hogar no la tenga activada.
-                if (pendientes.Any(p => !p.EsPersonal && perfiles[p.PerfilRepartoId].Modo == ModoReparto.CuentaComun)
+                if (pendientes.Any(p => !p.EsPersonal && ModosDeCuenta.EsDeCuentaComun(perfiles[p.PerfilRepartoId].Modo))
                     && !await gastos.CuentaComunActivaAsync(ct))
                     return Resultado<GeneracionDelMes>.Conflicto(Mensajes.CuentaInactiva);
+
+                // Las del ahorro, además, necesitan el ahorro activado y que alcance para todas las del mes.
+                var delAhorro = pendientes
+                    .Where(p => !p.EsPersonal && perfiles[p.PerfilRepartoId].Modo == ModoReparto.CuentaComunAhorro).Sum(p => p.Importe);
+                if (delAhorro > 0)
+                {
+                    if (!await gastos.AhorroActivoAsync(ct)) return Resultado<GeneracionDelMes>.Conflicto(Mensajes.AhorroInactivo);
+                    var disponible = Math.Max(0m, AhorroCuenta.Disponible(inicio, await gastos.DatosAhorroAsync(null, ct)));
+                    if (delAhorro > disponible)
+                        return Resultado<GeneracionDelMes>.Conflicto(
+                            $"El ahorro disponible ({disponible:0.00}) no cubre los gastos recurrentes del ahorro de este mes.",
+                            new Dictionary<string, object> { ["disponible"] = disponible });
+                }
 
                 var generados = new List<Gasto>(pendientes.Count);
                 foreach (var p in pendientes)

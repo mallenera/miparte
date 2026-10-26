@@ -4,12 +4,18 @@
 @inject EstadoHogar Hogar
 @inject ServicioSesion Sesion
 @inject MiParte.Web.Configuracion.OpcionesWeb Opciones
+@using System.Globalization
+@using MiParte.Web.Modelos
 
 <div class="asist">
     <p class="muted">Pregunta por los gastos del hogar; las cifras salen de tus datos. Puede preparar un gasto nuevo, pero nunca lo guarda sin que lo confirmes.</p>
     @if (_mensajes.Count > 0)
     {
         <button class="linkbtn" type="button" @onclick="Reiniciar" disabled="@_enviando">Nueva conversación</button>
+    }
+    @if (_alta is not null)
+    {
+        <button class="linkbtn" type="button" @onclick="CancelarAlta">Cancelar el gasto</button>
     }
 
     @if (!Disponible)
@@ -25,7 +31,8 @@
             {
                 <div class="empty">
                     <Icono Nombre="message-circle" Tamano="28" />
-                    <div>Prueba con una de estas preguntas</div>
+                    <button class="btn btn-sm alta-gasto" type="button" disabled="@_enviando" @onclick="IniciarAlta">Añadir gasto</button>
+                    <div>O prueba con una de estas preguntas</div>
                     <div class="sugerencias">
                         @foreach (var s in Sugerencias)
                         {
@@ -48,7 +55,7 @@
                     {
                         <div class="borrador" role="group" aria-label="Gasto propuesto">
                             <strong>Gasto propuesto (sin guardar)</strong>
-                            <div>@b.Concepto · @Formato.Euros(b.Importe) · @b.Fecha.ToString("dd/MM/yyyy")</div>
+                            <div>@b.Concepto · @Formato.Euros(b.Importe) · @b.Fecha.ToString(ModeloAltaGastoChat.FormatoFecha, CultureInfo.InvariantCulture)</div>
                             <div class="muted">Categoría: @b.Categoria · Perfil: @b.Perfil</div>
                             @if (m.EstadoBorrador == EstadoBorrador.Pendiente)
                             {
@@ -96,9 +103,9 @@
             <div class="aviso err u-mt12" role="alert">@_error</div>
         }
 
-        <form class="chatform" @onsubmit="() => EnviarAsync(_texto)">
+        <form class="chatform" @onsubmit="() => EnviarFormularioAsync()">
             <label class="sr" for="pregunta">Tu pregunta</label>
-            <input id="pregunta" type="text" autocomplete="off" maxlength="@MaxCaracteres" placeholder="Escribe tu pregunta…"
+            <input id="pregunta" type="text" autocomplete="off" maxlength="@MaxCaracteres" placeholder="@(_alta is null ? "Escribe tu pregunta…" : "Escribe tu respuesta…")"
                    @bind="_texto" @bind:event="oninput" disabled="@_enviando" />
             <button class="btn" type="submit" disabled="@(_enviando || string.IsNullOrWhiteSpace(_texto))">Enviar</button>
         </form>
@@ -133,6 +140,9 @@
         public EstadoBorrador EstadoBorrador { get; set; } = EstadoBorrador.Pendiente;
         public string Pagador { get; set; } = "";
         public string? Aviso { get; set; }
+
+        /// <summary>Mensaje del alta guiada: no se envía al asistente en el historial, solo el gasto completo al terminar.</summary>
+        public bool DeAlta { get; init; }
     }
 
     private readonly List<Burbuja> _mensajes = [];
@@ -142,6 +152,7 @@
     private string? _error;
     private bool _enviando;
     private bool _confirmando;
+    private ModeloAltaGastoChat? _alta;
 
     private bool Disponible => Opciones.AsistenteConfigurado || Sesion.EsDemoLocal;
 
@@ -162,6 +173,57 @@
         _enCurso = null;
         _error = null;
         _texto = "";
+        _alta = null;
+    }
+
+    /// <summary>Empieza el alta guiada: el asistente pregunta importe, concepto y fecha de uno en uno.</summary>
+    private void IniciarAlta()
+    {
+        _error = null;
+        _texto = "";
+        _alta = new ModeloAltaGastoChat();
+        _mensajes.Add(new Burbuja(false, _alta.Pregunta, []) { DeAlta = true });
+    }
+
+    private void CancelarAlta()
+    {
+        _alta = null;
+        _texto = "";
+        _mensajes.Add(new Burbuja(false, "Gasto cancelado. No se ha guardado nada.", []) { DeAlta = true });
+    }
+
+    /// <summary>Envía el formulario: una respuesta del alta guiada, o una pregunta normal al asistente.</summary>
+    private async Task EnviarFormularioAsync()
+    {
+        if (_alta is null)
+        {
+            await EnviarAsync(_texto);
+            return;
+        }
+        if (_enviando) return;
+        var respuesta = _texto.Trim();
+        if (respuesta.Length == 0) return;
+
+        var usuario = new Burbuja(true, respuesta, []) { DeAlta = true };
+        _mensajes.Add(usuario);
+        _texto = "";
+        var error = _alta.Responder(respuesta);
+        if (error is not null)
+        {
+            _mensajes.Add(new Burbuja(false, error, []) { DeAlta = true });
+            return;
+        }
+        if (_alta.PasoActual != ModeloAltaGastoChat.Paso.Completa)
+        {
+            _mensajes.Add(new Burbuja(false, _alta.Pregunta, []) { DeAlta = true });
+            return;
+        }
+
+        // Al completarse, la última respuesta no se muestra: el mensaje que va al asistente lo resume entero.
+        var mensaje = _alta.MensajeParaAsistente();
+        _alta = null;
+        _mensajes.Remove(usuario);
+        await EnviarAsync(mensaje);
     }
 
     private async Task EnviarAsync(string? pregunta)
@@ -174,6 +236,7 @@
         _mensajes.Add(usuario);
         _texto = "";
         var historial = _mensajes
+            .Where(m => !m.DeAlta)
             .TakeLast(MaxHistorial)
             .Select(m => new MensajeChatDto(m.EsMio ? "user" : "assistant", m.Texto))
             .ToList();

@@ -112,8 +112,15 @@ public static class Dtos
                 p.MiembroId, nombres.GetValueOrDefault(p.MiembroId, ""), p.Aportado, p.Ahorrado, p.PorcentajeGastos, p.PorcentajeAhorro,
                 p.ParteSaldo, p.ParteAhorro, p.Pendiente)).ToList(),
             d.AhorroActivo, ADto(s.Extracto), s.SaldoInicial is { } si ? new SaldoInicialDto(si.Fecha, si.Importe) : null,
-            TextoFrecuenciaAportacion.ATexto(d.Historico.Frecuencia));
+            TextoFrecuenciaAportacion.ATexto(d.Historico.Frecuencia), ADto(s.Resumen));
     }
+
+    /// <summary>Resumen mensual de la cuenta común (Hogar, Ahorro y Total).</summary>
+    private static ResumenCuentaMesDto ADto(ResumenMensualCuenta r) => new(ADto(r.Hogar), ADto(r.Ahorro), ADto(r.Total));
+
+    /// <summary>Una fila del resumen mensual de la cuenta común.</summary>
+    private static FilaResumenCuentaDto ADto(FilaResumenMensualCuenta f) => new(
+        f.Inicial, f.Ingresos, f.IngresosSueltos, f.Gastos, f.Reembolsos, f.Disponible);
 
     /// <summary>Extracto bancario de la cuenta común entre dos fechas.</summary>
     public static MovimientosCuentaComunResponse ADto(this ExtractoBanco x) => new(

@@ -355,6 +355,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .extracto th, .extracto td { padding: 8px 0; border-top: 1px solid var(--line); text-align: left; font-weight: 400; }
 .extracto td { text-align: right; white-space: nowrap; }
 .extracto tr.total th, .extracto tr.total td { font-weight: 700; border-top: 2px solid var(--line-2); }
+/* Resumen mensual de la cuenta común: una fila por Hogar y Ahorro, con scroll horizontal dentro de la tarjeta en móvil. */
+.tabla-scroll { overflow-x: auto; margin-top: 10px; }
+.resumen-cuenta { width: 100%; min-width: 480px; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 13px; }
+.resumen-cuenta th, .resumen-cuenta td { padding: 8px 6px; border-top: 1px solid var(--line); text-align: right; white-space: nowrap; font-weight: 400; }
+.resumen-cuenta th:first-child, .resumen-cuenta td:first-child { text-align: left; }
+.resumen-cuenta thead th { font-weight: 700; border-top: 0; }
+.resumen-cuenta tr.total th, .resumen-cuenta tr.total td { font-weight: 700; border-top: 2px solid var(--line-2); }
 .who { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; min-width: 0; }
 
 /* Pestañas: píldoras sueltas en lugar de una barra con subrayado */

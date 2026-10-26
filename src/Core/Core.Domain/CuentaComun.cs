@@ -78,6 +78,18 @@ public sealed record EstadoCuentaComun(
     decimal AhorroMes, decimal AhorroAcumulado, decimal AhorroRetirado, decimal AhorroDisponible,
     decimal AhorroDepositado = 0m, decimal AhorroGastado = 0m, decimal Ingresado = 0m);
 
+/// <summary>
+/// Una fila del resumen mensual de la cuenta común (Hogar o Ahorro): lo que había al empezar el mes (<paramref name="Inicial"/>, el disponible
+/// del mes anterior), lo que entra y sale en el mes, y lo que queda (<paramref name="Disponible"/>). <paramref name="Ingresos"/> son las
+/// aportaciones de la fila; <paramref name="IngresosSueltos"/>, los ingresos aparte; <paramref name="Gastos"/>, lo que sale de la fila, y
+/// <paramref name="Reembolsos"/>, lo devuelto a quien adelantó gastos (solo Hogar).
+/// </summary>
+public sealed record FilaResumenMensualCuenta(
+    decimal Inicial, decimal Ingresos, decimal IngresosSueltos, decimal Gastos, decimal Reembolsos, decimal Disponible);
+
+/// <summary>Resumen mensual de la cuenta común: la fila de Hogar (dinero para gastos), la de Ahorro y la suma de ambas.</summary>
+public sealed record ResumenMensualCuenta(FilaResumenMensualCuenta Hogar, FilaResumenMensualCuenta Ahorro, FilaResumenMensualCuenta Total);
+
 /// <summary>Cálculo del saldo acumulado de la cuenta común; no depende de persistencia.</summary>
 public static class CuentaComun
 {
@@ -189,6 +201,46 @@ public static class CuentaComun
         var movimientos = aportado + fijado + ingresado - directos + adelantadosDelAhorro - reembolsado;
         return new ExtractoCuentaComun(
             estado.Efectivo - movimientos, aportado, fijado, directos, adelantadosDelAhorro, reembolsado, estado.Efectivo, ingresado);
+    }
+
+    /// <summary>
+    /// Resumen del mes <paramref name="mes"/> (primer día) en filas de Hogar y Ahorro. El inicial de cada fila es el disponible del mes
+    /// anterior, así que el saldo se acumula, y el resto de columnas son solo del mes. El disponible de Hogar es el efectivo de
+    /// <see cref="Calcular"/> y el de Ahorro su ahorro disponible. Un gasto adelantado desde el ahorro sube el ingreso de Hogar (el
+    /// dinero pasa al efectivo) y el gasto de Ahorro; una retirada solo sale del ahorro.
+    /// </summary>
+    /// <param name="mes">Primer día del mes.</param>
+    /// <param name="h">Histórico de la cuenta hasta el fin del mes.</param>
+    public static ResumenMensualCuenta ResumenMensual(DateOnly mes, HistoricoCuenta h)
+    {
+        var fin = mes.AddMonths(1);
+        var anterior = Calcular(
+            mes.AddMonths(-1), h.Vigentes, h.Gastos, h.Reembolsos, h.Retiradas, h.Depositos, h.SaldoInicial, h.Ingresos);
+        bool EnMes(DateOnly f) => f >= mes && f < fin;
+
+        var aportesGastos = h.Vigentes.Select(a => a.MiembroId).Distinct()
+            .Sum(m => AportacionDelMes(m, mes, h.Vigentes) - AhorroDelMes(m, mes, h.Vigentes));
+        var aportesAhorro = h.Vigentes.Select(a => a.MiembroId).Distinct().Sum(m => AhorroDelMes(m, mes, h.Vigentes));
+        var gastos = (h.GastosDelMes ?? []).Where(g => EnMes(g.Fecha)).ToList();
+        var directos = gastos.Where(g => g.PagadoPor is null && !g.DesdeAhorro).Sum(g => g.Importe);
+        var delAhorro = gastos.Where(g => g.DesdeAhorro).Sum(g => g.Importe);
+        var adelantadosDelAhorro = gastos.Where(g => g.PagadoPor is not null && g.DesdeAhorro).Sum(g => g.Importe);
+        var reembolsado = h.Reembolsos.Where(r => EnMes(r.Fecha)).Sum(r => r.Importe);
+        var retirado = h.Retiradas.Where(r => EnMes(r.Fecha)).Sum(r => r.Importe);
+        var depositado = h.Depositos.Where(d => EnMes(d.Fecha)).Sum(d => d.Importe);
+        var ingresado = (h.Ingresos ?? []).Where(i => EnMes(i.Fecha)).Sum(i => i.Importe);
+        var fijado = h.SaldoInicial is { } si && EnMes(si.Fecha) ? si.Importe : 0m;
+
+        var hogar = new FilaResumenMensualCuenta(
+            anterior.Efectivo, aportesGastos + fijado + adelantadosDelAhorro, ingresado, directos, reembolsado,
+            anterior.Efectivo + aportesGastos + fijado + adelantadosDelAhorro + ingresado - directos - reembolsado);
+        var ahorro = new FilaResumenMensualCuenta(
+            anterior.AhorroDisponible, aportesAhorro, depositado, delAhorro + retirado, 0m,
+            anterior.AhorroDisponible + aportesAhorro + depositado - delAhorro - retirado);
+        var total = new FilaResumenMensualCuenta(
+            hogar.Inicial + ahorro.Inicial, hogar.Ingresos + ahorro.Ingresos, hogar.IngresosSueltos + ahorro.IngresosSueltos,
+            hogar.Gastos + ahorro.Gastos, hogar.Reembolsos + ahorro.Reembolsos, hogar.Disponible + ahorro.Disponible);
+        return new ResumenMensualCuenta(hogar, ahorro, total);
     }
 
     /// <summary>

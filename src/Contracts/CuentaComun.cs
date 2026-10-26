@@ -126,6 +126,7 @@ public record ActivarAhorroRequest(bool Activo);
 /// <param name="AhorroActivo">Si el hogar tiene activado el ahorro; si es false las escrituras del ahorro responden 409.</param>
 /// <param name="Extracto">Cómo cambia el efectivo de la cuenta en el mes, como un extracto bancario.</param>
 /// <param name="SaldoInicial">Saldo inicial fijado para la cuenta (con su fecha), o null si no hay.</param>
+/// <param name="Resumen">Resumen mensual por Hogar y Ahorro, con el inicial arrastrado del mes anterior.</param>
 public record CuentaComunResponse(
     string Mes, decimal AportadoMes, decimal Aportado, decimal Gastado, decimal Saldo,
     IReadOnlyList<PendienteCuentaDto> Pendientes, decimal Efectivo,
@@ -135,7 +136,7 @@ public record CuentaComunResponse(
     decimal AhorroDepositado = 0m, IReadOnlyList<DepositoAhorroDto>? DepositosAhorro = null,
     decimal AhorroGastado = 0m, bool Activa = true, IReadOnlyList<PartePersonaDto>? Partes = null,
     bool AhorroActivo = true, ExtractoCuentaComunDto? Extracto = null, SaldoInicialDto? SaldoInicial = null,
-    string AportacionFrecuencia = FrecuenciasAportacion.Mensual);
+    string AportacionFrecuencia = FrecuenciasAportacion.Mensual, ResumenCuentaMesDto? Resumen = null);
 
 /// <summary>
 /// Extracto del mes de la cuenta común: el efectivo al inicio, lo que entra y sale, y el efectivo al final. Los importes llevan su signo
@@ -152,6 +153,21 @@ public record CuentaComunResponse(
 public record ExtractoCuentaComunDto(
     decimal EfectivoInicial, decimal Aportaciones, decimal SaldoInicialFijado, decimal GastosCuenta,
     decimal GastosAdelantadosDelAhorro, decimal Reembolsos, decimal EfectivoFinal, decimal Ingresos = 0m);
+
+/// <summary>Una fila del resumen mensual de la cuenta común (Hogar, Ahorro o Total).</summary>
+/// <param name="Inicial">Disponible al empezar el mes: el de la fila el mes anterior.</param>
+/// <param name="Ingresos">Aportaciones del mes a la fila.</param>
+/// <param name="IngresosSueltos">Ingresos aparte del mes (a Hogar, o depósitos de ahorro).</param>
+/// <param name="Gastos">Lo que sale de la fila en el mes (en Ahorro, incluye las retiradas).</param>
+/// <param name="Reembolsos">Lo devuelto a quien adelantó gastos en el mes (solo Hogar).</param>
+/// <param name="Disponible">Lo que queda al final del mes: inicial, más lo que entra, menos lo que sale.</param>
+public record FilaResumenCuentaDto(decimal Inicial, decimal Ingresos, decimal IngresosSueltos, decimal Gastos, decimal Reembolsos, decimal Disponible);
+
+/// <summary>Resumen mensual de la cuenta común: Hogar (dinero para gastos), Ahorro y Total.</summary>
+/// <param name="Hogar">Fila de Hogar.</param>
+/// <param name="Ahorro">Fila de Ahorro.</param>
+/// <param name="Total">Suma de Hogar y Ahorro.</param>
+public record ResumenCuentaMesDto(FilaResumenCuentaDto Hogar, FilaResumenCuentaDto Ahorro, FilaResumenCuentaDto Total);
 
 /// <summary>Saldo inicial de la cuenta común: dinero que ya había en la cuenta para gastos a una fecha.</summary>
 /// <param name="Fecha">Día al que corresponde el saldo.</param>

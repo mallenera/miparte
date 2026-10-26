@@ -10,9 +10,10 @@ namespace MiParte.Core.Application.CuentaComun;
 /// <param name="Detalle">Aportaciones, movimientos del mes y nombres de los miembros.</param>
 /// <param name="Extracto">Cómo cambia el efectivo de la cuenta en el mes, como un extracto bancario.</param>
 /// <param name="SaldoInicial">Saldo inicial fijado para la cuenta, o null.</param>
+/// <param name="Resumen">Filas de Hogar y Ahorro del mes, con el inicial arrastrado del mes anterior.</param>
 public sealed record EstadoCuentaDelMes(
     DateOnly Mes, EstadoCuentaComun Estado, IReadOnlyList<PartePersona> Partes, HistoricoCuentaDetallado Detalle,
-    ExtractoCuentaComun Extracto, SaldoInicialCuenta? SaldoInicial);
+    ExtractoCuentaComun Extracto, SaldoInicialCuenta? SaldoInicial, ResumenMensualCuenta Resumen);
 
 /// <summary>Datos de una aportación mensual de un adulto.</summary>
 public sealed record FijarAportacion(Guid HogarId, Guid MiembroId, DateOnly Desde, decimal Importe, decimal Ahorro);
@@ -38,7 +39,8 @@ public sealed class ServicioCuentaComun(IRepositorioCuentaComun repositorio, Tim
         var partes = Domain.CuentaComun.PartesPorPersona(inicio, h.Vigentes, estado, h.Depositos);
         var reembolsos = detalle.ReembolsosDelMes.Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe)).ToList();
         var extracto = Domain.CuentaComun.Extracto(inicio, h.Vigentes, h.GastosDelMes ?? [], reembolsos, saldoInicial, estado, h.Ingresos);
-        return new EstadoCuentaDelMes(inicio, estado, partes, detalle, extracto, saldoInicial);
+        var resumen = Domain.CuentaComun.ResumenMensual(inicio, h);
+        return new EstadoCuentaDelMes(inicio, estado, partes, detalle, extracto, saldoInicial, resumen);
     }
 
     /// <summary>

@@ -78,6 +78,43 @@ else if (_m.Estado is not null)
         }
     </section>
 
+    @if (_m.Estado.Resumen is { } res)
+    {
+        <section class="card" aria-labelledby="t-resumen">
+            <div class="card-head"><h2 id="t-resumen">Resumen de @_m.NombreMes</h2></div>
+            <p class="muted">Inicial es lo que quedó el mes anterior; el resto, solo de este mes. Lo que queda pasa al mes siguiente.</p>
+            <div class="tabla-scroll">
+                <table class="resumen-cuenta" id="resumen-cuenta">
+                    <thead>
+                        <tr>
+                            <th scope="col"><span class="sr">Cuenta</span></th>
+                            <th scope="col">Inicial</th>
+                            <th scope="col">Ingresos</th>
+                            <th scope="col">Ingresos sueltos</th>
+                            <th scope="col">Gastos</th>
+                            <th scope="col">Reembolsos</th>
+                            <th scope="col">Disponible</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var (nombre, fila, clase) in new[] { ("Hogar", res.Hogar, ""), ("Ahorro", res.Ahorro, ""), ("Total", res.Total, "total") })
+                        {
+                            <tr class="@clase">
+                                <th scope="row">@nombre</th>
+                                <td>@Formato.Euros(fila.Inicial)</td>
+                                <td>@Formato.Euros(fila.Ingresos)</td>
+                                <td>@Formato.Euros(fila.IngresosSueltos)</td>
+                                <td>@Formato.Euros(fila.Gastos)</td>
+                                <td>@Formato.Euros(fila.Reembolsos)</td>
+                                <td><b>@Formato.Euros(fila.Disponible)</b></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    }
+
     @if (_m.Estado.Extracto is { } x)
     {
         <section class="card" aria-labelledby="t-extracto">

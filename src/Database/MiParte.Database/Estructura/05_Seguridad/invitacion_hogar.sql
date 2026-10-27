@@ -5,6 +5,13 @@
 ALTER TABLE public.invitacion_hogar ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: invitacion_hogar api_servicio; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY api_servicio ON public.invitacion_hogar TO miparte_api USING (true) WITH CHECK (true);
+
+
+--
 -- Name: invitacion_hogar invitacion_hogar_delete; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -36,6 +43,7 @@ CREATE POLICY invitacion_hogar_update ON public.invitacion_hogar FOR UPDATE TO a
 -- Name: TABLE invitacion_hogar; Type: ACL; Schema: public; Owner: -
 --
 
-REVOKE ALL ON TABLE public.invitacion_hogar FROM anon, authenticated;
+REVOKE ALL ON TABLE public.invitacion_hogar FROM anon, authenticated, miparte_api;
 
 GRANT SELECT ON TABLE public.invitacion_hogar TO authenticated;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.invitacion_hogar TO miparte_api;

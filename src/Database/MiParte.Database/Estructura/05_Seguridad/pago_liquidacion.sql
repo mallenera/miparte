@@ -5,6 +5,13 @@
 ALTER TABLE public.pago_liquidacion ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: pago_liquidacion api_servicio; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY api_servicio ON public.pago_liquidacion TO miparte_api USING (true) WITH CHECK (true);
+
+
+--
 -- Name: pago_liquidacion pago_liquidacion_hogar; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -15,6 +22,7 @@ CREATE POLICY pago_liquidacion_hogar ON public.pago_liquidacion TO authenticated
 -- Name: TABLE pago_liquidacion; Type: ACL; Schema: public; Owner: -
 --
 
-REVOKE ALL ON TABLE public.pago_liquidacion FROM anon, authenticated;
+REVOKE ALL ON TABLE public.pago_liquidacion FROM anon, authenticated, miparte_api;
 
 GRANT SELECT ON TABLE public.pago_liquidacion TO authenticated;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.pago_liquidacion TO miparte_api;

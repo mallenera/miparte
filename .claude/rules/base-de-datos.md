@@ -10,7 +10,8 @@ paths:
 - Compatibilidad: los ficheros de `Estructura/` se aplican en PostgreSQL 15+ (sin `MAINTAIN` ni `SET transaction_timeout`; el exportador los quita). Una columna `NOT NULL` nueva sobre una tabla con datos necesita `DEFAULT` o un script `Antes` que la rellene.
 
 - Toda tabla de datos lleva `hogar_id`, claves foráneas compuestas `(hogar_id, id)`, RLS habilitada con política por pertenencia al hogar y `check` de integridad (importes > 0, `numeric(12,2)`).
-- Toda entidad EF con `HogarId` necesita su `HasQueryFilter` en `MiParteDbContext`, además de la RLS: el rol de conexión puede saltarse la RLS.
+- Toda entidad EF con `HogarId` necesita su `HasQueryFilter` en `MiParteDbContext`, además de la RLS: el rol de conexión `miparte_api` ve todas las filas (política `api_servicio`).
+- Toda tabla nueva lleva en `05_Seguridad` la política `api_servicio` (`TO miparte_api USING (true) WITH CHECK (true)`) y `GRANT SELECT,INSERT,DELETE,UPDATE ... TO miparte_api` (menos si no debe modificarse, como `auditoria`). Nunca des a `miparte_api` DDL, `TRUNCATE`, acceso a `auth` ni pertenencia a otro rol; `EsquemaPostgresTests.RolDeLaApi_SoloLeeYEscribeFilasDePublic` lo vigila.
 - Enums como texto con conversión explícita; `UseSnakeCaseNamingConvention`; tablas fijadas con `ToTable`.
 - Funciones `SECURITY DEFINER`: `set search_path = ''` y nombres cualificados.
 - Prueba contra Postgres real con `MIPARTE_TEST_DB`; no confíes solo en los tests que se saltan.

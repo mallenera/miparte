@@ -5,6 +5,13 @@
 ALTER TABLE public.deposito_ahorro ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: deposito_ahorro api_servicio; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY api_servicio ON public.deposito_ahorro TO miparte_api USING (true) WITH CHECK (true);
+
+
+--
 -- Name: deposito_ahorro deposito_ahorro_select; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -15,6 +22,7 @@ CREATE POLICY deposito_ahorro_select ON public.deposito_ahorro FOR SELECT TO aut
 -- Name: TABLE deposito_ahorro; Type: ACL; Schema: public; Owner: -
 --
 
-REVOKE ALL ON TABLE public.deposito_ahorro FROM anon, authenticated;
+REVOKE ALL ON TABLE public.deposito_ahorro FROM anon, authenticated, miparte_api;
 
 GRANT SELECT ON TABLE public.deposito_ahorro TO authenticated;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.deposito_ahorro TO miparte_api;

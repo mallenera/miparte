@@ -5,6 +5,13 @@
 ALTER TABLE public.miembro ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: miembro api_servicio; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY api_servicio ON public.miembro TO miparte_api USING (true) WITH CHECK (true);
+
+
+--
 -- Name: miembro miembro_delete; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -36,6 +43,7 @@ CREATE POLICY miembro_update ON public.miembro FOR UPDATE TO authenticated USING
 -- Name: TABLE miembro; Type: ACL; Schema: public; Owner: -
 --
 
-REVOKE ALL ON TABLE public.miembro FROM anon, authenticated;
+REVOKE ALL ON TABLE public.miembro FROM anon, authenticated, miparte_api;
 
 GRANT SELECT ON TABLE public.miembro TO authenticated;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.miembro TO miparte_api;

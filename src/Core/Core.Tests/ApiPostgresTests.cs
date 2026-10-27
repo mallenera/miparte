@@ -17,6 +17,12 @@ namespace MiParte.Core.Tests;
 public class ApiPostgresTests
 {
     internal static readonly string? Cadena = Environment.GetEnvironmentVariable("MIPARTE_TEST_DB");
+
+    /// <summary>
+    /// Cadena con la que se conecta la propia API: MIPARTE_TEST_DB_API (el rol miparte_api, como en producción; CI la
+    /// define) o, si no existe, la de las pruebas. Preparar y limpiar datos sigue usando <see cref="Cadena"/>.
+    /// </summary>
+    internal static readonly string? CadenaApi = Environment.GetEnvironmentVariable("MIPARTE_TEST_DB_API") is { Length: > 0 } api ? api : Cadena;
     internal static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web);
 
     /// <summary>URL de Supabase de las pruebas: debe coincidir con la de AutenticacionTests (emisor del token).</summary>
@@ -34,7 +40,7 @@ public class ApiPostgresTests
         public WebApplicationFactory<Program> Fabrica { get; } = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(b =>
             {
-                b.UseSetting("ConnectionStrings:Default", Cadena);
+                b.UseSetting("ConnectionStrings:Default", CadenaApi);
                 b.UseSetting("Supabase:Url", UrlSupabase);
                 b.UseSetting("Supabase:JwtSecret", Secreto);
             });

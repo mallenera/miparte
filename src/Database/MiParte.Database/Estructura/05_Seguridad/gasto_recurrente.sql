@@ -5,6 +5,13 @@
 ALTER TABLE public.gasto_recurrente ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: gasto_recurrente api_servicio; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY api_servicio ON public.gasto_recurrente TO miparte_api USING (true) WITH CHECK (true);
+
+
+--
 -- Name: gasto_recurrente gasto_recurrente_hogar; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -15,6 +22,7 @@ CREATE POLICY gasto_recurrente_hogar ON public.gasto_recurrente TO authenticated
 -- Name: TABLE gasto_recurrente; Type: ACL; Schema: public; Owner: -
 --
 
-REVOKE ALL ON TABLE public.gasto_recurrente FROM anon, authenticated;
+REVOKE ALL ON TABLE public.gasto_recurrente FROM anon, authenticated, miparte_api;
 
 GRANT SELECT ON TABLE public.gasto_recurrente TO authenticated;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.gasto_recurrente TO miparte_api;

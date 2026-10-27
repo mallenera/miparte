@@ -21,6 +21,8 @@ jobs:
     env:
       PGPASSWORD: pg
       MIPARTE_TEST_DB: Host=localhost;Database=miparte;Username=postgres;Password=pg
+      # Core.Api arranca en las pruebas con el rol de mínimo privilegio, como en producción (la contraseña solo vale aquí).
+      MIPARTE_TEST_DB_API: Host=localhost;Database=miparte;Username=miparte_api;Password=api
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -28,6 +30,8 @@ jobs:
           dotnet-version: 10.0.x
       - name: Aplicar la estructura (proyecto de base de datos, con esquema auth simulado)
         run: dotnet run --project src/Database/MiParte.Database --configuration Release -- migrar --con-auth-stub --conexion "$MIPARTE_TEST_DB"
+      - name: Contraseña del rol de la API (la migración lo crea sin ella)
+        run: psql "host=localhost dbname=miparte user=postgres" -v ON_ERROR_STOP=1 -c "alter role miparte_api password 'api'"
       - run: dotnet build --configuration Release
       - run: dotnet test --configuration Release --no-build
   pwa:

@@ -5,6 +5,13 @@
 ALTER TABLE public.perfil_reparto ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: perfil_reparto api_servicio; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY api_servicio ON public.perfil_reparto TO miparte_api USING (true) WITH CHECK (true);
+
+
+--
 -- Name: perfil_reparto perfil_reparto_hogar; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -15,6 +22,7 @@ CREATE POLICY perfil_reparto_hogar ON public.perfil_reparto TO authenticated USI
 -- Name: TABLE perfil_reparto; Type: ACL; Schema: public; Owner: -
 --
 
-REVOKE ALL ON TABLE public.perfil_reparto FROM anon, authenticated;
+REVOKE ALL ON TABLE public.perfil_reparto FROM anon, authenticated, miparte_api;
 
 GRANT SELECT ON TABLE public.perfil_reparto TO authenticated;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.perfil_reparto TO miparte_api;

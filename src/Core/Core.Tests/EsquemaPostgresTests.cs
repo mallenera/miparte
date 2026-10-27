@@ -307,6 +307,64 @@ public class EsquemaPostgresTests
     }
 
     [SkippableFact]
+    public async Task RolDeLaApi_SoloLeeYEscribeFilasDePublic()
+    {
+        Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
+
+        await using var conn = await AbrirAsync();
+        // Sin atributos de administración ni pertenencia a otro rol (SET ROLE postgres le devolvería todo).
+        Assert.Equal(1L, await EscalarAsync(conn, """
+            select count(*) from pg_roles where rolname = 'miparte_api' and rolcanlogin
+              and not (rolsuper or rolcreatedb or rolcreaterole or rolreplication or rolbypassrls)
+            """));
+        Assert.Equal(0L, await EscalarAsync(conn,
+            "select count(*) from pg_auth_members am join pg_roles r on r.oid = am.member where r.rolname = 'miparte_api'"));
+
+        // Cada tabla de public (también las futuras): RLS con su política, filas sí, TRUNCATE no; la auditoría solo se añade.
+        var tablas = new List<string>();
+        await using (var cmd = new NpgsqlCommand("select tablename from pg_tables where schemaname = 'public' order by 1", conn))
+        await using (var r = await cmd.ExecuteReaderAsync())
+            while (await r.ReadAsync()) tablas.Add(r.GetString(0));
+        Assert.NotEmpty(tablas);
+        foreach (var tabla in tablas)
+        {
+            Assert.Equal(1L, await EscalarAsync(conn,
+                $"select count(*) from pg_policies where schemaname = 'public' and tablename = '{tabla}' and 'miparte_api' = any(roles)"));
+            var esperados = tabla == "auditoria"
+                ? new Dictionary<string, bool> { ["SELECT"] = true, ["INSERT"] = true, ["UPDATE"] = false, ["DELETE"] = false }
+                : new Dictionary<string, bool> { ["SELECT"] = true, ["INSERT"] = true, ["UPDATE"] = true, ["DELETE"] = true };
+            esperados["TRUNCATE"] = false;
+            esperados["REFERENCES"] = false;
+            esperados["TRIGGER"] = false;
+            foreach (var (privilegio, esperado) in esperados)
+                Assert.True(esperado == (bool)(await EscalarAsync(conn,
+                        $"select has_table_privilege('miparte_api', 'public.{tabla}', '{privilegio}')"))!,
+                    $"miparte_api {(esperado ? "debe" : "no debe")} tener {privilegio} sobre {tabla}");
+        }
+
+        // Ni DDL en public ni acceso a auth (usuarios de Supabase) ni al journal de migraciones ni a las RPC de alta.
+        Assert.False((bool)(await EscalarAsync(conn, "select has_schema_privilege('miparte_api', 'public', 'CREATE')"))!);
+        Assert.False((bool)(await EscalarAsync(conn, "select has_schema_privilege('miparte_api', 'auth', 'USAGE')"))!);
+        Assert.False((bool)(await EscalarAsync(conn, "select has_schema_privilege('miparte_api', 'miparte_migraciones', 'USAGE')"))!);
+        Assert.False((bool)(await EscalarAsync(conn, "select has_function_privilege('miparte_api', 'public.crear_hogar(text, text)', 'EXECUTE')"))!);
+        Assert.False((bool)(await EscalarAsync(conn, "select has_database_privilege('miparte_api', current_database(), 'CREATE')"))!);
+
+        // Y en la práctica: escribe una fila (la RLS le deja), pero no puede quitar la RLS ni borrar tablas.
+        await using var tx = await conn.BeginTransactionAsync();
+        await using (var rol = new NpgsqlCommand("set local role miparte_api", conn, tx))
+            await rol.ExecuteNonQueryAsync();
+        await using (var ins = new NpgsqlCommand("insert into public.hogar (nombre) values ('Casa rol api') returning 1", conn, tx))
+            Assert.Equal(1, await ins.ExecuteScalarAsync());
+        var ex = await Assert.ThrowsAsync<PostgresException>(async () =>
+        {
+            await using var ddl = new NpgsqlCommand("alter table public.gasto disable row level security", conn, tx);
+            await ddl.ExecuteNonQueryAsync();
+        });
+        Assert.Equal(PostgresErrorCodes.InsufficientPrivilege, ex.SqlState);
+        await tx.RollbackAsync();
+    }
+
+    [SkippableFact]
     public async Task Ahorro_NoPuedeSuperarLaAportacionNiSerNegativo()
     {
         Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");

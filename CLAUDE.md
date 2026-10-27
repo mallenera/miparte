@@ -47,6 +47,8 @@ dotnet run --project src/Database/MiParte.Database -- migrar --con-auth-stub --c
 MIPARTE_TEST_DB="Host=localhost;Database=miparte;Username=postgres;Password=..." dotnet test
 ```
 
+Con `MIPARTE_TEST_DB_API` (p. ej. `...;Username=miparte_api;Password=...`, tras `alter role miparte_api password '...'`) las pruebas de API arrancan Core.Api con el rol de producción en vez de `postgres`; CI la define siempre.
+
 `supabase/tests/auth_stub.sql` simula el esquema `auth` de Supabase (y sus privilegios por defecto para `anon`/`authenticated`, necesarios para que los tests de permisos tengan algo que comprobar); lo aplica `migrar --con-auth-stub` antes de las migraciones (en Supabase real no se usa). El proyecto `MiParte.Database.Tests` crea y borra bases temporales a partir del servidor de `MIPARTE_TEST_DB`.
 
 #### Montar un PostgreSQL local en Windows (una vez)
@@ -103,10 +105,10 @@ El esquema y las políticas RLS viven en SQL y la **fuente de verdad es `src/Dat
 ### Multitenencia por hogar (dos capas)
 
 1. RLS en Postgres (Supabase).
-2. En el servicio, el rol de conexión puede saltarse la RLS, así que `MiParteDbContext` aplica un **global query filter por `hogar_id`** a todas las entidades (con `IHogarActual`). Toda entidad nueva con `HogarId` necesita su `HasQueryFilter`.
+2. En el servicio, el rol de conexión `miparte_api` tiene una política RLS (`api_servicio`) que le deja ver todas las filas, así que `MiParteDbContext` aplica un **global query filter por `hogar_id`** a todas las entidades (con `IHogarActual`). Toda entidad nueva con `HogarId` necesita su `HasQueryFilter`.
 
 `HogarActualMiddleware` resuelve el hogar de cada petición autenticada: `sub` del JWT → `miembro.user_id` (activos). Esa lectura pasa por `CacheAcceso` (singleton, 30 s) y deja el miembro del hogar en `HttpContext.Items[ClaveMiembro]`, que `RequierePermiso` reutiliza sin consultar; el middleware invalida la caché tras cualquier escritura en `/api/miembros`, `/api/invitaciones` y `/api/hogar(es)`, así que un endpoint nuevo que cambie miembros desde otra ruta debe invalidarla también. Con varias instancias de la API, un permiso retirado tarda como mucho 30 s en surtir efecto en las demás. Un solo hogar se usa directamente; si hay varios exige la cabecera `X-Hogar-Id` (409 si falta, 403 si no pertenece, 400 si es inválida). Usa `IgnoreQueryFilters()` porque aún no hay hogar. `HogarActual` es scoped y se resuelve dentro del middleware para que `/health` funcione sin BD.
 
 ### Autenticación
 
-`Core.Api` valida el JWT de Supabase Auth: emisor `{Supabase__Url}/auth/v1`, audiencia `authenticated`. Si se define `Supabase__JwtSecret` solo se aceptan HS256 (legado); si no, solo asimétricos vía JWKS del proyecto. Sin configuración ningún token es válido pero la API arranca. La cadena de conexión viene de `ConnectionStrings__Default` (variable de entorno, nunca en el repo); si falta no se registra la persistencia. Con Supabase usa el Session pooler (puerto 5432), no el Transaction pooler (6543), por las sentencias preparadas de Npgsql; en producción `SSL Mode=VerifyFull` con el CA del proyecto (ver `.env.example`). El `.env` (ignorado por git) lo lee `docker compose` pero no `dotnet run`.
+`Core.Api` valida el JWT de Supabase Auth: emisor `{Supabase__Url}/auth/v1`, audiencia `authenticated`. Si se define `Supabase__JwtSecret` solo se aceptan HS256 (legado); si no, solo asimétricos vía JWKS del proyecto. Sin configuración ningún token es válido pero la API arranca. La cadena de conexión viene de `ConnectionStrings__Default` (variable de entorno, nunca en el repo); si falta no se registra la persistencia. Su usuario es el rol `miparte_api` (mínimo privilegio: filas de `public`, sin DDL ni `auth`; lo crea `migrar` sin contraseña), nunca `postgres`, que solo se usa para migrar; toda tabla nueva necesita su política `api_servicio` y su `GRANT` a `miparte_api` en `05_Seguridad` (ver `docs/despliegue.md`). Con Supabase usa el Session pooler (puerto 5432), no el Transaction pooler (6543), por las sentencias preparadas de Npgsql; en producción `SSL Mode=VerifyFull` con el CA del proyecto (ver `.env.example`). El `.env` (ignorado por git) lo lee `docker compose` pero no `dotnet run`.

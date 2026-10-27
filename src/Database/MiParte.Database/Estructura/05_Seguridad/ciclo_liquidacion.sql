@@ -5,6 +5,13 @@
 ALTER TABLE public.ciclo_liquidacion ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: ciclo_liquidacion api_servicio; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY api_servicio ON public.ciclo_liquidacion TO miparte_api USING (true) WITH CHECK (true);
+
+
+--
 -- Name: ciclo_liquidacion ciclo_liquidacion_select; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -15,6 +22,7 @@ CREATE POLICY ciclo_liquidacion_select ON public.ciclo_liquidacion FOR SELECT TO
 -- Name: TABLE ciclo_liquidacion; Type: ACL; Schema: public; Owner: -
 --
 
-REVOKE ALL ON TABLE public.ciclo_liquidacion FROM anon, authenticated;
+REVOKE ALL ON TABLE public.ciclo_liquidacion FROM anon, authenticated, miparte_api;
 
 GRANT SELECT ON TABLE public.ciclo_liquidacion TO authenticated;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.ciclo_liquidacion TO miparte_api;

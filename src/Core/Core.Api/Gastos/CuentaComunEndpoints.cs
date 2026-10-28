@@ -28,6 +28,7 @@ public static class CuentaComunEndpoints
         app.MapPost("/api/cuenta-comun/reembolsos", CrearReembolsoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
         app.MapDelete("/api/cuenta-comun/reembolsos/{id:guid}", BorrarReembolsoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
         app.MapGet("/api/cuenta-comun/ingresos", ListarIngresosAsync).RequireAuthorization();
+        app.MapPost("/api/cuenta-comun/deudas", CrearDeudaAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
         app.MapPost("/api/cuenta-comun/ingresos", CrearIngresoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
         app.MapDelete("/api/cuenta-comun/ingresos/{id:guid}", BorrarIngresoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
         app.MapPost("/api/cuenta-comun/depositos-ahorro", CrearDepositoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.AhorroMovimientos);
@@ -127,6 +128,25 @@ public static class CuentaComunEndpoints
         if (hogar.HogarId is null) return ApiComun.SinHogar();
         var r = await servicio.EliminarSaldoInicialAsync(ct);
         return r.Error is { } error ? ApiComun.Respuesta(error) : Results.NoContent();
+    }
+
+    /// <summary>POST /api/cuenta-comun/deudas: registra un adelanto, una devolución o una compensación de la deuda de una persona. 400 si el tipo, el importe o el miembro no valen; 409 sin hogar, si la cuenta o el ahorro están inactivos o si supera lo que debe o lo pendiente. 201 si se crea.</summary>
+    private static async Task<IResult> CrearDeudaAsync(
+        CrearDeudaCuentaRequest req, [FromServices] ServicioCuentaComun servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
+    {
+        if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
+        var tipo = req.Tipo switch
+        {
+            "adelanto" => TipoMovimientoDeuda.Adelanto,
+            "devolucion" => TipoMovimientoDeuda.Devolucion,
+            "compensacion" => TipoMovimientoDeuda.Compensacion,
+            _ => (TipoMovimientoDeuda?)null,
+        };
+        if (tipo is not { } tipoDeuda)
+            return ApiComun.Invalido("El tipo debe ser adelanto, devolucion o compensacion.");
+        var r = await servicio.RegistrarDeudaAsync(new RegistrarMovimiento(hogarId, req.MiembroId, req.Importe, req.Fecha, req.Concepto, req.DesdeAhorro), tipoDeuda, ct);
+        if (r.Error is { } error) return ApiComun.Respuesta(error);
+        return Results.Created($"/api/cuenta-comun/deudas/{r.Valor!.Id}", r.Valor.ADto());
     }
 
     /// <summary>POST /api/cuenta-comun/reembolsos: registra un pago de la cuenta a quien adelantó gastos. 400 si el importe es inválido o el miembro no es del hogar; 409 sin hogar o si supera lo pendiente de reembolsar al miembro. 201 si se crea.</summary>

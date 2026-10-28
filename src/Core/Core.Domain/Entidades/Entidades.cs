@@ -321,6 +321,30 @@ public class ReembolsoCuenta
     public bool DesdeAhorro { get; set; }
 }
 
+/// <summary>
+/// Movimiento de la deuda de una persona con la cuenta común o su ahorro (tabla deuda_cuenta): un adelanto de la cuenta por ella,
+/// una devolución suya o una compensación con lo que la cuenta le debe.
+/// </summary>
+public class MovimientoDeudaCuenta
+{
+    /// <summary>Identificador del movimiento.</summary>
+    public Guid Id { get; set; }
+    /// <summary>Hogar al que pertenece.</summary>
+    public Guid HogarId { get; set; }
+    /// <summary>Persona que debe (o que devuelve) la deuda.</summary>
+    public Guid MiembroId { get; set; }
+    /// <summary>Fecha del movimiento.</summary>
+    public DateOnly Fecha { get; set; }
+    /// <summary>Importe (positivo).</summary>
+    public decimal Importe { get; set; }
+    /// <summary>Qué pasó con la deuda: adelanto, devolución o compensación.</summary>
+    public TipoMovimientoDeuda Tipo { get; set; }
+    /// <summary>Fondo al que se debe: el ahorro (true) o Hogar (false).</summary>
+    public bool DesdeAhorro { get; set; }
+    /// <summary>Nota opcional.</summary>
+    public string? Concepto { get; set; }
+}
+
 /// <summary>Perfil de reparto reutilizable: un modo y los valores por miembro (detalles).</summary>
 public class PerfilReparto
 {

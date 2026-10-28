@@ -72,6 +72,12 @@ public interface IRepositorioCuentaComun
     /// <summary>Borra un reembolso; false si no existe en el hogar.</summary>
     Task<bool> EliminarReembolsoAsync(Guid id, CancellationToken ct);
 
+    /// <summary>Todos los movimientos de deuda de las personas con la cuenta común o su ahorro.</summary>
+    Task<IReadOnlyList<MovimientoDeuda>> DeudasAsync(CancellationToken ct);
+
+    /// <summary>Guarda un movimiento de deuda nuevo (adelanto, devolución o compensación).</summary>
+    Task GuardarDeudaAsync(MovimientoDeudaCuenta deuda, CancellationToken ct);
+
     /// <summary>Guarda un ingreso a la cuenta común nuevo.</summary>
     Task GuardarIngresoAsync(IngresoCuentaComun ingreso, CancellationToken ct);
 

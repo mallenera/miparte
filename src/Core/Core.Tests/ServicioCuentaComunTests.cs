@@ -334,6 +334,66 @@ public class ServicioCuentaComunTests
         Assert.Equal(480m, x.SaldoFinal);
     }
 
+    [Fact]
+    public async Task Devolucion_MayorQueLaDeuda_EsConflicto()
+    {
+        await Servicio.RegistrarDeudaAsync(Mov(_ana, 50m), TipoMovimientoDeuda.Adelanto, default);
+
+        var r = await Servicio.RegistrarDeudaAsync(Mov(_ana, 60m), TipoMovimientoDeuda.Devolucion, default);
+
+        Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
+    }
+
+    [Fact]
+    public async Task Devolucion_HastaLaDeuda_SeRegistra()
+    {
+        await Servicio.RegistrarDeudaAsync(Mov(_ana, 50m), TipoMovimientoDeuda.Adelanto, default);
+
+        var r = await Servicio.RegistrarDeudaAsync(Mov(_ana, 50m), TipoMovimientoDeuda.Devolucion, default);
+
+        Assert.Null(r.Error);
+        Assert.Equal(TipoMovimientoDeuda.Devolucion, _repo.Deudas.Single(d => d.Tipo == TipoMovimientoDeuda.Devolucion).Tipo);
+    }
+
+    [Fact]
+    public async Task Compensacion_SinPendienteDeReembolso_EsConflicto()
+    {
+        await Servicio.RegistrarDeudaAsync(Mov(_ana, 50m), TipoMovimientoDeuda.Adelanto, default);
+
+        var r = await Servicio.RegistrarDeudaAsync(Mov(_ana, 10m), TipoMovimientoDeuda.Compensacion, default);
+
+        Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
+    }
+
+    [Fact]
+    public async Task Compensacion_NoPasaDeLoPendienteYDescuentaLasAnteriores()
+    {
+        _repo.GastadoPor[_ana] = 30m;
+        await Servicio.RegistrarDeudaAsync(Mov(_ana, 20m), TipoMovimientoDeuda.Adelanto, default);
+
+        var primera = await Servicio.RegistrarDeudaAsync(Mov(_ana, 20m), TipoMovimientoDeuda.Compensacion, default);
+        var segunda = await Servicio.RegistrarDeudaAsync(Mov(_ana, 15m), TipoMovimientoDeuda.Compensacion, default);
+
+        Assert.Null(primera.Error);
+        Assert.Equal(TipoError.Conflicto, segunda.Error!.Tipo);
+    }
+
+    [Fact]
+    public async Task AdelantoDelAhorro_SinAhorroDisponible_EsConflicto()
+    {
+        var r = await Servicio.RegistrarDeudaAsync(Mov(_ana, 10m, desdeAhorro: true), TipoMovimientoDeuda.Adelanto, default);
+
+        Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
+    }
+
+    [Fact]
+    public async Task Deuda_DeUnMiembroAjeno_EsInvalida()
+    {
+        var r = await Servicio.RegistrarDeudaAsync(new(Hogar, Guid.NewGuid(), 10m, null, null), TipoMovimientoDeuda.Adelanto, default);
+
+        Assert.Equal(TipoError.Invalido, r.Error!.Tipo);
+    }
+
     private sealed class RepositorioFalso : IRepositorioCuentaComun
     {
         public List<Miembro> Miembros { get; } = [];
@@ -448,6 +508,18 @@ public class ServicioCuentaComunTests
         public Task GuardarReembolsoAsync(ReembolsoCuenta reembolso, CancellationToken ct)
         {
             Reembolsos.Add(reembolso);
+            return Task.CompletedTask;
+        }
+
+        public List<MovimientoDeudaCuenta> Deudas { get; } = [];
+
+        public Task<IReadOnlyList<MovimientoDeuda>> DeudasAsync(CancellationToken ct)
+            => Task.FromResult<IReadOnlyList<MovimientoDeuda>>(
+                Deudas.Select(d => new MovimientoDeuda(d.MiembroId, d.Fecha, d.Importe, d.Tipo, d.DesdeAhorro)).ToList());
+
+        public Task GuardarDeudaAsync(MovimientoDeudaCuenta deuda, CancellationToken ct)
+        {
+            Deudas.Add(deuda);
             return Task.CompletedTask;
         }
 

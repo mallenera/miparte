@@ -273,6 +273,43 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
             return "Aportación guardada";
         });
 
+    /// <summary>Persona a la que se refiere el movimiento de deuda.</summary>
+    public Guid Deudor { get; set; }
+
+    /// <summary>Tipo del movimiento: «adelanto», «devolucion» o «compensacion».</summary>
+    public string TipoDeuda { get; set; } = "adelanto";
+
+    /// <summary>Si el movimiento es del fondo del ahorro (true) o de Hogar (false).</summary>
+    public bool DeudaDesdeAhorro { get; set; }
+
+    /// <summary>Importe del movimiento de deuda, tal como lo escribe la persona.</summary>
+    public string ImporteDeuda { get; set; } = "";
+
+    /// <summary>Concepto del movimiento de deuda.</summary>
+    public string ConceptoDeuda { get; set; } = "";
+
+    /// <summary>Si el importe del movimiento de deuda se puede enviar.</summary>
+    public bool DeudaValida => EntradaImporte.TryParse(ImporteDeuda, out _);
+
+    /// <summary>Nombre visible de un tipo de movimiento de deuda.</summary>
+    public static string NombreTipoDeuda(string tipo) => tipo switch
+    {
+        "devolucion" => "Devolución",
+        "compensacion" => "Compensación",
+        _ => "Adelanto",
+    };
+
+    /// <summary>Registra un adelanto, una devolución o una compensación de la deuda de una persona con la cuenta común.</summary>
+    public Task<string?> RegistrarDeudaAsync() =>
+        EjecutarAsync(async () =>
+        {
+            var importe = Importe(ImporteDeuda);
+            await api.CrearDeudaAsync(new CrearDeudaCuentaRequest(Deudor, TipoDeuda, importe, null, Texto(ConceptoDeuda), DeudaDesdeAhorro));
+            ImporteDeuda = "";
+            ConceptoDeuda = "";
+            return $"{NombreTipoDeuda(TipoDeuda)} registrado";
+        });
+
     /// <summary>Registra un reembolso de la cuenta a quien adelantó gastos.</summary>
     public Task<string?> ReembolsarAsync() =>
         EjecutarAsync(async () =>

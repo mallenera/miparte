@@ -139,6 +139,36 @@ public class ApiPostgresTests
     }
 
     [SkippableFact]
+    public async Task DeudasDeLaCuenta_SeRegistranYCuadranEnEstadoYBanco_EnPostgres()
+    {
+        Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
+        await using var e = new Entorno();
+        var user = await e.CrearUsuarioAsync();
+        var hogar = await CrearHogar(e.Cliente(user), "Casa deudas", "Ana");
+        var c = e.Cliente(user, hogar.Id);
+        var ana = (await Leer<List<MiembroDto>>(await c.GetAsync("/api/miembros"))).Single();
+        await Leer<JsonElement>(await c.PutAsJsonAsync("/api/cuenta-comun/activacion", new ActivarCuentaComunRequest(true)));
+        await Leer<JsonElement>(await c.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(ana.Id, new DateOnly(2026, 9, 1), 300m, 0m)));
+        await Leer<JsonElement>(await c.PostAsJsonAsync("/api/cuenta-comun/deudas",
+            new CrearDeudaCuentaRequest(ana.Id, "adelanto", 40m, new DateOnly(2026, 10, 5), "Fontanero")), HttpStatusCode.Created);
+        await Leer<JsonElement>(await c.PostAsJsonAsync("/api/cuenta-comun/deudas",
+            new CrearDeudaCuentaRequest(ana.Id, "devolucion", 15m, new DateOnly(2026, 10, 6), null)), HttpStatusCode.Created);
+        // Ya debe 25: una devolución de 100 supera la deuda y una compensación no tiene pendiente de reembolso que restar.
+        await Leer<JsonElement>(await c.PostAsJsonAsync("/api/cuenta-comun/deudas",
+            new CrearDeudaCuentaRequest(ana.Id, "devolucion", 100m, new DateOnly(2026, 10, 7), null)), HttpStatusCode.Conflict);
+        await Leer<JsonElement>(await c.PostAsJsonAsync("/api/cuenta-comun/deudas",
+            new CrearDeudaCuentaRequest(ana.Id, "compensacion", 5m, new DateOnly(2026, 10, 7), null)), HttpStatusCode.Conflict);
+
+        var octubre = await Leer<CuentaComunResponse>(await c.GetAsync("/api/cuenta-comun?mes=2026-10"));
+        // Aportado 600 (sep. y oct.), menos el adelanto de 40 y más la devolución de 15.
+        Assert.Equal(575m, octubre.Efectivo);
+        var deuda = Assert.Single(octubre.Deudas!);
+        Assert.Equal(25m, deuda.Importe);
+        Assert.Equal(octubre.Efectivo, (await Leer<MovimientosCuentaComunResponse>(
+            await c.GetAsync("/api/cuenta-comun/movimientos?desde=2026-10-01&hasta=2026-10-31"))).EfectivoFinal);
+    }
+
+    [SkippableFact]
     public async Task CuentaComunCompleta_ResumenYEstadoRespondenOk_EnPostgres()
     {
         Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");

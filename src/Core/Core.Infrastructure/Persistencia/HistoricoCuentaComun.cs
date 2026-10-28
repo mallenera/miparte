@@ -13,7 +13,8 @@ namespace MiParte.Core.Infrastructure.Persistencia;
 public sealed class HistoricoCuentaComun
 {
     private const int TipoAportacion = 0, TipoReembolsoMes = 1, TipoRetiradaMes = 2, TipoDepositoMes = 3, TipoReembolsos = 4,
-        TipoGastos = 5, TipoGastosMes = 6, TipoRetiradas = 7, TipoDepositos = 8, TipoNombre = 9, TipoFunciones = 10, TipoIngresos = 11;
+        TipoGastos = 5, TipoGastosMes = 6, TipoRetiradas = 7, TipoDepositos = 8, TipoNombre = 9, TipoFunciones = 10, TipoIngresos = 11,
+        TipoDeudaAdelanto = 12, TipoDeudaDevolucion = 13, TipoDeudaCompensacion = 14;
 
     /// <summary>
     /// Fila común a todas las partes de la consulta: EF las une con <c>UNION ALL</c> y para eso necesitan la misma forma. Los
@@ -119,6 +120,10 @@ public sealed class HistoricoCuentaComun
                 Tipo = TipoIngresos, Id = vacio, MiembroId = vacio, Fecha = inicio,
                 Importe = g.Sum(x => x.Importe), Ahorro = 0m, Marca = g.Key, Marca2 = false, Texto = "",
             });
+        // Deudas con la cuenta por tipo, agrupadas por persona y fondo; Marca2 indica si son del mes (para fecharlas como los depósitos).
+        var deudas = DeudasAgrupadas(db, inicio, fin, vacio, TipoMovimientoDeuda.Adelanto, TipoDeudaAdelanto)
+            .Concat(DeudasAgrupadas(db, inicio, fin, vacio, TipoMovimientoDeuda.Devolucion, TipoDeudaDevolucion))
+            .Concat(DeudasAgrupadas(db, inicio, fin, vacio, TipoMovimientoDeuda.Compensacion, TipoDeudaCompensacion));
         var aportaciones = db.AportacionesCuenta.Select(a => new Fila
         {
             Tipo = TipoAportacion, Id = a.Id, MiembroId = a.MiembroId, Fecha = a.Desde,
@@ -130,7 +135,8 @@ public sealed class HistoricoCuentaComun
             Importe = 0m, Ahorro = 0m, Marca = h.CuentaComunActiva, Marca2 = h.AhorroActivo, Texto = "",
         });
 
-        var consulta = gastos.Concat(gastosMes).Concat(reembolsos).Concat(retiradas).Concat(depositos).Concat(ingresos).Concat(aportaciones).Concat(funciones);
+        var consulta = gastos.Concat(gastosMes).Concat(reembolsos).Concat(retiradas).Concat(depositos).Concat(ingresos).Concat(aportaciones).Concat(funciones)
+            .Concat(deudas);
 
         if (detalleDelMes)
         {
@@ -163,6 +169,20 @@ public sealed class HistoricoCuentaComun
             ? new SaldoInicialCuenta(fecha, importe) : null;
         return new HistoricoCuentaComun(filas, inicio, saldoInicial, saldo?.AportacionFrecuencia ?? FrecuenciaAportacion.Mensual);
     }
+
+    /// <summary>
+    /// Deudas de un tipo hasta el fin del mes, sumadas por persona, fondo y si son del mes (<c>Marca2</c>): el cálculo necesita el
+    /// total, no cada movimiento.
+    /// </summary>
+    private static IQueryable<Fila> DeudasAgrupadas(
+        MiParteDbContext db, DateOnly inicio, DateOnly fin, Guid vacio, TipoMovimientoDeuda tipo, int tipoFila)
+        => db.MovimientosDeudaCuenta.Where(d => d.Tipo == tipo && d.Fecha < fin)
+            .GroupBy(d => new { d.MiembroId, d.DesdeAhorro, EnMes = d.Fecha >= inicio })
+            .Select(g => new Fila
+            {
+                Tipo = tipoFila, Id = vacio, MiembroId = g.Key.MiembroId, Fecha = inicio,
+                Importe = g.Sum(x => x.Importe), Ahorro = 0m, Marca = g.Key.DesdeAhorro, Marca2 = g.Key.EnMes, Texto = "",
+            });
 
     private IEnumerable<Fila> De(int tipo) => _filas.Where(f => f.Tipo == tipo);
 
@@ -205,6 +225,23 @@ public sealed class HistoricoCuentaComun
     /// <summary>Ingresos sueltos hasta el fin del mes; los del mes llevan la fecha del mes y los anteriores, el día previo.</summary>
     public List<IngresoDeCuenta> Ingresos => De(TipoIngresos)
         .Select(f => new IngresoDeCuenta(f.Marca ? _inicio : _inicio.AddDays(-1), f.Importe)).ToList();
+
+    /// <summary>
+    /// Deudas con la cuenta hasta el fin del mes, por persona, fondo y tipo. Las del mes llevan la fecha del mes y las anteriores,
+    /// el día previo, igual que los depósitos.
+    /// </summary>
+    public List<MovimientoDeuda> Deudas => _filas
+        .Where(f => f.Tipo is TipoDeudaAdelanto or TipoDeudaDevolucion or TipoDeudaCompensacion)
+        .Select(f => new MovimientoDeuda(
+            f.MiembroId, f.Marca2 ? _inicio : _inicio.AddDays(-1), f.Importe,
+            f.Tipo switch
+            {
+                TipoDeudaAdelanto => TipoMovimientoDeuda.Adelanto,
+                TipoDeudaDevolucion => TipoMovimientoDeuda.Devolucion,
+                _ => TipoMovimientoDeuda.Compensacion,
+            },
+            f.Marca))
+        .ToList();
 
     /// <summary>Nombre de cada miembro por id (solo con <c>detalleDelMes</c>).</summary>
     public Dictionary<Guid, string> Nombres => De(TipoNombre).ToDictionary(f => f.Id, f => f.Texto);

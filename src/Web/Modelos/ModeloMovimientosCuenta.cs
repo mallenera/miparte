@@ -166,6 +166,11 @@ public sealed class ModeloMovimientosCuenta(CoreApiClient api, DateOnly hoy)
             "gasto_ahorro" => $"Gasto desde el ahorro: {Nombre(m)}",
             "gasto_ahorro_adelantado" => $"Gasto desde el ahorro adelantado por {quien}: {Nombre(m)}",
             "reembolso" => $"Reembolso a {quien}",
+            "adelanto_persona" => $"Adelanto de la cuenta por {quien}",
+            "adelanto_persona_ahorro" => $"Adelanto del ahorro por {quien}",
+            "devolucion_deuda" => $"Devolución de {quien} a la cuenta",
+            "devolucion_deuda_ahorro" => $"Devolución de {quien} al ahorro",
+            "compensacion_deuda" => $"Compensación de la deuda de {quien}",
             "retirada_ahorro" => $"Retirada de ahorro de {quien}",
             _ => m.Tipo,
         };
@@ -173,7 +178,8 @@ public sealed class ModeloMovimientosCuenta(CoreApiClient api, DateOnly hoy)
 
     /// <summary>Si la línea es del ahorro de la cuenta común (para marcarla en la lista).</summary>
     public static bool EsAhorro(MovimientoCuentaComunDto m)
-        => m.Tipo is "deposito_ahorro" or "gasto_ahorro" or "gasto_ahorro_adelantado" or "retirada_ahorro";
+        => m.Tipo is "deposito_ahorro" or "gasto_ahorro" or "gasto_ahorro_adelantado" or "retirada_ahorro"
+            or "adelanto_persona_ahorro" or "devolucion_deuda_ahorro";
 
     /// <summary>
     /// Si la línea pasa el filtro de cuenta. Una aportación con parte de ahorro es de las dos: lleva dinero a la cuenta común y a su

@@ -270,6 +270,59 @@ else if (_m.Estado is not null)
         }
     </section>
 
+    <section class="card" aria-labelledby="t-deudas">
+        <div class="card-head"><h2 id="t-deudas">Deudas con la cuenta</h2></div>
+        <p class="muted">Lo que una persona debe a la cuenta común o a su ahorro porque la cuenta pagó algo por ella. Se salda con una devolución suya, o con una compensación que resta de lo que la cuenta le debe por reembolsos.</p>
+
+        @if (_m.Estado.Deudas is not { Count: > 0 } deudas)
+        {
+            <div class="empty">Nadie debe nada a la cuenta.</div>
+        }
+        else
+        {
+            @foreach (var d in deudas)
+            {
+                <div class="gastorow">
+                    <div class="g-main">
+                        <div class="g-concepto">@Formato.NombreMiembro(d.MiembroId, _m.Miembros)</div>
+                        <div class="muted g-meta">@(d.DesdeAhorro ? "Debe al ahorro" : "Debe a Hogar")</div>
+                    </div>
+                    <div class="g-importe">@Formato.Euros(d.Importe)</div>
+                </div>
+            }
+        }
+
+        @if (PuedeCuenta)
+        {
+            <form class="addcat" id="form-deuda" @onsubmit="RegistrarDeudaAsync">
+                <h3 class="u-titulo-form">Nuevo movimiento de deuda</h3>
+                <label>Persona
+                    <select value="@_m.Deudor" @onchange="e => _m.Deudor = Guid.Parse(e.Value!.ToString()!)">
+                        @foreach (var m in _m.Miembros)
+                        {
+                            <option value="@m.Id">@m.Nombre</option>
+                        }
+                    </select>
+                </label>
+                <label>Tipo
+                    <select @bind="_m.TipoDeuda">
+                        <option value="adelanto">Adelanto: la cuenta pagó por ella</option>
+                        <option value="devolucion">Devolución: ella ingresa para pagar</option>
+                        <option value="compensacion">Compensación: restar lo que la cuenta le debe</option>
+                    </select>
+                </label>
+                <label class="check"><input type="checkbox" @bind="_m.DeudaDesdeAhorro" /> Del ahorro (no de Hogar)</label>
+                <label>Importe (€)
+                    <input inputmode="decimal" required placeholder="0,00" @bind="_m.ImporteDeuda" @bind:event="oninput" />
+                </label>
+                <label>Concepto
+                    <input maxlength="200" placeholder="Opcional" @bind="_m.ConceptoDeuda" @bind:event="oninput" />
+                </label>
+                <button class="btn" type="submit" disabled="@(!_m.DeudaValida || _m.Enviando)">Registrar</button>
+            </form>
+        }
+    </section>
+
     <section class="card" aria-labelledby="t-ingresos">
         <div class="card-head"><h2 id="t-ingresos">Ingresos</h2></div>
         <p class="muted">Dinero que entra a la cuenta común fuera de las aportaciones y del ahorro, por ejemplo lo que pagan las amigas de una cena. Suma al saldo y al efectivo de la cuenta; no cambia los reembolsos.</p>
@@ -430,6 +483,8 @@ else if (_m.Estado is not null)
     private Task FijarAportacionAsync() => Mostrar(_m.FijarAportacionAsync());
 
     private Task ReembolsarAsync() => Mostrar(_m.ReembolsarAsync());
+
+    private Task RegistrarDeudaAsync() => Mostrar(_m.RegistrarDeudaAsync());
 
     private Task IngresarAhorroAsync() => Mostrar(_m.IngresarAhorroAsync());
 

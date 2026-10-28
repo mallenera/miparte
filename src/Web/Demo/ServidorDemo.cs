@@ -131,6 +131,7 @@ public sealed partial class ServidorDemo
             ("cuenta-comun", 3, "PUT") when subruta == "saldo-inicial" => await FijarSaldoInicial((await Cuerpo<FijarSaldoInicialRequest>())!, ct),
             ("cuenta-comun", 3, "DELETE") when subruta == "saldo-inicial" => Sin(await _cuenta.EliminarSaldoInicialAsync(ct)),
             ("cuenta-comun", 3, "POST") when subruta == "reembolsos" => await CrearReembolso((await Cuerpo<CrearReembolsoRequest>())!, ct),
+            ("cuenta-comun", 3, "POST") when subruta == "deudas" => await CrearDeuda((await Cuerpo<CrearDeudaCuentaRequest>())!, ct),
             ("cuenta-comun", 4, "DELETE") when subruta == "reembolsos" && id is { } i => Sin(await _cuenta.EliminarReembolsoAsync(i, ct)),
             ("cuenta-comun", 3, "GET") when subruta == "movimientos" => await MovimientosCuentaComun(uri, ct),
             ("cuenta-comun", 3, "GET") when subruta == "ingresos" => Ok((await _cuenta.ListarIngresosAsync(ct)).Select(i => i.ADto()).ToList()),
@@ -323,6 +324,20 @@ public sealed partial class ServidorDemo
     {
         var res = await _cuenta.FijarSaldoInicialAsync(r.Fecha, r.Importe, ct);
         return res.Error is { } e ? Error(e) : Ok(new SaldoInicialDto(res.Valor!.Fecha, res.Valor.Importe));
+    }
+
+    private async Task<HttpResponseMessage> CrearDeuda(CrearDeudaCuentaRequest r, CancellationToken ct)
+    {
+        if (r.Tipo is not ("adelanto" or "devolucion" or "compensacion"))
+            return Mal(HttpStatusCode.BadRequest, "El tipo debe ser adelanto, devolucion o compensacion.");
+        var tipo = r.Tipo switch
+        {
+            "adelanto" => TipoMovimientoDeuda.Adelanto,
+            "devolucion" => TipoMovimientoDeuda.Devolucion,
+            _ => TipoMovimientoDeuda.Compensacion,
+        };
+        var res = await _cuenta.RegistrarDeudaAsync(new RegistrarMovimiento(IdHogar, r.MiembroId, r.Importe, r.Fecha, r.Concepto, r.DesdeAhorro), tipo, ct);
+        return res.Error is { } e ? Error(e) : Respuesta(HttpStatusCode.Created, res.Valor!.ADto());
     }
 
     private async Task<HttpResponseMessage> CrearReembolso(CrearReembolsoRequest r, CancellationToken ct)

@@ -216,14 +216,17 @@ public sealed class ModeloResumen(CoreApiClient api, DateOnly hoy)
         CuentaComun = cuenta.Result;
     }
 
-    /// <summary>Espera una lectura opcional: si la API falla, devuelve null.</summary>
+    /// <summary>
+    /// Espera una lectura opcional: si la API falla o la petición caduca (el timeout de HttpClient se ve como cancelación), devuelve null
+    /// para que la carga principal no se caiga con ella.
+    /// </summary>
     private static async Task<T?> SiFalla<T>(Task<T> carga) where T : class
     {
         try
         {
             return await carga;
         }
-        catch (ApiException)
+        catch (Exception e) when (e is ApiException or OperationCanceledException)
         {
             return null;
         }

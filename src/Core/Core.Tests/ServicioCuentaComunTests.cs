@@ -24,8 +24,8 @@ public class ServicioCuentaComunTests
 
     private ServicioCuentaComun Servicio => new(_repo, TimeProvider.System);
 
-    private static RegistrarMovimiento Mov(Guid miembro, decimal importe, DateOnly? fecha = null)
-        => new(Hogar, miembro, importe, fecha ?? Septiembre.AddDays(5), null);
+    private static RegistrarMovimiento Mov(Guid miembro, decimal importe, DateOnly? fecha = null, bool desdeAhorro = false)
+        => new(Hogar, miembro, importe, fecha ?? Septiembre.AddDays(5), null, desdeAhorro);
 
     [Fact]
     public async Task Aportacion_ConAhorroMayorQueElImporte_EsInvalida()
@@ -105,6 +105,23 @@ public class ServicioCuentaComunTests
 
         Assert.Equal(70m, demasiado.Error!.Extra!["pendiente"]);
         Assert.Null(justo.Error);
+    }
+
+    [Fact]
+    public async Task Reembolso_DelAhorro_SeLimitaAlPendienteDelAhorro_SinTocarHogar()
+    {
+        _repo.GastadoPor[_ana] = 100m;
+        _repo.GastadoPorAhorro[_ana] = 50m;
+
+        var delAhorro = await Servicio.CrearReembolsoAsync(Mov(_ana, 50.01m, desdeAhorro: true), default);
+        var delAhorroJusto = await Servicio.CrearReembolsoAsync(Mov(_ana, 50m, desdeAhorro: true), default);
+        var deHogar = await Servicio.CrearReembolsoAsync(Mov(_ana, 100m), default);
+
+        Assert.Equal(50m, delAhorro.Error!.Extra!["pendiente"]);
+        Assert.Null(delAhorroJusto.Error);
+        Assert.Null(deHogar.Error);
+        Assert.True(delAhorroJusto.Valor!.DesdeAhorro);
+        Assert.False(deHogar.Valor!.DesdeAhorro);
     }
 
     [Fact]
@@ -325,6 +342,7 @@ public class ServicioCuentaComunTests
         public List<RetiradaAhorro> Retiradas { get; } = [];
         public List<ReembolsoCuenta> Reembolsos { get; } = [];
         public Dictionary<Guid, decimal> GastadoPor { get; } = [];
+        public Dictionary<Guid, decimal> GastadoPorAhorro { get; } = [];
         public Dictionary<Guid, decimal> ReembolsadoA { get; } = [];
         public bool Cuenta { get; set; }
         public bool Ahorro { get; set; }
@@ -359,7 +377,7 @@ public class ServicioCuentaComunTests
             var fin = inicio.AddMonths(1);
             var vigentes = Vigentes();
             var historico = new HistoricoCuenta(
-                vigentes, [], Reembolsos.Select(r => new ReembolsoDeCuenta(r.MiembroId, inicio, r.Importe)).ToList(),
+                vigentes, [], Reembolsos.Select(r => new ReembolsoDeCuenta(r.MiembroId, inicio, r.Importe, r.DesdeAhorro)).ToList(),
                 Retiradas.Where(r => r.Fecha < fin).Select(r => new RetiradaDeAhorro(inicio, r.Importe)).ToList(),
                 Depositos.Where(d => d.Fecha < fin).Select(d => new DepositoDeAhorro(d.Fecha, d.Importe, d.MiembroId)).ToList(),
                 Cuenta, 0m, [], Saldo, Frecuencia,
@@ -372,7 +390,7 @@ public class ServicioCuentaComunTests
         public Task<DatosMovimientosBanco> MovimientosBancoAsync(DateOnly hasta, CancellationToken ct)
             => Task.FromResult(new DatosMovimientosBanco(
                 Vigentes(), Saldo, [],
-                Reembolsos.Where(r => r.Fecha <= hasta).Select(r => new MovimientoCuenta(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto)).ToList(),
+                Reembolsos.Where(r => r.Fecha <= hasta).Select(r => new MovimientoCuenta(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto, r.DesdeAhorro)).ToList(),
                 Ingresos.Where(i => i.Fecha <= hasta).Select(i => new MovimientoCuenta(i.Id, i.MiembroId, i.Fecha, i.Importe, i.Concepto)).ToList(),
                 Depositos.Where(d => d.Fecha <= hasta).Select(d => new MovimientoCuenta(d.Id, d.MiembroId, d.Fecha, d.Importe, d.Concepto)).ToList(),
                 Retiradas.Where(r => r.Fecha <= hasta).Select(r => new MovimientoCuenta(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto)).ToList()));
@@ -410,10 +428,12 @@ public class ServicioCuentaComunTests
 
         // Los fakes solo modelan el fondo de Hogar: lo del ahorro se prueba en los tests de dominio y de la BD.
         public Task<decimal> GastadoACargoAsync(Guid miembroId, bool desdeAhorro, CancellationToken ct)
-            => Task.FromResult(desdeAhorro ? 0m : GastadoPor.GetValueOrDefault(miembroId));
+            => Task.FromResult((desdeAhorro ? GastadoPorAhorro : GastadoPor).GetValueOrDefault(miembroId));
 
         public Task<decimal> ReembolsadoAsync(Guid miembroId, bool desdeAhorro, CancellationToken ct)
-            => Task.FromResult(desdeAhorro ? 0m : ReembolsadoA.GetValueOrDefault(miembroId) + Reembolsos.Where(r => r.MiembroId == miembroId).Sum(r => r.Importe));
+            => Task.FromResult(
+                (desdeAhorro ? 0m : ReembolsadoA.GetValueOrDefault(miembroId))
+                + Reembolsos.Where(r => r.MiembroId == miembroId && r.DesdeAhorro == desdeAhorro).Sum(r => r.Importe));
 
         public Task<AportacionCuenta> FijarAportacionAsync(
             Guid hogarId, Guid miembroId, DateOnly desde, decimal importe, decimal ahorro, CancellationToken ct)

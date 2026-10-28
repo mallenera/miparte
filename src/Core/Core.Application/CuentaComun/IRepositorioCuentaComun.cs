@@ -57,11 +57,11 @@ public interface IRepositorioCuentaComun
     /// <summary>Datos para calcular el ahorro disponible.</summary>
     Task<DatosAhorro> DatosAhorroAsync(CancellationToken ct);
 
-    /// <summary>Total de gastos a cargo de la cuenta que adelantó el miembro.</summary>
-    Task<decimal> GastadoACargoAsync(Guid miembroId, CancellationToken ct);
+    /// <summary>Total de gastos a cargo de la cuenta que adelantó el miembro, del fondo de Hogar o del ahorro (<paramref name="desdeAhorro"/>).</summary>
+    Task<decimal> GastadoACargoAsync(Guid miembroId, bool desdeAhorro, CancellationToken ct);
 
-    /// <summary>Total que la cuenta ya ha reembolsado al miembro.</summary>
-    Task<decimal> ReembolsadoAsync(Guid miembroId, CancellationToken ct);
+    /// <summary>Total que la cuenta ya ha reembolsado al miembro desde ese fondo (<paramref name="desdeAhorro"/>).</summary>
+    Task<decimal> ReembolsadoAsync(Guid miembroId, bool desdeAhorro, CancellationToken ct);
 
     /// <summary>Fija la aportación del miembro desde el mes, sustituyendo la de ese mes si ya existía.</summary>
     Task<AportacionCuenta> FijarAportacionAsync(Guid hogarId, Guid miembroId, DateOnly desde, decimal importe, decimal ahorro, CancellationToken ct);

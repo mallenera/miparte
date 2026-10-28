@@ -125,12 +125,14 @@ public sealed class RepositorioCuentaComun(MiParteDbContext db) : IRepositorioCu
     public Task<DatosAhorro> DatosAhorroAsync(CancellationToken ct) => ConsultasAhorro.LeerAsync(db, null, ct);
 
     /// <inheritdoc />
-    public async Task<decimal> GastadoACargoAsync(Guid miembroId, CancellationToken ct)
-        => await db.Gastos.Where(g => g.ACargoCuentaComun && g.PagadoPor == miembroId).SumAsync(g => g.Importe, ct);
+    public async Task<decimal> GastadoACargoAsync(Guid miembroId, bool desdeAhorro, CancellationToken ct)
+        => await db.Gastos.Where(g => g.ACargoCuentaComun && g.PagadoPor == miembroId && g.PagadoDesdeAhorro == desdeAhorro)
+            .SumAsync(g => g.Importe, ct);
 
     /// <inheritdoc />
-    public async Task<decimal> ReembolsadoAsync(Guid miembroId, CancellationToken ct)
-        => await db.ReembolsosCuenta.Where(r => r.MiembroId == miembroId).SumAsync(r => r.Importe, ct);
+    public async Task<decimal> ReembolsadoAsync(Guid miembroId, bool desdeAhorro, CancellationToken ct)
+        => await db.ReembolsosCuenta.Where(r => r.MiembroId == miembroId && r.DesdeAhorro == desdeAhorro)
+            .SumAsync(r => r.Importe, ct);
 
     /// <inheritdoc />
     public async Task<AportacionCuenta> FijarAportacionAsync(

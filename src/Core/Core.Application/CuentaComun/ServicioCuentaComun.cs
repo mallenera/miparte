@@ -24,7 +24,7 @@ public sealed record FijarAportacion(Guid HogarId, Guid MiembroId, DateOnly Desd
 /// <param name="Importe">Importe del movimiento.</param>
 /// <param name="Fecha">Fecha; hoy si es null.</param>
 /// <param name="Concepto">Nota opcional.</param>
-public sealed record RegistrarMovimiento(Guid HogarId, Guid MiembroId, decimal Importe, DateOnly? Fecha, string? Concepto);
+public sealed record RegistrarMovimiento(Guid HogarId, Guid MiembroId, decimal Importe, DateOnly? Fecha, string? Concepto, bool DesdeAhorro = false);
 
 /// <summary>Casos de uso de la cuenta común: aportaciones, saldo, reembolsos y movimientos del ahorro.</summary>
 public sealed class ServicioCuentaComun(IRepositorioCuentaComun repositorio, TimeProvider reloj)
@@ -37,7 +37,7 @@ public sealed class ServicioCuentaComun(IRepositorioCuentaComun repositorio, Tim
         var saldoInicial = h.SaldoInicial;
         var estado = Domain.CuentaComun.Calcular(inicio, h.Vigentes, h.Gastos, h.Reembolsos, h.Retiradas, h.Depositos, saldoInicial, h.Ingresos);
         var partes = Domain.CuentaComun.PartesPorPersona(inicio, h.Vigentes, estado, h.Depositos);
-        var reembolsos = detalle.ReembolsosDelMes.Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe)).ToList();
+        var reembolsos = detalle.ReembolsosDelMes.Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe, r.DesdeAhorro)).ToList();
         var extracto = Domain.CuentaComun.Extracto(inicio, h.Vigentes, h.GastosDelMes ?? [], reembolsos, saldoInicial, estado, h.Ingresos);
         var resumen = Domain.CuentaComun.ResumenMensual(inicio, h);
         return new EstadoCuentaDelMes(inicio, estado, partes, detalle, extracto, saldoInicial, resumen);
@@ -144,7 +144,9 @@ public sealed class ServicioCuentaComun(IRepositorioCuentaComun repositorio, Tim
         if (!await repositorio.ExisteMiembroAsync(m.MiembroId, ct))
             return Resultado<ReembolsoCuenta>.Invalido("El miembro del reembolso debe pertenecer al hogar.");
 
-        var pendiente = await repositorio.GastadoACargoAsync(m.MiembroId, ct) - await repositorio.ReembolsadoAsync(m.MiembroId, ct);
+        // Un reembolso sale de un solo fondo: se compara con lo pendiente de ese fondo, no con el total del miembro.
+        var pendiente = await repositorio.GastadoACargoAsync(m.MiembroId, m.DesdeAhorro, ct)
+            - await repositorio.ReembolsadoAsync(m.MiembroId, m.DesdeAhorro, ct);
         if (m.Importe > pendiente)
         {
             var visible = Math.Max(0m, pendiente);
@@ -156,7 +158,7 @@ public sealed class ServicioCuentaComun(IRepositorioCuentaComun repositorio, Tim
         var r = new ReembolsoCuenta
         {
             Id = Guid.NewGuid(), HogarId = m.HogarId, MiembroId = m.MiembroId, Importe = m.Importe,
-            Fecha = m.Fecha ?? Hoy, Concepto = ReglasMovimiento.NormalizarConcepto(m.Concepto),
+            Fecha = m.Fecha ?? Hoy, Concepto = ReglasMovimiento.NormalizarConcepto(m.Concepto), DesdeAhorro = m.DesdeAhorro,
         };
         await repositorio.GuardarReembolsoAsync(r, ct);
         return Resultado<ReembolsoCuenta>.Ok(r);

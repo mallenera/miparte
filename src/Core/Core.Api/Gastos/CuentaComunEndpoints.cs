@@ -134,7 +134,7 @@ public static class CuentaComunEndpoints
         CrearReembolsoRequest req, [FromServices] ServicioCuentaComun servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
     {
         if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
-        var r = await servicio.CrearReembolsoAsync(new RegistrarMovimiento(hogarId, req.MiembroId, req.Importe, req.Fecha, req.Concepto), ct);
+        var r = await servicio.CrearReembolsoAsync(new RegistrarMovimiento(hogarId, req.MiembroId, req.Importe, req.Fecha, req.Concepto, req.DesdeAhorro), ct);
         if (r.Error is { } error) return ApiComun.Respuesta(error);
         return Results.Created($"/api/cuenta-comun/reembolsos/{r.Valor!.Id}", r.Valor.ADto());
     }

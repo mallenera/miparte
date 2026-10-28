@@ -21,14 +21,16 @@ public record FijarAportacionRequest(Guid MiembroId, DateOnly Desde, decimal Imp
 /// <param name="Fecha">Fecha del reembolso.</param>
 /// <param name="Importe">Importe reembolsado.</param>
 /// <param name="Concepto">Descripción opcional.</param>
-public record ReembolsoCuentaDto(Guid Id, Guid MiembroId, DateOnly Fecha, decimal Importe, string? Concepto);
+/// <param name="DesdeAhorro">Si sale del fondo del ahorro (true) o de Hogar (false).</param>
+public record ReembolsoCuentaDto(Guid Id, Guid MiembroId, DateOnly Fecha, decimal Importe, string? Concepto, bool DesdeAhorro = false);
 
 /// <summary>POST /api/cuenta-comun/reembolsos. Fecha por defecto: hoy (UTC).</summary>
 /// <param name="MiembroId">Miembro que recibe el reembolso.</param>
 /// <param name="Importe">Importe reembolsado.</param>
 /// <param name="Fecha">Fecha del reembolso; si es null se usa hoy (UTC).</param>
 /// <param name="Concepto">Descripción opcional.</param>
-public record CrearReembolsoRequest(Guid MiembroId, decimal Importe, DateOnly? Fecha, string? Concepto);
+/// <param name="DesdeAhorro">Fondo del que se paga: el ahorro (true) o Hogar (false, por defecto). Un reembolso nunca mezcla fondos.</param>
+public record CrearReembolsoRequest(Guid MiembroId, decimal Importe, DateOnly? Fecha, string? Concepto, bool DesdeAhorro = false);
 
 /// <summary>Dinero que entra a la cuenta común fuera de la aportación mensual y del ahorro (p. ej. lo que pagan las amigas de una cena). Suma al saldo y al efectivo de la cuenta desde su fecha; no toca el ahorro ni los reembolsos pendientes.</summary>
 /// <param name="Id">Identificador del ingreso.</param>
@@ -79,7 +81,8 @@ public record CrearRetiradaAhorroRequest(Guid MiembroId, decimal Importe, DateOn
 /// <param name="MiembroId">Miembro acreedor.</param>
 /// <param name="Nombre">Nombre del miembro.</param>
 /// <param name="Importe">Importe pendiente de reembolsar.</param>
-public record PendienteCuentaDto(Guid MiembroId, string Nombre, decimal Importe);
+/// <param name="DesdeAhorro">Si el pendiente es de adelantos pagados desde el ahorro (true) o de Hogar (false).</param>
+public record PendienteCuentaDto(Guid MiembroId, string Nombre, decimal Importe, bool DesdeAhorro = false);
 
 /// <summary>«Su parte» de un miembro en la cuenta común: lo que ha puesto y la porción que le toca del saldo y del ahorro.</summary>
 /// <param name="MiembroId">Miembro.</param>
@@ -161,7 +164,8 @@ public record ExtractoCuentaComunDto(
 /// <param name="Gastos">Lo que sale de la fila en el mes (en Ahorro, incluye las retiradas).</param>
 /// <param name="Reembolsos">Lo devuelto a quien adelantó gastos en el mes (solo Hogar).</param>
 /// <param name="Disponible">Lo que queda al final del mes: inicial, más lo que entra, menos lo que sale.</param>
-public record FilaResumenCuentaDto(decimal Inicial, decimal Ingresos, decimal IngresosSueltos, decimal Gastos, decimal Reembolsos, decimal Disponible);
+/// <param name="Pendiente">Lo que la cuenta aún debe al cierre del mes por los adelantos de esa fila (Hogar o Ahorro).</param>
+public record FilaResumenCuentaDto(decimal Inicial, decimal Ingresos, decimal IngresosSueltos, decimal Gastos, decimal Reembolsos, decimal Disponible, decimal Pendiente = 0m);
 
 /// <summary>Resumen mensual de la cuenta común: Hogar (dinero para gastos), Ahorro y Total.</summary>
 /// <param name="Hogar">Fila de Hogar.</param>

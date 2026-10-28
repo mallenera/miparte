@@ -33,6 +33,12 @@ public sealed class ModeloResumen(CoreApiClient api, DateOnly hoy)
     /// <summary>Liquidación del mes mostrado; null hasta cargarla.</summary>
     public LiquidacionResponse? Liquidacion { get; private set; }
 
+    /// <summary>
+    /// Cuenta común del mes mostrado, con la tabla del resumen mensual; null si el hogar no la tiene o no se pudo leer (el resumen sigue
+    /// viéndose sin ella).
+    /// </summary>
+    public CuentaComunResponse? CuentaComun { get; private set; }
+
     /// <summary>Miembros del hogar.</summary>
     public List<MiembroDto> Miembros { get; private set; } = [];
 
@@ -83,10 +89,28 @@ public sealed class ModeloResumen(CoreApiClient api, DateOnly hoy)
     /// <summary>Cierre del mes mostrado; null si está abierto.</summary>
     public MesCerradoDto? CierreDelMes => Cierres.FirstOrDefault(c => c.Mes == Formato.Mes(_mes));
 
+    /// <summary>Si el mes tiene gastos: sin ellos no hay nada que cerrar y no se muestra el cierre.</summary>
+    public bool HayGastos => Resumen is { GastosTotales: > 0 };
+
     // ───── Lecturas para pintar ─────
 
     /// <summary>Sin filtro pasa todo; con filtro, solo lo que afecta al miembro elegido.</summary>
     public bool FiltraMiembro(Guid id) => FiltroMiembro == "" || id.ToString() == FiltroMiembro;
+
+    /// <summary>
+    /// Personas de la tabla «Por persona»: las del resumen del mes y las que solo tienen saldo de liquidación (p. ej. quien solo recibió
+    /// un pago).
+    /// </summary>
+    public IReadOnlyList<ResumenMiembroDto> Personas()
+    {
+        var delResumen = Resumen!.Miembros;
+        var solaLiquidacion = (Liquidacion?.Saldos ?? []).Where(s => delResumen.All(m => m.MiembroId != s.MiembroId))
+            .Select(s => new ResumenMiembroDto(s.MiembroId, s.Nombre, 0m, 0m));
+        return [.. delResumen, .. solaLiquidacion];
+    }
+
+    /// <summary>Saldo de liquidación de una persona en el mes; null si no tiene.</summary>
+    public SaldoMiembroDto? SaldoDe(Guid miembroId) => Liquidacion?.Saldos.FirstOrDefault(s => s.MiembroId == miembroId);
 
     /// <summary>Si la categoría madre está desplegada.</summary>
     public bool EstaAbierta(Guid categoriaId) => _abiertas.Contains(categoriaId);
@@ -174,9 +198,10 @@ public sealed class ModeloResumen(CoreApiClient api, DateOnly hoy)
         var datos = api.ObtenerResumenYLiquidacionAsync(Formato.Mes(_mes));
         var cierres = OVacia(api.ListarCierresMesAsync()); // el cierre es informativo aquí: sin él se sigue viendo el resumen
         var ciclos = PorCiclos ? OVacia(api.ListarCiclosLiquidacionAsync()) : Task.FromResult<List<CicloLiquidacionDto>>([]);
+        var cuenta = SiFalla(api.ObtenerCuentaComunAsync(Formato.Mes(_mes))); // solo para su tabla: sin ella se sigue viendo el resumen
         try
         {
-            await Task.WhenAll(datos, cierres, ciclos);
+            await Task.WhenAll(datos, cierres, ciclos, cuenta);
         }
         catch (ApiException) when (version != _version)
         {
@@ -188,6 +213,23 @@ public sealed class ModeloResumen(CoreApiClient api, DateOnly hoy)
         Liquidacion = datos.Result.Liquidacion;
         Cierres = cierres.Result;
         Ciclos = ciclos.Result;
+        CuentaComun = cuenta.Result;
+    }
+
+    /// <summary>
+    /// Espera una lectura opcional: si la API falla o la petición caduca (el timeout de HttpClient se ve como cancelación), devuelve null
+    /// para que la carga principal no se caiga con ella.
+    /// </summary>
+    private static async Task<T?> SiFalla<T>(Task<T> carga) where T : class
+    {
+        try
+        {
+            return await carga;
+        }
+        catch (Exception e) when (e is ApiException or OperationCanceledException)
+        {
+            return null;
+        }
     }
 
     /// <summary>

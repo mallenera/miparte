@@ -47,28 +47,17 @@ else if (_m.Estado is not null)
                 <button class="linkbtn" type="button" aria-label="Mes siguiente" @onclick="() => _m.CambiarMesAsync(1)"><Icono Nombre="chevron-right" /></button>
             </div>
         </div>
-        <p class="muted">Saldo acumulado hasta final de mes: aportaciones para gastos (sin el ahorro) menos los gastos cargados a la cuenta.</p>
+        <p class="muted">Inicial es lo que quedó el mes anterior; el resto, solo de este mes. Lo que queda pasa al mes siguiente.</p>
 
         @if (_m.Error is not null)
         {
             <div class="aviso err u-mt12" role="alert">@_m.Error</div>
         }
 
-        <div class="u-fila-mt10">
-            <span class="chip">Saldo&nbsp;<b id="saldo">@Formato.Euros(_m.Estado.Saldo)</b></span>
-            <span class="chip">Efectivo&nbsp;<b>@Formato.Euros(_m.Estado.Efectivo)</b></span>
-            <span class="chip">Aportado este mes&nbsp;<b>@Formato.Euros(_m.Estado.AportadoMes)</b></span>
-            <span class="chip">Aportado en total&nbsp;<b>@Formato.Euros(_m.Estado.Aportado)</b></span>
-            <span class="chip">Gastado en total&nbsp;<b>@Formato.Euros(_m.Estado.Gastado)</b></span>
-            @if (_m.Estado.AhorroActivo || _m.Estado.AhorroGastado != 0)
-            {
-                <span class="chip">Gastado del ahorro&nbsp;<b>@Formato.Euros(_m.Estado.AhorroGastado)</b></span>
-            }
-            @if (_m.Estado.AhorroActivo)
-            {
-                <span class="chip">Ahorro disponible&nbsp;<b id="ahorro">@Formato.Euros(_m.Estado.AhorroDisponible)</b></span>
-            }
-        </div>
+        @if (_m.Estado.Resumen is { } res)
+        {
+            <div class="u-mt12"><TablaResumenCuenta Resumen="res" /></div>
+        }
 
         @if (_m.Estado.Saldo < 0)
         {
@@ -77,43 +66,6 @@ else if (_m.Estado is not null)
             </div>
         }
     </section>
-
-    @if (_m.Estado.Resumen is { } res)
-    {
-        <section class="card" aria-labelledby="t-resumen">
-            <div class="card-head"><h2 id="t-resumen">Resumen de @_m.NombreMes</h2></div>
-            <p class="muted">Inicial es lo que quedó el mes anterior; el resto, solo de este mes. Lo que queda pasa al mes siguiente.</p>
-            <div class="tabla-scroll">
-                <table class="resumen-cuenta" id="resumen-cuenta">
-                    <thead>
-                        <tr>
-                            <th scope="col"><span class="sr">Cuenta</span></th>
-                            <th scope="col">Inicial</th>
-                            <th scope="col">Ingresos</th>
-                            <th scope="col">Ingresos sueltos</th>
-                            <th scope="col">Gastos</th>
-                            <th scope="col">Reembolsos</th>
-                            <th scope="col">Disponible</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var (nombre, fila, clase) in new[] { ("Hogar", res.Hogar, ""), ("Ahorro", res.Ahorro, ""), ("Total", res.Total, "total") })
-                        {
-                            <tr class="@clase">
-                                <th scope="row">@nombre</th>
-                                <td>@Formato.Euros(fila.Inicial)</td>
-                                <td>@Formato.Euros(fila.Ingresos)</td>
-                                <td>@Formato.Euros(fila.IngresosSueltos)</td>
-                                <td>@Formato.Euros(fila.Gastos)</td>
-                                <td>@Formato.Euros(fila.Reembolsos)</td>
-                                <td><b>@Formato.Euros(fila.Disponible)</b></td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        </section>
-    }
 
     @if (_m.Estado.Extracto is { } x)
     {
@@ -268,7 +220,7 @@ else if (_m.Estado is not null)
         {
             <div class="catrow">
                 <div class="c-name">@p.Nombre</div>
-                <div class="c-sel">La cuenta le debe @Formato.Euros(p.Importe)</div>
+                <div class="c-sel">La cuenta le debe @Formato.Euros(p.Importe) · @(p.DesdeAhorro ? "del ahorro" : "de Hogar")</div>
             </div>
         }
 
@@ -276,7 +228,7 @@ else if (_m.Estado is not null)
         {
             <div class="gastorow">
                 <div class="g-main">
-                    <div class="g-concepto">Reembolso a @Formato.NombreMiembro(r.MiembroId, _m.Miembros)</div>
+                    <div class="g-concepto">Reembolso a @Formato.NombreMiembro(r.MiembroId, _m.Miembros) @(r.DesdeAhorro ? "(del ahorro)" : "(de Hogar)")</div>
                     <div class="muted g-meta">@r.Fecha.ToString("dd/MM/yyyy", Es)@(string.IsNullOrWhiteSpace(r.Concepto) ? "" : " · " + r.Concepto)</div>
                 </div>
                 <div class="g-importe">@Formato.Euros(r.Importe)</div>
@@ -300,10 +252,10 @@ else if (_m.Estado is not null)
             <form class="addcat" id="form-reembolso" @onsubmit="ReembolsarAsync">
                 <h3 class="u-titulo-form">Nuevo reembolso</h3>
                 <label>A
-                    <select @bind="_m.Reembolsado">
+                    <select value="@_m.ClavePendiente" @onchange="e => _m.ElegirPendiente(e.Value?.ToString())">
                         @foreach (var p in _m.Estado.Pendientes)
                         {
-                            <option value="@p.MiembroId">@p.Nombre</option>
+                            <option value="@ModeloCuentaComun.ClaveDe(p)">@p.Nombre @(p.DesdeAhorro ? "(del ahorro)" : "(de Hogar)")</option>
                         }
                     </select>
                 </label>

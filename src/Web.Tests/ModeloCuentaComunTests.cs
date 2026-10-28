@@ -171,6 +171,24 @@ public class ModeloCuentaComunTests
     }
 
     [Fact]
+    public async Task Reembolsar_del_fondo_del_ahorro_lo_envia_con_su_fondo_y_no_mezcla_fondos()
+    {
+        var deHogar = new PendienteCuentaDto(_marcos.Id, "Marcos", 40m);
+        var delAhorro = new PendienteCuentaDto(_marcos.Id, "Marcos", 60m, DesdeAhorro: true);
+        var (m, api) = Crear(Estado(pendientes: [deHogar, delAhorro]));
+        api.Responde("POST /api/cuenta-comun/reembolsos", HttpStatusCode.Created,
+            new ReembolsoCuentaDto(Guid.NewGuid(), _marcos.Id, Hoy, 60m, null, true));
+        await m.CargarAsync();
+        Assert.Equal(ModeloCuentaComun.ClaveDe(deHogar), m.ClavePendiente);
+
+        m.ElegirPendiente(ModeloCuentaComun.ClaveDe(delAhorro));
+        m.ImporteReembolso = "60";
+        await m.ReembolsarAsync();
+
+        Assert.Contains("\"desdeAhorro\":true", api.Cuerpos["POST /api/cuenta-comun/reembolsos"]);
+    }
+
+    [Fact]
     public async Task Reembolsar_envia_el_concepto_recortado_y_limpia_el_formulario()
     {
         var pendiente = new PendienteCuentaDto(_marcos.Id, "Marcos", 95m);

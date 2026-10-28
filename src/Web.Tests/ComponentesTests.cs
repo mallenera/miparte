@@ -342,7 +342,7 @@ public class ComponentesTests : BunitContext
         var c = Render<VistaCuentaComun>();
 
         Assert.Contains("La cuenta no cubre los gastos", c.Markup);
-        Assert.Contains("50,00", c.Find("#saldo").TextContent);
+        Assert.Contains("50,00", c.Find(".aviso.warn").TextContent);
     }
 
     [Fact]
@@ -427,11 +427,9 @@ public class ComponentesTests : BunitContext
 
         var c = Render<VistaCuentaComun>();
 
-        Assert.Contains("180,00", c.Find("#ahorro").TextContent);
         Assert.Empty(c.FindAll("#form-retirada"));
         Assert.DoesNotContain("Retirado", c.Markup);
         Assert.DoesNotContain("Retirada de", c.Markup);
-        Assert.Contains("Gastado del ahorro", c.Markup);
         Assert.Contains("Anotar un gasto del ahorro", c.Markup);
     }
 
@@ -597,8 +595,9 @@ public class ComponentesTests : BunitContext
 
         var c = Render<VistaResumen>();
 
-        Assert.Contains("La cuenta común le debe", c.Markup);
-        Assert.Single(c.FindAll(".catrow .chip"));
+        var ana = c.FindAll("#resumen-personas tbody tr")[0].QuerySelectorAll("td");
+        Assert.Contains("Debe a la cuenta común", c.Markup);
+        Assert.Contains("100,00", ana[2].TextContent);
     }
 
     [Fact]
@@ -1215,16 +1214,19 @@ public class ComponentesTests : BunitContext
     }
 
     [Fact]
-    public void Resumen_muestra_los_saldos_de_la_cuenta_comun_si_vienen_en_la_respuesta()
+    public void Resumen_muestra_la_tabla_de_la_cuenta_comun_del_mes()
     {
         var con = new ResumenMensualResponse("2026-10", 0m, [], [],
             new ResumenCuentaComunDto(500m, 120m, 280m, 400m, 120m, 100m, 100m));
-        Registrar(ApiResumen(con, Liquidacion(0m)));
+        var fila = new FilaResumenCuentaDto(500m, 120m, 280m, 400m, 120m, 100m);
+        var cuenta = Cuenta(0m) with { Resumen = new ResumenCuentaMesDto(fila, fila, fila) };
+        Registrar(ApiResumen(con, Liquidacion(0m)).Responde("GET /api/cuenta-comun", HttpStatusCode.OK, cuenta));
 
         var c = Render<VistaResumen>();
 
-        Assert.Contains("280,00", c.Find("#cuenta-saldo").TextContent);
-        Assert.Contains("Pendiente de reembolsar", c.Markup);
+        Assert.Contains("280,00", c.Find("#resumen-cuenta").TextContent);
+        Assert.Contains("Pendiente de reembolsar", c.Find("#resumen-cuenta").TextContent);
+        Assert.Contains("Ver la cuenta común", c.Markup);
     }
 
     [Fact]
@@ -1234,7 +1236,7 @@ public class ComponentesTests : BunitContext
 
         var c = Render<VistaResumen>();
 
-        Assert.Empty(c.FindAll("#cuenta-saldo"));
+        Assert.Empty(c.FindAll("#resumen-cuenta"));
     }
 
     [Fact]

@@ -69,6 +69,26 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
     /// <summary>Miembro al que se reembolsa.</summary>
     public Guid Reembolsado { get; set; }
 
+    /// <summary>Fondo del reembolso elegido: el del ahorro (true) o el de Hogar. Un reembolso nunca mezcla fondos.</summary>
+    public bool ReembolsadoDesdeAhorro { get; set; }
+
+    /// <summary>Clave del pendiente elegido en el formulario, «miembro|fondo», que es lo que lee el selector.</summary>
+    public string ClavePendiente => ClaveDe(Reembolsado, ReembolsadoDesdeAhorro);
+
+    /// <summary>Clave de un pendiente para el selector del formulario de reembolso.</summary>
+    public static string ClaveDe(PendienteCuentaDto p) => ClaveDe(p.MiembroId, p.DesdeAhorro);
+
+    private static string ClaveDe(Guid miembroId, bool desdeAhorro) => $"{miembroId}|{(desdeAhorro ? 1 : 0)}";
+
+    /// <summary>Elige el pendiente del formulario a partir de su clave; una clave que no sea válida no cambia nada.</summary>
+    public void ElegirPendiente(string? clave)
+    {
+        var partes = (clave ?? "").Split('|');
+        if (partes.Length != 2 || !Guid.TryParse(partes[0], out var miembro)) return;
+        Reembolsado = miembro;
+        ReembolsadoDesdeAhorro = partes[1] == "1";
+    }
+
     /// <summary>Adulto que ingresa al ahorro.</summary>
     public Guid Depositante { get; set; }
 
@@ -183,8 +203,12 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
 
         if (version != _version) return;
         Estado = estado;
-        if (Estado.Pendientes.All(p => p.MiembroId != Reembolsado))
-            Reembolsado = Estado.Pendientes.FirstOrDefault()?.MiembroId ?? Guid.Empty;
+        if (Estado.Pendientes.All(p => ClaveDe(p) != ClavePendiente))
+        {
+            var primero = Estado.Pendientes.FirstOrDefault();
+            Reembolsado = primero?.MiembroId ?? Guid.Empty;
+            ReembolsadoDesdeAhorro = primero?.DesdeAhorro ?? false;
+        }
         AlCambiarAportante();
         AlCambiarSaldoInicial();
 
@@ -254,7 +278,7 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
         EjecutarAsync(async () =>
         {
             var importe = Importe(ImporteReembolso);
-            await api.CrearReembolsoAsync(new CrearReembolsoRequest(Reembolsado, importe, null, Texto(ConceptoReembolso)));
+            await api.CrearReembolsoAsync(new CrearReembolsoRequest(Reembolsado, importe, null, Texto(ConceptoReembolso), ReembolsadoDesdeAhorro));
             ImporteReembolso = "";
             ConceptoReembolso = "";
             return "Reembolso registrado";

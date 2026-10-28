@@ -40,6 +40,9 @@ public static class CatalogoPermisos
     public const string CuentaMovimientos = "cuenta.movimientos";
     /// <summary>Ingresos y retiradas de ahorro.</summary>
     public const string AhorroMovimientos = "ahorro.movimientos";
+
+    /// <summary>Añadir, marcar y borrar productos de la lista de la compra, y crear sus enlaces QR.</summary>
+    public const string ListaCompra = "lista.compra";
     /// <summary>Crear, editar y borrar categorías.</summary>
     public const string CategoriasGestionar = "categorias.gestionar";
     /// <summary>Crear, editar y borrar perfiles de reparto.</summary>
@@ -71,6 +74,7 @@ public static class CatalogoPermisos
         new(MesReabrir, "Reabrir un mes cerrado", "Liquidación", false),
         new(CuentaMovimientos, "Aportaciones y reembolsos de la cuenta común", "Cuenta común", true),
         new(AhorroMovimientos, "Ingresos y retiradas de ahorro", "Cuenta común", true),
+        new(ListaCompra, "Añadir, marcar y borrar productos de la lista de la compra, y crear enlaces QR", "Lista de la compra", true),
         new(CategoriasGestionar, "Crear, editar y borrar categorías", "Reparto", true),
         new(PerfilesGestionar, "Crear, editar y borrar perfiles de reparto", "Reparto", true),
         new(HistorialVer, "Ver el historial de cambios", "Hogar", false),

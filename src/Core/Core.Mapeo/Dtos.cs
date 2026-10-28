@@ -46,7 +46,7 @@ public static class Dtos
     public static HogarResumen ADto(this Hogar h)
         => new(h.Id, h.Nombre, h.CuentaComunActiva, h.AhorroActivo, TextoTipoGrupo.ATexto(h.Tipo), h.RecurrentesActivas,
             TextoModoLiquidacion.ATexto(h.LiquidacionModo), h.PeriodoPropio?.ATexto(), h.PeriodoCerradoEn is not null,
-            TextoFrecuenciaAportacion.ATexto(h.AportacionFrecuencia));
+            TextoFrecuenciaAportacion.ATexto(h.AportacionFrecuencia), h.ListaCompraActiva);
 
     /// <summary>Ciclo de liquidación cerrado, con el nombre de quien lo cerró.</summary>
     public static CicloLiquidacionDto ADto(this CicloConAutor c)
@@ -119,6 +119,9 @@ public static class Dtos
     /// <summary>Movimiento de deuda de la cuenta común tal como se devuelve al crearlo.</summary>
     public static MovimientoDeudaCuentaDto ADto(this MovimientoDeudaCuenta d) => new(
         d.Id, d.MiembroId, d.Fecha, d.Importe, TextoTipoDeuda(d.Tipo), d.DesdeAhorro, d.Concepto);
+
+    /// <summary>Producto de la lista de la compra tal como se devuelve.</summary>
+    public static ProductoCompraDto ADto(this ProductoListaCompra p) => new(p.Id, p.Nombre, p.Cantidad, p.Comprado);
 
     /// <summary>Texto con que viaja cada tipo de movimiento de deuda en la API.</summary>
     public static string TextoTipoDeuda(TipoMovimientoDeuda tipo) => tipo switch

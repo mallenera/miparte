@@ -7,6 +7,7 @@ CREATE TABLE public.hogar (
     nombre text NOT NULL,
     creado_en timestamp with time zone DEFAULT now() NOT NULL,
     cuenta_comun_activa boolean DEFAULT false NOT NULL,
+    lista_compra_activa boolean DEFAULT false NOT NULL,
     ahorro_activo boolean DEFAULT false NOT NULL,
     recurrentes_activas boolean DEFAULT true NOT NULL,
     liquidacion_modo text DEFAULT 'mensual'::text NOT NULL,

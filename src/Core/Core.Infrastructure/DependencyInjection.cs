@@ -7,6 +7,7 @@ using MiParte.Core.Application.Cierres;
 using MiParte.Core.Application.Gastos;
 using MiParte.Core.Application.Hogares;
 using MiParte.Core.Application.Liquidacion;
+using MiParte.Core.Application.ListaCompra;
 using MiParte.Core.Application.Miembros;
 using MiParte.Core.Application.Notificaciones;
 using MiParte.Core.Application.Periodos;
@@ -44,6 +45,7 @@ public static class DependencyInjection
         services.AddScoped<IRepositorioLiquidacion>(sp => new RepositorioLiquidacion(sp.GetRequiredService<MiParteDbContext>()));
         services.AddScoped<IRepositorioGastos>(sp => new RepositorioGastos(sp.GetRequiredService<MiParteDbContext>()));
         services.AddScoped<IRepositorioCuentaComun>(sp => new RepositorioCuentaComun(sp.GetRequiredService<MiParteDbContext>()));
+        services.AddScoped<IRepositorioListaCompra>(sp => new RepositorioListaCompra(sp.GetRequiredService<MiParteDbContext>()));
         services.AddScoped<IRepositorioMiembros>(sp => new RepositorioMiembros(sp.GetRequiredService<MiParteDbContext>()));
         services.AddScoped<IRepositorioEnlacesGrupo>(sp => new RepositorioEnlacesGrupo(sp.GetRequiredService<MiParteDbContext>()));
         services.AddScoped<IRepositorioRecurrentes>(sp => new RepositorioRecurrentes(sp.GetRequiredService<MiParteDbContext>()));

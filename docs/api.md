@@ -237,6 +237,28 @@ Formulario de la página pública `/contacto`. Es el único endpoint anónimo ad
 
 Total: 69 endpoints de negocio (5 hogares/yo, 10 miembros/invitaciones/enlaces de grupo, 4 categorías, 5 perfiles, 5 gastos, 6 recurrentes, 8 resumen/liquidación/pagos/ciclos, 16 cuenta común, 5 cierre de mes, 1 auditoría, 3 avisos del navegador, 1 contacto) más `GET /health`.
 
+### 3.14 Lista de la compra
+
+Lista de productos del hogar, con su función propia (`hogar.lista_compra_activa`, por defecto desactivada; la activa un miembro con `hogar.funciones`). Un producto tiene nombre (1-100 caracteres), cantidad (entero de 1 a 999, por defecto 1) y el check de comprado; no se convierte en gastos. Los productos y los enlaces no se borran al desactivar la lista: solo quedan bloqueados los cambios (409).
+
+Los enlaces QR son para quien no tiene cuenta: `POST /api/lista-compra/enlaces` devuelve un token en claro, que no vuelve a verse, y la URL pública es `/compra/{token}` del front. El token solo permite leer, añadir y marcar productos de ese hogar, y caduca a los 7 días; revocarlo lo invalida. En BD solo se guarda su hash (`enlace_lista_compra.token_hash`). Las rutas públicas no piden sesión y llevan el token en la cabecera `X-Enlace-Lista` (está permitida en CORS).
+
+| Método y ruta | Descripción | Request | Response | Errores | Permisos |
+|---|---|---|---|---|---|
+| `GET /api/lista-compra` | Activación y productos del hogar (pendientes primero) | - | `ListaCompraResponse` 200 | 409 sin hogar | miembro |
+| `PUT /api/lista-compra/activacion` | Activa o desactiva la lista del hogar | `ActivarListaCompraRequest` | `{ activa }` 200 | 409 sin hogar | `hogar.funciones` |
+| `POST /api/lista-compra/productos` | Añade un producto | `CrearProductoCompraRequest` (`nombre`, `cantidad` opcional) | `ProductoCompraDto` 201 | 400 nombre o cantidad inválidos; 409 lista desactivada o sin hogar | `lista.compra` |
+| `PUT /api/lista-compra/productos/{id}` | Marca o desmarca como comprado | `MarcarProductoCompraRequest` | `ProductoCompraDto` 200 | 404 no es del hogar; 409 sin hogar | `lista.compra` |
+| `DELETE /api/lista-compra/productos/{id}` | Borra un producto | - | 204 | 404; 409 sin hogar | `lista.compra` |
+| `POST /api/lista-compra/enlaces` | Crea un enlace QR (caduca a los 7 días). El token va solo aquí | - | `EnlaceListaCreado` 201 | 409 lista desactivada o sin hogar | `lista.compra` |
+| `DELETE /api/lista-compra/enlaces/{id}` | Revoca un enlace | - | 204 | 404; 409 sin hogar | `lista.compra` |
+| `POST /api/lista-compra/qr` | Genera el SVG de un QR con el texto indicado (1-500 caracteres) | `QrListaRequest` | `QrListaResponse` 200 | 400 texto inválido; 409 sin hogar | sesión |
+| `GET /api/lista-compra/publica` | Lista del enlace QR (sin sesión, cabecera `X-Enlace-Lista`) | - | `ListaCompraResponse` 200 | 404 token desconocido; 409 enlace revocado o caducado, o lista desactivada | enlace QR |
+| `POST /api/lista-compra/publica/productos` | Añade un producto con el enlace QR | `CrearProductoCompraRequest` | `ProductoCompraDto` 201 | 400; 404; 409 | enlace QR (limitado por `Costosa`) |
+| `PUT /api/lista-compra/publica/productos/{id}` | Marca o desmarca un producto del hogar del enlace | `MarcarProductoCompraRequest` | `ProductoCompraDto` 200 | 404; 409 | enlace QR (limitado por `Costosa`) |
+
+`ProductoCompraDto` = `{ id, nombre, cantidad, comprado }`. Permiso `lista.compra`: añadir, marcar, borrar y crear o revocar enlaces; por defecto lo tienen todos los miembros . La plantilla «Solo lectura» no lo incluye.
+
 ## 4. Ejemplos JSON
 
 ### Hogares

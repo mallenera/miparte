@@ -847,3 +847,7 @@ section.card + section.card { margin-top: 24px; }
 .gastos-cuerpo { display: flex; flex-direction: column; }
 .gastos-cuerpo > .editando { order: -1; margin-bottom: 14px; }
 .modo { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* Código QR de la lista de la compra: ocupa el ancho de la tarjeta, con tope, sin estilos en línea (CSP). */
+.qr-lista { max-width: 240px; margin: 12px 0; }
+.qr-lista svg { display: block; width: 100%; height: auto; }

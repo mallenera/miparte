@@ -99,10 +99,12 @@ internal sealed class ClienteHttpCore
     /// <param name="ruta">Ruta relativa a la URL base de Core.Api.</param>
     /// <param name="cuerpo">Cuerpo JSON de la petición, si lo lleva.</param>
     /// <param name="ct">Token de cancelación.</param>
-    internal async Task<T> EnviarAsync<T>(HttpMethod metodo, string ruta, object? cuerpo, CancellationToken ct)
+    internal async Task<T> EnviarAsync<T>(HttpMethod metodo, string ruta, object? cuerpo, CancellationToken ct, string? cabeceraEnlace = null)
     {
         using var peticion = new HttpRequestMessage(metodo, ruta);
         if (cuerpo is not null) peticion.Content = JsonContent.Create(cuerpo, cuerpo.GetType());
+        // Token del enlace QR de la lista de la compra: lo usan las rutas públicas, que no tienen sesión.
+        if (cabeceraEnlace is not null) peticion.Headers.TryAddWithoutValidation("X-Enlace-Lista", cabeceraEnlace);
 
         HttpResponseMessage respuesta;
         try

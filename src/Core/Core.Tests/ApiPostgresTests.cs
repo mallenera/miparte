@@ -139,6 +139,58 @@ public class ApiPostgresTests
     }
 
     [SkippableFact]
+    public async Task ListaCompra_ActivacionProductosYEnlaceQr_EnPostgres()
+    {
+        Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
+        await using var e = new Entorno();
+        var user = await e.CrearUsuarioAsync();
+        var hogar = await CrearHogar(e.Cliente(user), "Casa compra", "Ana");
+        var c = e.Cliente(user, hogar.Id);
+
+        // Desactivada: no se puede añadir, pero la lista se puede leer.
+        await Leer<JsonElement>(await c.PostAsJsonAsync("/api/lista-compra/productos", new CrearProductoCompraRequest("Leche")), HttpStatusCode.Conflict);
+        var inicial = await Leer<ListaCompraResponse>(await c.GetAsync("/api/lista-compra"));
+        Assert.False(inicial.Activa);
+
+        await Leer<JsonElement>(await c.PutAsJsonAsync("/api/lista-compra/activacion", new ActivarListaCompraRequest(true)));
+        var producto = await Leer<ProductoCompraDto>(
+            await c.PostAsJsonAsync("/api/lista-compra/productos", new CrearProductoCompraRequest("Leche", 2)), HttpStatusCode.Created);
+        Assert.Equal(2, producto.Cantidad);
+
+        var enlace = await Leer<EnlaceListaCreado>(await c.PostAsync("/api/lista-compra/enlaces", null), HttpStatusCode.Created);
+        var qr = await Leer<QrListaResponse>(await c.PostAsJsonAsync("/api/lista-compra/qr", new QrListaRequest($"https://app.test/compra/{enlace.Token}")));
+        Assert.Contains("<svg", qr.Svg);
+
+        // Enlace público: ve la lista, añade y marca, sin tocar nada de otro hogar.
+        var anonima = e.Cliente(user);
+        var lista = await Leer<ListaCompraResponse>(await PublicaAsync(anonima, HttpMethod.Get, "/api/lista-compra/publica", enlace.Token));
+        Assert.Single(lista.Productos);
+        await Leer<ProductoCompraDto>(
+            await PublicaAsync(anonima, HttpMethod.Post, "/api/lista-compra/publica/productos", enlace.Token, new CrearProductoCompraRequest("Pan")),
+            HttpStatusCode.Created);
+        await Leer<ProductoCompraDto>(
+            await PublicaAsync(anonima, HttpMethod.Put, $"/api/lista-compra/publica/productos/{producto.Id}", enlace.Token, new MarcarProductoCompraRequest(true)));
+        var despues = await Leer<ListaCompraResponse>(await c.GetAsync("/api/lista-compra"));
+        Assert.Equal(2, despues.Productos.Count);
+        Assert.True(despues.Productos.Single(p => p.Id == producto.Id).Comprado);
+
+        // Revocado: el mismo token deja de servir.
+        var borrado = await c.DeleteAsync($"/api/lista-compra/enlaces/{enlace.Id}");
+        Assert.Equal(HttpStatusCode.NoContent, borrado.StatusCode);
+        var revocado = await PublicaAsync(anonima, HttpMethod.Get, "/api/lista-compra/publica", enlace.Token);
+        Assert.Equal(HttpStatusCode.Conflict, revocado.StatusCode);
+    }
+
+    /// <summary>Petición sin sesión del enlace QR: el token va en la cabecera X-Enlace-Lista.</summary>
+    private static Task<HttpResponseMessage> PublicaAsync(HttpClient c, HttpMethod metodo, string ruta, string token, object? cuerpo = null)
+    {
+        var peticion = new HttpRequestMessage(metodo, ruta);
+        peticion.Headers.Add("X-Enlace-Lista", token);
+        if (cuerpo is not null) peticion.Content = JsonContent.Create(cuerpo);
+        return c.SendAsync(peticion);
+    }
+
+    [SkippableFact]
     public async Task DeudasDeLaCuenta_SeRegistranYCuadranEnEstadoYBanco_EnPostgres()
     {
         Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");

@@ -55,6 +55,8 @@ public class Hogar
     public DateTimeOffset CreadoEn { get; set; }
     /// <summary>Si el hogar usa la cuenta común (aportaciones, saldo, reembolsos y ahorro); la activa un admin.</summary>
     public bool CuentaComunActiva { get; set; }
+    /// <summary>Si el hogar tiene activada la lista de la compra (la pestaña y los enlaces QR).</summary>
+    public bool ListaCompraActiva { get; set; }
     /// <summary>Si el hogar usa el ahorro de la cuenta común (aportaciones con ahorro, depósitos, retiradas y gastos desde el ahorro); solo tiene efecto con la cuenta común activada.</summary>
     public bool AhorroActivo { get; set; }
     /// <summary>Si el hogar genera gastos recurrentes (alta de plantillas y generación del mes); desactivarlo deja las plantillas pausadas, sin borrarlas.</summary>
@@ -343,6 +345,42 @@ public class MovimientoDeudaCuenta
     public bool DesdeAhorro { get; set; }
     /// <summary>Nota opcional.</summary>
     public string? Concepto { get; set; }
+}
+
+/// <summary>Producto de la lista de la compra del hogar (tabla producto_compra).</summary>
+public class ProductoListaCompra
+{
+    /// <summary>Identificador del producto.</summary>
+    public Guid Id { get; set; }
+    /// <summary>Hogar al que pertenece.</summary>
+    public Guid HogarId { get; set; }
+    /// <summary>Nombre del producto.</summary>
+    public string Nombre { get; set; } = "";
+    /// <summary>Cantidad (entero de 1 a 999).</summary>
+    public int Cantidad { get; set; } = 1;
+    /// <summary>Si ya está en el carro.</summary>
+    public bool Comprado { get; set; }
+    /// <summary>Momento en que se añadió.</summary>
+    public DateTimeOffset CreadoEn { get; set; }
+}
+
+/// <summary>Enlace para añadir productos a la lista de la compra por QR (tabla enlace_lista_compra). Guarda solo el hash del token.</summary>
+public class EnlaceListaCompra
+{
+    /// <summary>Identificador del enlace.</summary>
+    public Guid Id { get; set; }
+    /// <summary>Hogar al que da acceso.</summary>
+    public Guid HogarId { get; set; }
+    /// <summary>Hash SHA-256 del token (nunca el token en claro).</summary>
+    public string TokenHash { get; set; } = "";
+    /// <summary>Miembro que lo creó.</summary>
+    public Guid CreadoPor { get; set; }
+    /// <summary>Momento de creación.</summary>
+    public DateTimeOffset CreadoEn { get; set; }
+    /// <summary>A partir de cuándo deja de admitir cambios; null = no caduca.</summary>
+    public DateTimeOffset? CaducaEn { get; set; }
+    /// <summary>False cuando se ha revocado.</summary>
+    public bool Activo { get; set; } = true;
 }
 
 /// <summary>Perfil de reparto reutilizable: un modo y los valores por miembro (detalles).</summary>

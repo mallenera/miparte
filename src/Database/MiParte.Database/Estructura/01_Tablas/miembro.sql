@@ -14,7 +14,7 @@ CREATE TABLE public.miembro (
     permisos text[],
     CONSTRAINT miembro_check CHECK (((tipo = 'a_cargo'::text) = (responsable_id IS NOT NULL))),
     CONSTRAINT miembro_nombre_check CHECK ((length(btrim(nombre)) > 0)),
-    CONSTRAINT miembro_permisos_check CHECK (((permisos IS NULL) OR (permisos <@ ARRAY['gastos.crear'::text, 'gastos.editar'::text, 'gastos.borrar'::text, 'recurrentes.gestionar'::text, 'pagos.registrar'::text, 'mes.cerrar'::text, 'mes.reabrir'::text, 'cuenta.movimientos'::text, 'ahorro.movimientos'::text, 'categorias.gestionar'::text, 'perfiles.gestionar'::text, 'historial.ver'::text, 'miembros.gestionar'::text, 'invitaciones.crear'::text, 'hogar.funciones'::text, 'permisos.gestionar'::text, 'hogar.eliminar'::text, 'enlaces.gestionar'::text]))),
+    CONSTRAINT miembro_permisos_check CHECK (((permisos IS NULL) OR (permisos <@ ARRAY['gastos.crear'::text, 'gastos.editar'::text, 'gastos.borrar'::text, 'recurrentes.gestionar'::text, 'pagos.registrar'::text, 'mes.cerrar'::text, 'mes.reabrir'::text, 'cuenta.movimientos'::text, 'ahorro.movimientos'::text, 'categorias.gestionar'::text, 'perfiles.gestionar'::text, 'historial.ver'::text, 'miembros.gestionar'::text, 'invitaciones.crear'::text, 'hogar.funciones'::text, 'permisos.gestionar'::text, 'hogar.eliminar'::text, 'enlaces.gestionar'::text, 'lista.compra'::text]))),
     CONSTRAINT miembro_rol_check CHECK ((rol = ANY (ARRAY['admin'::text, 'miembro'::text]))),
     CONSTRAINT miembro_tipo_check CHECK ((tipo = ANY (ARRAY['adulto'::text, 'a_cargo'::text])))
 );

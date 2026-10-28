@@ -97,7 +97,9 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
     if (origenes.Length > 0)
         p.WithOrigins(origenes)
          .WithHeaders("Authorization", "Content-Type", HogarActualMiddleware.Cabecera)
-         .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
+         .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
+         // Cachea el preflight en el navegador: sin esto repite un OPTIONS (un viaje más a Render) por cada petición.
+         .SetPreflightMaxAge(TimeSpan.FromHours(2));
 }));
 
 var app = builder.Build();

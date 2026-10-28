@@ -408,10 +408,12 @@ public class ServicioCuentaComunTests
         public async Task<DatosAhorro> DatosAhorroAsync(CancellationToken ct)
             => new(Vigentes(), await DepositosAsync(null, ct), Retiradas.Sum(r => r.Importe), 0m);
 
-        public Task<decimal> GastadoACargoAsync(Guid miembroId, CancellationToken ct) => Task.FromResult(GastadoPor.GetValueOrDefault(miembroId));
+        // Los fakes solo modelan el fondo de Hogar: lo del ahorro se prueba en los tests de dominio y de la BD.
+        public Task<decimal> GastadoACargoAsync(Guid miembroId, bool desdeAhorro, CancellationToken ct)
+            => Task.FromResult(desdeAhorro ? 0m : GastadoPor.GetValueOrDefault(miembroId));
 
-        public Task<decimal> ReembolsadoAsync(Guid miembroId, CancellationToken ct)
-            => Task.FromResult(ReembolsadoA.GetValueOrDefault(miembroId) + Reembolsos.Where(r => r.MiembroId == miembroId).Sum(r => r.Importe));
+        public Task<decimal> ReembolsadoAsync(Guid miembroId, bool desdeAhorro, CancellationToken ct)
+            => Task.FromResult(desdeAhorro ? 0m : ReembolsadoA.GetValueOrDefault(miembroId) + Reembolsos.Where(r => r.MiembroId == miembroId).Sum(r => r.Importe));
 
         public Task<AportacionCuenta> FijarAportacionAsync(
             Guid hogarId, Guid miembroId, DateOnly desde, decimal importe, decimal ahorro, CancellationToken ct)

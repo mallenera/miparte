@@ -28,7 +28,7 @@ internal static class RepositoriosEnMemoria
         return new HistoricoCuenta(
             a.Aportaciones.Select(x => new AportacionVigente(x.MiembroId, x.Desde, x.Importe, x.Ahorro, a.Hogar.AportacionFrecuencia)).ToList(),
             gastos.Select(g => new GastoDeCuenta(g.PagadoPor, g.Fecha, g.Importe, g.PagadoDesdeAhorro)).ToList(),
-            a.Reembolsos.Where(r => r.Fecha < fin).Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe)).ToList(),
+            a.Reembolsos.Where(r => r.Fecha < fin).Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe, r.DesdeAhorro)).ToList(),
             a.Retiradas.Where(r => r.Fecha < fin).Select(r => new RetiradaDeAhorro(r.Fecha, r.Importe)).ToList(),
             a.Depositos.Where(d => d.Fecha < fin).Select(d => new DepositoDeAhorro(d.Fecha, d.Importe, d.MiembroId)).ToList(),
             a.Hogar.CuentaComunActiva,
@@ -271,11 +271,12 @@ internal sealed class RepositorioCuentaComunEnMemoria(AlmacenDemo a) : IReposito
 
     public Task<DatosAhorro> DatosAhorroAsync(CancellationToken ct) => Task.FromResult(RepositoriosEnMemoria.Ahorro(a, null));
 
-    public Task<decimal> GastadoACargoAsync(Guid miembroId, CancellationToken ct)
-        => Task.FromResult(a.Gastos.Where(g => g.ACargoCuentaComun && g.PagadoPor == miembroId).Sum(g => g.Importe));
+    public Task<decimal> GastadoACargoAsync(Guid miembroId, bool desdeAhorro, CancellationToken ct)
+        => Task.FromResult(a.Gastos.Where(g => g.ACargoCuentaComun && g.PagadoPor == miembroId && g.PagadoDesdeAhorro == desdeAhorro)
+            .Sum(g => g.Importe));
 
-    public Task<decimal> ReembolsadoAsync(Guid miembroId, CancellationToken ct)
-        => Task.FromResult(a.Reembolsos.Where(r => r.MiembroId == miembroId).Sum(r => r.Importe));
+    public Task<decimal> ReembolsadoAsync(Guid miembroId, bool desdeAhorro, CancellationToken ct)
+        => Task.FromResult(a.Reembolsos.Where(r => r.MiembroId == miembroId && r.DesdeAhorro == desdeAhorro).Sum(r => r.Importe));
 
     public Task<AportacionCuenta> FijarAportacionAsync(
         Guid hogarId, Guid miembroId, DateOnly desde, decimal importe, decimal ahorro, CancellationToken ct)

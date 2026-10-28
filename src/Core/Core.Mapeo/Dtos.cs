@@ -60,7 +60,7 @@ public static class Dtos
     public static AportacionCuentaDto ADto(this AportacionCuenta a) => new(a.Id, a.MiembroId, a.Desde, a.Importe, a.Ahorro);
 
     /// <summary>Reembolso de la cuenta común.</summary>
-    public static ReembolsoCuentaDto ADto(this ReembolsoCuenta r) => new(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto);
+    public static ReembolsoCuentaDto ADto(this ReembolsoCuenta r) => new(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto, r.DesdeAhorro);
 
     /// <summary>Ingreso a la cuenta común fuera de aportaciones y ahorro.</summary>
     public static IngresoCuentaComunDto ADto(this IngresoCuentaComun i) => new(i.Id, i.MiembroId, i.Fecha, i.Importe, i.Concepto);
@@ -100,9 +100,9 @@ public static class Dtos
         var nombres = d.Nombres;
         return new CuentaComunResponse(
             FormatosApi.FormatoMes(s.Mes), e.AportadoMes, e.Aportado, e.Gastado, e.Saldo,
-            e.Pendientes.Select(p => new PendienteCuentaDto(p.MiembroId, nombres.GetValueOrDefault(p.MiembroId, ""), p.Importe)).ToList(),
+            e.Pendientes.Select(p => new PendienteCuentaDto(p.MiembroId, nombres.GetValueOrDefault(p.MiembroId, ""), p.Importe, p.DesdeAhorro)).ToList(),
             e.Efectivo, d.Aportaciones.Select(a => new AportacionCuentaDto(a.Id, a.MiembroId, a.Desde, a.Importe, a.Ahorro)).ToList(),
-            d.ReembolsosDelMes.Select(r => new ReembolsoCuentaDto(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto)).ToList(),
+            d.ReembolsosDelMes.Select(r => new ReembolsoCuentaDto(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto, r.DesdeAhorro)).ToList(),
             e.AhorroMes, e.AhorroAcumulado, e.AhorroRetirado, e.AhorroDisponible,
             d.RetiradasDelMes.Select(r => new RetiradaAhorroDto(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto)).ToList(),
             e.AhorroDepositado,
@@ -120,7 +120,7 @@ public static class Dtos
 
     /// <summary>Una fila del resumen mensual de la cuenta común.</summary>
     private static FilaResumenCuentaDto ADto(FilaResumenMensualCuenta f) => new(
-        f.Inicial, f.Ingresos, f.IngresosSueltos, f.Gastos, f.Reembolsos, f.Disponible);
+        f.Inicial, f.Ingresos, f.IngresosSueltos, f.Gastos, f.Reembolsos, f.Disponible, f.Pendiente);
 
     /// <summary>Extracto bancario de la cuenta común entre dos fechas.</summary>
     public static MovimientosCuentaComunResponse ADto(this ExtractoBanco x) => new(

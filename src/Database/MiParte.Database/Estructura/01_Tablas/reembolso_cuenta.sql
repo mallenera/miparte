@@ -9,6 +9,7 @@ CREATE TABLE public.reembolso_cuenta (
     fecha date NOT NULL,
     importe numeric(12,2) NOT NULL,
     concepto text,
+    desde_ahorro boolean DEFAULT false NOT NULL,
     CONSTRAINT reembolso_cuenta_importe_check CHECK ((importe > (0)::numeric))
 );
 

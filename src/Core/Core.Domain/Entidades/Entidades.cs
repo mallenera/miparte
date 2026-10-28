@@ -317,6 +317,8 @@ public class ReembolsoCuenta
     public decimal Importe { get; set; }
     /// <summary>Nota opcional.</summary>
     public string? Concepto { get; set; }
+    /// <summary>Fondo del que sale: el ahorro (true) o Hogar (false). Un reembolso es de un solo fondo.</summary>
+    public bool DesdeAhorro { get; set; }
 }
 
 /// <summary>Perfil de reparto reutilizable: un modo y los valores por miembro (detalles).</summary>

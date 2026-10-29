@@ -28,6 +28,7 @@ public static class ListaCompraEndpoints
         app.MapPost("/api/lista-compra/productos", CrearProductoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.ListaCompra);
         app.MapPut("/api/lista-compra/productos/{id:guid}", MarcarProductoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.ListaCompra);
         app.MapDelete("/api/lista-compra/productos/{id:guid}", BorrarProductoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.ListaCompra);
+        app.MapGet("/api/lista-compra/enlaces", ListarEnlacesAsync).RequireAuthorization();
         app.MapPost("/api/lista-compra/enlaces", CrearEnlaceAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.ListaCompra);
         app.MapDelete("/api/lista-compra/enlaces/{id:guid}", RevocarEnlaceAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.ListaCompra);
         app.MapPost("/api/lista-compra/qr", GenerarQrAsync).RequireAuthorization();
@@ -97,6 +98,14 @@ public static class ListaCompraEndpoints
         if (r.Error is { } error) return ApiComun.Respuesta(error);
         var e = r.Valor!;
         return Results.Created($"/api/lista-compra/enlaces/{e.Id}", new EnlaceListaCreado(e.Id, e.Token, e.CaducaEn));
+    }
+
+    /// <summary>GET /api/lista-compra/enlaces: los enlaces QR del hogar con su estado, sin token, del más reciente al más antiguo. 409 sin hogar.</summary>
+    private static async Task<IResult> ListarEnlacesAsync([FromServices] ServicioListaCompra servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
+    {
+        if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
+        var enlaces = await servicio.ListarEnlacesAsync(hogarId, ct);
+        return Results.Ok(enlaces.Select(e => new EnlaceListaDto(e.Id, e.CreadoPor, e.CreadoEn, e.CaducaEn, ReglasListaCompra.TextoEstado(e.Estado))).ToList());
     }
 
     /// <summary>DELETE /api/lista-compra/enlaces/{id}: revoca un enlace. 204; 404 si no es del hogar.</summary>

@@ -34,6 +34,14 @@ public record MarcarProductoCompraRequest(bool Comprado);
 /// <param name="CaducaEn">Caducidad del enlace.</param>
 public record EnlaceListaCreado(Guid Id, string Token, DateTimeOffset CaducaEn);
 
+/// <summary>Enlace QR de la lista de la compra tal como se lista. No lleva el token: solo se devuelve al crearlo.</summary>
+/// <param name="Id">Identificador del enlace (para revocarlo).</param>
+/// <param name="CreadoPor">Miembro que lo creó.</param>
+/// <param name="CreadoEn">Momento de creación.</param>
+/// <param name="CaducaEn">Caducidad, o null si no caduca.</param>
+/// <param name="Estado">«vigente», «revocado» o «caducado».</param>
+public record EnlaceListaDto(Guid Id, Guid CreadoPor, DateTimeOffset CreadoEn, DateTimeOffset? CaducaEn, string Estado);
+
 /// <summary>POST /api/lista-compra/qr: texto que codifica el QR en formato SVG.</summary>
 /// <param name="Texto">Texto a codificar (la URL de la lista, por ejemplo). Hasta 500 caracteres.</param>
 public record QrListaRequest(string Texto);

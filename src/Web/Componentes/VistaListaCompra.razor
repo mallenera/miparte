@@ -97,6 +97,25 @@
                     <p class="muted"><a href="@ModeloListaCompra.UrlPublica(BaseAplicacion, _m.Enlace.Token)">@ModeloListaCompra.UrlPublica(BaseAplicacion, _m.Enlace.Token)</a></p>
                     <button class="linkbtn danger" type="button" disabled="@_m.Enviando" @onclick="RevocarEnlaceAsync">Revocar el enlace</button>
                 }
+
+                @if (_m.Enlaces.Count > 0)
+                {
+                    <h3 class="u-titulo-form u-mt12">Enlaces creados</h3>
+                    <p class="muted">El código de un enlace solo se ve al crearlo. Si lo has perdido o ya no lo quieres, revócalo y crea otro.</p>
+                    @foreach (var e in _m.Enlaces)
+                    {
+                        <div class="gastorow" @key="e.Id">
+                            <div class="g-main">
+                                <div class="g-concepto">Creado el @e.CreadoEn.ToLocalTime().ToString("dd/MM/yyyy", Es) por @_m.Creador(e)</div>
+                                <div class="muted g-meta">@TextoEstado(e)</div>
+                            </div>
+                            @if (e.Estado == "vigente")
+                            {
+                                <button class="linkbtn danger" type="button" disabled="@_m.Enviando" aria-label="Revocar el enlace creado el @e.CreadoEn.ToLocalTime().ToString("dd/MM/yyyy", Es)" @onclick="() => RevocarAsync(e)">Revocar</button>
+                            }
+                        </div>
+                    }
+                }
             }
         }
 
@@ -110,6 +129,8 @@
 @code {
     /// <summary>Token del enlace QR si la lista se abre desde el QR; null para la lista del hogar.</summary>
     [Parameter] public string? Token { get; set; }
+
+    private static readonly System.Globalization.CultureInfo Es = new("es-ES");
 
     private ModeloListaCompra _m = null!;
     private Timer? _refresco;
@@ -146,6 +167,15 @@
     private async Task CrearEnlaceAsync() => await Mostrar(_m.CrearEnlaceAsync(BaseAplicacion));
 
     private async Task RevocarEnlaceAsync() => await Mostrar(_m.RevocarEnlaceAsync());
+
+    private async Task RevocarAsync(EnlaceListaDto e) => await Mostrar(_m.RevocarEnlaceAsync(e.Id));
+
+    private static string TextoEstado(EnlaceListaDto e) => e.Estado switch
+    {
+        "revocado" => "Revocado",
+        "caducado" => $"Caducó el {e.CaducaEn?.ToLocalTime().ToString("dd/MM/yyyy", Es)}",
+        _ => e.CaducaEn is { } c ? $"Vigente hasta el {c.ToLocalTime().ToString("dd/MM/yyyy", Es)}" : "Vigente",
+    };
 
     private async Task ActivarAsync(bool activa)
     {

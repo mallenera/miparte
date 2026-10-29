@@ -138,6 +138,7 @@ public sealed partial class ServidorDemo
             ("lista-compra", 3, "POST") when subruta == "productos" => await CrearProductoLista((await Cuerpo<CrearProductoCompraRequest>())!, ct),
             ("lista-compra", 4, "PUT") when subruta == "productos" && id is { } i => await MarcarProductoLista(i, (await Cuerpo<MarcarProductoCompraRequest>())!, ct),
             ("lista-compra", 4, "DELETE") when subruta == "productos" && id is { } i => Sin(await _lista.EliminarAsync(IdHogar, i, ct)),
+            ("lista-compra", 3, "GET") when subruta == "enlaces" => await ListarEnlacesLista(ct),
             ("lista-compra", 3, "POST") when subruta == "enlaces" => await CrearEnlaceLista(ct),
             ("lista-compra", 4, "DELETE") when subruta == "enlaces" && id is { } i => Sin(await _lista.RevocarEnlaceAsync(IdHogar, i, ct)),
             ("lista-compra", 3, "POST") when subruta == "qr" => await GenerarQrLista((await Cuerpo<QrListaRequest>())!),
@@ -372,6 +373,10 @@ public sealed partial class ServidorDemo
         var res = await _lista.MarcarAsync(IdHogar, id, r.Comprado, ct);
         return res.Error is { } e ? Error(e, mensajeEn404: true) : Ok(res.Valor!.ADto());
     }
+
+    private async Task<HttpResponseMessage> ListarEnlacesLista(CancellationToken ct)
+        => Ok((await _lista.ListarEnlacesAsync(IdHogar, ct))
+            .Select(e => new EnlaceListaDto(e.Id, e.CreadoPor, e.CreadoEn, e.CaducaEn, ReglasListaCompra.TextoEstado(e.Estado))).ToList());
 
     private async Task<HttpResponseMessage> CrearEnlaceLista(CancellationToken ct)
     {

@@ -22,6 +22,7 @@ public static class TextoAuditoria
         ("aportacion_cuenta", "Aportaciones a la cuenta común"), ("reembolso_cuenta", "Reembolsos de la cuenta común"), ("deuda_cuenta", "Deudas con la cuenta común"),
         ("ingreso_cuenta_comun", "Ingresos de la cuenta común"), ("deposito_ahorro", "Ingresos de ahorro"), ("retirada_ahorro", "Retiradas de ahorro"),
         ("perfil_reparto", "Perfiles de reparto"), ("categoria", "Categorías"),
+        ("producto_compra", "Productos de la lista de la compra"), ("enlace_lista_compra", "Enlaces QR de la lista de la compra"),
         ("miembro", "Miembros"), ("invitacion", "Invitaciones"), ("hogar", "Hogar"),
     ];
 
@@ -32,7 +33,8 @@ public static class TextoAuditoria
         ["aportacion_cuenta"] = "una aportación a la cuenta común", ["reembolso_cuenta"] = "un reembolso de la cuenta común", ["deuda_cuenta"] = "un movimiento de deuda con la cuenta común",
         ["ingreso_cuenta_comun"] = "un ingreso a la cuenta común", ["retirada_ahorro"] = "una retirada de ahorro", ["deposito_ahorro"] = "un ingreso de ahorro",
         ["perfil_reparto"] = "un perfil de reparto", ["categoria"] = "una categoría",
-        ["ciclo_liquidacion"] = "un cierre de liquidación",
+        ["ciclo_liquidacion"] = "un cierre de liquidación", ["producto_compra"] = "un producto de la lista de la compra",
+        ["enlace_lista_compra"] = "un enlace QR de la lista de la compra",
     };
 
     private static readonly Dictionary<string, string> Campos = new()
@@ -43,7 +45,8 @@ public static class TextoAuditoria
         ["responsableId"] = "Responsable", ["repartos"] = "Reparto", ["detalle"] = "Detalle", ["ahorro"] = "Ahorro",
         ["aCargoCuentaComun"] = "A cargo de la cuenta común", ["pagadoDesdeAhorro"] = "Pagado desde el ahorro",
         ["permisos"] = "Permisos", ["cuentaComunActiva"] = "Cuenta común activada", ["ahorroActivo"] = "Ahorro activado", ["recurrentesActivas"] = "Recurrentes activadas",
-        ["liquidacionModo"] = "Modo de liquidación",
+        ["liquidacionModo"] = "Modo de liquidación", ["listaCompraActiva"] = "Lista de la compra activada",
+        ["cantidad"] = "Cantidad", ["caducaEn"] = "Caduca", ["creadoEn"] = "Creado", ["comprado"] = "Comprado",
     };
 
     /// <summary>Frase del evento sin el autor: «creó un gasto "Compra"», «borró una categoría»…</summary>

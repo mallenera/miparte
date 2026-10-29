@@ -64,6 +64,11 @@ public sealed class RepositorioListaCompra(MiParteDbContext db) : IRepositorioLi
         => db.EnlacesListaCompra.IgnoreQueryFilters().FirstOrDefaultAsync(e => e.HogarId == hogarId && e.Id == id, ct);
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<EnlaceListaCompra>> EnlacesAsync(Guid hogarId, CancellationToken ct)
+        => await db.EnlacesListaCompra.IgnoreQueryFilters().AsNoTracking().Where(e => e.HogarId == hogarId)
+            .OrderByDescending(e => e.CreadoEn).ThenBy(e => e.Id).ToListAsync(ct);
+
+    /// <inheritdoc />
     public Task ActualizarEnlaceAsync(EnlaceListaCompra enlace, CancellationToken ct) => db.SaveChangesAsync(ct);
 
     /// <inheritdoc />

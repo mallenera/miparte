@@ -316,6 +316,56 @@ public class ServicioListaCompraTests
         Assert.Equal(TipoError.Conflicto, (await Servicio.PublicaAsync(e.Token, default)).Error!.Tipo);
     }
 
+    [Theory]
+    [InlineData(true, false, EstadoEnlaceLista.Vigente, "vigente")]
+    [InlineData(true, true, EstadoEnlaceLista.Caducado, "caducado")]
+    [InlineData(false, false, EstadoEnlaceLista.Revocado, "revocado")]
+    [InlineData(false, true, EstadoEnlaceLista.Revocado, "revocado")] // revocar manda sobre caducar
+    public void ElEstadoDeUnEnlace_DependeDeSiSeRevocoYDeSuCaducidad(bool activo, bool caducado, EstadoEnlaceLista esperado, string texto)
+    {
+        var ahora = _reloj.GetUtcNow();
+        DateTimeOffset? caduca = caducado ? ahora.AddMinutes(-1) : ahora.AddMinutes(1);
+
+        var estado = ReglasListaCompra.Estado(activo, caduca, ahora);
+
+        Assert.Equal(esperado, estado);
+        Assert.Equal(texto, ReglasListaCompra.TextoEstado(estado));
+        Assert.Equal(esperado == EstadoEnlaceLista.Vigente, ReglasListaCompra.Vigente(activo, caduca, ahora));
+    }
+
+    [Fact]
+    public async Task ListarEnlaces_DevuelveLosDelHogar_ConSuEstado_ElMasRecientePrimero_YSinToken()
+    {
+        var viejo = (await Servicio.CrearEnlaceAsync(Hogar, Ana, null, default)).Valor!;
+        _reloj.Avanzar(TimeSpan.FromHours(1));
+        var revocado = (await Servicio.CrearEnlaceAsync(Hogar, Ana, null, default)).Valor!;
+        await Servicio.RevocarEnlaceAsync(Hogar, revocado.Id, default);
+        _reloj.Avanzar(TimeSpan.FromHours(1));
+        var reciente = (await Servicio.CrearEnlaceAsync(Hogar, Ana, null, default)).Valor!;
+        var otroHogar = Guid.NewGuid();
+        _repo.Activas.Add(otroHogar);
+        await Servicio.CrearEnlaceAsync(otroHogar, Ana, null, default);
+        _reloj.Avanzar(ReglasListaCompra.VigenciaEnlace - TimeSpan.FromHours(1)); // el primero ya pasó de 7 días; el reciente aún no
+
+        var enlaces = await Servicio.ListarEnlacesAsync(Hogar, default);
+
+        Assert.Equal([reciente.Id, revocado.Id, viejo.Id], enlaces.Select(e => e.Id));
+        Assert.Equal([EstadoEnlaceLista.Vigente, EstadoEnlaceLista.Revocado, EstadoEnlaceLista.Caducado], enlaces.Select(e => e.Estado));
+        Assert.All(enlaces, e => Assert.Equal(Ana, e.CreadoPor));
+        // El resumen no tiene dónde llevar el token ni su hash.
+        Assert.DoesNotContain(typeof(ResumenEnlaceLista).GetProperties(), p => p.Name.Contains("Token", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ListarEnlaces_FuncionaConLaListaDesactivada_YSinEnlacesDevuelveVacio()
+    {
+        Assert.Empty(await Servicio.ListarEnlacesAsync(Hogar, default));
+        await Servicio.CrearEnlaceAsync(Hogar, Ana, null, default);
+        await Servicio.ActivarAsync(Hogar, false, default);
+
+        Assert.Single(await Servicio.ListarEnlacesAsync(Hogar, default));
+    }
+
     /// <summary>Reloj que el test mueve a mano.</summary>
     private sealed class RelojFalso(DateTimeOffset ahora) : TimeProvider
     {
@@ -367,6 +417,10 @@ public class ServicioListaCompraTests
 
         public Task<EnlaceListaCompra?> EnlaceAsync(Guid hogarId, Guid id, CancellationToken ct)
             => Task.FromResult(Enlaces.FirstOrDefault(e => e.HogarId == hogarId && e.Id == id));
+
+        public Task<IReadOnlyList<EnlaceListaCompra>> EnlacesAsync(Guid hogarId, CancellationToken ct)
+            => Task.FromResult<IReadOnlyList<EnlaceListaCompra>>(
+                Enlaces.Where(e => e.HogarId == hogarId).OrderByDescending(e => e.CreadoEn).ThenBy(e => e.Id).ToList());
 
         public Task ActualizarEnlaceAsync(EnlaceListaCompra enlace, CancellationToken ct) => Task.CompletedTask;
 

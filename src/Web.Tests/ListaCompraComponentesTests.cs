@@ -188,6 +188,76 @@ public class ListaCompraComponentesTests : BunitContext
         Assert.Empty(c.FindAll(".qr-lista"));
     }
 
+    private static EnlaceListaDto EnlaceDto(Guid id, string estado, DateTimeOffset? caduca) =>
+        new(id, AnaId, new DateTimeOffset(2026, 10, 20, 10, 0, 0, TimeSpan.Zero), caduca, estado);
+
+    private static readonly Guid AnaId = Guid.NewGuid();
+
+    [Fact]
+    public void Lista_los_enlaces_creados_con_su_estado_y_solo_deja_revocar_los_vigentes()
+    {
+        Guid vigente = Guid.NewGuid(), revocado = Guid.NewGuid(), caducado = Guid.NewGuid();
+        var api = Registrar(ApiConLista()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ApiFalsa.Miembro("Ana", esYo: true, id: AnaId) })
+            .Responde("GET /api/lista-compra/enlaces", HttpStatusCode.OK, new[]
+            {
+                EnlaceDto(vigente, "vigente", new DateTimeOffset(2026, 11, 3, 10, 0, 0, TimeSpan.Zero)),
+                EnlaceDto(revocado, "revocado", new DateTimeOffset(2026, 11, 3, 10, 0, 0, TimeSpan.Zero)),
+                EnlaceDto(caducado, "caducado", new DateTimeOffset(2026, 10, 27, 10, 0, 0, TimeSpan.Zero)),
+            }));
+
+        var c = Render<VistaListaCompra>();
+
+        Assert.Contains("Enlaces creados", c.Markup);
+        var filas = c.FindAll(".gastorow").Where(f => f.TextContent.Contains("Creado el")).ToList();
+        Assert.Equal(3, filas.Count);
+        Assert.Contains("por Ana", filas[0].TextContent);
+        Assert.Contains("Vigente hasta el 03/11/2026", filas[0].TextContent);
+        Assert.Contains("Revocado", filas[1].TextContent);
+        Assert.Contains("Caducó el 27/10/2026", filas[2].TextContent);
+        // Solo el vigente tiene botón de revocar.
+        Assert.Single(c.FindAll("button.linkbtn.danger").Where(b => b.TextContent == "Revocar"));
+        Assert.Contains("El código de un enlace solo se ve al crearlo", c.Markup);
+    }
+
+    [Fact]
+    public void Revoca_un_enlace_antiguo_desde_la_lista()
+    {
+        var vigente = Guid.NewGuid();
+        var api = Registrar(ApiConLista()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ApiFalsa.Miembro("Ana", esYo: true, id: AnaId) })
+            .Responde("GET /api/lista-compra/enlaces", HttpStatusCode.OK, new[] { EnlaceDto(vigente, "vigente", null) })
+            .Responde($"DELETE /api/lista-compra/enlaces/{vigente}", HttpStatusCode.NoContent));
+        var c = Render<VistaListaCompra>();
+
+        Assert.Contains("Vigente", c.Find(".gastorow").TextContent);
+        c.Find("button.linkbtn.danger").Click();
+
+        Assert.Contains($"DELETE /api/lista-compra/enlaces/{vigente}", api.Recibidas);
+    }
+
+    [Fact]
+    public void Sin_el_permiso_de_la_lista_no_se_ven_los_enlaces()
+    {
+        var api = Registrar(ApiConLista()
+            .Responde("GET /api/lista-compra/enlaces", HttpStatusCode.OK, new[] { EnlaceDto(Guid.NewGuid(), "vigente", null) }), []);
+
+        var c = Render<VistaListaCompra>();
+
+        Assert.DoesNotContain("Enlaces creados", c.Markup);
+    }
+
+    [Fact]
+    public void Sin_enlaces_creados_no_aparece_la_seccion()
+    {
+        Registrar(ApiConLista());
+
+        var c = Render<VistaListaCompra>();
+
+        Assert.DoesNotContain("Enlaces creados", c.Markup);
+        Assert.Contains("Crear código QR", c.Markup);
+    }
+
     [Fact]
     public void EnlaceQr_AbreLaListaSinSesion_ConLaCabeceraDelToken_YSinGestion()
     {

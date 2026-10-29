@@ -30,5 +30,30 @@ public static class ReglasListaCompra
 
     /// <summary>Si un enlace sigue admitiendo añadir o marcar: no revocado y sin caducar en <paramref name="ahora"/>.</summary>
     public static bool Vigente(bool activo, DateTimeOffset? caducaEn, DateTimeOffset ahora)
-        => activo && (caducaEn is null || caducaEn > ahora);
+        => Estado(activo, caducaEn, ahora) == EstadoEnlaceLista.Vigente;
+
+    /// <summary>Estado de un enlace en <paramref name="ahora"/>: revocado si se revocó (aunque haya caducado), caducado si ya pasó su fecha, vigente si no.</summary>
+    public static EstadoEnlaceLista Estado(bool activo, DateTimeOffset? caducaEn, DateTimeOffset ahora)
+        => !activo ? EstadoEnlaceLista.Revocado : caducaEn is { } c && c <= ahora ? EstadoEnlaceLista.Caducado : EstadoEnlaceLista.Vigente;
+
+    /// <summary>Texto con que viaja el estado en la API.</summary>
+    public static string TextoEstado(EstadoEnlaceLista estado) => estado switch
+    {
+        EstadoEnlaceLista.Revocado => "revocado",
+        EstadoEnlaceLista.Caducado => "caducado",
+        _ => "vigente",
+    };
+}
+
+/// <summary>Estado de un enlace QR de la lista de la compra.</summary>
+public enum EstadoEnlaceLista
+{
+    /// <summary>Admite ver, añadir y marcar productos.</summary>
+    Vigente,
+
+    /// <summary>Un miembro lo revocó.</summary>
+    Revocado,
+
+    /// <summary>Pasó su fecha de caducidad sin revocarse.</summary>
+    Caducado,
 }

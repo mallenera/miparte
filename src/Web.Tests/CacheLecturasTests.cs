@@ -40,6 +40,21 @@ public class CacheLecturasTests
     private int Peticiones(string metodoYRuta) => _api.Recibidas.Count(r => r == metodoYRuta);
 
     [Fact]
+    public async Task Los_enlaces_de_la_lista_de_la_compra_no_se_cachean_y_se_ven_nada_mas_crear_uno()
+    {
+        _api.Responde("GET /api/lista-compra/enlaces", HttpStatusCode.OK, Array.Empty<EnlaceListaDto>())
+            .Responde("POST /api/lista-compra/enlaces", HttpStatusCode.Created, new EnlaceListaCreado(Guid.NewGuid(), "t", DateTimeOffset.UtcNow));
+        var api = await ClienteAsync();
+
+        await api.ListarEnlacesListaCompraAsync();
+        await api.CrearEnlaceListaCompraAsync();
+        await api.ListarEnlacesListaCompraAsync();
+
+        // Con caché, la segunda lectura saldría de la memoria y no mostraría el enlace recién creado.
+        Assert.Equal(2, _api.Recibidas.Count(r => r == "GET /api/lista-compra/enlaces"));
+    }
+
+    [Fact]
     public async Task Repetir_la_lectura_no_vuelve_a_pedirla_a_la_api()
     {
         var api = await ClienteAsync();

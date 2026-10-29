@@ -35,6 +35,9 @@ public interface IRepositorioListaCompra
     /// <summary>Un enlace del hogar, o null si no es de ese hogar.</summary>
     Task<EnlaceListaCompra?> EnlaceAsync(Guid hogarId, Guid id, CancellationToken ct);
 
+    /// <summary>Todos los enlaces del hogar, del más reciente al más antiguo (con su hash, nunca el token).</summary>
+    Task<IReadOnlyList<EnlaceListaCompra>> EnlacesAsync(Guid hogarId, CancellationToken ct);
+
     /// <summary>Guarda los cambios de un enlace ya leído (p. ej. al revocarlo).</summary>
     Task ActualizarEnlaceAsync(EnlaceListaCompra enlace, CancellationToken ct);
 

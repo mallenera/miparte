@@ -308,6 +308,51 @@ public class ListaCompraHttpTests
     }
 
     [Fact]
+    public async Task ListarEnlaces_LoPuedeHacerCualquierMiembro_SinTokenNiHash_YSoloDelPropioHogar()
+    {
+        var e = await Montar(true); // Beto no tiene ningún permiso
+        var otro = await OtroHogarAsync(e.Fabrica);
+        var propio = await CrearEnlace(e.Admin);
+        await CrearEnlace(otro);
+
+        var respuesta = await e.Miembro.GetAsync("/api/lista-compra/enlaces");
+        var texto = await respuesta.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
+        var lista = JsonSerializer.Deserialize<List<EnlaceListaDto>>(texto, Web)!;
+        var enlace = Assert.Single(lista);
+        Assert.Equal((propio.Id, "vigente", e.AdminId), (enlace.Id, enlace.Estado, enlace.CreadoPor));
+        Assert.DoesNotContain(propio.Token, texto);
+        Assert.DoesNotContain("token", texto, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ListarEnlaces_MuestraElEstadoActualizado_TrasRevocar()
+    {
+        var e = await Montar(true);
+        var uno = await CrearEnlace(e.Admin);
+        var dos = await CrearEnlace(e.Admin);
+        await e.Admin.DeleteAsync($"/api/lista-compra/enlaces/{uno.Id}");
+
+        var lista = await Leer<List<EnlaceListaDto>>(await e.Admin.GetAsync("/api/lista-compra/enlaces"));
+
+        Assert.Equal(2, lista.Count);
+        Assert.Equal("revocado", lista.Single(x => x.Id == uno.Id).Estado);
+        Assert.Equal("vigente", lista.Single(x => x.Id == dos.Id).Estado);
+    }
+
+    [Fact]
+    public async Task ListarEnlaces_SinSesion_Es401_YConLaListaDesactivadaSigueFuncionando()
+    {
+        var e = await Montar(true);
+        await CrearEnlace(e.Admin);
+        await e.Admin.PutAsJsonAsync("/api/lista-compra/activacion", new ActivarListaCompraRequest(false));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await e.Anonimo.GetAsync("/api/lista-compra/enlaces")).StatusCode);
+        Assert.Single(await Leer<List<EnlaceListaDto>>(await e.Admin.GetAsync("/api/lista-compra/enlaces")));
+    }
+
+    [Fact]
     public async Task RutasPrivadas_SinSesion_Responden401()
     {
         var e = await Montar(true);

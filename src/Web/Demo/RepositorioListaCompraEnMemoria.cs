@@ -41,6 +41,10 @@ internal sealed class RepositorioListaCompraEnMemoria(AlmacenDemo a) : IReposito
     public Task<EnlaceListaCompra?> EnlaceAsync(Guid hogarId, Guid id, CancellationToken ct)
         => Task.FromResult(a.EnlacesListaCompra.FirstOrDefault(e => e.HogarId == hogarId && e.Id == id));
 
+    public Task<IReadOnlyList<EnlaceListaCompra>> EnlacesAsync(Guid hogarId, CancellationToken ct)
+        => Task.FromResult<IReadOnlyList<EnlaceListaCompra>>(
+            a.EnlacesListaCompra.Where(e => e.HogarId == hogarId).OrderByDescending(e => e.CreadoEn).ThenBy(e => e.Id).ToList());
+
     public Task ActualizarEnlaceAsync(EnlaceListaCompra enlace, CancellationToken ct) => Task.CompletedTask;
 
     public Task<EnlaceListaCompra?> EnlacePorHashAsync(string tokenHash, CancellationToken ct)

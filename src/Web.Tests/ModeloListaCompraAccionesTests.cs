@@ -188,6 +188,117 @@ public class ModeloListaCompraAccionesTests
         Assert.DoesNotContain("POST /api/lista-compra/productos", api.Recibidas);
     }
 
+    private static readonly Guid AnaId = Guid.NewGuid();
+
+    private static EnlaceListaDto Enlace(Guid id, string estado, DateTimeOffset? caduca = null)
+        => new(id, AnaId, new DateTimeOffset(2026, 10, 20, 10, 0, 0, TimeSpan.Zero), caduca, estado);
+
+    [Fact]
+    public async Task Al_cargar_una_lista_activa_trae_los_enlaces_y_los_nombres_de_quien_los_creo()
+    {
+        var id = Guid.NewGuid();
+        var api = Api()
+            .Responde("GET /api/lista-compra/enlaces", HttpStatusCode.OK, new[] { Enlace(id, "vigente") })
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ApiFalsa.Miembro("Ana", id: AnaId) });
+        var m = new ModeloListaCompra(Cliente(api));
+
+        await m.CargarAsync();
+
+        var enlace = Assert.Single(m.Enlaces);
+        Assert.Equal("Ana", m.Creador(enlace));
+        Assert.Equal([id], m.EnlacesVigentes.Select(e => e.Id));
+    }
+
+    [Fact]
+    public async Task Una_lista_desactivada_no_pide_los_enlaces()
+    {
+        var api = Api(activa: false);
+        var m = new ModeloListaCompra(Cliente(api));
+
+        await m.CargarAsync();
+
+        Assert.Empty(m.Enlaces);
+        Assert.DoesNotContain("GET /api/lista-compra/enlaces", api.Recibidas);
+    }
+
+    [Fact]
+    public async Task Si_fallan_los_enlaces_o_los_miembros_la_lista_sigue_sirviendo()
+    {
+        var api = Api()
+            .Error("GET /api/lista-compra/enlaces", HttpStatusCode.InternalServerError, "boom")
+            .Error("GET /api/miembros", HttpStatusCode.InternalServerError, "boom");
+        var m = new ModeloListaCompra(Cliente(api));
+
+        await m.CargarAsync();
+
+        Assert.Null(m.Error);
+        Assert.Equal(2, m.Productos.Count);
+        Assert.Empty(m.Enlaces);
+    }
+
+    [Fact]
+    public async Task Se_puede_revocar_un_enlace_antiguo_y_la_lista_de_enlaces_se_recarga()
+    {
+        var viejo = Guid.NewGuid();
+        var revocado = false;
+        var api = Api()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ApiFalsa.Miembro("Ana", id: AnaId) })
+            .Responde("GET /api/lista-compra/enlaces", _ => ApiFalsa.Json(HttpStatusCode.OK, new[] { Enlace(viejo, revocado ? "revocado" : "vigente") }))
+            .Responde($"DELETE /api/lista-compra/enlaces/{viejo}", _ =>
+            {
+                revocado = true;
+                return ApiFalsa.Json(HttpStatusCode.NoContent, null);
+            });
+        var m = new ModeloListaCompra(Cliente(api));
+        await m.CargarAsync();
+        Assert.Single(m.EnlacesVigentes);
+
+        var aviso = await m.RevocarEnlaceAsync(viejo);
+
+        Assert.Equal("Enlace revocado", aviso);
+        Assert.Empty(m.EnlacesVigentes);
+        Assert.Equal("revocado", Assert.Single(m.Enlaces).Estado);
+    }
+
+    [Fact]
+    public async Task Revocar_el_enlace_recien_creado_borra_tambien_su_qr()
+    {
+        var id = Guid.NewGuid();
+        var api = Api()
+            .Responde("POST /api/lista-compra/enlaces", HttpStatusCode.Created, new EnlaceListaCreado(id, "tok", DateTimeOffset.UtcNow.AddDays(7)))
+            .Responde("POST /api/lista-compra/qr", HttpStatusCode.OK, new QrListaResponse("<svg/>"))
+            .Responde($"DELETE /api/lista-compra/enlaces/{id}", HttpStatusCode.NoContent);
+        var m = new ModeloListaCompra(Cliente(api));
+        await m.CargarAsync();
+        await m.CrearEnlaceAsync("https://mi.app");
+
+        await m.RevocarEnlaceAsync(id);
+
+        Assert.Null(m.Enlace);
+        Assert.Null(m.Qr);
+        // Al crear y al revocar se vuelve a pedir la lista de enlaces.
+        Assert.True(api.Recibidas.Count(r => r == "GET /api/lista-compra/enlaces") >= 3);
+    }
+
+    [Fact]
+    public async Task Revocar_un_enlace_antiguo_no_toca_el_qr_del_que_se_acaba_de_crear()
+    {
+        var nuevo = Guid.NewGuid();
+        var viejo = Guid.NewGuid();
+        var api = Api()
+            .Responde("POST /api/lista-compra/enlaces", HttpStatusCode.Created, new EnlaceListaCreado(nuevo, "tok", DateTimeOffset.UtcNow.AddDays(7)))
+            .Responde("POST /api/lista-compra/qr", HttpStatusCode.OK, new QrListaResponse("<svg/>"))
+            .Responde($"DELETE /api/lista-compra/enlaces/{viejo}", HttpStatusCode.NoContent);
+        var m = new ModeloListaCompra(Cliente(api));
+        await m.CargarAsync();
+        await m.CrearEnlaceAsync("https://mi.app");
+
+        await m.RevocarEnlaceAsync(viejo);
+
+        Assert.Equal(nuevo, m.Enlace!.Id);
+        Assert.Equal("<svg/>", m.Qr);
+    }
+
     [Theory]
     [InlineData("1", true)]
     [InlineData("999", true)]

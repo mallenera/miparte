@@ -13,6 +13,14 @@ public sealed record ListaPublica(IReadOnlyList<ProductoListaCompra> Productos);
 /// <param name="CaducaEn">Caducidad del enlace.</param>
 public sealed record EnlaceListaEmitido(Guid Id, string Token, DateTimeOffset CaducaEn);
 
+/// <summary>Un enlace QR tal como se lista: sin el token, que solo se conoce al crearlo.</summary>
+/// <param name="Id">Identificador del enlace.</param>
+/// <param name="CreadoPor">Miembro que lo creó.</param>
+/// <param name="CreadoEn">Momento de creación.</param>
+/// <param name="CaducaEn">Caducidad, o null si no caduca.</param>
+/// <param name="Estado">Vigente, revocado o caducado en el momento de la consulta.</param>
+public sealed record ResumenEnlaceLista(Guid Id, Guid CreadoPor, DateTimeOffset CreadoEn, DateTimeOffset? CaducaEn, EstadoEnlaceLista Estado);
+
 /// <summary>Casos de uso de la lista de la compra: productos, activación del hogar y enlaces para añadir por QR.</summary>
 public sealed class ServicioListaCompra(IRepositorioListaCompra repositorio, TimeProvider reloj)
 {
@@ -80,6 +88,15 @@ public sealed class ServicioListaCompra(IRepositorioListaCompra repositorio, Tim
         };
         await repositorio.GuardarEnlaceAsync(enlace, ct);
         return Resultado<EnlaceListaEmitido>.Ok(new EnlaceListaEmitido(enlace.Id, token, caduca));
+    }
+
+    /// <summary>Enlaces QR del hogar con su estado, del más reciente al más antiguo; se devuelven aunque la lista esté desactivada.</summary>
+    public async Task<IReadOnlyList<ResumenEnlaceLista>> ListarEnlacesAsync(Guid hogarId, CancellationToken ct)
+    {
+        var ahora = reloj.GetUtcNow();
+        return (await repositorio.EnlacesAsync(hogarId, ct))
+            .Select(e => new ResumenEnlaceLista(e.Id, e.CreadoPor, e.CreadoEn, e.CaducaEn, ReglasListaCompra.Estado(e.Activo, e.CaducaEn, ahora)))
+            .ToList();
     }
 
     /// <summary>Revoca un enlace: deja de admitir cambios, pero se conserva. No encontrado si no es del hogar.</summary>

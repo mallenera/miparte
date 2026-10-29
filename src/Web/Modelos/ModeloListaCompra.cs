@@ -39,6 +39,15 @@ public sealed class ModeloListaCompra(CoreApiClient api, string? token = null)
     /// <summary>Último error, o null.</summary>
     public string? Error { get; private set; }
 
+    /// <summary>Enlaces QR del hogar, del más reciente al más antiguo. Sin token: solo se conoce al crearlo.</summary>
+    public List<EnlaceListaDto> Enlaces { get; private set; } = [];
+
+    /// <summary>Miembros del hogar, para mostrar quién creó cada enlace.</summary>
+    public List<MiembroDto> Miembros { get; private set; } = [];
+
+    /// <summary>Enlaces que todavía admiten cambios.</summary>
+    public IEnumerable<EnlaceListaDto> EnlacesVigentes => Enlaces.Where(e => e.Estado == "vigente");
+
     /// <summary>Enlace QR creado en esta sesión de la página, si lo hay. El token solo está aquí.</summary>
     public EnlaceListaCreado? Enlace { get; private set; }
 
@@ -145,18 +154,32 @@ public sealed class ModeloListaCompra(CoreApiClient api, string? token = null)
     {
         Enlace = await api.CrearEnlaceListaCompraAsync();
         Qr = (await api.GenerarQrListaCompraAsync(UrlPublica(baseAplicacion, Enlace.Token))).Svg;
+        await RecargarEnlacesAsync();
         return "Enlace QR creado";
     });
 
     /// <summary>Revoca el enlace QR de esta página; deja de admitir cambios.</summary>
-    public Task<string?> RevocarEnlaceAsync() => EjecutarAsync(async () =>
+    public Task<string?> RevocarEnlaceAsync()
+        => Enlace is null ? Task.FromResult<string?>("No hay enlace que revocar") : RevocarEnlaceAsync(Enlace.Id);
+
+    /// <summary>Revoca un enlace QR de la lista (también uno antiguo, que ya no se puede mostrar); deja de admitir cambios.</summary>
+    /// <param name="id">Enlace a revocar.</param>
+    public Task<string?> RevocarEnlaceAsync(Guid id) => EjecutarAsync(async () =>
     {
-        if (Enlace is null) return "No hay enlace que revocar";
-        await api.RevocarEnlaceListaCompraAsync(Enlace.Id);
-        Enlace = null;
-        Qr = null;
+        await api.RevocarEnlaceListaCompraAsync(id);
+        if (Enlace?.Id == id)
+        {
+            Enlace = null;
+            Qr = null;
+        }
+
+        await RecargarEnlacesAsync();
         return "Enlace revocado";
     });
+
+    /// <summary>Nombre de quien creó un enlace.</summary>
+    /// <param name="enlace">Enlace listado.</param>
+    public string Creador(EnlaceListaDto enlace) => MiParte.Web.Formato.NombreMiembro(enlace.CreadoPor, Miembros);
 
     /// <summary>Dirección de la lista pública para un token, sobre la base de la aplicación.</summary>
     /// <param name="baseAplicacion">Dirección base de la aplicación web.</param>
@@ -176,6 +199,33 @@ public sealed class ModeloListaCompra(CoreApiClient api, string? token = null)
         var del = await api.ObtenerListaCompraAsync();
         Activa = del.Activa;
         Productos = del.Productos.ToList();
+        if (Activa && Miembros.Count == 0) await RecargarMiembrosAsync();
+        if (Activa) await RecargarEnlacesAsync();
+    }
+
+    // Los enlaces y los nombres de quien los creó son información secundaria: si fallan, la lista sigue sirviendo.
+    private async Task RecargarEnlacesAsync()
+    {
+        try
+        {
+            Enlaces = await api.ListarEnlacesListaCompraAsync();
+        }
+        catch (ApiException)
+        {
+            Enlaces = [];
+        }
+    }
+
+    private async Task RecargarMiembrosAsync()
+    {
+        try
+        {
+            Miembros = await api.ListarMiembrosAsync();
+        }
+        catch (ApiException)
+        {
+            Miembros = [];
+        }
     }
 
     private async Task<string?> EjecutarAsync(Func<Task<string?>> operacion)

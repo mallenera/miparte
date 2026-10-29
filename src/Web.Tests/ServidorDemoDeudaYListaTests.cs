@@ -209,6 +209,26 @@ public class ServidorDemoDeudaYListaTests
     }
 
     [Fact]
+    public async Task La_demo_lista_los_enlaces_con_su_estado_y_permite_revocar_uno_antiguo()
+    {
+        var api = Cliente();
+        var primero = await api.CrearEnlaceListaCompraAsync();
+        var segundo = await api.CrearEnlaceListaCompraAsync();
+
+        await api.RevocarEnlaceListaCompraAsync(primero.Id);
+        var enlaces = await api.ListarEnlacesListaCompraAsync();
+
+        Assert.Equal(2, enlaces.Count);
+        Assert.Equal("revocado", enlaces.Single(e => e.Id == primero.Id).Estado);
+        Assert.Equal("vigente", enlaces.Single(e => e.Id == segundo.Id).Estado);
+        // El listado no lleva el token: solo se conoce al crear el enlace.
+        Assert.DoesNotContain(typeof(EnlaceListaDto).GetProperties(), p => p.Name.Contains("Token", StringComparison.OrdinalIgnoreCase));
+        var revocado = await Assert.ThrowsAsync<ApiException>(() => api.ObtenerListaPublicaAsync(primero.Token));
+        Assert.Equal(HttpStatusCode.Conflict, revocado.Codigo);
+        Assert.Empty((await api.ObtenerListaPublicaAsync(segundo.Token)).Productos); // el vigente sigue sirviendo
+    }
+
+    [Fact]
     public async Task Un_token_desconocido_no_encuentra_la_lista()
     {
         var api = Cliente();

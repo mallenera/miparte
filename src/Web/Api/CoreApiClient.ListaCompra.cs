@@ -44,6 +44,11 @@ public sealed partial class CoreApiClient
     public Task<EnlaceListaCreado> CrearEnlaceListaCompraAsync(CancellationToken ct = default) =>
         _nucleo.EnviarAsync<EnlaceListaCreado>(HttpMethod.Post, "api/lista-compra/enlaces", null, ct);
 
+    /// <summary>Enlaces QR del hogar con su estado, sin token (<c>GET /api/lista-compra/enlaces</c>).</summary>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<List<EnlaceListaDto>> ListarEnlacesListaCompraAsync(CancellationToken ct = default) =>
+        _nucleo.ObtenerAsync<List<EnlaceListaDto>>("api/lista-compra/enlaces", ct); // sin caché: cambia con cada enlace que se crea o revoca
+
     /// <summary>Revoca un enlace QR (<c>DELETE /api/lista-compra/enlaces/{id}</c>).</summary>
     /// <param name="id">Enlace a revocar.</param>
     /// <param name="ct">Token de cancelación.</param>

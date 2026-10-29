@@ -613,18 +613,21 @@ public class ComponentesTests : BunitContext
     }
 
     [Fact]
-    public void Cuenta_comun_muestra_saldo_y_avisa_si_no_cubre_los_gastos()
+    public void Cuenta_comun_avisa_si_el_ahorro_no_cubre_lo_que_debe_y_dice_cuanto_falta()
     {
         var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
+        // El ahorro debe 112,95 a las personas y tiene 80,94 disponibles: faltan 32,01.
+        var estado = new CuentaComunResponse(
+            "2026-10", 1000m, 1000m, 0m, 0m, [new PendienteCuentaDto(AnaId, "Ana", 112.95m, true)], 1000m, [], [], AhorroDisponible: 80.94m);
         var api = new ApiFalsa()
             .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
-            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, Cuenta(-50m));
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, estado);
         Registrar(api);
 
         var c = Render<VistaCuentaComun>();
 
-        Assert.Contains("La cuenta no cubre los gastos", c.Markup);
-        Assert.Contains("50,00", c.Find(".aviso.warn").TextContent);
+        Assert.Contains("El ahorro no cubre lo que debe a las personas: faltan 32,01", c.Find(".aviso.warn").TextContent);
+        Assert.Contains("falta reembolsar 112,95", c.Find("#reembolsos-por-persona").TextContent);
     }
 
     [Fact]
@@ -878,8 +881,23 @@ public class ComponentesTests : BunitContext
         var c = Render<VistaResumen>();
 
         var ana = c.FindAll("#resumen-personas tbody tr")[0].QuerySelectorAll("td");
-        Assert.Contains("Debe a la cuenta común", c.Markup);
+        Assert.Contains("Cuenta común", c.Markup);
+        Assert.Contains("la cuenta le debe", ana[2].TextContent);
         Assert.Contains("100,00", ana[2].TextContent);
+    }
+
+    [Fact]
+    public void Resumen_cuenta_comun_en_negativo_indica_que_la_persona_debe_a_la_cuenta()
+    {
+        var resumen = new ResumenMensualResponse("2026-10", 0m,
+            [new ResumenMiembroDto(AnaId, "Ana", 0m, 0m, -15m), new ResumenMiembroDto(LuisId, "Luis", 0m, 0m)], []);
+        Registrar(ApiResumen(resumen, Liquidacion(0m)));
+
+        var c = Render<VistaResumen>();
+
+        var ana = c.FindAll("#resumen-personas tbody tr")[0].QuerySelectorAll("td");
+        Assert.Contains("debe a la cuenta", ana[2].TextContent);
+        Assert.Contains("15,00", ana[2].TextContent);
     }
 
     [Fact]

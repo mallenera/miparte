@@ -1,0 +1,27 @@
+@* Avisos de la cuenta común (ahorro o efectivo que no alcanzan) y lo que falta por reembolsar a cada persona. La usan la pestaña Cuenta común y Resumen. *@
+@foreach (var aviso in AvisosCuentaComun.Avisos(Estado))
+{
+    <div class="aviso warn u-mt12" role="status">@aviso</div>
+}
+
+<div class="u-mt12" id="reembolsos-por-persona">
+    <h3 class="u-titulo-form">Falta por reembolsar</h3>
+    @if (_personas.Count == 0)
+    {
+        <div class="empty">Nadie tiene nada pendiente con la cuenta.</div>
+    }
+    @foreach (var persona in _personas)
+    {
+        <div class="catrow">
+            <div class="c-name">@persona.Nombre</div>
+            <div class="c-sel">@string.Join(" · ", AvisosCuentaComun.Lineas(persona))</div>
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>Estado de la cuenta del mes que se muestra.</summary>
+    [Parameter, EditorRequired] public CuentaComunResponse Estado { get; set; } = default!;
+
+    private IReadOnlyList<PersonaCuenta> _personas => AvisosCuentaComun.PorPersona(Estado.Pendientes);
+}

@@ -59,12 +59,7 @@ else if (_m.Estado is not null)
             <div class="u-mt12"><TablaResumenCuenta Resumen="res" /></div>
         }
 
-        @if (_m.Estado.Saldo < 0)
-        {
-            <div class="aviso warn u-mt12" role="status">
-                La cuenta no cubre los gastos: faltan @Formato.Euros(-_m.Estado.Saldo) para cubrirlos.
-            </div>
-        }
+        <AvisosCuenta Estado="_m.Estado" />
     </section>
 
     @if (_m.Estado.Extracto is { } x)
@@ -220,7 +215,7 @@ else if (_m.Estado is not null)
         {
             <div class="catrow">
                 <div class="c-name">@p.Nombre</div>
-                <div class="c-sel">La cuenta le debe @Formato.Euros(p.Importe) · @(p.DesdeAhorro ? "del ahorro" : "de Hogar")</div>
+                <div class="c-sel">@(p.Importe > 0 ? "La cuenta le debe" : "Debe a la cuenta") @Formato.Euros(Math.Abs(p.Importe)) · @(p.DesdeAhorro ? "del ahorro" : "de Hogar")</div>
             </div>
         }
 

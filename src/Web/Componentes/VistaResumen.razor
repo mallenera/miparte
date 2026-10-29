@@ -34,7 +34,7 @@ else if (_m.Resumen is not null && _m.Liquidacion is not null)
 
     <section class="card" aria-labelledby="t-resumen">
         <div class="card-head"><h2 id="t-resumen">Resumen del mes</h2></div>
-        <p class="muted">Por persona: lo que ha pagado, lo que le corresponde, lo que debe a la cuenta común y su saldo de liquidación.</p>
+        <p class="muted">Por persona: lo que ha pagado, lo que le corresponde, su saldo con la cuenta común y su saldo de liquidación.</p>
 
         @if (_m.Liquidacion.Saldos.Count > 1)
         {
@@ -80,7 +80,7 @@ else if (_m.Resumen is not null && _m.Liquidacion is not null)
                             <th scope="col"><span class="sr">Persona</span></th>
                             <th scope="col">Ha pagado</th>
                             <th scope="col">Le corresponden</th>
-                            <th scope="col">Debe a la cuenta común</th>
+                            <th scope="col">Cuenta común</th>
                             <th scope="col">Liquidación</th>
                         </tr>
                     </thead>
@@ -92,7 +92,17 @@ else if (_m.Resumen is not null && _m.Liquidacion is not null)
                                 <th scope="row"><div class="c-name"><Avatar Nombre="@m.Nombre" Color="@ColorMiembro.De(m.MiembroId, _m.Miembros)" Tamano="sm" /> @m.Nombre</div></th>
                                 <td>@Formato.Euros(m.Pagado)</td>
                                 <td>@Formato.Euros(m.Asumido)</td>
-                                <td><b>@Formato.Euros(m.DebeCuentaComun)</b></td>
+                                <td>
+                                    @if (m.DebeCuentaComun != 0m)
+                                    {
+                                        <b class="g-importe saldo @(m.DebeCuentaComun > 0 ? "pos" : "neg")">@Saldo(m.DebeCuentaComun)</b>
+                                        <span>@(m.DebeCuentaComun > 0 ? "la cuenta le debe" : "debe a la cuenta")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="muted">—</span>
+                                    }
+                                </td>
                                 <td>
                                     @if (liquidacion is { } l)
                                     {
@@ -112,7 +122,7 @@ else if (_m.Resumen is not null && _m.Liquidacion is not null)
         }
     </section>
 
-    @if (_m.Resumen.CuentaComun is { } cuenta)
+    @if (_m.Resumen.CuentaComun is not null)
     {
         <section class="card" aria-labelledby="t-cuenta-resumen">
             <div class="card-head"><h2 id="t-cuenta-resumen">Cuenta común</h2></div>
@@ -121,9 +131,9 @@ else if (_m.Resumen is not null && _m.Liquidacion is not null)
             {
                 <div class="u-mt12"><TablaResumenCuenta Resumen="filas" /></div>
             }
-            @if (cuenta.Saldo < 0)
+            @if (_m.CuentaComun is { } estadoCuenta)
             {
-                <div class="aviso warn u-mt12" role="status">La cuenta no cubre los gastos: faltan @Formato.Euros(-cuenta.Saldo).</div>
+                <AvisosCuenta Estado="estadoCuenta" />
             }
             <a class="linkbtn u-mt8-inline" href="cuenta-comun">Ver la cuenta común</a>
         </section>

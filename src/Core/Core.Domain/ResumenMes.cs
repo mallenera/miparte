@@ -13,8 +13,11 @@ public sealed record HistoricoCuenta(
 /// <summary>Importe asociado a un miembro.</summary>
 public sealed record ImporteMiembro(Guid MiembroId, decimal Importe);
 
-/// <summary>Lo pagado, asumido, pendiente de reembolso y personal de un miembro en el mes.</summary>
-public sealed record ResumenMiembro(Guid MiembroId, string Nombre, decimal Pagado, decimal Asumido, decimal PendienteCuenta, decimal Personal);
+/// <summary>
+/// Lo pagado, asumido, saldo con la cuenta común y personal de un miembro en el mes. El saldo es neto: positivo si la cuenta
+/// le debe a la persona, negativo si ella le debe a la cuenta (p. ej. por un adelanto que aún no devolvió).
+/// </summary>
+public sealed record ResumenMiembro(Guid MiembroId, string Nombre, decimal Pagado, decimal Asumido, decimal SaldoCuenta, decimal Personal);
 
 /// <summary>Gasto de una categoría en el mes y lo que asume cada miembro.</summary>
 public sealed record ResumenCategoria(Guid CategoriaId, string Nombre, decimal Total, IReadOnlyList<ImporteMiembro> PorMiembro);
@@ -53,7 +56,7 @@ public static class ResumenMes
         var implicados = miembros.Where(m => m.Activo && m.Tipo == TipoMiembro.Adulto).Select(m => m.Id)
             .Concat(gastos.Where(g => g.PagadoPor is not null).Select(g => g.PagadoPor!.Value))
             .Concat(gastos.SelectMany(g => g.Repartos).Select(r => r.MiembroId))
-            .Concat(cuenta.Pendientes.Where(p => p.Importe > 0m).Select(p => p.MiembroId))
+            .Concat(cuenta.Pendientes.Where(p => p.Importe != 0m).Select(p => p.MiembroId))
             .Concat(personales.Select(g => g.PagadoPor!.Value))
             .ToHashSet();
         var porMiembro = miembros.Where(m => implicados.Contains(m.Id)).OrderBy(m => m.Nombre).ThenBy(m => m.Id)
@@ -61,7 +64,7 @@ public static class ResumenMes
                 m.Id, m.Nombre,
                 gastos.Where(g => g.PagadoPor == m.Id).Sum(g => g.Importe),
                 gastos.SelectMany(g => g.Repartos).Where(r => r.MiembroId == m.Id).Sum(r => r.ImporteAsumido),
-                Math.Max(0m, cuenta.Pendientes.Where(p => p.MiembroId == m.Id).Sum(p => p.Importe)),
+                cuenta.Pendientes.Where(p => p.MiembroId == m.Id).Sum(p => p.Importe),
                 personales.Where(g => g.PagadoPor == m.Id).Sum(g => g.Importe)))
             .ToList();
 

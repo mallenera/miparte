@@ -36,6 +36,9 @@ public sealed class ModeloConfiguracionHogar(CoreApiClient api, EstadoHogar hoga
     /// <summary>Si el hogar tiene activado el ahorro.</summary>
     public bool AhorroActivo => hogar.HogarActual?.AhorroActivo ?? false;
 
+    /// <summary>Si el hogar tiene activada la lista de la compra.</summary>
+    public bool ListaCompraActiva => hogar.HogarActual?.ListaCompraActiva ?? false;
+
     /// <summary>Si el hogar genera gastos recurrentes (plantillas y generación mensual).</summary>
     public bool RecurrentesActivas => hogar.HogarActual?.RecurrentesActivas ?? false;
 
@@ -106,6 +109,9 @@ public sealed class ModeloConfiguracionHogar(CoreApiClient api, EstadoHogar hoga
 
     /// <summary>Clave de la casilla de recurrentes (cambia tras cada intento).</summary>
     public string ClaveRecurrentes => $"recurrentes-{_versionFunciones}";
+
+    /// <summary>Clave de la casilla de lista de la compra (cambia tras cada intento).</summary>
+    public string ClaveListaCompra => $"lista-compra-{_versionFunciones}";
 
     /// <summary>Clave del selector de liquidación (cambia tras cada intento).</summary>
     public string ClaveLiquidacion => $"liquidacion-{_versionFunciones}";
@@ -197,6 +203,29 @@ public sealed class ModeloConfiguracionHogar(CoreApiClient api, EstadoHogar hoga
         EjecutarFuncionAsync(
             () => api.ActivarRecurrentesAsync(activas), CuentaComunActiva, AhorroActivo, activas,
             activas ? "Recurrentes activadas" : "Recurrentes desactivadas");
+
+    /// <summary>Activa o desactiva la lista de la compra del hogar; devuelve el aviso, o null si la API lo rechazó.</summary>
+    public async Task<string?> CambiarListaCompraAsync(bool activa)
+    {
+        ErrorFunciones = null;
+        GuardandoFunciones = true;
+        try
+        {
+            await api.ActivarListaCompraAsync(activa);
+            hogar.ActualizarListaCompra(activa);
+            return activa ? "Lista de la compra activada" : "Lista de la compra desactivada";
+        }
+        catch (ApiException e)
+        {
+            ErrorFunciones = e.Message;
+            return null;
+        }
+        finally
+        {
+            GuardandoFunciones = false;
+            _versionFunciones++;
+        }
+    }
 
     /// <summary>
     /// Cambia el modo de liquidación («mensual» o «ciclos»). No altera los gastos ni los ciclos cerrados. Devuelve el aviso, o null si

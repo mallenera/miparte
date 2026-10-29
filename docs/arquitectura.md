@@ -37,7 +37,8 @@ La única excepción a «Api no usa `DbContext`» es la infraestructura transver
 |---|---|---|---|
 | Resumen, liquidación y pagos | `ServicioLiquidacion` | `IRepositorioLiquidacion` | `ResumenMes`, `LiquidacionMes`, `Liquidacion` |
 | Gastos | `ServicioGastos` | `IRepositorioGastos` | `RepartoGasto`, `AhorroCuenta`, `ReglasMovimiento` |
-| Cuenta común y ahorro | `ServicioCuentaComun` | `IRepositorioCuentaComun` | `CuentaComun`, `HolguraAhorro`, `ReglasCuentaComun` |
+| Cuenta común y ahorro (incluye la deuda de las personas con la cuenta) | `ServicioCuentaComun` | `IRepositorioCuentaComun` | `CuentaComun`, `MovimientosBanco`, `HolguraAhorro`, `ReglasCuentaComun` |
+| Lista de la compra y sus enlaces QR | `ServicioListaCompra` | `IRepositorioListaCompra` | `ReglasListaCompra`, `TokenInvitacion` |
 | Miembros e invitaciones | `ServicioMiembros` | `IRepositorioMiembros` | `ReglasMiembros`, `TokenInvitacion`, `CatalogoPermisos` |
 | Recurrentes | `ServicioRecurrentes` | `IRepositorioRecurrentes` (+ `IRepositorioGastos`) | `GeneracionRecurrente` |
 | Categorías | `ServicioCategorias` | `IRepositorioCategorias` (+ `IRepositorioGastos`) | `ReglasCategoria` |
@@ -66,8 +67,15 @@ La única excepción a «Api no usa `DbContext`» es la infraestructura transver
 | Casos de uso | `Core.Tests/Servicio*Tests.cs` | Con un repositorio en memoria (`RepositorioGastosFalso`, fakes anidados) y un reloj manual; sin HTTP ni BD. |
 | Contrato HTTP y permisos | `Core.Tests/*` con `WebApplicationFactory` | InMemory o PostgreSQL real (`MIPARTE_TEST_DB`). |
 | Esquema, RLS, triggers | `EsquemaPostgresTests`, `MiParte.Database.Tests` | Solo con PostgreSQL real. |
+| Modelos y componentes web | `Web.Tests/Modelo*Tests`, `ComponentesTests`, `ListaCompraComponentesTests` | `ApiFalsa` (con la cabecera `X-Enlace-Lista` registrada) y bUnit; sin servidor. |
+| Modo demo | `Web.Tests/ServidorDemo*Tests` | Los `Servicio*` reales sobre los repositorios en memoria, incluidas la deuda y la lista con su enlace QR. |
 
 Una regla nueva se prueba primero en su capa (dominio o servicio); los tests HTTP comprueban solo el cableado y el código de estado.
+
+Dos ejemplos de la práctica:
+
+- La deuda con la cuenta común se prueba en el dominio por **invariantes** entre cálculos que deben contar el mismo dinero (el disponible de cada fila del resumen mensual es el efectivo y el ahorro del estado; el extracto bancario suma efectivo más ahorro), en el servicio con los dos fondos y en HTTP con el permiso y los códigos de estado.
+- Las rutas públicas de la lista de la compra no tienen hogar en la petición: el repositorio recibe el hogar de forma explícita y la API se prueba sin sesión (`ListaCompraHttpTests`), comprobando que un enlace nunca llega a datos de otro hogar.
 
 ## Desvíos y deuda conocida
 
@@ -94,7 +102,7 @@ componentes.
 
 | Pieza | Dónde | Qué resuelve |
 |---|---|---|
-| Modelos de pantalla | `src/Web/Modelos` | Un modelo por pestaña o panel: `ModeloGastos`, `ModeloRecurrentes`, `ModeloCuentaComun`, `ModeloResumen`, `ModeloDashboard`, `ModeloConfiguracionHogar`, `ModeloCategorias`, `ModeloHistorial` y `ModeloPermisos`. Guardan el estado de la pantalla, cargan los datos de referencia y ejecutan las operaciones contra la API (guardar, eliminar, recargar con control de respuestas tardías) devolviendo el aviso a mostrar o dejando el error. La vista lo crea con `CoreApiClient` y enlaza sus propiedades; la parte que depende del navegador (foco, portapapeles, «Compartir», navegación) se queda en la vista. |
+| Modelos de pantalla | `src/Web/Modelos` | Un modelo por pestaña o panel: `ModeloGastos`, `ModeloRecurrentes`, `ModeloCuentaComun`, `ModeloListaCompra`, `ModeloResumen`, `ModeloDashboard`, `ModeloConfiguracionHogar`, `ModeloCategorias`, `ModeloHistorial` y `ModeloPermisos`. Guardan el estado de la pantalla, cargan los datos de referencia y ejecutan las operaciones contra la API (guardar, eliminar, recargar con control de respuestas tardías) devolviendo el aviso a mostrar o dejando el error. La vista lo crea con `CoreApiClient` y enlaza sus propiedades; la parte que depende del navegador (foco, portapapeles, «Compartir», navegación) se queda en la vista. |
 | `EntradaImporte` | `src/Web/Reparto` | Interpretación del importe escrito en un formulario (coma o punto, máx. 2 decimales, cero opcional). Una sola copia para Gastos, Recurrentes y Cuenta común. |
 | `ListaGastos` | `src/Web/Reparto` | Filtros del cliente (categoría con subcategorías, quién paga), orden, totales y perfiles ofrecidos. |
 | `GraficoGastos` | `src/Web/Reparto` | Agrupación en «Otras categorías» y porcentajes del Dashboard. |

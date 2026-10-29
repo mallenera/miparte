@@ -7,7 +7,8 @@ public sealed record HistoricoCuenta(
     IReadOnlyList<AportacionVigente> Vigentes, IReadOnlyList<GastoDeCuenta> Gastos, IReadOnlyList<ReembolsoDeCuenta> Reembolsos,
     IReadOnlyList<RetiradaDeAhorro> Retiradas, IReadOnlyList<DepositoDeAhorro> Depositos, bool CuentaActiva, decimal GastadoMes,
     IReadOnlyList<GastoDeCuenta>? GastosDelMes = null, SaldoInicialCuenta? SaldoInicial = null,
-    FrecuenciaAportacion Frecuencia = FrecuenciaAportacion.Mensual, IReadOnlyList<IngresoDeCuenta>? Ingresos = null);
+    FrecuenciaAportacion Frecuencia = FrecuenciaAportacion.Mensual, IReadOnlyList<IngresoDeCuenta>? Ingresos = null,
+    IReadOnlyList<MovimientoDeuda>? Deudas = null);
 
 /// <summary>Importe asociado a un miembro.</summary>
 public sealed record ImporteMiembro(Guid MiembroId, decimal Importe);
@@ -47,7 +48,7 @@ public static class ResumenMes
         var gastosTotales = gastos.Sum(g => g.Importe);
 
         // Lo que adelantó un miembro para la cuenta común cuenta como pagado, y la cuenta le debe lo aún no reembolsado.
-        var cuenta = CuentaComun.Calcular(inicio, [], historico.Gastos, historico.Reembolsos);
+        var cuenta = CuentaComun.Calcular(inicio, [], historico.Gastos, historico.Reembolsos, deudas: historico.Deudas);
         // Los acreedores con pendiente de meses anteriores aparecen aunque no participen en los gastos de este mes (p. ej. un miembro ya inactivo).
         var implicados = miembros.Where(m => m.Activo && m.Tipo == TipoMiembro.Adulto).Select(m => m.Id)
             .Concat(gastos.Where(g => g.PagadoPor is not null).Select(g => g.PagadoPor!.Value))
@@ -78,7 +79,7 @@ public static class ResumenMes
         {
             var estado = CuentaComun.Calcular(
                 inicio, historico.Vigentes, historico.Gastos, historico.Reembolsos, historico.Retiradas, historico.Depositos,
-                historico.SaldoInicial, historico.Ingresos);
+                historico.SaldoInicial, historico.Ingresos, historico.Deudas);
             // Lo gastado de la cuenta y lo gastado del ahorro se informan por separado.
             var delAhorro = (historico.GastosDelMes ?? []).Where(g => g.DesdeAhorro).Sum(g => g.Importe);
             resumenCuenta = new ResumenCuenta(

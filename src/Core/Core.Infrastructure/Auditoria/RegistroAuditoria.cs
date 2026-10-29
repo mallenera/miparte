@@ -112,7 +112,9 @@ public static class RegistroAuditoria
                 break;
             default:
                 accion = Editar;
-                foreach (var p in Propiedades(raiz).Where(p => p.IsModified && !Equals(p.OriginalValue, p.CurrentValue)))
+                // Marcar o desmarcar un producto como comprado no se audita: es el uso normal de la lista y llenaría el historial.
+                foreach (var p in Propiedades(raiz).Where(p => p.IsModified && !Equals(p.OriginalValue, p.CurrentValue)
+                             && !(raiz.Entity is ProductoListaCompra && p.Metadata.Name == nameof(ProductoListaCompra.Comprado))))
                 {
                     antes[p.Metadata.Name] = p.OriginalValue;
                     despues[p.Metadata.Name] = p.CurrentValue;
@@ -209,7 +211,8 @@ public static class RegistroAuditoria
     private static Guid IdDe(object entidad) => entidad switch
     {
         Hogar x => x.Id, Miembro x => x.Id, InvitacionHogar x => x.Id, EnlaceGrupo x => x.Id, Gasto x => x.Id, GastoRecurrente x => x.Id,
-        PagoLiquidacionRegistro x => x.Id, AportacionCuenta x => x.Id, ReembolsoCuenta x => x.Id,
+        PagoLiquidacionRegistro x => x.Id, AportacionCuenta x => x.Id, ReembolsoCuenta x => x.Id, MovimientoDeudaCuenta x => x.Id,
+        ProductoListaCompra x => x.Id, EnlaceListaCompra x => x.Id,
         RetiradaAhorro x => x.Id, IngresoCuentaComun x => x.Id, DepositoAhorro x => x.Id, MesCerrado x => x.Id, CicloLiquidacion x => x.Id, PerfilReparto x => x.Id,
         Categoria x => x.Id, _ => Guid.Empty,
     };
@@ -219,7 +222,8 @@ public static class RegistroAuditoria
     {
         Hogar => "hogar", Miembro => "miembro", InvitacionHogar => "invitacion", EnlaceGrupo => "enlace_grupo", Gasto => "gasto",
         GastoRecurrente => "gasto_recurrente", PagoLiquidacionRegistro => "pago_liquidacion",
-        AportacionCuenta => "aportacion_cuenta", ReembolsoCuenta => "reembolso_cuenta",
+        AportacionCuenta => "aportacion_cuenta", ReembolsoCuenta => "reembolso_cuenta", MovimientoDeudaCuenta => "deuda_cuenta",
+        ProductoListaCompra => "producto_compra", EnlaceListaCompra => "enlace_lista_compra",
         RetiradaAhorro => "retirada_ahorro", MesCerrado => "mes_cerrado", CicloLiquidacion => "ciclo_liquidacion", DepositoAhorro => "deposito_ahorro", IngresoCuentaComun => "ingreso_cuenta_comun", PerfilReparto => "perfil_reparto", Categoria => "categoria", _ => null,
     };
 }

@@ -288,7 +288,7 @@ public class EsquemaPostgresTests
         {
             "hogar", "miembro", "perfil_reparto", "perfil_reparto_detalle", "categoria", "gasto_recurrente", "gasto",
             "gasto_reparto", "invitacion_hogar", "pago_liquidacion", "aportacion_cuenta", "reembolso_cuenta",
-            "retirada_ahorro", "deposito_ahorro", "suscripcion_push",
+            "retirada_ahorro", "deposito_ahorro", "suscripcion_push", "deuda_cuenta", "producto_compra", "enlace_lista_compra",
         };
         foreach (var tabla in tablas)
             foreach (var privilegio in new[] { "INSERT", "UPDATE", "DELETE", "TRUNCATE" })
@@ -330,6 +330,130 @@ public class EsquemaPostgresTests
             await tx.RollbackAsync("antes");
         }
 
+        await tx.RollbackAsync();
+    }
+
+    [SkippableFact]
+    public async Task DeudaCuenta_RestringeTipoImporteConceptoYMiembroDelHogar()
+    {
+        Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
+
+        await using var conn = await AbrirAsync();
+        var user = await CrearUsuarioAsync(conn);
+        var otroUser = await CrearUsuarioAsync(conn);
+        await using var tx = await conn.BeginTransactionAsync();
+        var hogar = (Guid)(await EscalarComoAsync(conn, tx, user, "select public.crear_hogar('Casa deuda', 'Ana')"))!;
+        var miembro = (Guid)(await EscalarComoAsync(conn, tx, user, "select id from public.miembro where hogar_id = @h", ("h", hogar)))!;
+        var otroHogar = (Guid)(await EscalarComoAsync(conn, tx, otroUser, "select public.crear_hogar('Otra casa', 'Eva')"))!;
+        var ajeno = (Guid)(await EscalarComoAsync(conn, tx, otroUser, "select id from public.miembro where hogar_id = @h", ("h", otroHogar)))!;
+
+        const string insertar =
+            "insert into public.deuda_cuenta (hogar_id, miembro_id, fecha, importe, tipo, concepto) values (@h, @m, '2026-10-01', @i, @t, @c) returning 1";
+        object[] valido = [hogar, miembro, 10m, "adelanto", "Fontanero"];
+        Assert.Equal(1, await EscalarComoAsync(conn, tx, user, insertar, Parametros(valido)));
+        foreach (var tipo in new[] { "devolucion", "compensacion" })
+            Assert.Equal(1, await EscalarComoAsync(conn, tx, user, insertar, Parametros([hogar, miembro, 10m, tipo, "x"])));
+
+        // Tipo desconocido, importe no positivo y concepto de más de 200 caracteres: restricciones CHECK.
+        foreach (object[] malo in new[]
+        {
+            new object[] { hogar, miembro, 10m, "prestamo", "x" },
+            new object[] { hogar, miembro, 0m, "adelanto", "x" },
+            new object[] { hogar, miembro, -3m, "adelanto", "x" },
+            new object[] { hogar, miembro, 10m, "adelanto", new string('a', 201) },
+        })
+        {
+            await tx.SaveAsync("antes");
+            var ex = await Assert.ThrowsAsync<PostgresException>(() => EscalarComoAsync(conn, tx, user, insertar, Parametros(malo)));
+            Assert.Equal(PostgresErrorCodes.CheckViolation, ex.SqlState);
+            await tx.RollbackAsync("antes");
+        }
+
+        // Un miembro de otro hogar rompe la clave foránea compuesta (hogar_id, miembro_id).
+        await tx.SaveAsync("antes");
+        var fk = await Assert.ThrowsAsync<PostgresException>(() => EscalarComoAsync(conn, tx, user, insertar, Parametros([hogar, ajeno, 10m, "adelanto", "x"])));
+        Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, fk.SqlState);
+        await tx.RollbackAsync("antes");
+        await tx.RollbackAsync();
+
+        static (string, object)[] Parametros(object[] v) => [("h", v[0]), ("m", v[1]), ("i", v[2]), ("t", v[3]), ("c", v[4])];
+    }
+
+    [SkippableFact]
+    public async Task ListaCompra_RestringeNombreCantidadYTokenUnico()
+    {
+        Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
+
+        await using var conn = await AbrirAsync();
+        var user = await CrearUsuarioAsync(conn);
+        await using var tx = await conn.BeginTransactionAsync();
+        var hogar = (Guid)(await EscalarComoAsync(conn, tx, user, "select public.crear_hogar('Casa compra', 'Ana')"))!;
+        var miembro = (Guid)(await EscalarComoAsync(conn, tx, user, "select id from public.miembro where hogar_id = @h", ("h", hogar)))!;
+
+        Assert.Equal(false, await EscalarComoAsync(conn, tx, user, "select lista_compra_activa from public.hogar where id = @h", ("h", hogar)));
+
+        const string producto = "insert into public.producto_compra (hogar_id, nombre, cantidad) values (@h, @n, @c) returning cantidad";
+        Assert.Equal(1, await EscalarComoAsync(conn, tx, user, "insert into public.producto_compra (hogar_id, nombre) values (@h, 'Leche') returning cantidad", ("h", hogar)));
+        Assert.Equal(999, await EscalarComoAsync(conn, tx, user, producto, ("h", hogar), ("n", "Agua"), ("c", 999)));
+
+        foreach (var (nombre, cantidad) in new[] { ("Leche", 0), ("Leche", 1000), ("   ", 1), ("", 1), (new string('a', 101), 1) })
+        {
+            await tx.SaveAsync("antes");
+            var ex = await Assert.ThrowsAsync<PostgresException>(() =>
+                EscalarComoAsync(conn, tx, user, producto, ("h", hogar), ("n", nombre), ("c", cantidad)));
+            Assert.Equal(PostgresErrorCodes.CheckViolation, ex.SqlState);
+            await tx.RollbackAsync("antes");
+        }
+
+        // El token solo se guarda como hash y no se repite: dos enlaces no pueden compartirlo.
+        const string enlace = "insert into public.enlace_lista_compra (hogar_id, token_hash, creado_por) values (@h, @t, @m) returning 1";
+        Assert.Equal(1, await EscalarComoAsync(conn, tx, user, enlace, ("h", hogar), ("t", "hash-1"), ("m", miembro)));
+        await tx.SaveAsync("antes");
+        var duplicado = await Assert.ThrowsAsync<PostgresException>(() =>
+            EscalarComoAsync(conn, tx, user, enlace, ("h", hogar), ("t", "hash-1"), ("m", miembro)));
+        Assert.Equal(PostgresErrorCodes.UniqueViolation, duplicado.SqlState);
+        await tx.RollbackAsync("antes");
+
+        Assert.Equal(true, await EscalarComoAsync(conn, tx, user,
+            "select activo from public.enlace_lista_compra where token_hash = 'hash-1'"));
+        await tx.RollbackAsync();
+    }
+
+    [SkippableFact]
+    public async Task TablasDeDeudaYListaCompra_TienenRlsPoliticaYSoloLecturaParaAuthenticated()
+    {
+        Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
+
+        await using var conn = await AbrirAsync();
+        foreach (var tabla in new[] { "deuda_cuenta", "producto_compra", "enlace_lista_compra" })
+        {
+            Assert.True((bool)(await EscalarAsync(conn, $"select relrowsecurity from pg_class where oid = 'public.{tabla}'::regclass"))!, $"{tabla} debe tener RLS");
+            Assert.Equal(1L, await EscalarAsync(conn, $"select count(*) from pg_policies where schemaname = 'public' and tablename = '{tabla}'"));
+            foreach (var privilegio in new[] { "INSERT", "UPDATE", "DELETE", "TRUNCATE" })
+                Assert.False((bool)(await EscalarAsync(conn, $"select has_table_privilege('authenticated', 'public.{tabla}', '{privilegio}')"))!,
+                    $"authenticated no debe tener {privilegio} sobre {tabla}");
+            Assert.True((bool)(await EscalarAsync(conn, $"select has_table_privilege('authenticated', 'public.{tabla}', 'SELECT')"))!);
+            Assert.False((bool)(await EscalarAsync(conn, $"select has_table_privilege('anon', 'public.{tabla}', 'SELECT')"))!);
+        }
+    }
+
+    [SkippableFact]
+    public async Task PermisoListaCompra_LoAdmiteElCheckDeMiembro_YUnoInventadoNo()
+    {
+        Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
+
+        await using var conn = await AbrirAsync();
+        var user = await CrearUsuarioAsync(conn);
+        await using var tx = await conn.BeginTransactionAsync();
+        var hogar = (Guid)(await EscalarComoAsync(conn, tx, user, "select public.crear_hogar('Casa permisos', 'Ana')"))!;
+
+        Assert.Equal(1, await EscalarComoAsync(conn, tx, user,
+            "update public.miembro set permisos = array['lista.compra', 'gastos.crear'] where hogar_id = @h returning 1", ("h", hogar)));
+        await tx.SaveAsync("antes");
+        var ex = await Assert.ThrowsAsync<PostgresException>(() => EscalarComoAsync(conn, tx, user,
+            "update public.miembro set permisos = array['lista.inventada'] where hogar_id = @h returning 1", ("h", hogar)));
+        Assert.Equal(PostgresErrorCodes.CheckViolation, ex.SqlState);
+        await tx.RollbackAsync("antes");
         await tx.RollbackAsync();
     }
 

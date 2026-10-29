@@ -5,9 +5,10 @@ public sealed record AportacionRegistrada(Guid Id, Guid MiembroId, DateOnly Desd
 
 /// <summary>
 /// Histórico de la cuenta común hasta el fin de un mes con el detalle que necesita la pantalla de la cuenta: las aportaciones, los
-/// movimientos del mes uno a uno y los nombres de los miembros.
+/// movimientos del mes uno a uno (también los de deuda con la cuenta, con su identificador) y los nombres de los miembros.
 /// </summary>
 public sealed record HistoricoCuentaDetallado(
     HistoricoCuenta Historico, bool AhorroActivo, IReadOnlyList<AportacionRegistrada> Aportaciones,
     IReadOnlyList<MovimientoCuenta> ReembolsosDelMes, IReadOnlyList<MovimientoCuenta> RetiradasDelMes,
-    IReadOnlyList<MovimientoCuenta> DepositosDelMes, IReadOnlyDictionary<Guid, string> Nombres);
+    IReadOnlyList<MovimientoCuenta> DepositosDelMes, IReadOnlyDictionary<Guid, string> Nombres,
+    IReadOnlyList<MovimientoDeuda>? DeudasDelMes = null);

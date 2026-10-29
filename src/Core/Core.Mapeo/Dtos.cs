@@ -46,7 +46,7 @@ public static class Dtos
     public static HogarResumen ADto(this Hogar h)
         => new(h.Id, h.Nombre, h.CuentaComunActiva, h.AhorroActivo, TextoTipoGrupo.ATexto(h.Tipo), h.RecurrentesActivas,
             TextoModoLiquidacion.ATexto(h.LiquidacionModo), h.PeriodoPropio?.ATexto(), h.PeriodoCerradoEn is not null,
-            TextoFrecuenciaAportacion.ATexto(h.AportacionFrecuencia));
+            TextoFrecuenciaAportacion.ATexto(h.AportacionFrecuencia), h.ListaCompraActiva);
 
     /// <summary>Ciclo de liquidación cerrado, con el nombre de quien lo cerró.</summary>
     public static CicloLiquidacionDto ADto(this CicloConAutor c)
@@ -112,8 +112,26 @@ public static class Dtos
                 p.MiembroId, nombres.GetValueOrDefault(p.MiembroId, ""), p.Aportado, p.Ahorrado, p.PorcentajeGastos, p.PorcentajeAhorro,
                 p.ParteSaldo, p.ParteAhorro, p.Pendiente)).ToList(),
             d.AhorroActivo, ADto(s.Extracto), s.SaldoInicial is { } si ? new SaldoInicialDto(si.Fecha, si.Importe) : null,
-            TextoFrecuenciaAportacion.ATexto(d.Historico.Frecuencia), ADto(s.Resumen));
+            TextoFrecuenciaAportacion.ATexto(d.Historico.Frecuencia), ADto(s.Resumen),
+            e.Deudas?.Select(x => new DeudaCuentaDto(x.MiembroId, nombres.GetValueOrDefault(x.MiembroId, ""), x.Importe, x.DesdeAhorro)).ToList(),
+            d.DeudasDelMes?.Select(x => new MovimientoDeudaCuentaDto(
+                x.Id ?? Guid.Empty, x.MiembroId, x.Fecha, x.Importe, TextoTipoDeuda(x.Tipo), x.DesdeAhorro, x.Concepto)).ToList());
     }
+
+    /// <summary>Movimiento de deuda de la cuenta común tal como se devuelve al crearlo.</summary>
+    public static MovimientoDeudaCuentaDto ADto(this MovimientoDeudaCuenta d) => new(
+        d.Id, d.MiembroId, d.Fecha, d.Importe, TextoTipoDeuda(d.Tipo), d.DesdeAhorro, d.Concepto);
+
+    /// <summary>Producto de la lista de la compra tal como se devuelve.</summary>
+    public static ProductoCompraDto ADto(this ProductoListaCompra p) => new(p.Id, p.Nombre, p.Cantidad, p.Comprado);
+
+    /// <summary>Texto con que viaja cada tipo de movimiento de deuda en la API.</summary>
+    public static string TextoTipoDeuda(TipoMovimientoDeuda tipo) => tipo switch
+    {
+        TipoMovimientoDeuda.Adelanto => "adelanto",
+        TipoMovimientoDeuda.Devolucion => "devolucion",
+        _ => "compensacion",
+    };
 
     /// <summary>Resumen mensual de la cuenta común (Hogar, Ahorro y Total).</summary>
     private static ResumenCuentaMesDto ADto(ResumenMensualCuenta r) => new(ADto(r.Hogar), ADto(r.Ahorro), ADto(r.Total));

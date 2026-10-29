@@ -46,10 +46,12 @@ public static class ModosLiquidacion
 /// <param name="Periodo">Periodo propio del hogar («YYYY-MM-DD/YYYY-MM-DD» o «YYYY-MM-DD/» si está abierto); null si usa meses.</param>
 /// <param name="PeriodoCerrado">Si el periodo propio está cerrado: sus gastos no se pueden editar ni borrar.</param>
 /// <param name="AportacionFrecuencia">Con qué frecuencia aportan a la cuenta común (ver <see cref="FrecuenciasAportacion"/>); "mensual" por defecto.</param>
+/// <param name="ListaCompraActiva">Si el hogar tiene activada la lista de la compra.</param>
 public record HogarResumen(
     Guid Id, string Nombre, bool CuentaComunActiva = false, bool AhorroActivo = false, string Tipo = TiposGrupo.Hogar,
     bool RecurrentesActivas = true, string LiquidacionModo = ModosLiquidacion.Mensual,
-    string? Periodo = null, bool PeriodoCerrado = false, string AportacionFrecuencia = FrecuenciasAportacion.Mensual);
+    string? Periodo = null, bool PeriodoCerrado = false, string AportacionFrecuencia = FrecuenciasAportacion.Mensual,
+    bool ListaCompraActiva = false);
 
 /// <summary>Frecuencias de aportación a la cuenta común, tal como viajan por la API.</summary>
 public static class FrecuenciasAportacion

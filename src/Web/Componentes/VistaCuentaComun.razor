@@ -98,7 +98,7 @@ else if (_m.Estado is not null)
         </section>
     }
 
-    <PanelMovimientosCuenta />
+    <PanelMovimientosCuenta @ref="_movimientos" />
 
     <section class="card" aria-labelledby="t-saldo-inicial">
         <div class="card-head"><h2 id="t-saldo-inicial">Saldo inicial</h2></div>
@@ -270,6 +270,90 @@ else if (_m.Estado is not null)
         }
     </section>
 
+    <section class="card" aria-labelledby="t-deudas">
+        <div class="card-head"><h2 id="t-deudas">Deudas con la cuenta</h2></div>
+        <p class="muted">Lo que una persona debe a la cuenta común o a su ahorro porque la cuenta pagó algo por ella. Se salda con una devolución suya, o con una compensación que resta de lo que la cuenta le debe por reembolsos.</p>
+
+        @if (_m.Estado.Deudas is not { Count: > 0 } deudas)
+        {
+            <div class="empty">Nadie debe nada a la cuenta.</div>
+        }
+        else
+        {
+            @foreach (var d in deudas)
+            {
+                <div class="gastorow">
+                    <div class="g-main">
+                        <div class="g-concepto">@Formato.NombreMiembro(d.MiembroId, _m.Miembros)</div>
+                        <div class="muted g-meta">@(d.DesdeAhorro ? "Debe al ahorro" : "Debe a Hogar")</div>
+                    </div>
+                    <div class="g-importe">@Formato.Euros(d.Importe)</div>
+                </div>
+            }
+        }
+
+        @if (_m.Estado.MovimientosDeuda is { Count: > 0 } movimientosDeuda)
+        {
+            <h3 class="u-titulo-form u-mt12">Movimientos de @_m.NombreMes</h3>
+            @foreach (var d in movimientosDeuda)
+            {
+                <div class="gastorow" @key="d.Id">
+                    <div class="g-main">
+                        <div class="g-concepto">@ModeloCuentaComun.NombreTipoDeuda(d.Tipo) · @Formato.NombreMiembro(d.MiembroId, _m.Miembros) @(d.DesdeAhorro ? "(del ahorro)" : "(de Hogar)")</div>
+                        <div class="muted g-meta">@d.Fecha.ToString("dd/MM/yyyy", Es)@(string.IsNullOrWhiteSpace(d.Concepto) ? "" : " · " + d.Concepto)</div>
+                    </div>
+                    <div class="g-importe">@Formato.Euros(d.Importe)</div>
+                    @if (PuedeCuenta)
+                    {
+                        <div class="c-acc">
+                            @if (_m.ConfirmandoEliminar == d.Id)
+                            {
+                                <span class="muted">¿Eliminar?</span>
+                                <button class="linkbtn danger" type="button" @onclick="() => EliminarDeudaAsync(d)">Sí</button>
+                                <button class="linkbtn" type="button" @onclick="() => _m.ConfirmandoEliminar = null">No</button>
+                            }
+                            else
+                            {
+                                <button class="linkbtn danger" type="button" aria-label="Eliminar @ModeloCuentaComun.NombreTipoDeuda(d.Tipo).ToLowerInvariant() de @Formato.NombreMiembro(d.MiembroId, _m.Miembros)" @onclick="() => _m.ConfirmandoEliminar = d.Id">Eliminar</button>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        }
+
+        @if (PuedeCuenta)
+        {
+            <form class="addcat" id="form-deuda" @onsubmit="RegistrarDeudaAsync">
+                <h3 class="u-titulo-form">Nuevo movimiento de deuda</h3>
+                <p class="u-titulo-form muted">@ModeloCuentaComun.AyudaTipoDeuda(_m.TipoDeuda)</p>
+                <label>Persona
+                    <select value="@_m.Deudor" @onchange="e => _m.Deudor = Guid.Parse(e.Value!.ToString()!)">
+                        @foreach (var m in _m.Adultos)
+                        {
+                            <option value="@m.Id">@m.Nombre</option>
+                        }
+                    </select>
+                </label>
+                <label>Tipo
+                    <select @bind="_m.TipoDeuda">
+                        <option value="adelanto">Adelanto</option>
+                        <option value="devolucion">Devolución</option>
+                        <option value="compensacion">Compensación</option>
+                    </select>
+                </label>
+                <label class="chk"><input type="checkbox" @bind="_m.DeudaDesdeAhorro" /> Del ahorro (no de Hogar)</label>
+                <label>Importe (€)
+                    <input inputmode="decimal" required placeholder="0,00" @bind="_m.ImporteDeuda" @bind:event="oninput" />
+                </label>
+                <label>Concepto
+                    <input maxlength="200" placeholder="Opcional" @bind="_m.ConceptoDeuda" @bind:event="oninput" />
+                </label>
+                <button class="btn" type="submit" disabled="@(!_m.DeudaValida || _m.Enviando)">Registrar</button>
+            </form>
+        }
+    </section>
+
     <section class="card" aria-labelledby="t-ingresos">
         <div class="card-head"><h2 id="t-ingresos">Ingresos</h2></div>
         <p class="muted">Dinero que entra a la cuenta común fuera de las aportaciones y del ahorro, por ejemplo lo que pagan las amigas de una cena. Suma al saldo y al efectivo de la cuenta; no cambia los reembolsos.</p>
@@ -431,6 +515,10 @@ else if (_m.Estado is not null)
 
     private Task ReembolsarAsync() => Mostrar(_m.ReembolsarAsync());
 
+    private Task RegistrarDeudaAsync() => Mostrar(_m.RegistrarDeudaAsync());
+
+    private Task EliminarDeudaAsync(MovimientoDeudaCuentaDto d) => Mostrar(_m.EliminarDeudaAsync(d));
+
     private Task IngresarAhorroAsync() => Mostrar(_m.IngresarAhorroAsync());
 
     private Task FijarSaldoInicialAsync() => Mostrar(_m.FijarSaldoInicialAsync());
@@ -446,8 +534,19 @@ else if (_m.Estado is not null)
     private Task EliminarIngresoAsync(IngresoCuentaComunDto i) => Mostrar(_m.EliminarIngresoAsync(i));
 
     /// <summary>Espera la operación del modelo y, si salió bien, muestra su aviso.</summary>
+    private PanelMovimientosCuenta? _movimientos;
+
     private async Task Mostrar(Task<string?> operacion)
     {
-        if (await operacion is { } aviso) Avisos.Mostrar(aviso);
+        if (await operacion is not { } aviso)
+        {
+            // El error también sale arriba, en la primera tarjeta, que puede quedar lejos de donde se actuó: se repite como aviso visible.
+            if (_m.Error is { } error) Avisos.Mostrar(error, TimeSpan.FromSeconds(6));
+            return;
+        }
+
+        Avisos.Mostrar(aviso);
+        // Lo que se acaba de registrar tiene que verse también en el extracto de Movimientos.
+        if (_movimientos is not null) await _movimientos.RecargarAsync();
     }
 }

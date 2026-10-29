@@ -1,0 +1,192 @@
+@implements IDisposable
+@inject CoreApiClient Api
+@inject ServicioPermisos Permisos
+@inject EstadoHogar Hogar
+@inject NavigationManager Navegacion
+
+@* Lista de la compra del hogar (con sesión) o la de un enlace QR (sin sesión, con el token de <see cref="Token"/>). *@
+<section class="card" aria-labelledby="t-lista-compra">
+    <div class="card-head"><h2 id="t-lista-compra">Lista de la compra</h2></div>
+
+    @if (_m.Cargando)
+    {
+        <p>Cargando…</p>
+    }
+    else
+    {
+        @if (_m.Error is not null)
+        {
+            <div class="aviso err u-mt12" role="alert">@_m.Error</div>
+        }
+
+        @if (!_m.Activa)
+        {
+            <p class="muted">La lista de la compra no está activada en este hogar.</p>
+            @if (PuedeActivar)
+            {
+                <button class="btn" type="button" disabled="@_m.Enviando" @onclick="() => ActivarAsync(true)">Activar la lista de la compra</button>
+            }
+        }
+        else
+        {
+            <p class="muted">Se actualiza sola cada pocos segundos. Marca lo que ya está en el carro.</p>
+
+            @if (PuedeEditar || _m.Publica)
+            {
+                <form class="addcat" @onsubmit="AnadirAsync">
+                    <label>Producto
+                        <input maxlength="100" required placeholder="Leche, pan…" @bind="_m.Nombre" @bind:event="oninput" />
+                    </label>
+                    <label>Cantidad
+                        <input inputmode="numeric" placeholder="1" @bind="_m.Cantidad" @bind:event="oninput" />
+                    </label>
+                    <button class="btn" type="submit" disabled="@(!_m.NuevoValido || _m.Enviando)">Añadir</button>
+                </form>
+            }
+
+            @if (_m.Productos.Count == 0)
+            {
+                <div class="empty">La lista está vacía.</div>
+            }
+
+            @foreach (var p in _m.Pendientes)
+            {
+                <div class="gastorow" @key="p.Id">
+                    <label class="chk">
+                        <input type="checkbox" checked="@false" @onchange="() => MarcarAsync(p, true)" />
+                        <span class="g-concepto">@p.Nombre</span>
+                    </label>
+                    <div class="g-importe">× @p.Cantidad</div>
+                    @if (PuedeEditar)
+                    {
+                        <button class="linkbtn danger" type="button" aria-label="Borrar @p.Nombre" @onclick="() => EliminarAsync(p)">Borrar</button>
+                    }
+                </div>
+            }
+
+            @if (_m.Comprados.Any())
+            {
+                <h3 class="u-titulo-form">En el carro</h3>
+                @foreach (var p in _m.Comprados)
+                {
+                    <div class="gastorow" @key="p.Id">
+                        <label class="chk">
+                            <input type="checkbox" checked="@true" @onchange="() => MarcarAsync(p, false)" />
+                            <span class="muted">@p.Nombre</span>
+                        </label>
+                        <div class="g-importe muted">× @p.Cantidad</div>
+                        @if (PuedeEditar)
+                        {
+                            <button class="linkbtn danger" type="button" aria-label="Borrar @p.Nombre" @onclick="() => EliminarAsync(p)">Borrar</button>
+                        }
+                    </div>
+                }
+            }
+
+            @if (PuedeEditar && !_m.Publica)
+            {
+                <h3 class="u-titulo-form">Compartir por QR</h3>
+                <p class="muted">Quien escanee el código puede añadir productos y marcarlos como comprados, sin cuenta. El enlace caduca en 7 días.</p>
+                @if (_m.Enlace is null)
+                {
+                    <button class="btn" type="button" disabled="@_m.Enviando" @onclick="CrearEnlaceAsync">Crear código QR</button>
+                }
+                else
+                {
+                    <div class="qr-lista" role="img" aria-label="Código QR para añadir a la lista de la compra">@((MarkupString)_m.Qr!)</div>
+                    <p class="muted"><a href="@ModeloListaCompra.UrlPublica(BaseAplicacion, _m.Enlace.Token)">@ModeloListaCompra.UrlPublica(BaseAplicacion, _m.Enlace.Token)</a></p>
+                    <button class="linkbtn danger" type="button" disabled="@_m.Enviando" @onclick="RevocarEnlaceAsync">Revocar el enlace</button>
+                }
+
+                @if (_m.Enlaces.Count > 0)
+                {
+                    <h3 class="u-titulo-form u-mt12">Enlaces creados</h3>
+                    <p class="muted">El código de un enlace solo se ve al crearlo. Si lo has perdido o ya no lo quieres, revócalo y crea otro.</p>
+                    @foreach (var e in _m.Enlaces)
+                    {
+                        <div class="gastorow" @key="e.Id">
+                            <div class="g-main">
+                                <div class="g-concepto">Creado el @e.CreadoEn.ToLocalTime().ToString("dd/MM/yyyy", Es) por @_m.Creador(e)</div>
+                                <div class="muted g-meta">@TextoEstado(e)</div>
+                            </div>
+                            @if (e.Estado == "vigente")
+                            {
+                                <button class="linkbtn danger" type="button" disabled="@_m.Enviando" aria-label="Revocar el enlace creado el @e.CreadoEn.ToLocalTime().ToString("dd/MM/yyyy", Es)" @onclick="() => RevocarAsync(e)">Revocar</button>
+                            }
+                        </div>
+                    }
+                }
+            }
+        }
+
+        @if (_aviso is not null)
+        {
+            <div class="aviso u-mt12" role="status">@_aviso</div>
+        }
+    }
+</section>
+
+@code {
+    /// <summary>Token del enlace QR si la lista se abre desde el QR; null para la lista del hogar.</summary>
+    [Parameter] public string? Token { get; set; }
+
+    private static readonly System.Globalization.CultureInfo Es = new("es-ES");
+
+    private ModeloListaCompra _m = null!;
+    private Timer? _refresco;
+    private string? _aviso;
+
+    /// <summary>Base de la aplicación web, sin barra final, para componer el enlace público.</summary>
+    private string BaseAplicacion => Navegacion.BaseUri.TrimEnd('/');
+
+    private bool PuedeEditar => !_m.Publica && Permisos.Tiene(Claves.ListaCompra);
+
+    private bool PuedeActivar => !_m.Publica && Permisos.Tiene(Claves.HogarFunciones);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _m = new ModeloListaCompra(Api, Token);
+        // Con un enlace QR no hay sesión ni permisos que cargar; con sesión, abrir la pestaña directamente (o recargar) no los trae todavía.
+        if (!_m.Publica) await Permisos.AsegurarAsync();
+        await _m.CargarAsync();
+        _refresco = new Timer(_ => _ = InvokeAsync(RefrescarAsync), null, ModeloListaCompra.IntervaloRefresco, ModeloListaCompra.IntervaloRefresco);
+    }
+
+    private async Task RefrescarAsync()
+    {
+        await _m.RefrescarAsync();
+        StateHasChanged();
+    }
+
+    private async Task AnadirAsync() => await Mostrar(_m.AnadirAsync());
+
+    private async Task MarcarAsync(ProductoCompraDto p, bool comprado) => await Mostrar(_m.MarcarAsync(p, comprado));
+
+    private async Task EliminarAsync(ProductoCompraDto p) => await Mostrar(_m.EliminarAsync(p));
+
+    private async Task CrearEnlaceAsync() => await Mostrar(_m.CrearEnlaceAsync(BaseAplicacion));
+
+    private async Task RevocarEnlaceAsync() => await Mostrar(_m.RevocarEnlaceAsync());
+
+    private async Task RevocarAsync(EnlaceListaDto e) => await Mostrar(_m.RevocarEnlaceAsync(e.Id));
+
+    private static string TextoEstado(EnlaceListaDto e) => e.Estado switch
+    {
+        "revocado" => "Revocado",
+        "caducado" => $"Caducó el {e.CaducaEn?.ToLocalTime().ToString("dd/MM/yyyy", Es)}",
+        _ => e.CaducaEn is { } c ? $"Vigente hasta el {c.ToLocalTime().ToString("dd/MM/yyyy", Es)}" : "Vigente",
+    };
+
+    private async Task ActivarAsync(bool activa)
+    {
+        await Mostrar(_m.ActivarAsync(activa));
+        if (_m.Error is null) Hogar.ActualizarListaCompra(_m.Activa);
+    }
+
+    private async Task Mostrar(Task<string?> operacion)
+    {
+        _aviso = await operacion;
+    }
+
+    public void Dispose() => _refresco?.Dispose();
+}

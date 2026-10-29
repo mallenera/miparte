@@ -35,10 +35,10 @@ public sealed class ServicioCuentaComun(IRepositorioCuentaComun repositorio, Tim
         var detalle = await repositorio.HistoricoDetalladoAsync(inicio, ct);
         var h = detalle.Historico;
         var saldoInicial = h.SaldoInicial;
-        var estado = Domain.CuentaComun.Calcular(inicio, h.Vigentes, h.Gastos, h.Reembolsos, h.Retiradas, h.Depositos, saldoInicial, h.Ingresos);
+        var estado = Domain.CuentaComun.Calcular(inicio, h.Vigentes, h.Gastos, h.Reembolsos, h.Retiradas, h.Depositos, saldoInicial, h.Ingresos, h.Deudas);
         var partes = Domain.CuentaComun.PartesPorPersona(inicio, h.Vigentes, estado, h.Depositos);
         var reembolsos = detalle.ReembolsosDelMes.Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe, r.DesdeAhorro)).ToList();
-        var extracto = Domain.CuentaComun.Extracto(inicio, h.Vigentes, h.GastosDelMes ?? [], reembolsos, saldoInicial, estado, h.Ingresos);
+        var extracto = Domain.CuentaComun.Extracto(inicio, h.Vigentes, h.GastosDelMes ?? [], reembolsos, saldoInicial, estado, h.Ingresos, h.Deudas);
         var resumen = Domain.CuentaComun.ResumenMensual(inicio, h);
         return new EstadoCuentaDelMes(inicio, estado, partes, detalle, extracto, saldoInicial, resumen);
     }
@@ -259,6 +259,113 @@ public sealed class ServicioCuentaComun(IRepositorioCuentaComun repositorio, Tim
     /// <summary>Borra una retirada de ahorro; no encontrado si no existe.</summary>
     public async Task<Resultado<bool>> EliminarRetiradaAsync(Guid id, CancellationToken ct)
         => await repositorio.EliminarRetiradaAsync(id, ct) ? Resultado<bool>.Ok(true) : Resultado<bool>.NoEncontrado();
+
+    /// <summary>
+    /// Registra un movimiento de la deuda de una persona: un adelanto (la cuenta paga por ella), una devolución (ella ingresa) o una
+    /// compensación (la cuenta resta lo que le debe). Inválido si el importe no vale o la persona no es del hogar; conflicto si la
+    /// cuenta o el ahorro están inactivos, si una devolución o compensación supera lo que debe, si una compensación supera lo pendiente
+    /// de reembolsarle o si un adelanto del ahorro supera el ahorro disponible.
+    /// </summary>
+    public async Task<Resultado<MovimientoDeudaCuenta>> RegistrarDeudaAsync(RegistrarMovimiento m, TipoMovimientoDeuda tipo, CancellationToken ct)
+    {
+        if (await ExigirActivaAsync<MovimientoDeudaCuenta>(ct) is { } inactiva) return inactiva;
+        if (m.DesdeAhorro && await ExigirAhorroAsync<MovimientoDeudaCuenta>(ct) is { } sinAhorro) return sinAhorro;
+        var error = ReglasMovimiento.ValidarImporte(m.Importe) ?? ReglasMovimiento.ValidarConcepto(m.Concepto);
+        if (error is not null) return Resultado<MovimientoDeudaCuenta>.Invalido(error);
+        if (!await repositorio.ExisteMiembroAsync(m.MiembroId, ct))
+            return Resultado<MovimientoDeudaCuenta>.Invalido("La persona de la deuda debe pertenecer al hogar.");
+
+        var fecha = m.Fecha ?? Hoy;
+        var deudas = await repositorio.DeudasAsync(ct);
+        if (tipo == TipoMovimientoDeuda.Adelanto && m.DesdeAhorro)
+        {
+            // Un adelanto del ahorro lo saca de él: no puede dejarlo por debajo de lo que ya hay (los datos del ahorro ya cuentan las deudas).
+            var disponible = AhorroCuenta.Disponible(fecha, await repositorio.DatosAhorroAsync(ct));
+            if (m.Importe > disponible)
+            {
+                var visible = Math.Max(0m, disponible);
+                return Resultado<MovimientoDeudaCuenta>.Conflicto(
+                    $"El importe supera el ahorro disponible ({visible:0.00}).",
+                    new Dictionary<string, object> { ["disponible"] = visible });
+            }
+        }
+
+        if (tipo is TipoMovimientoDeuda.Devolucion or TipoMovimientoDeuda.Compensacion)
+        {
+            var debe = DeudaDe(deudas, m.MiembroId, m.DesdeAhorro);
+            if (m.Importe > debe)
+            {
+                var visible = Math.Max(0m, debe);
+                return Resultado<MovimientoDeudaCuenta>.Conflicto(
+                    $"El importe supera lo que debe la persona ({visible:0.00}).",
+                    new Dictionary<string, object> { ["debe"] = visible });
+            }
+        }
+
+        // Una compensación quita de lo que la cuenta le debe, así que no puede pasar de lo pendiente de reembolsarle.
+        if (tipo == TipoMovimientoDeuda.Compensacion)
+        {
+            var pendiente = await PendienteDeFondoAsync(m.MiembroId, m.DesdeAhorro, deudas, ct);
+            if (m.Importe > pendiente)
+            {
+                var visible = Math.Max(0m, pendiente);
+                return Resultado<MovimientoDeudaCuenta>.Conflicto(
+                    $"El importe supera lo que la cuenta le debe por reembolsar ({visible:0.00}).",
+                    new Dictionary<string, object> { ["pendiente"] = visible });
+            }
+        }
+
+        var d = new MovimientoDeudaCuenta
+        {
+            Id = Guid.NewGuid(), HogarId = m.HogarId, MiembroId = m.MiembroId, Importe = m.Importe,
+            Fecha = fecha, Tipo = tipo, DesdeAhorro = m.DesdeAhorro, Concepto = ReglasMovimiento.NormalizarConcepto(m.Concepto),
+        };
+        await repositorio.GuardarDeudaAsync(d, ct);
+        return Resultado<MovimientoDeudaCuenta>.Ok(d);
+    }
+
+    /// <summary>
+    /// Borra un movimiento de deuda. No encontrado si no existe; conflicto si es un adelanto al que ya se han aplicado devoluciones o
+    /// compensaciones (la deuda quedaría negativa) o si es una devolución o compensación del ahorro cuyo importe ya se ha usado
+    /// (el ahorro quedaría sin respaldo).
+    /// </summary>
+    public async Task<Resultado<bool>> EliminarDeudaAsync(Guid id, CancellationToken ct)
+    {
+        var d = await repositorio.DeudaAsync(id, ct);
+        if (d is null) return Resultado<bool>.NoEncontrado();
+
+        if (d.Tipo == TipoMovimientoDeuda.Adelanto)
+        {
+            var resto = DeudaDe(await repositorio.DeudasAsync(ct), d.MiembroId, d.DesdeAhorro) - d.Importe;
+            if (resto < 0m)
+                return Resultado<bool>.Conflicto(
+                    $"No se puede borrar este adelanto: dejaría devoluciones o compensaciones sin deuda ({-resto:0.00}).",
+                    new Dictionary<string, object> { ["falta"] = -resto });
+        }
+
+        // Quitar una devolución o una compensación del ahorro es quitarle dinero: no puede dejar sin respaldo lo ya usado. Borrarla equivale a
+        // añadir un uso del mismo importe en su fecha.
+        if (d.DesdeAhorro && d.Tipo != TipoMovimientoDeuda.Adelanto)
+        {
+            var usos = (await repositorio.UsosDeAhorroAsync(ct)).Append(new UsoDeAhorro(d.Fecha, d.Importe)).ToList();
+            var holgura = HolguraAhorro.Calcular(await repositorio.AportacionesAsync(ct), await repositorio.DepositosAsync(null, ct), usos);
+            if (holgura is < 0m) return SinRespaldo<bool>("borrar este movimiento", -holgura.Value);
+        }
+
+        await repositorio.EliminarDeudaAsync(id, ct);
+        return Resultado<bool>.Ok(true);
+    }
+
+    /// <summary>Lo que una persona debe a un fondo: los adelantos suman y las devoluciones y compensaciones restan.</summary>
+    private static decimal DeudaDe(IEnumerable<MovimientoDeuda> deudas, Guid miembroId, bool desdeAhorro)
+        => deudas.Where(d => d.MiembroId == miembroId && d.DesdeAhorro == desdeAhorro)
+            .Sum(d => d.Tipo == TipoMovimientoDeuda.Adelanto ? d.Importe : -d.Importe);
+
+    /// <summary>Lo que el fondo le debe a la persona por gastos que adelantó y aún no se le han reembolsado ni compensado.</summary>
+    private async Task<decimal> PendienteDeFondoAsync(Guid miembroId, bool desdeAhorro, IEnumerable<MovimientoDeuda> deudas, CancellationToken ct)
+        => await repositorio.GastadoACargoAsync(miembroId, desdeAhorro, ct) - await repositorio.ReembolsadoAsync(miembroId, desdeAhorro, ct)
+            - deudas.Where(d => d.MiembroId == miembroId && d.DesdeAhorro == desdeAhorro && d.Tipo == TipoMovimientoDeuda.Compensacion)
+                .Sum(d => d.Importe);
 
     private DateOnly Hoy => DateOnly.FromDateTime(reloj.GetUtcNow().UtcDateTime);
 

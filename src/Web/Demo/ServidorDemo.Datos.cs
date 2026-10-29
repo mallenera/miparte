@@ -35,7 +35,7 @@ public sealed partial class ServidorDemo
     {
         var a = new AlmacenDemo(new Hogar
         {
-            Id = IdHogar, Nombre = "Casa de Ana y Marcos", CuentaComunActiva = true, AhorroActivo = true,
+            Id = IdHogar, Nombre = "Casa de Ana y Marcos", CuentaComunActiva = true, AhorroActivo = true, ListaCompraActiva = true,
         });
 
         a.Miembros.AddRange(

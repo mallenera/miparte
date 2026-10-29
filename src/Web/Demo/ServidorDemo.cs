@@ -5,6 +5,7 @@ using MiParte.Core.Application;
 using MiParte.Core.Application.Categorias;
 using MiParte.Core.Application.Cierres;
 using MiParte.Core.Application.CuentaComun;
+using MiParte.Core.Application.ListaCompra;
 using MiParte.Core.Application.Gastos;
 using MiParte.Core.Application.Liquidacion;
 using MiParte.Core.Application.Miembros;
@@ -32,6 +33,7 @@ public sealed partial class ServidorDemo
     private readonly ServicioLiquidacion _liquidacion;
     private readonly ServicioGastos _gastos;
     private readonly ServicioCuentaComun _cuenta;
+    private readonly ServicioListaCompra _lista;
     private readonly ServicioMiembros _miembros;
     private readonly ServicioRecurrentes _recurrentes;
     private readonly ServicioPerfiles _perfiles;
@@ -50,6 +52,7 @@ public sealed partial class ServidorDemo
         _gastos = new ServicioGastos(gastos);
         _liquidacion = new ServicioLiquidacion(new RepositorioLiquidacionEnMemoria(_almacen), reloj);
         _cuenta = new ServicioCuentaComun(new RepositorioCuentaComunEnMemoria(_almacen), reloj);
+        _lista = new ServicioListaCompra(new RepositorioListaCompraEnMemoria(_almacen), reloj);
         _miembros = new ServicioMiembros(new RepositorioMiembrosEnMemoria(_almacen), reloj);
         _recurrentes = new ServicioRecurrentes(new RepositorioRecurrentesEnMemoria(_almacen), gastos);
         _perfiles = new ServicioPerfiles(new RepositorioPerfilesEnMemoria(_almacen));
@@ -130,7 +133,21 @@ public sealed partial class ServidorDemo
             ("cuenta-comun", 3, "PUT") when subruta == "aportaciones" => await FijarAportacion((await Cuerpo<FijarAportacionRequest>())!, ct),
             ("cuenta-comun", 3, "PUT") when subruta == "saldo-inicial" => await FijarSaldoInicial((await Cuerpo<FijarSaldoInicialRequest>())!, ct),
             ("cuenta-comun", 3, "DELETE") when subruta == "saldo-inicial" => Sin(await _cuenta.EliminarSaldoInicialAsync(ct)),
+            ("lista-compra", 2, "GET") => await ListaCompra(ct),
+            ("lista-compra", 3, "PUT") when subruta == "activacion" => Ok(new { activa = await _lista.ActivarAsync(IdHogar, (await Cuerpo<ActivarListaCompraRequest>())!.Activa, ct) }),
+            ("lista-compra", 3, "POST") when subruta == "productos" => await CrearProductoLista((await Cuerpo<CrearProductoCompraRequest>())!, ct),
+            ("lista-compra", 4, "PUT") when subruta == "productos" && id is { } i => await MarcarProductoLista(i, (await Cuerpo<MarcarProductoCompraRequest>())!, ct),
+            ("lista-compra", 4, "DELETE") when subruta == "productos" && id is { } i => Sin(await _lista.EliminarAsync(IdHogar, i, ct)),
+            ("lista-compra", 3, "GET") when subruta == "enlaces" => await ListarEnlacesLista(ct),
+            ("lista-compra", 3, "POST") when subruta == "enlaces" => await CrearEnlaceLista(ct),
+            ("lista-compra", 4, "DELETE") when subruta == "enlaces" && id is { } i => Sin(await _lista.RevocarEnlaceAsync(IdHogar, i, ct)),
+            ("lista-compra", 3, "POST") when subruta == "qr" => await GenerarQrLista((await Cuerpo<QrListaRequest>())!),
+            ("lista-compra", 3, "GET") when subruta == "publica" => await ListaPublica(peticion, ct),
+            ("lista-compra", 4, "POST") when subruta == "publica" => await CrearProductoPublico(peticion, (await Cuerpo<CrearProductoCompraRequest>())!, ct),
+            ("lista-compra", 5, "PUT") when subruta == "publica" && id is { } i => await MarcarProductoPublico(peticion, i, (await Cuerpo<MarcarProductoCompraRequest>())!, ct),
             ("cuenta-comun", 3, "POST") when subruta == "reembolsos" => await CrearReembolso((await Cuerpo<CrearReembolsoRequest>())!, ct),
+            ("cuenta-comun", 3, "POST") when subruta == "deudas" => await CrearDeuda((await Cuerpo<CrearDeudaCuentaRequest>())!, ct),
+            ("cuenta-comun", 4, "DELETE") when subruta == "deudas" && id is { } i => Sin(await _cuenta.EliminarDeudaAsync(i, ct)),
             ("cuenta-comun", 4, "DELETE") when subruta == "reembolsos" && id is { } i => Sin(await _cuenta.EliminarReembolsoAsync(i, ct)),
             ("cuenta-comun", 3, "GET") when subruta == "movimientos" => await MovimientosCuentaComun(uri, ct),
             ("cuenta-comun", 3, "GET") when subruta == "ingresos" => Ok((await _cuenta.ListarIngresosAsync(ct)).Select(i => i.ADto()).ToList()),
@@ -323,6 +340,81 @@ public sealed partial class ServidorDemo
     {
         var res = await _cuenta.FijarSaldoInicialAsync(r.Fecha, r.Importe, ct);
         return res.Error is { } e ? Error(e) : Ok(new SaldoInicialDto(res.Valor!.Fecha, res.Valor.Importe));
+    }
+
+    private async Task<HttpResponseMessage> CrearDeuda(CrearDeudaCuentaRequest r, CancellationToken ct)
+    {
+        if (r.Tipo is not ("adelanto" or "devolucion" or "compensacion"))
+            return Mal(HttpStatusCode.BadRequest, "El tipo debe ser adelanto, devolucion o compensacion.");
+        var tipo = r.Tipo switch
+        {
+            "adelanto" => TipoMovimientoDeuda.Adelanto,
+            "devolucion" => TipoMovimientoDeuda.Devolucion,
+            _ => TipoMovimientoDeuda.Compensacion,
+        };
+        var res = await _cuenta.RegistrarDeudaAsync(new RegistrarMovimiento(IdHogar, r.MiembroId, r.Importe, r.Fecha, r.Concepto, r.DesdeAhorro), tipo, ct);
+        return res.Error is { } e ? Error(e) : Respuesta(HttpStatusCode.Created, res.Valor!.ADto());
+    }
+
+    private async Task<HttpResponseMessage> ListaCompra(CancellationToken ct)
+    {
+        var productos = await _lista.ListarAsync(IdHogar, ct);
+        return Ok(new ListaCompraResponse(await _lista.ActivaAsync(IdHogar, ct), productos.Select(p => p.ADto()).ToList()));
+    }
+
+    private async Task<HttpResponseMessage> CrearProductoLista(CrearProductoCompraRequest r, CancellationToken ct)
+    {
+        var res = await _lista.AnadirAsync(IdHogar, r.Nombre, r.Cantidad ?? 1, ct);
+        return res.Error is { } e ? Error(e) : Respuesta(HttpStatusCode.Created, res.Valor!.ADto());
+    }
+
+    private async Task<HttpResponseMessage> MarcarProductoLista(Guid id, MarcarProductoCompraRequest r, CancellationToken ct)
+    {
+        var res = await _lista.MarcarAsync(IdHogar, id, r.Comprado, ct);
+        return res.Error is { } e ? Error(e, mensajeEn404: true) : Ok(res.Valor!.ADto());
+    }
+
+    private async Task<HttpResponseMessage> ListarEnlacesLista(CancellationToken ct)
+        => Ok((await _lista.ListarEnlacesAsync(IdHogar, ct))
+            .Select(e => new EnlaceListaDto(e.Id, e.CreadoPor, e.CreadoEn, e.CaducaEn, ReglasListaCompra.TextoEstado(e.Estado))).ToList());
+
+    private async Task<HttpResponseMessage> CrearEnlaceLista(CancellationToken ct)
+    {
+        if (_almacen.MiembroActual is not { } miembro) return Mal(HttpStatusCode.Conflict, "No hay miembro para crear el enlace.");
+        var res = await _lista.CrearEnlaceAsync(IdHogar, miembro, null, ct);
+        return res.Error is { } e ? Error(e) : Respuesta(HttpStatusCode.Created, new EnlaceListaCreado(res.Valor!.Id, res.Valor.Token, res.Valor.CaducaEn));
+    }
+
+    private static async Task<HttpResponseMessage> GenerarQrLista(QrListaRequest r)
+    {
+        if (string.IsNullOrWhiteSpace(r.Texto) || r.Texto.Length > 500)
+            return Mal(HttpStatusCode.BadRequest, "El texto del QR debe tener entre 1 y 500 caracteres.");
+        using var generador = new QRCoder.QRCodeGenerator();
+        using var datos = generador.CreateQrCode(r.Texto, QRCoder.QRCodeGenerator.ECCLevel.M);
+        return Ok(new QrListaResponse(new QRCoder.SvgQRCode(datos).GetGraphic(8, "#24161A", "#FFFFFF", true, QRCoder.SvgQRCode.SizingMode.ViewBoxAttribute)));
+    }
+
+    /// <summary>Token del enlace QR de la cabecera X-Enlace-Lista, o null.</summary>
+    private static string? TokenEnlace(HttpRequestMessage peticion)
+        => peticion.Headers.TryGetValues("X-Enlace-Lista", out var valores) ? valores.FirstOrDefault() : null;
+
+    private async Task<HttpResponseMessage> ListaPublica(HttpRequestMessage peticion, CancellationToken ct)
+    {
+        var res = await _lista.PublicaAsync(TokenEnlace(peticion), ct);
+        if (res.Error is { } e) return Error(e, mensajeEn404: true);
+        return Ok(new ListaCompraResponse(true, res.Valor!.Productos.Select(p => p.ADto()).ToList()));
+    }
+
+    private async Task<HttpResponseMessage> CrearProductoPublico(HttpRequestMessage peticion, CrearProductoCompraRequest r, CancellationToken ct)
+    {
+        var res = await _lista.AnadirPublicoAsync(TokenEnlace(peticion), r.Nombre, r.Cantidad ?? 1, ct);
+        return res.Error is { } e ? Error(e, mensajeEn404: true) : Respuesta(HttpStatusCode.Created, res.Valor!.ADto());
+    }
+
+    private async Task<HttpResponseMessage> MarcarProductoPublico(HttpRequestMessage peticion, Guid id, MarcarProductoCompraRequest r, CancellationToken ct)
+    {
+        var res = await _lista.MarcarPublicoAsync(TokenEnlace(peticion), id, r.Comprado, ct);
+        return res.Error is { } e ? Error(e, mensajeEn404: true) : Ok(res.Valor!.ADto());
     }
 
     private async Task<HttpResponseMessage> CrearReembolso(CrearReembolsoRequest r, CancellationToken ct)

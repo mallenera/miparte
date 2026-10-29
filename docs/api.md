@@ -42,7 +42,7 @@ El resto de rutas `/api/*` requieren hogar (cabecera o hogar único). Los datos 
 
 ### CORS
 
-Orígenes permitidos: variable de entorno `Cors__OrigenesPermitidos__0` (y `__1`, ...), equivalente a `Cors:OrigenesPermitidos` en configuración. Ejemplo: `Cors__OrigenesPermitidos__0=http://localhost:8080`. Sin configuración no se permite ningún origen cruzado. Cabeceras permitidas: `Authorization`, `Content-Type`, `X-Hogar-Id`. Métodos: GET, POST, PUT, PATCH, DELETE, OPTIONS. Las barras finales del origen se ignoran.
+Orígenes permitidos: variable de entorno `Cors__OrigenesPermitidos__0` (y `__1`, ...), equivalente a `Cors:OrigenesPermitidos` en configuración. Ejemplo: `Cors__OrigenesPermitidos__0=http://localhost:8080`. Sin configuración no se permite ningún origen cruzado. Cabeceras permitidas: `Authorization`, `Content-Type`, `X-Hogar-Id` y `X-Enlace-Lista` (el token de los enlaces QR de la lista de la compra, §3.14). Métodos: GET, POST, PUT, PATCH, DELETE, OPTIONS. Las barras finales del origen se ignoran.
 
 ### Límites de peticiones (429)
 
@@ -52,6 +52,7 @@ Ventana deslizante de 1 minuto, **por usuario** (`sub` del JWT ya validado) y, s
 |---|---|---|
 | Toda la API (salvo `/health`) | 120/min | `Limites__PeticionesPorMinuto` |
 | Costosas: `POST /api/hogares`, `POST /api/invitaciones`, `POST /api/invitaciones/aceptar`, `POST /api/gastos-recurrentes/generar` | 10/min | `Limites__CostosasPorMinuto` |
+| Escrituras públicas de la lista de la compra: `POST /api/lista-compra/publica/productos` y `PUT /api/lista-compra/publica/productos/{id}` (comparten el tope de las costosas; sin sesión cuentan por IP) | 10/min | `Limites__CostosasPorMinuto` |
 | Formulario de contacto: `POST /api/contacto` (ventana de 1 hora; `Retry-After` indica 60 s, el front no reintenta) | 5/hora | `Limites__ContactoPorHora` |
 | Tamaño del cuerpo de la petición (413 al superarlo) | 65536 bytes | `Limites__MaxCuerpoBytes` |
 
@@ -172,7 +173,7 @@ Los gastos personales (§3.6) no entran en la liquidación ni en `gastosTotales`
 |---|---|---|---|---|---|
 | `PUT /api/hogar/aportaciones` | **Permiso `hogar.funciones`.** Fija con qué frecuencia aportan los miembros a la cuenta común (`{ "frecuencia": "unica" \| "mensual" \| "bimestral" \| "trimestral" \| "semestral" \| "anual" }`). Por defecto `mensual`, como en los hogares existentes. Cada aportación hereda la frecuencia del hogar: una periódica cobra su importe una vez por periodo, en el primer mes (bimestral desde enero cobra en enero y cubre enero y febrero); una `unica` cobra una vez, en el mes de su aportación, y no tiene periodo. Cambiarla recalcula también los cobros pasados | `FijarFrecuenciaAportacionRequest` | `FrecuenciaAportacionResponse` 200 | 400 frecuencia vacía o desconocida; 403 sin el permiso; 409 sin hogar o si con la nueva frecuencia el ahorro ya retirado o gastado quedaría sin respaldo (`{ error, falta }`) | permiso `hogar.funciones` |
 | `PUT /api/cuenta-comun/activacion` | **Permiso `hogar.funciones`.** Activa o desactiva la cuenta común del hogar (`{ "activa": true }`). Desactivarla no borra datos: solo bloquea las escrituras de la cuenta y los gastos a su cargo (409) hasta reactivarla. Los hogares que ya tenían datos de cuenta común quedaron activados por la migración | `ActivarCuentaComunRequest` | `{ "activa": bool }` 200 | 403 sin el permiso; 409 sin hogar | permiso `hogar.funciones` |
-| `GET /api/cuenta-comun?mes=YYYY-MM` | Estado al final del mes (incluye `activa` y `partes`, «su parte» por persona; se devuelve aunque la cuenta no esté activada): aportado (mes y acumulado), gastado, saldo, reembolsos pendientes por miembro y fondo (`pendientes[].desdeAhorro`), efectivo, ahorro (del mes, acumulado, ingresado aparte, retirado, gastado y disponible), aportaciones configuradas, y reembolsos, ingresos aparte y retiradas de ahorro del mes. Incluye `extracto` (`ExtractoCuentaComunDto`: efectivo al inicio y al final del mes con sus movimientos, como un extracto bancario; el inicio coincide con el final del mes anterior), `saldoInicial` (`{ fecha, importe }` o null) y `resumen` (`ResumenCuentaMesDto`: filas `hogar`, `ahorro` y `total`, cada una con `inicial` (disponible del mes anterior), `ingresos` (aportaciones del mes a la fila), `ingresosSueltos` (ingresos aparte del mes: a Hogar, o depósitos de ahorro), `gastos` (lo que sale de la fila; en ahorro, incluye las retiradas y los gastos desde el ahorro) y `reembolsos` (lo devuelto a quien adelantó gastos, solo hogar) y `disponible`, que pasa al mes siguiente, y `pendiente` (lo que la cuenta aún debe al cierre por los adelantos de esa fila: Hogar, o Ahorro). El `disponible` de hogar coincide con `efectivo` y el de ahorro con `ahorroDisponible`). `mes` obligatorio | - | `CuentaComunResponse` 200 | 400 mes inválido; 409 sin hogar | miembro |
+| `GET /api/cuenta-comun?mes=YYYY-MM` | Estado al final del mes (incluye `activa` y `partes`, «su parte» por persona; se devuelve aunque la cuenta no esté activada): aportado (mes y acumulado), gastado, saldo, reembolsos pendientes por miembro y fondo (`pendientes[].desdeAhorro`), lo que cada persona debe a la cuenta (`deudas`, `DeudaCuentaDto`; no suma al efectivo) y los movimientos de deuda del mes uno a uno (`movimientosDeuda`, `MovimientoDeudaCuentaDto` con su `id`, para mostrarlos y borrarlos), efectivo, ahorro (del mes, acumulado, ingresado aparte, retirado, gastado y disponible), aportaciones configuradas, y reembolsos, ingresos aparte y retiradas de ahorro del mes. Incluye `extracto` (`ExtractoCuentaComunDto`: efectivo al inicio y al final del mes con sus movimientos, como un extracto bancario; el inicio coincide con el final del mes anterior), `saldoInicial` (`{ fecha, importe }` o null) y `resumen` (`ResumenCuentaMesDto`: filas `hogar`, `ahorro` y `total`, cada una con `inicial` (disponible del mes anterior), `ingresos` (aportaciones del mes a la fila), `ingresosSueltos` (ingresos aparte del mes: a Hogar, o depósitos de ahorro), `gastos` (lo que sale de la fila; en ahorro, incluye las retiradas y los gastos desde el ahorro) y `reembolsos` (lo devuelto a quien adelantó gastos, solo hogar) y `disponible`, que pasa al mes siguiente, y `pendiente` (lo que la cuenta aún debe al cierre por los adelantos de esa fila: Hogar, o Ahorro). El `disponible` de hogar coincide con `efectivo` y el de ahorro con `ahorroDisponible`). `mes` obligatorio | - | `CuentaComunResponse` 200 | 400 mes inválido; 409 sin hogar | miembro |
 | `GET /api/cuenta-comun/movimientos?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` | Extracto de la cuenta línea a línea entre dos fechas (ambas incluidas), para cuadrarlo con el banco. Supone el ahorro en la misma cuenta que el dinero de gastos: un único saldo. Líneas (`tipo`): `saldo_inicial`, `aportacion` (una por persona y mes de cobro, fechada el día 1, importe completo con su parte `ahorro`), `ingreso`, `deposito_ahorro` (entradas, importe positivo); `gasto` y `gasto_ahorro` (solo los que paga la cuenta directamente, `pagadoPor` nulo), `reembolso`, `retirada_ahorro` (salidas, importe negativo; desde `Scripts/20261025210000_retiradas_ahorro_a_gastos.sql` solo quedan retiradas de meses cerrados). `gasto_ahorro_adelantado`: gasto del ahorro que adelantó una persona (`miembroId`), con `importe` 0 porque no mueve el banco y `ahorro` negativo (lo que pasa del ahorro al efectivo hasta reembolsarlo); `saldo` no cambia. Los gastos de la cuenta común que adelanta una persona no salen: el banco solo ve su reembolso. Cada línea lleva `saldo` tras ella, acumulado desde el primer movimiento; `saldoAnterior` es el del día previo a `desde`. El saldo final se reparte en `efectivoFinal` (mismo cálculo que `efectivo` de `GET /api/cuenta-comun`: con `hasta` en el último día del mes coinciden) y `ahorroFinal` (el `ahorroDisponible`). Orden cronológico; en un mismo día, primero las entradas. Se devuelve aunque la cuenta no esté activada | - | `MovimientosCuentaComunResponse` 200 | 400 falta una fecha, formato inválido o `desde` posterior a `hasta`; 409 sin hogar | miembro |
 | `PUT /api/cuenta-comun/saldo-inicial` | Fija (o sustituye) el dinero que había en la cuenta para gastos a una fecha, p. ej. el saldo del banco al empezar a usar la app. Cuenta como un ingreso de esa fecha: los meses anteriores no lo ven. Solo afecta al saldo y al efectivo de gastos, no al ahorro | `FijarSaldoInicialRequest` (`{ fecha, importe }`) | `SaldoInicialDto` 200 | 400 importe negativo, con más de 2 decimales o demasiado grande; 409 sin hogar o cuenta común sin activar | permiso `cuenta.movimientos` |
 | `DELETE /api/cuenta-comun/saldo-inicial` | Quita el saldo inicial | - | 204 | 404 si no hay saldo inicial; 409 sin hogar | permiso `cuenta.movimientos` |
@@ -180,6 +181,8 @@ Los gastos personales (§3.6) no entran en la liquidación ni en `gastosTotales`
 | `PUT /api/cuenta-comun/aportaciones` | Fija lo que aporta un adulto desde un mes (`desde` = día 1); si ya había una de ese mes la sustituye. Importe 0 = deja de aportar. `ahorro` (opcional, 0 por defecto) es la parte del importe que se aparta: el resto queda para gastos | `FijarAportacionRequest` | `AportacionCuentaDto` 200 | 400 `desde` no es día 1, importe o ahorro negativos o con más de 2 decimales, ahorro mayor que el importe, miembro no adulto activo; 409 sin hogar o rebaja del ahorro que dejaría sin respaldo lo ya retirado o gastado desde el ahorro (`{ error, falta }`); 409 también con la cuenta común sin activar | permiso `cuenta.movimientos` |
 | `POST /api/cuenta-comun/reembolsos` | Registra un pago de la cuenta a quien adelantó gastos cargados a ella (`fecha` opcional, por defecto hoy UTC). `desdeAhorro` (opcional, `false` por defecto) indica de qué fondo sale: `true` paga los adelantos hechos desde el ahorro, `false` los de Hogar. Un reembolso es de un solo fondo y se compara con lo pendiente de ese fondo; la respuesta (`ReembolsoCuentaDto`) incluye `desdeAhorro`. Los reembolsos anteriores a este cambio son de Hogar | `CrearReembolsoRequest` | `ReembolsoCuentaDto` 201 | 400 importe o miembro fuera del hogar; 409 importe mayor que lo pendiente (`{ error, pendiente }`) o sin hogar | permiso `cuenta.movimientos` |
 | `DELETE /api/cuenta-comun/reembolsos/{id}` | Elimina un reembolso | - | 204 | 404; 409 sin hogar | permiso `cuenta.movimientos` |
+| `POST /api/cuenta-comun/deudas` | Registra un movimiento de la deuda de una persona con la cuenta común. `tipo`: `adelanto` (la cuenta paga por ella: baja el efectivo, o el ahorro si `desdeAhorro`, y ella le debe ese importe), `devolucion` (ella ingresa para pagar: entra en la cuenta, o en el ahorro) o `compensacion` (la cuenta resta lo que le debe por reembolsos pendientes; no mueve dinero). `fecha` opcional, por defecto hoy UTC. Una devolución o compensación no puede superar lo que la persona debe (409 con `{ error, debe }`); una compensación no puede superar lo pendiente de reembolsarle (409 con `{ error, pendiente }`); un adelanto del ahorro no puede superar el ahorro disponible (409). La deuda aparece en `CuentaComunResponse.deudas` (`DeudaCuentaDto`: `miembroId`, `nombre`, `importe`, `desdeAhorro`) y en el extracto como `adelanto_persona`, `adelanto_persona_ahorro`, `devolucion_deuda`, `devolucion_deuda_ahorro` y `compensacion_deuda` | `CrearDeudaCuentaRequest` | `MovimientoDeudaCuentaDto` 201 | 400 tipo, importe o miembro inválidos; 409 cuenta o ahorro inactivos, sin hogar o superando lo que debe o lo pendiente | permiso `cuenta.movimientos` |
+| `DELETE /api/cuenta-comun/deudas/{id}` | Borra un movimiento de deuda (el `id` sale de `movimientosDeuda` o del extracto). Un **adelanto** al que ya se han aplicado devoluciones o compensaciones no se puede borrar si la deuda quedaría negativa (409 con `{ error, falta }`); una **devolución o compensación del ahorro** tampoco si ese dinero ya se ha usado y el ahorro quedaría sin respaldo (409 con `{ error, falta }`). Borrar una devolución o compensación de Hogar siempre se puede: la deuda y lo pendiente de reembolso vuelven | - | 204 | 404 no existe en el hogar; 409 sin hogar o por las reglas anteriores | permiso `cuenta.movimientos` |
 | `GET /api/cuenta-comun/ingresos` | Lista los ingresos a la cuenta común fuera de aportaciones y ahorro, del más reciente al más antiguo | - | `IngresoCuentaComunDto[]` 200 | 409 sin hogar | cualquier miembro del hogar |
 | `POST /api/cuenta-comun/ingresos` | Registra dinero que entra a la cuenta común (p. ej. lo que pagan las amigas de una cena). Suma al saldo y al efectivo de la cuenta desde su fecha (y al extracto del mes, `extracto.ingresos`); no cambia el ahorro ni los reembolsos pendientes (`fecha` opcional, por defecto hoy UTC) | `CrearIngresoCuentaComunRequest` | `IngresoCuentaComunDto` 201 | 400 importe o miembro fuera del hogar; 409 cuenta inactiva o sin hogar | permiso `cuenta.movimientos` |
 | `DELETE /api/cuenta-comun/ingresos/{id}` | Elimina un ingreso a la cuenta común | - | 204 | 404; 409 sin hogar | permiso `cuenta.movimientos` |
@@ -208,7 +211,7 @@ Un mes cerrado congela sus **gastos** y, con ellos, su reparto, su resumen y su 
 |---|---|---|---|---|---|
 | `GET /api/auditoria?entidad=&entidadId=&limite=&hasta=&despuesDeId=` | Historial de cambios del hogar, del más reciente al más antiguo (empates por `id`). `limite` 1-200 (50 por defecto). Se pagina con el `cuando` y el `id` del último evento recibido, enviados como `hasta` (ISO 8601) y `despuesDeId`; con solo `hasta` se perderían los eventos de un mismo guardado, que comparten `cuando` | - | `EventoAuditoriaDto[]` 200 | 400 límite fuera de 1-200; 403 sin el permiso `historial.ver`; 409 sin hogar | permiso `historial.ver` |
 
-Cada cambio de gasto, gasto recurrente, pago de liquidación, aportación, reembolso, ingreso y retirada de ahorro, perfil, categoría, miembro, invitación y enlace de grupo queda registrado **en la misma transacción** que el cambio (no puede haber cambio sin rastro). `accion`: `crear` (solo `despues`), `editar` (solo los campos que cambian, en `antes` y `despues`), `borrar` (solo `antes`), `vincular` (un usuario queda ligado a un miembro al aceptar una invitación) y `usar` (invitación aceptada). El reparto de un gasto (`repartos`) y el detalle de un perfil (`detalle`) van dentro de su evento. Crear un hogar es un único evento (no se detalla la semilla). Nunca se registran el token de una invitación ni su hash. `autor` es el nombre del miembro vinculado al usuario; `usuarioId` sigue siendo válido aunque ese miembro se desactive.
+Cada cambio de gasto, gasto recurrente, pago de liquidación, aportación, reembolso, deuda con la cuenta, ingreso y retirada de ahorro, perfil, categoría, miembro, invitación, enlace de grupo, producto de la lista de la compra (alta, borrado y cambios de nombre o cantidad; marcarlo como comprado no se registra) y enlace QR de la lista queda registrado **en la misma transacción** que el cambio (no puede haber cambio sin rastro). `accion`: `crear` (solo `despues`), `editar` (solo los campos que cambian, en `antes` y `despues`), `borrar` (solo `antes`), `vincular` (un usuario queda ligado a un miembro al aceptar una invitación) y `usar` (invitación aceptada). El reparto de un gasto (`repartos`) y el detalle de un perfil (`detalle`) van dentro de su evento. Crear un hogar es un único evento (no se detalla la semilla). Nunca se registran el token de una invitación ni su hash. `autor` es el nombre del miembro vinculado al usuario; `usuarioId` sigue siendo válido aunque ese miembro se desactive.
 
 **Origen del cambio (`origen`).** Cada `EventoAuditoriaDto` lleva `origen`: `manual` (por defecto, lo que hace la persona desde la aplicación) o `asistente` (un gasto que propuso el chat y confirmó la persona). Assistant.Api lo marca enviando la cabecera `X-Origen: asistente` en `POST /api/gastos` al confirmar un borrador (`POST /api/chat/confirmar-gasto`, `docs/asistente.md`). El autor (`usuarioId`, `autor`) sigue siendo quien confirma. Es una **etiqueta** que envía el cliente con el JWT de la persona, no una prueba de origen: cualquier otro valor de `X-Origen` cuenta como `manual`. Columna `auditoria.origen` (`manual` o `asistente`), script `Scripts/20261024130000_predeterminado_unico_y_origen_auditoria.sql`.
 
@@ -235,6 +238,29 @@ Formulario de la página pública `/contacto`. Es el único endpoint anónimo ad
 `ContactoRequest`: `{ "motivo": "duda", "email": "ana@ejemplo.es", "mensaje": "...", "nombre": "Ana", "web": null }`. `nombre` es opcional. `web` es un campo trampa que el formulario deja oculto y vacío: si llega relleno, la API responde 204 sin enviar nada. Con 503 el front ofrece escribir directamente a `mipartetuparte@gmail.com`.
 
 Total: 69 endpoints de negocio (5 hogares/yo, 10 miembros/invitaciones/enlaces de grupo, 4 categorías, 5 perfiles, 5 gastos, 6 recurrentes, 8 resumen/liquidación/pagos/ciclos, 16 cuenta común, 5 cierre de mes, 1 auditoría, 3 avisos del navegador, 1 contacto) más `GET /health`.
+
+### 3.14 Lista de la compra
+
+Lista de productos del hogar, con su función propia (`hogar.lista_compra_activa`, por defecto desactivada; la activa un miembro con `hogar.funciones`). Un producto tiene nombre (1-100 caracteres), cantidad (entero de 1 a 999, por defecto 1) y el check de comprado; no se convierte en gastos. Los productos y los enlaces no se borran al desactivar la lista: solo quedan bloqueados los cambios (409).
+
+Los enlaces QR son para quien no tiene cuenta: `POST /api/lista-compra/enlaces` devuelve un token en claro, que no vuelve a verse, y la URL pública es `/compra/{token}` del front. El token solo permite leer, añadir y marcar productos de ese hogar, y caduca a los 7 días; revocarlo lo invalida. En BD solo se guarda su hash (`enlace_lista_compra.token_hash`). Las rutas públicas no piden sesión y llevan el token en la cabecera `X-Enlace-Lista` (está permitida en CORS).
+
+| Método y ruta | Descripción | Request | Response | Errores | Permisos |
+|---|---|---|---|---|---|
+| `GET /api/lista-compra` | Activación y productos del hogar (pendientes primero) | - | `ListaCompraResponse` 200 | 409 sin hogar | miembro |
+| `PUT /api/lista-compra/activacion` | Activa o desactiva la lista del hogar | `ActivarListaCompraRequest` | `{ activa }` 200 | 409 sin hogar | `hogar.funciones` |
+| `POST /api/lista-compra/productos` | Añade un producto | `CrearProductoCompraRequest` (`nombre`, `cantidad` opcional) | `ProductoCompraDto` 201 | 400 nombre o cantidad inválidos; 409 lista desactivada o sin hogar | `lista.compra` |
+| `PUT /api/lista-compra/productos/{id}` | Marca o desmarca como comprado | `MarcarProductoCompraRequest` | `ProductoCompraDto` 200 | 404 no es del hogar; 409 sin hogar | `lista.compra` |
+| `DELETE /api/lista-compra/productos/{id}` | Borra un producto | - | 204 | 404; 409 sin hogar | `lista.compra` |
+| `GET /api/lista-compra/enlaces` | Enlaces QR del hogar, del más reciente al más antiguo, con su estado (`vigente`, `revocado` o `caducado`) y quién los creó. **No lleva el token**: solo se devuelve al crear el enlace; para uno perdido hay que revocarlo y crear otro. Funciona con la lista desactivada | - | `EnlaceListaDto[]` 200 | 409 sin hogar | miembro |
+| `POST /api/lista-compra/enlaces` | Crea un enlace QR (caduca a los 7 días). El token va solo aquí | - | `EnlaceListaCreado` 201 | 409 lista desactivada o sin hogar | `lista.compra` |
+| `DELETE /api/lista-compra/enlaces/{id}` | Revoca un enlace | - | 204 | 404; 409 sin hogar | `lista.compra` |
+| `POST /api/lista-compra/qr` | Genera el SVG de un QR con el texto indicado (1-500 caracteres) | `QrListaRequest` | `QrListaResponse` 200 | 400 texto inválido; 409 sin hogar | sesión |
+| `GET /api/lista-compra/publica` | Lista del enlace QR (sin sesión, cabecera `X-Enlace-Lista`) | - | `ListaCompraResponse` 200 | 404 token desconocido; 409 enlace revocado o caducado, o lista desactivada | enlace QR |
+| `POST /api/lista-compra/publica/productos` | Añade un producto con el enlace QR | `CrearProductoCompraRequest` | `ProductoCompraDto` 201 | 400; 404; 409 | enlace QR (limitado por `Costosa`) |
+| `PUT /api/lista-compra/publica/productos/{id}` | Marca o desmarca un producto del hogar del enlace | `MarcarProductoCompraRequest` | `ProductoCompraDto` 200 | 404; 409 | enlace QR (limitado por `Costosa`) |
+
+`ProductoCompraDto` = `{ id, nombre, cantidad, comprado }`. Permiso `lista.compra`: añadir, marcar, borrar y crear o revocar enlaces; por defecto lo tienen todos los miembros . La plantilla «Solo lectura» no lo incluye.
 
 ## 4. Ejemplos JSON
 
@@ -507,6 +533,97 @@ Categoría marcada «predeterminada para gastos» (`predeterminadoGastos`, opcio
 
 Error típico si se pasa de la deuda (409): `{ "error": "El importe supera la deuda pendiente entre ambos miembros (150.00).", "pendiente": 150.00 }`.
 
+### Deudas con la cuenta común
+
+`POST /api/cuenta-comun/deudas` (permiso `cuenta.movimientos`). `tipo` es `adelanto`, `devolucion` o `compensacion`; `fecha` es opcional (hoy UTC) y `desdeAhorro` también (`false`, el fondo de Hogar):
+
+```json
+{
+  "miembroId": "b0000000-0000-4000-8000-0000000000aa",
+  "tipo": "adelanto", "importe": 40.00, "fecha": "2026-10-05",
+  "concepto": "Fontanero", "desdeAhorro": false
+}
+```
+```json
+{
+  "id": "d0000000-0000-4000-8000-000000000001",
+  "miembroId": "b0000000-0000-4000-8000-0000000000aa",
+  "fecha": "2026-10-05", "importe": 40.00, "tipo": "adelanto", "desdeAhorro": false, "concepto": "Fontanero"
+}
+```
+
+Después, `GET /api/cuenta-comun?mes=2026-10` incluye lo que debe cada persona (el efectivo ya refleja el pago de la cuenta) y los movimientos en el extracto de `GET /api/cuenta-comun/movimientos` (`adelanto_persona`, con importe negativo):
+
+```json
+{
+  "efectivo": 560.00,
+  "deudas": [
+    { "miembroId": "b0000000-0000-4000-8000-0000000000aa", "nombre": "Ana", "importe": 40.00, "desdeAhorro": false }
+  ]
+}
+```
+
+Errores típicos (409): una devolución o compensación por encima de la deuda, `{ "error": "El importe supera lo que debe la persona (40.00).", "debe": 40.00 }`; una compensación por encima de lo que la cuenta le debe por reembolsos, `{ "error": "El importe supera lo que la cuenta le debe por reembolsar (0.00).", "pendiente": 0.00 }`; un adelanto del ahorro que no cabe, `{ "error": "El importe supera el ahorro disponible (20.00).", "disponible": 20.00 }`. Con un `tipo` desconocido responde 400.
+
+`DELETE /api/cuenta-comun/deudas/{id}` responde 204. Rechazos típicos (409): un adelanto ya devuelto, `{ "error": "No se puede borrar este adelanto: dejaría devoluciones o compensaciones sin deuda (20.00).", "falta": 20.00 }`; una devolución del ahorro ya usada, `{ "error": "No se puede borrar este movimiento: ya se ha retirado o gastado ese ahorro (faltarían 60.00).", "falta": 60.00 }`.
+
+**El ahorro cuenta las deudas del ahorro**: el ahorro disponible (y por tanto lo que admiten un gasto desde el ahorro, una retirada o un adelanto) resta lo que la cuenta ha adelantado desde él y suma lo que se ha devuelto o compensado, y los controles que protegen el ahorro (`PUT /api/cuenta-comun/aportaciones` al rebajar el ahorro, `DELETE` de un ingreso de ahorro y el cambio de frecuencia de las aportaciones) también lo tienen en cuenta: responden 409 si dejarían sin respaldo ese dinero.
+
+### Lista de la compra
+
+`PUT /api/lista-compra/activacion` (permiso `hogar.funciones`) y `POST /api/lista-compra/productos` (permiso `lista.compra`; `cantidad` es opcional y vale 1):
+
+```json
+{ "activa": true }
+```
+```json
+{ "nombre": "Leche", "cantidad": 2 }
+```
+```json
+{ "id": "c0000000-0000-4000-8000-000000000001", "nombre": "Leche", "cantidad": 2, "comprado": false }
+```
+
+`GET /api/lista-compra` devuelve los pendientes primero y, en cada grupo, por orden de alta:
+
+```json
+{
+  "activa": true,
+  "productos": [
+    { "id": "c0000000-0000-4000-8000-000000000001", "nombre": "Leche", "cantidad": 2, "comprado": false },
+    { "id": "c0000000-0000-4000-8000-000000000002", "nombre": "Pan", "cantidad": 1, "comprado": true }
+  ]
+}
+```
+
+Compartir por QR: `POST /api/lista-compra/enlaces` devuelve el token **una sola vez**; la URL del QR es `{front}/compra/{token}` y `POST /api/lista-compra/qr` con ese texto devuelve el SVG:
+
+```json
+{ "id": "e0000000-0000-4000-8000-000000000001", "token": "Xk3...q9A", "caducaEn": "2026-11-04T10:00:00+00:00" }
+```
+```json
+{ "texto": "https://miparte.example/compra/Xk3...q9A" }
+```
+```json
+{ "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" ...>...</svg>" }
+```
+
+Quien abre el QR no tiene sesión. Su cliente llama a las rutas públicas con la cabecera `X-Enlace-Lista: <token>`:
+
+```http
+GET /api/lista-compra/publica
+X-Enlace-Lista: Xk3...q9A
+
+POST /api/lista-compra/publica/productos
+X-Enlace-Lista: Xk3...q9A
+{ "nombre": "Huevos", "cantidad": 6 }
+
+PUT /api/lista-compra/publica/productos/c0000000-0000-4000-8000-000000000001
+X-Enlace-Lista: Xk3...q9A
+{ "comprado": true }
+```
+
+Respuestas de error del acceso público: 404 si falta la cabecera o el token no existe; 409 `{ "error": "El enlace de la lista ha caducado o se ha revocado." }` con el enlace caducado o revocado, y 409 `{ "error": "La lista de la compra no está activada en este hogar." }` si el hogar la desactiva. Un producto de otro hogar da 404 aunque se conozca su id.
+
 ## 5. Reglas de negocio útiles para la UI
 
 - **Gastos personales**: un gasto con `personal: true` solo lo ven y lo cambian quien paga (`pagadoPor`). No aparece en las listas, detalle, resumen, dashboard ni historial de los demás, ni siquiera de un admin; los endpoints responden 404 a quien no es el pagador. Solo quien paga puede anotarlo; si intenta anotar uno de otro, 400. Las plantillas recurrentes personales siguen la misma regla. Los gastos personales de un miembro desactivado se conservan, pero nadie los ve hasta que vuelva a activarse.
@@ -520,12 +637,15 @@ Error típico si se pasa de la deuda (409): `{ "error": "El importe supera la de
 - **Semilla al crear hogar**: 5 perfiles para cualquier tipo (`Cuenta común`, `Cuenta común (ahorro)`, `Por partes`, `Porcentaje fijo`, `Individual`; el creador queda con 1 parte en "Por partes" y 100 % en "Porcentaje fijo"). Las 6 categorías estándar (Hipoteca/Alquiler, Alimentación, Suministros, Gastos varios de casa e Hijo con "Por partes"; Ocio personal con "Individual") solo aplican al tipo `hogar`; `piso_compartido`, `viaje`, `evento` y `otro` siembran sus categorías propias con "Por partes" (ver «Tipo de grupo» en §4). El creador es admin y adulto.
 - **Quién soy**: `MiembroDto.esYo` es `true` en el miembro vinculado al usuario autenticado (en `GET /api/miembros`, `PUT` y `DELETE`; el alta siempre devuelve `false`). El front lo usa para saber si mostrar los controles de admin y cuál es "su" miembro.
 - **Roles y permisos**: el rol (`admin` / `miembro`) solo decide la plantilla de permisos de quien no tiene lista propia; el hogar siempre conserva al menos un admin activo y vinculado (409). Un adulto responsable de miembros a cargo activos no se puede desactivar (409).
-- **Permisos por miembro** (`miembro.permisos`, nulo = sin lista propia). `MiembroDto.permisos` devuelve los **efectivos**: la lista propia si existe; si no, la plantilla del rol (admin todos, miembro los marcados «defecto»); los adultos sin cuenta y los a cargo, ninguno. Cualquier adulto con cuenta, **admins incluidos**, puede tener cualquier combinación. Sin el permiso la API responde 403 `{ "error": "No tienes permiso para ..." }`; las lecturas siguen abiertas a cualquier miembro. Un miembro con `permisos.gestionar` los cambia con `PUT /api/miembros/{id}` y `permisos` (lista completa de claves; 400 clave desconocida; 409 si el destino no es un adulto con cuenta). Cambiar el `rol` sin enviar `permisos` devuelve al miembro a la plantilla del rol nuevo. **Invariante**: siempre queda al menos un adulto activo con cuenta con `permisos.gestionar` (409 si el cambio lo impide). Catálogo (18): `gastos.crear`, `gastos.editar`, `gastos.borrar`, `recurrentes.gestionar` (también `POST /api/gastos-recurrentes/generar`), `pagos.registrar` (crear y borrar pagos de liquidación), `mes.cerrar`, `cuenta.movimientos` (aportaciones y reembolsos), `ahorro.movimientos` (ingresos y retiradas), `categorias.gestionar`, `perfiles.gestionar` (todos «defecto»); `mes.reabrir`, `historial.ver`, `miembros.gestionar` (añadir, renombrar a otros, desactivar, responsable), `invitaciones.crear`, `enlaces.gestionar` (crear, listar y revocar enlaces de grupo), `hogar.funciones` (cuenta común, ahorro, recurrentes y modo de liquidación) `permisos.gestionar` y `hogar.eliminar` (eliminar el hogar; sin «defecto»). Cualquiera puede renombrarse a sí mismo. Plantillas para la web (`CatalogoPermisos.Plantillas`): Solo lectura, Colaborador (defecto), Gestor (todo salvo `hogar.funciones`, `permisos.gestionar` y `hogar.eliminar`) y Administrador (todo).
+- **Permisos por miembro** (`miembro.permisos`, nulo = sin lista propia). `MiembroDto.permisos` devuelve los **efectivos**: la lista propia si existe; si no, la plantilla del rol (admin todos, miembro los marcados «defecto»); los adultos sin cuenta y los a cargo, ninguno. Cualquier adulto con cuenta, **admins incluidos**, puede tener cualquier combinación. Sin el permiso la API responde 403 `{ "error": "No tienes permiso para ..." }`; las lecturas siguen abiertas a cualquier miembro. Un miembro con `permisos.gestionar` los cambia con `PUT /api/miembros/{id}` y `permisos` (lista completa de claves; 400 clave desconocida; 409 si el destino no es un adulto con cuenta). Cambiar el `rol` sin enviar `permisos` devuelve al miembro a la plantilla del rol nuevo. **Invariante**: siempre queda al menos un adulto activo con cuenta con `permisos.gestionar` (409 si el cambio lo impide). Catálogo (19): `gastos.crear`, `gastos.editar`, `gastos.borrar`, `recurrentes.gestionar` (también `POST /api/gastos-recurrentes/generar`), `pagos.registrar` (crear y borrar pagos de liquidación), `mes.cerrar`, `cuenta.movimientos` (aportaciones, reembolsos y deudas con la cuenta), `ahorro.movimientos` (ingresos y retiradas), `categorias.gestionar`, `perfiles.gestionar`, `lista.compra` (productos y enlaces QR de la lista de la compra) (todos «defecto»); `mes.reabrir`, `historial.ver`, `miembros.gestionar` (añadir, renombrar a otros, desactivar, responsable), `invitaciones.crear`, `enlaces.gestionar` (crear, listar y revocar enlaces de grupo), `hogar.funciones` (cuenta común, ahorro, recurrentes y modo de liquidación) `permisos.gestionar` y `hogar.eliminar` (eliminar el hogar; sin «defecto»). Cualquiera puede renombrarse a sí mismo. Plantillas para la web (`CatalogoPermisos.Plantillas`): Solo lectura, Colaborador (defecto), Gestor (todo salvo `hogar.funciones`, `permisos.gestionar` y `hogar.eliminar`) y Administrador (todo).
 - **Adultos sin cuenta** (`tipo` adulto y sin `UserId`; p. ej. viajes o eventos). Participan igual que cualquier adulto: pueden pagar gastos (`pagadoPor`), aparecen en los repartos, en la liquidación y en la cuenta común, y no tienen permisos (`permisos` vacío) ni pueden tener rol `admin` (400 al pedirlo; un dato heredado no cuenta como administrador en las comprobaciones de «siempre queda un admin»). Para que quede vinculado a una cuenta: un miembro con `miembros.gestionar` crea una invitación con `miembroId` (`POST /api/invitaciones`, que exige también `miembros.gestionar`) y la persona la acepta con `POST /api/invitaciones/aceptar`. Al aceptar, el miembro queda ligado al usuario (auditoría `vincular`, entidad `miembro`) y conserva su nombre, sus gastos y sus repartos; un usuario no puede figurar dos veces en el hogar y un miembro vinculado no admite otra invitación. Un adulto sin cuenta puede seguir sin cuenta indefinidamente.
 - **Invitaciones**: el `token` en claro solo se devuelve en la respuesta de `POST /api/invitaciones` (en base de datos solo se guarda su hash): mostrarlo o copiarlo en ese momento. El front lo ofrece como enlace `<web>/unirse#token=<token>` (en el fragmento, que el navegador no envía al servidor); la API solo conoce el token y no genera enlaces. Caduca a los 7 días (`caducaEn`) y es de un solo uso. Quien acepta no necesita hogar previo. Si la invitación apunta a un `miembroId`, ese miembro queda vinculado al usuario; si no, hay que enviar `nombre` y entra como adulto con rol `miembro`.
 - **Cierre de mes**: `GET /api/cierres-mes` dice qué meses están cerrados; en ellos la UI debe ocultar o desactivar alta, edición y borrado de gastos y la generación de recurrentes (el servidor los rechaza con 409). Cierra un mes quien tenga el permiso `mes.cerrar` y lo reabre quien tenga `mes.reabrir` (por defecto, cualquier miembro puede cerrar y solo un admin puede reabrir).
 - **Periodo cerrado**: con el periodo propio del hogar cerrado (`POST /api/hogar/cerrar-periodo`), `POST /api/gastos`, `PUT /api/gastos/{id}` (fecha actual o nueva dentro del rango) y `DELETE /api/gastos/{id}` devuelven 409 `{ "error": "El periodo está cerrado." }`. El cierre de mes sigue aplicando por separado. `GET /api/hogares` y `GET /api/yo` devuelven en `HogarResumen` los campos `periodo` (texto `YYYY-MM-DD/YYYY-MM-DD`, o `YYYY-MM-DD/` si está abierto; null si el hogar usa meses), `periodoCerrado` (bool) y `aportacionFrecuencia` (`unica`, `mensual`, `bimestral`, `trimestral`, `semestral` o `anual`). `GET /api/cuenta-comun` incluye también `aportacionFrecuencia`.
 - **Eliminaciones**: categorías y perfiles en uso devuelven 409; los miembros se desactivan, no se borran.
+
+- **Deuda con la cuenta común**: la deuda de una persona (adelantos − devoluciones − compensaciones, por fondo) es un derecho de la cuenta, no efectivo: el adelanto baja el efectivo (o el ahorro) en cuanto se registra, la devolución lo repone y la compensación lo deja como está (quita pendiente de reembolso y lo guarda en el fondo). No entra en la liquidación entre personas. Un adelanto del ahorro no puede superar el ahorro disponible, contando lo ya adelantado y devuelto.
+- **Lista de la compra**: se activa por hogar (`hogar.funciones`). Con ella desactivada, los productos y enlaces se conservan pero cualquier cambio da 409, también desde un enlace QR. Un enlace QR caduca a los 7 días, se puede revocar y solo da acceso a la lista de su hogar. La web la refresca sola cada 15 segundos; la API no tiene notificaciones push de la lista.
 
 ## 6. Nota de cambio en /api/yo
 

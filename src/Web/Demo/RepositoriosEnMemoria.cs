@@ -35,7 +35,8 @@ internal static class RepositoriosEnMemoria
             gastosDelMes.Sum(g => g.Importe),
             gastosDelMes.Select(g => new GastoDeCuenta(g.PagadoPor, g.Fecha, g.Importe, g.PagadoDesdeAhorro)).ToList(),
             a.Hogar.SaldoInicialFecha is { } f && a.Hogar.SaldoInicialImporte is { } i ? new SaldoInicialCuenta(f, i) : null, a.Hogar.AportacionFrecuencia,
-            a.Ingresos.Where(x => x.Fecha < fin).Select(x => new IngresoDeCuenta(x.Fecha, x.Importe)).ToList());
+            a.Ingresos.Where(x => x.Fecha < fin).Select(x => new IngresoDeCuenta(x.Fecha, x.Importe)).ToList(),
+            a.Deudas.Where(d => d.Fecha < fin).Select(d => new MovimientoDeuda(d.MiembroId, d.Fecha, d.Importe, d.Tipo, d.DesdeAhorro)).ToList());
     }
 
     /// <summary>Datos del ahorro; <paramref name="excluirGasto"/> deja fuera un gasto que se estÃ¡ editando.</summary>
@@ -43,7 +44,8 @@ internal static class RepositoriosEnMemoria
         a.Aportaciones.Select(x => new AportacionVigente(x.MiembroId, x.Desde, x.Importe, x.Ahorro, a.Hogar.AportacionFrecuencia)).ToList(),
         a.Depositos.Select(d => new DepositoDeAhorro(d.Fecha, d.Importe)).ToList(),
         a.Retiradas.Sum(r => r.Importe),
-        a.Gastos.Where(g => g.PagadoDesdeAhorro && g.Id != excluirGasto).Sum(g => g.Importe));
+        a.Gastos.Where(g => g.PagadoDesdeAhorro && g.Id != excluirGasto).Sum(g => g.Importe)
+            + AhorroCuenta.UsosPorDeudas(a.Deudas.Select(d => new MovimientoDeuda(d.MiembroId, d.Fecha, d.Importe, d.Tipo, d.DesdeAhorro, d.Id, d.Concepto))).Sum(u => u.Importe));
 }
 
 /// <summary>Resumen, liquidaciÃ³n y pagos en memoria.</summary>
@@ -213,7 +215,8 @@ internal sealed class RepositorioCuentaComunEnMemoria(AlmacenDemo a) : IReposito
                 .Select(r => M(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto)).ToList(),
             a.Depositos.Where(d => d.Fecha >= inicio && d.Fecha < fin).OrderBy(d => d.Fecha).ThenBy(d => d.Id)
                 .Select(d => M(d.Id, d.MiembroId, d.Fecha, d.Importe, d.Concepto)).ToList(),
-            a.Nombres()));
+            a.Nombres(),
+            a.Deudas.Where(d => d.Fecha >= inicio && d.Fecha < fin).OrderBy(d => d.Fecha).ThenBy(d => d.Tipo).ThenBy(d => d.Id).Select(d => new MovimientoDeuda(d.MiembroId, d.Fecha, d.Importe, d.Tipo, d.DesdeAhorro, d.Id, d.Concepto)).ToList()));
     }
 
     public async Task<DatosMovimientosBanco> MovimientosBancoAsync(DateOnly hasta, CancellationToken ct)
@@ -230,7 +233,23 @@ internal sealed class RepositorioCuentaComunEnMemoria(AlmacenDemo a) : IReposito
             a.Depositos.Where(x => x.Fecha <= hasta).Select(x => M(x.Id, x.MiembroId, x.Fecha, x.Importe, x.Concepto)).ToList(),
             a.Retiradas.Where(x => x.Fecha <= hasta).Select(x => M(x.Id, x.MiembroId, x.Fecha, x.Importe, x.Concepto)).ToList(),
             a.Gastos.Where(g => g.ACargoCuentaComun && g.PagadoPor is not null && g.PagadoDesdeAhorro && g.Fecha <= hasta)
-                .Select(g => new GastoPagadoPorCuenta(g.Id, g.Fecha, g.Importe, g.CategoriaId, g.Concepto, true, g.PagadoPor)).ToList());
+                .Select(g => new GastoPagadoPorCuenta(g.Id, g.Fecha, g.Importe, g.CategoriaId, g.Concepto, true, g.PagadoPor)).ToList(),
+            Deudas: a.Deudas.Where(d => d.Fecha <= hasta).Select(d => new MovimientoDeuda(d.MiembroId, d.Fecha, d.Importe, d.Tipo, d.DesdeAhorro, d.Id, d.Concepto)).ToList());
+    }
+
+    public Task<IReadOnlyList<MovimientoDeuda>> DeudasAsync(CancellationToken ct)
+        => Task.FromResult<IReadOnlyList<MovimientoDeuda>>(
+            a.Deudas.Select(d => new MovimientoDeuda(d.MiembroId, d.Fecha, d.Importe, d.Tipo, d.DesdeAhorro, d.Id, d.Concepto)).ToList());
+
+    public Task<MovimientoDeuda?> DeudaAsync(Guid id, CancellationToken ct)
+        => Task.FromResult(a.Deudas.Where(d => d.Id == id).Select(d => new MovimientoDeuda(d.MiembroId, d.Fecha, d.Importe, d.Tipo, d.DesdeAhorro, d.Id, d.Concepto)).FirstOrDefault());
+
+    public Task<bool> EliminarDeudaAsync(Guid id, CancellationToken ct) => Task.FromResult(a.Deudas.RemoveAll(d => d.Id == id) > 0);
+
+    public Task GuardarDeudaAsync(MovimientoDeudaCuenta deuda, CancellationToken ct)
+    {
+        a.Deudas.Add(deuda);
+        return Task.CompletedTask;
     }
 
     public Task<SaldoInicialCuenta?> SaldoInicialAsync(CancellationToken ct)
@@ -267,7 +286,8 @@ internal sealed class RepositorioCuentaComunEnMemoria(AlmacenDemo a) : IReposito
     public Task<IReadOnlyList<UsoDeAhorro>> UsosDeAhorroAsync(CancellationToken ct)
         => Task.FromResult<IReadOnlyList<UsoDeAhorro>>(
             a.Retiradas.Select(r => new UsoDeAhorro(r.Fecha, r.Importe))
-                .Concat(a.Gastos.Where(g => g.PagadoDesdeAhorro).Select(g => new UsoDeAhorro(g.Fecha, g.Importe))).ToList());
+                .Concat(a.Gastos.Where(g => g.PagadoDesdeAhorro).Select(g => new UsoDeAhorro(g.Fecha, g.Importe)))
+                .Concat(AhorroCuenta.UsosPorDeudas(a.Deudas.Select(d => new MovimientoDeuda(d.MiembroId, d.Fecha, d.Importe, d.Tipo, d.DesdeAhorro, d.Id, d.Concepto)))).ToList());
 
     public Task<DatosAhorro> DatosAhorroAsync(CancellationToken ct) => Task.FromResult(RepositoriosEnMemoria.Ahorro(a, null));
 

@@ -208,6 +208,26 @@ public class ModeloCuentaComunTests
     }
 
     [Fact]
+    public async Task Registrar_una_devolucion_del_ahorro_envia_su_tipo_y_fondo_y_limpia_el_formulario()
+    {
+        var (m, api) = Crear(Estado());
+        api.Responde("POST /api/cuenta-comun/deudas", HttpStatusCode.Created,
+            new MovimientoDeudaCuentaDto(Guid.NewGuid(), _marcos.Id, Hoy, 25m, "devolucion", true, null));
+        await m.CargarAsync();
+        m.Deudor = _marcos.Id;
+        m.TipoDeuda = "devolucion";
+        m.DeudaDesdeAhorro = true;
+        m.ImporteDeuda = "25";
+
+        var aviso = await m.RegistrarDeudaAsync();
+
+        Assert.Equal("Devolución registrada", aviso);
+        Assert.Contains("\"tipo\":\"devolucion\"", api.Cuerpos["POST /api/cuenta-comun/deudas"]);
+        Assert.Contains("\"desdeAhorro\":true", api.Cuerpos["POST /api/cuenta-comun/deudas"]);
+        Assert.Equal("", m.ImporteDeuda);
+    }
+
+    [Fact]
     public async Task Un_error_de_la_api_al_ingresar_al_ahorro_queda_en_Error_y_cancela_la_confirmacion()
     {
         var (m, api) = Crear(Estado());

@@ -52,6 +52,12 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
     public DbSet<AportacionCuenta> AportacionesCuenta => Set<AportacionCuenta>();
     /// <summary>Conjunto de <see cref="ReembolsoCuenta"/> del hogar actual.</summary>
     public DbSet<ReembolsoCuenta> ReembolsosCuenta => Set<ReembolsoCuenta>();
+    /// <summary>Conjunto de <see cref="MovimientoDeudaCuenta"/> del hogar actual.</summary>
+    public DbSet<MovimientoDeudaCuenta> MovimientosDeudaCuenta => Set<MovimientoDeudaCuenta>();
+    /// <summary>Conjunto de <see cref="ProductoListaCompra"/> del hogar actual.</summary>
+    public DbSet<ProductoListaCompra> ProductosListaCompra => Set<ProductoListaCompra>();
+    /// <summary>Conjunto de <see cref="EnlaceListaCompra"/> del hogar actual.</summary>
+    public DbSet<EnlaceListaCompra> EnlacesListaCompra => Set<EnlaceListaCompra>();
     /// <summary>Conjunto de <see cref="IngresoCuentaComun"/> del hogar actual.</summary>
     public DbSet<IngresoCuentaComun> IngresosCuentaComun => Set<IngresoCuentaComun>();
 
@@ -224,6 +230,28 @@ public class MiParteDbContext(DbContextOptions<MiParteDbContext> options, IHogar
         {
             e.ToTable("reembolso_cuenta");
             e.Property(x => x.Importe).HasPrecision(12, 2);
+            e.HasQueryFilter(x => x.HogarId == HogarId);
+        });
+
+        b.Entity<MovimientoDeudaCuenta>(e =>
+        {
+            e.ToTable("deuda_cuenta");
+            e.Property(x => x.Importe).HasPrecision(12, 2);
+            e.Property(x => x.Tipo).HasConversion(
+                v => v == TipoMovimientoDeuda.Adelanto ? "adelanto" : v == TipoMovimientoDeuda.Devolucion ? "devolucion" : "compensacion",
+                v => v == "adelanto" ? TipoMovimientoDeuda.Adelanto : v == "devolucion" ? TipoMovimientoDeuda.Devolucion : TipoMovimientoDeuda.Compensacion);
+            e.HasQueryFilter(x => x.HogarId == HogarId);
+        });
+
+        b.Entity<ProductoListaCompra>(e =>
+        {
+            e.ToTable("producto_compra");
+            e.HasQueryFilter(x => x.HogarId == HogarId);
+        });
+
+        b.Entity<EnlaceListaCompra>(e =>
+        {
+            e.ToTable("enlace_lista_compra");
             e.HasQueryFilter(x => x.HogarId == HogarId);
         });
 

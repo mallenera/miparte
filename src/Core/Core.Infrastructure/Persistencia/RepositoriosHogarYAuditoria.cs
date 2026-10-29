@@ -20,7 +20,7 @@ public sealed class RepositorioHogares(MiParteDbContext db) : IRepositorioHogare
                 .Select(h => new
                 {
                     h.Id, h.Nombre, h.CuentaComunActiva, h.AhorroActivo, h.Tipo, h.RecurrentesActivas, h.LiquidacionModo,
-                    h.PeriodoDesde, h.PeriodoHasta, h.PeriodoCerradoEn, h.AportacionFrecuencia,
+                    h.PeriodoDesde, h.PeriodoHasta, h.PeriodoCerradoEn, h.AportacionFrecuencia, h.ListaCompraActiva,
                 })
                 .ToListAsync(ct))
             .Select(h => new Hogar
@@ -28,7 +28,7 @@ public sealed class RepositorioHogares(MiParteDbContext db) : IRepositorioHogare
                 Id = h.Id, Nombre = h.Nombre, CuentaComunActiva = h.CuentaComunActiva, AhorroActivo = h.AhorroActivo, Tipo = h.Tipo,
                 RecurrentesActivas = h.RecurrentesActivas, LiquidacionModo = h.LiquidacionModo,
                 PeriodoDesde = h.PeriodoDesde, PeriodoHasta = h.PeriodoHasta, PeriodoCerradoEn = h.PeriodoCerradoEn,
-                AportacionFrecuencia = h.AportacionFrecuencia,
+                AportacionFrecuencia = h.AportacionFrecuencia, ListaCompraActiva = h.ListaCompraActiva,
             })
             .ToList();
 

@@ -177,6 +177,145 @@ public class ServicioListaCompraTests
         Assert.True(r.Valor!.Comprado);
     }
 
+    [Fact]
+    public async Task Activar_YDesactivar_NoBorranProductos_SoloBloqueanLosCambios()
+    {
+        await Servicio.AnadirAsync(Hogar, "Pan", 1, default);
+
+        await Servicio.ActivarAsync(Hogar, false, default);
+
+        Assert.False(await Servicio.ActivaAsync(Hogar, default));
+        Assert.Single(await Servicio.ListarAsync(Hogar, default));
+        Assert.Equal(TipoError.Conflicto, (await Servicio.AnadirAsync(Hogar, "Leche", 1, default)).Error!.Tipo);
+
+        await Servicio.ActivarAsync(Hogar, true, default);
+        Assert.Null((await Servicio.AnadirAsync(Hogar, "Leche", 1, default)).Error);
+    }
+
+    [Fact]
+    public async Task Anadir_AdmiteUnNombreDeCienCaracteres_YUnaCantidadDe999()
+    {
+        var r = await Servicio.AnadirAsync(Hogar, new string('a', 100), 999, default);
+
+        Assert.Null(r.Error);
+        Assert.Equal(999, r.Valor!.Cantidad);
+    }
+
+    [Fact]
+    public async Task Marcar_YDesmarcar_VuelveAlEstadoAnterior()
+    {
+        var p = (await Servicio.AnadirAsync(Hogar, "Pan", 1, default)).Valor!;
+
+        Assert.True((await Servicio.MarcarAsync(Hogar, p.Id, true, default)).Valor!.Comprado);
+        Assert.False((await Servicio.MarcarAsync(Hogar, p.Id, false, default)).Valor!.Comprado);
+    }
+
+    [Fact]
+    public async Task Eliminar_BorraElProducto_YUnoQueNoExisteNoSeEncuentra()
+    {
+        var p = (await Servicio.AnadirAsync(Hogar, "Pan", 1, default)).Valor!;
+
+        Assert.Null((await Servicio.EliminarAsync(Hogar, p.Id, default)).Error);
+        Assert.Equal(TipoError.NoEncontrado, (await Servicio.EliminarAsync(Hogar, p.Id, default)).Error!.Tipo);
+        Assert.Empty(await Servicio.ListarAsync(Hogar, default));
+    }
+
+    [Fact]
+    public async Task Eliminar_UnProductoDeOtroHogar_NoLoBorra()
+    {
+        var ajeno = new ProductoListaCompra { Id = Guid.NewGuid(), HogarId = Guid.NewGuid(), Nombre = "Ajeno", Cantidad = 1 };
+        _repo.Productos.Add(ajeno);
+
+        var r = await Servicio.EliminarAsync(Hogar, ajeno.Id, default);
+
+        Assert.Equal(TipoError.NoEncontrado, r.Error!.Tipo);
+        Assert.Contains(ajeno, _repo.Productos);
+    }
+
+    [Fact]
+    public async Task CrearEnlace_ConUnaCaducidadPasada_EsInvalido_YConUnaFutura_LaRespeta()
+    {
+        var pasada = await Servicio.CrearEnlaceAsync(Hogar, Ana, _reloj.GetUtcNow().AddMinutes(-1), default);
+        var futura = _reloj.GetUtcNow().AddDays(2);
+        var valida = await Servicio.CrearEnlaceAsync(Hogar, Ana, futura, default);
+
+        Assert.Equal(TipoError.Invalido, pasada.Error!.Tipo);
+        Assert.Equal(futura, valida.Valor!.CaducaEn);
+        Assert.Single(_repo.Enlaces);
+    }
+
+    [Fact]
+    public async Task CadaEnlaceTieneSuPropioToken_YRevocarUnoNoAfectaAlOtro()
+    {
+        var a = (await Servicio.CrearEnlaceAsync(Hogar, Ana, null, default)).Valor!;
+        var b = (await Servicio.CrearEnlaceAsync(Hogar, Ana, null, default)).Valor!;
+
+        await Servicio.RevocarEnlaceAsync(Hogar, a.Id, default);
+
+        Assert.NotEqual(a.Token, b.Token);
+        Assert.Equal(TipoError.Conflicto, (await Servicio.PublicaAsync(a.Token, default)).Error!.Tipo);
+        Assert.Null((await Servicio.PublicaAsync(b.Token, default)).Error);
+    }
+
+    [Fact]
+    public async Task RevocarUnEnlaceDeOtroHogar_NoLoEncuentra_YElEnlaceSigueVigente()
+    {
+        var otroHogar = Guid.NewGuid();
+        _repo.Activas.Add(otroHogar);
+        var ajeno = (await Servicio.CrearEnlaceAsync(otroHogar, Ana, null, default)).Valor!;
+
+        var r = await Servicio.RevocarEnlaceAsync(Hogar, ajeno.Id, default);
+
+        Assert.Equal(TipoError.NoEncontrado, r.Error!.Tipo);
+        Assert.Null((await Servicio.PublicaAsync(ajeno.Token, default)).Error);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task SinToken_ElAccesoPublicoNoEncuentraNada(string? token)
+    {
+        Assert.Equal(TipoError.NoEncontrado, (await Servicio.PublicaAsync(token, default)).Error!.Tipo);
+        Assert.Equal(TipoError.NoEncontrado, (await Servicio.AnadirPublicoAsync(token, "Pan", 1, default)).Error!.Tipo);
+        Assert.Equal(TipoError.NoEncontrado, (await Servicio.MarcarPublicoAsync(token, Guid.NewGuid(), true, default)).Error!.Tipo);
+    }
+
+    [Fact]
+    public async Task ConLaListaDesactivada_ElEnlaceDejaDeServir_YVuelveAServirAlReactivarla()
+    {
+        var e = (await Servicio.CrearEnlaceAsync(Hogar, Ana, null, default)).Valor!;
+
+        await Servicio.ActivarAsync(Hogar, false, default);
+        Assert.Equal(TipoError.Conflicto, (await Servicio.PublicaAsync(e.Token, default)).Error!.Tipo);
+        Assert.Equal(TipoError.Conflicto, (await Servicio.AnadirPublicoAsync(e.Token, "Pan", 1, default)).Error!.Tipo);
+
+        await Servicio.ActivarAsync(Hogar, true, default);
+        Assert.Null((await Servicio.PublicaAsync(e.Token, default)).Error);
+    }
+
+    [Fact]
+    public async Task AnadirPorEnlace_ValidaIgualQueDentro()
+    {
+        var e = (await Servicio.CrearEnlaceAsync(Hogar, Ana, null, default)).Valor!;
+
+        Assert.Equal(TipoError.Invalido, (await Servicio.AnadirPublicoAsync(e.Token, " ", 1, default)).Error!.Tipo);
+        Assert.Equal(TipoError.Invalido, (await Servicio.AnadirPublicoAsync(e.Token, "Pan", 1000, default)).Error!.Tipo);
+        Assert.Empty(_repo.Productos);
+    }
+
+    [Fact]
+    public async Task ElEnlaceExpiraJustoEnSuCaducidad()
+    {
+        var e = (await Servicio.CrearEnlaceAsync(Hogar, Ana, _reloj.GetUtcNow().AddHours(1), default)).Valor!;
+
+        _reloj.Avanzar(TimeSpan.FromMinutes(59));
+        Assert.Null((await Servicio.PublicaAsync(e.Token, default)).Error);
+
+        _reloj.Avanzar(TimeSpan.FromMinutes(1));
+        Assert.Equal(TipoError.Conflicto, (await Servicio.PublicaAsync(e.Token, default)).Error!.Tipo);
+    }
+
     /// <summary>Reloj que el test mueve a mano.</summary>
     private sealed class RelojFalso(DateTimeOffset ahora) : TimeProvider
     {

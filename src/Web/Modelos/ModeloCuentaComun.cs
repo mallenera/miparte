@@ -177,6 +177,7 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
             Adultos = Miembros.Where(m => m.Tipo == TiposMiembro.Adulto && m.Activo).ToList();
             Aportante = Depositante = (Adultos.FirstOrDefault(m => m.EsYo) ?? Adultos.FirstOrDefault())?.Id ?? Guid.Empty;
             Ingresante = (Miembros.FirstOrDefault(m => m.EsYo) ?? Miembros.FirstOrDefault())?.Id ?? Guid.Empty;
+            Deudor = Ingresante;
             await RecargarAsync();
         }
         catch (ApiException e)
@@ -307,7 +308,12 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
             await api.CrearDeudaAsync(new CrearDeudaCuentaRequest(Deudor, TipoDeuda, importe, null, Texto(ConceptoDeuda), DeudaDesdeAhorro));
             ImporteDeuda = "";
             ConceptoDeuda = "";
-            return $"{NombreTipoDeuda(TipoDeuda)} registrado";
+            return TipoDeuda switch
+            {
+                "devolucion" => "Devolución registrada",
+                "compensacion" => "Compensación registrada",
+                _ => "Adelanto registrado",
+            };
         });
 
     /// <summary>Registra un reembolso de la cuenta a quien adelantó gastos.</summary>

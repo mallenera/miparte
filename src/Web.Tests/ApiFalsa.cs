@@ -23,6 +23,9 @@ internal sealed class ApiFalsa : HttpMessageHandler
     /// <summary>Cuerpos JSON recibidos por «MÉTODO ruta» (última petición de cada una).</summary>
     public Dictionary<string, string> Cuerpos { get; } = new();
 
+    /// <summary>Token del enlace QR de la lista de la compra (cabecera X-Enlace-Lista) recibido por «MÉTODO ruta».</summary>
+    public Dictionary<string, string> Enlaces { get; } = new();
+
     public ApiFalsa Responde(string metodoYRuta, HttpStatusCode codigo, object? cuerpo = null)
     {
         _rutas[metodoYRuta] = _ => Respuesta(codigo, cuerpo);
@@ -51,6 +54,7 @@ internal sealed class ApiFalsa : HttpMessageHandler
         Recibidas.Add(clave);
         Consultas.Add(Uri.UnescapeDataString(request.RequestUri.PathAndQuery));
         if (request.Content is not null) Cuerpos[clave] = await request.Content.ReadAsStringAsync(cancellationToken);
+        if (request.Headers.TryGetValues("X-Enlace-Lista", out var enlace)) Enlaces[clave] = enlace.First();
         return _rutas.TryGetValue(clave, out var f)
             ? f(request)
             : Respuesta(HttpStatusCode.NotFound, new { error = $"Sin ruta falsa para {clave}" });

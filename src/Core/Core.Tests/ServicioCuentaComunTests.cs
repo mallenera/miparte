@@ -394,6 +394,125 @@ public class ServicioCuentaComunTests
         Assert.Equal(TipoError.Invalido, r.Error!.Tipo);
     }
 
+    private void AportarConAhorro(decimal ahorro = 50m)
+        => _repo.Aportaciones.Add(new AportacionCuenta { Id = Guid.NewGuid(), HogarId = Hogar, MiembroId = _ana, Desde = Septiembre, Importe = 100m, Ahorro = ahorro });
+
+    [Fact]
+    public async Task AdelantoDelAhorro_TieneEnCuentaLoYaAdelantado_YNoDejaElAhorroEnNegativo()
+    {
+        AportarConAhorro();
+
+        var primero = await Servicio.RegistrarDeudaAsync(Mov(_ana, 30m, desdeAhorro: true), TipoMovimientoDeuda.Adelanto, default);
+        var segundo = await Servicio.RegistrarDeudaAsync(Mov(_ana, 30m, desdeAhorro: true), TipoMovimientoDeuda.Adelanto, default);
+
+        Assert.Null(primero.Error);
+        Assert.Equal(TipoError.Conflicto, segundo.Error!.Tipo);
+        Assert.Equal(20m, segundo.Error.Extra!["disponible"]);
+    }
+
+    [Fact]
+    public async Task UnaDevolucionAlAhorro_ReponeElAhorroParaVolverAAdelantar()
+    {
+        AportarConAhorro();
+        await Servicio.RegistrarDeudaAsync(Mov(_ana, 50m, desdeAhorro: true), TipoMovimientoDeuda.Adelanto, default);
+        Assert.Equal(TipoError.Conflicto, (await Servicio.RegistrarDeudaAsync(Mov(_ana, 10m, desdeAhorro: true), TipoMovimientoDeuda.Adelanto, default)).Error!.Tipo);
+
+        await Servicio.RegistrarDeudaAsync(Mov(_ana, 20m, desdeAhorro: true), TipoMovimientoDeuda.Devolucion, default);
+
+        Assert.Null((await Servicio.RegistrarDeudaAsync(Mov(_ana, 20m, desdeAhorro: true), TipoMovimientoDeuda.Adelanto, default)).Error);
+    }
+
+    [Fact]
+    public async Task LaDeudaDeHogarYLaDelAhorro_SonIndependientes()
+    {
+        AportarConAhorro();
+        await Servicio.RegistrarDeudaAsync(Mov(_ana, 10m), TipoMovimientoDeuda.Adelanto, default);
+
+        // Debe 10 a Hogar, pero nada al ahorro: no puede devolver al ahorro.
+        var alAhorro = await Servicio.RegistrarDeudaAsync(Mov(_ana, 10m, desdeAhorro: true), TipoMovimientoDeuda.Devolucion, default);
+        var aHogar = await Servicio.RegistrarDeudaAsync(Mov(_ana, 10m), TipoMovimientoDeuda.Devolucion, default);
+
+        Assert.Equal(TipoError.Conflicto, alAhorro.Error!.Tipo);
+        Assert.Null(aHogar.Error);
+    }
+
+    [Fact]
+    public async Task CompensacionDelAhorro_UsaLoPendienteDelAhorro_NoLoDeHogar()
+    {
+        AportarConAhorro();
+        _repo.GastadoPor[_ana] = 30m; // la cuenta le debe 30 de Hogar
+        await Servicio.RegistrarDeudaAsync(Mov(_ana, 20m, desdeAhorro: true), TipoMovimientoDeuda.Adelanto, default);
+
+        var sinPendienteDelAhorro = await Servicio.RegistrarDeudaAsync(Mov(_ana, 10m, desdeAhorro: true), TipoMovimientoDeuda.Compensacion, default);
+        _repo.GastadoPorAhorro[_ana] = 30m;
+        var conPendienteDelAhorro = await Servicio.RegistrarDeudaAsync(Mov(_ana, 10m, desdeAhorro: true), TipoMovimientoDeuda.Compensacion, default);
+
+        Assert.Equal(TipoError.Conflicto, sinPendienteDelAhorro.Error!.Tipo);
+        Assert.Null(conPendienteDelAhorro.Error);
+    }
+
+    [Fact]
+    public async Task ElAhorroInactivo_BloqueaLasDeudasDelAhorro_PeroNoLasDeHogar()
+    {
+        _repo.Ahorro = false;
+
+        var delAhorro = await Servicio.RegistrarDeudaAsync(Mov(_ana, 10m, desdeAhorro: true), TipoMovimientoDeuda.Adelanto, default);
+        var deHogar = await Servicio.RegistrarDeudaAsync(Mov(_ana, 10m), TipoMovimientoDeuda.Adelanto, default);
+
+        Assert.Equal(TipoError.Conflicto, delAhorro.Error!.Tipo);
+        Assert.Null(deHogar.Error);
+    }
+
+    [Fact]
+    public async Task ConLaCuentaInactiva_NoSeRegistraNingunTipoDeMovimiento()
+    {
+        _repo.Cuenta = false;
+
+        foreach (var tipo in Enum.GetValues<TipoMovimientoDeuda>())
+            Assert.Equal(TipoError.Conflicto, (await Servicio.RegistrarDeudaAsync(Mov(_ana, 10m), tipo, default)).Error!.Tipo);
+        Assert.Empty(_repo.Deudas);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task UnImporteNoPositivo_EsInvalido(int importe)
+    {
+        var r = await Servicio.RegistrarDeudaAsync(Mov(_ana, importe), TipoMovimientoDeuda.Adelanto, default);
+
+        Assert.Equal(TipoError.Invalido, r.Error!.Tipo);
+        Assert.Empty(_repo.Deudas);
+    }
+
+    [Fact]
+    public async Task UnConceptoDeMasDeDoscientosCaracteres_EsInvalido_YUnoNormalSeRecorta()
+    {
+        var largo = await Servicio.RegistrarDeudaAsync(new(Hogar, _ana, 10m, Septiembre, new string('a', 201)), TipoMovimientoDeuda.Adelanto, default);
+        var normal = await Servicio.RegistrarDeudaAsync(new(Hogar, _ana, 10m, Septiembre, "  Fontanero  "), TipoMovimientoDeuda.Adelanto, default);
+
+        Assert.Equal(TipoError.Invalido, largo.Error!.Tipo);
+        Assert.Equal("Fontanero", normal.Valor!.Concepto);
+    }
+
+    [Fact]
+    public async Task SinFecha_ElMovimientoSeFechaHoy_YGuardaTipoFondoYPersona()
+    {
+        var reloj = new RelojDeDeuda(new DateTimeOffset(2026, 10, 28, 23, 30, 0, TimeSpan.Zero));
+        var servicio = new ServicioCuentaComun(_repo, reloj);
+
+        var r = await servicio.RegistrarDeudaAsync(new(Hogar, _ana, 10m, null, null), TipoMovimientoDeuda.Adelanto, default);
+
+        var d = Assert.Single(_repo.Deudas);
+        Assert.Equal(new DateOnly(2026, 10, 28), d.Fecha);
+        Assert.Equal((Hogar, _ana, TipoMovimientoDeuda.Adelanto, false), (d.HogarId, d.MiembroId, d.Tipo, d.DesdeAhorro));
+        Assert.Equal(d.Id, r.Valor!.Id);
+    }
+
+    private sealed class RelojDeDeuda(DateTimeOffset ahora) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => ahora;
+    }
+
     private sealed class RepositorioFalso : IRepositorioCuentaComun
     {
         public List<Miembro> Miembros { get; } = [];

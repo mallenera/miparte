@@ -221,7 +221,7 @@ public class ModeloCuentaComunTests
 
         var aviso = await m.RegistrarDeudaAsync();
 
-        Assert.Equal("Devolución registrado", aviso);
+        Assert.Equal("Devolución registrada", aviso);
         Assert.Contains("\"tipo\":\"devolucion\"", api.Cuerpos["POST /api/cuenta-comun/deudas"]);
         Assert.Contains("\"desdeAhorro\":true", api.Cuerpos["POST /api/cuenta-comun/deudas"]);
         Assert.Equal("", m.ImporteDeuda);

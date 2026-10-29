@@ -195,7 +195,7 @@ public static class MovimientosBanco
                     break;
                 // Una compensación no mueve el banco; del ahorro sí pasa a él lo que deja de ser pendiente.
                 default:
-                    yield return new(TipoMovimientoBanco.CompensacionDeuda, null, x.Fecha, 0m, x.MiembroId, null, null,
+                    yield return new(TipoMovimientoBanco.CompensacionDeuda, x.Id, x.Fecha, 0m, x.MiembroId, null, x.Concepto,
                         x.DesdeAhorro ? x.Importe : 0m, 0m);
                     break;
             }
@@ -211,7 +211,7 @@ public static class MovimientosBanco
 
     /// <summary>Línea de un movimiento de deuda con el signo de su sentido (los de la cuenta, o los del ahorro).</summary>
     private static MovimientoBanco Deuda(MovimientoDeuda x, TipoMovimientoBanco tipo, int signo)
-        => new(tipo, null, x.Fecha, signo * x.Importe, x.MiembroId, null, null, 0m, 0m);
+        => new(tipo, x.Id, x.Fecha, signo * x.Importe, x.MiembroId, null, x.Concepto, 0m, 0m);
 
     /// <summary>Línea de un movimiento suelto con el signo de su sentido.</summary>
     private static MovimientoBanco Suelto(TipoMovimientoBanco tipo, MovimientoCuenta x, int signo)

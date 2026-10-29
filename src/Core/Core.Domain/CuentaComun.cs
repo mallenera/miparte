@@ -36,8 +36,11 @@ public enum TipoMovimientoDeuda
 /// <summary>
 /// Movimiento de la deuda de <paramref name="MiembroId"/> con la cuenta común, o con su ahorro si <paramref name="DesdeAhorro"/>.
 /// Es aparte de los gastos y de los reembolsos: un pago de la cuenta por una persona no es un gasto del hogar.
+/// <paramref name="Id"/> y <paramref name="Concepto"/> solo vienen cuando el movimiento se lee uno a uno (para borrarlo o mostrarlo); en los
+/// totales agrupados son null.
 /// </summary>
-public sealed record MovimientoDeuda(Guid MiembroId, DateOnly Fecha, decimal Importe, TipoMovimientoDeuda Tipo, bool DesdeAhorro = false);
+public sealed record MovimientoDeuda(
+    Guid MiembroId, DateOnly Fecha, decimal Importe, TipoMovimientoDeuda Tipo, bool DesdeAhorro = false, Guid? Id = null, string? Concepto = null);
 
 /// <summary>Lo que una persona debe a la cuenta común (o a su ahorro) por adelantos aún no devueltos ni compensados.</summary>
 public sealed record DeudaMiembro(Guid MiembroId, decimal Importe, bool DesdeAhorro = false);

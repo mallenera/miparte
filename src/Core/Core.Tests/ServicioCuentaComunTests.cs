@@ -508,6 +508,169 @@ public class ServicioCuentaComunTests
         Assert.Equal(d.Id, r.Valor!.Id);
     }
 
+    private async Task<Guid> Registrar(decimal importe, TipoMovimientoDeuda tipo, bool desdeAhorro = false, Guid? miembro = null)
+    {
+        var r = await Servicio.RegistrarDeudaAsync(Mov(miembro ?? _ana, importe, desdeAhorro: desdeAhorro), tipo, default);
+        Assert.Null(r.Error);
+        return r.Valor!.Id;
+    }
+
+    [Fact]
+    public async Task BorrarUnaDeudaQueNoExiste_NoLaEncuentra()
+    {
+        var r = await Servicio.EliminarDeudaAsync(Guid.NewGuid(), default);
+
+        Assert.Equal(TipoError.NoEncontrado, r.Error!.Tipo);
+    }
+
+    [Fact]
+    public async Task BorrarUnAdelantoSinNadaAplicado_LoQuitaYLaDeudaDesaparece()
+    {
+        var adelanto = await Registrar(40m, TipoMovimientoDeuda.Adelanto);
+
+        var r = await Servicio.EliminarDeudaAsync(adelanto, default);
+
+        Assert.Null(r.Error);
+        Assert.Empty(_repo.Deudas);
+        Assert.Empty(MiParte.Core.Domain.CuentaComun.Deudas(await _repo.DeudasAsync(default)));
+    }
+
+    [Fact]
+    public async Task UnAdelantoAlQueYaSeAplicoUnaDevolucion_NoSePuedeBorrar_PeroUnaDevolucionSi()
+    {
+        var adelanto = await Registrar(50m, TipoMovimientoDeuda.Adelanto);
+        var devolucion = await Registrar(20m, TipoMovimientoDeuda.Devolucion);
+
+        var sinSitio = await Servicio.EliminarDeudaAsync(adelanto, default);
+        Assert.Equal(TipoError.Conflicto, sinSitio.Error!.Tipo);
+        Assert.Equal(20m, sinSitio.Error.Extra!["falta"]);
+        Assert.Equal(2, _repo.Deudas.Count);
+
+        // Quitar la devolución vuelve a dejar la deuda entera, y entonces sí se puede borrar el adelanto.
+        Assert.Null((await Servicio.EliminarDeudaAsync(devolucion, default)).Error);
+        Assert.Null((await Servicio.EliminarDeudaAsync(adelanto, default)).Error);
+        Assert.Empty(_repo.Deudas);
+    }
+
+    [Fact]
+    public async Task ConDosAdelantos_SePuedeBorrarUnoMientrasLaDeudaRestanteCubraLoDevuelto()
+    {
+        var primero = await Registrar(30m, TipoMovimientoDeuda.Adelanto);
+        var segundo = await Registrar(50m, TipoMovimientoDeuda.Adelanto);
+        await Registrar(25m, TipoMovimientoDeuda.Devolucion);
+
+        // Debe 55: sin el primer adelanto quedarían 25, justo lo devuelto; sin el segundo, -5.
+        Assert.Null((await Servicio.EliminarDeudaAsync(primero, default)).Error);
+        var r = await Servicio.EliminarDeudaAsync(segundo, default);
+
+        Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
+    }
+
+    [Fact]
+    public async Task UnaCompensacionSePuedeBorrar_YLaDeudaVuelve()
+    {
+        _repo.GastadoPor[_ana] = 30m;
+        await Registrar(20m, TipoMovimientoDeuda.Adelanto);
+        var compensacion = await Registrar(20m, TipoMovimientoDeuda.Compensacion);
+        Assert.Empty(MiParte.Core.Domain.CuentaComun.Deudas(await _repo.DeudasAsync(default)));
+
+        var r = await Servicio.EliminarDeudaAsync(compensacion, default);
+
+        Assert.Null(r.Error);
+        Assert.Equal(20m, Assert.Single(MiParte.Core.Domain.CuentaComun.Deudas(await _repo.DeudasAsync(default))).Importe);
+    }
+
+    [Fact]
+    public async Task LasDeudasDeHogarYDelAhorro_SeBorranPorSeparado()
+    {
+        AportarConAhorro();
+        var deHogar = await Registrar(10m, TipoMovimientoDeuda.Adelanto);
+        await Registrar(10m, TipoMovimientoDeuda.Devolucion);
+        var delAhorro = await Registrar(10m, TipoMovimientoDeuda.Adelanto, desdeAhorro: true);
+
+        // La devolución de Hogar no cubre el adelanto del ahorro, pero sí le quita el sitio al de Hogar.
+        Assert.Equal(TipoError.Conflicto, (await Servicio.EliminarDeudaAsync(deHogar, default)).Error!.Tipo);
+        Assert.Null((await Servicio.EliminarDeudaAsync(delAhorro, default)).Error);
+    }
+
+    // ----- El ahorro cuenta las deudas -----
+
+    [Fact]
+    public async Task UnaDevolucionAlAhorroYaUsada_NoSePuedeBorrar()
+    {
+        AportarConAhorro();
+        await Registrar(50m, TipoMovimientoDeuda.Adelanto, desdeAhorro: true);
+        var devolucion = await Registrar(50m, TipoMovimientoDeuda.Devolucion, desdeAhorro: true);
+        _repo.Retiradas.Add(new RetiradaAhorro { Id = Guid.NewGuid(), HogarId = Hogar, MiembroId = _ana, Fecha = Septiembre.AddDays(7), Importe = 50m });
+
+        var r = await Servicio.EliminarDeudaAsync(devolucion, default);
+
+        Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
+        Assert.Equal(50m, r.Error.Extra!["falta"]);
+        Assert.Equal(2, _repo.Deudas.Count);
+    }
+
+    [Fact]
+    public async Task UnaDevolucionAlAhorroSinUsar_SePuedeBorrar()
+    {
+        AportarConAhorro();
+        await Registrar(50m, TipoMovimientoDeuda.Adelanto, desdeAhorro: true);
+        var devolucion = await Registrar(20m, TipoMovimientoDeuda.Devolucion, desdeAhorro: true);
+
+        // El ahorro quedaba en 20 (50 − 50 + 20): quitar la devolución lo deja en 0, que cubre todo lo usado.
+        Assert.Null((await Servicio.EliminarDeudaAsync(devolucion, default)).Error);
+    }
+
+    [Fact]
+    public async Task RebajarElAhorroDeUnaAportacion_TieneEnCuentaLoAdelantadoDesdeElAhorro()
+    {
+        AportarConAhorro(50m);
+        await Registrar(50m, TipoMovimientoDeuda.Adelanto, desdeAhorro: true); // el ahorro disponible queda en 0
+
+        var r = await Servicio.FijarAportacionAsync(new(Hogar, _ana, Septiembre, 100m, 20m), default);
+
+        Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
+        Assert.Equal(30m, r.Error.Extra!["falta"]);
+    }
+
+    [Fact]
+    public async Task UnaDevolucionDelAhorro_DaSitioParaRebajarElAhorroDeUnaAportacion()
+    {
+        AportarConAhorro(50m);
+        await Registrar(50m, TipoMovimientoDeuda.Adelanto, desdeAhorro: true);
+        await Registrar(30m, TipoMovimientoDeuda.Devolucion, desdeAhorro: true);
+
+        // Usado neto: 20; lo ahorrado tras rebajar a 20 cubre justo.
+        var r = await Servicio.FijarAportacionAsync(new(Hogar, _ana, Septiembre, 100m, 20m), default);
+
+        Assert.Null(r.Error);
+    }
+
+    [Fact]
+    public async Task BorrarUnIngresoDeAhorro_TieneEnCuentaLasDeudasDelAhorro()
+    {
+        AportarConAhorro(0m);
+        var deposito = await Servicio.CrearDepositoAsync(Mov(_ana, 100m), default);
+        await Registrar(80m, TipoMovimientoDeuda.Adelanto, desdeAhorro: true);
+
+        var r = await Servicio.EliminarDepositoAsync(deposito.Valor!.Id, default);
+
+        Assert.Equal(TipoError.Conflicto, r.Error!.Tipo);
+        Assert.Equal(80m, r.Error.Extra!["falta"]);
+    }
+
+    [Fact]
+    public async Task CambiarLaFrecuencia_TieneEnCuentaLasDeudasDelAhorro()
+    {
+        AportarConAhorro(50m);
+        await Registrar(50m, TipoMovimientoDeuda.Adelanto, desdeAhorro: true);
+
+        // Con frecuencia única solo cobra la primera vez: el mismo ahorro de septiembre, así que sigue cubriendo.
+        var r = await Servicio.CambiarFrecuenciaAsync(FrecuenciaAportacion.Unica, default);
+
+        Assert.Null(r.Error);
+    }
+
     private sealed class RelojDeDeuda(DateTimeOffset ahora) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => ahora;
@@ -600,10 +763,12 @@ public class ServicioCuentaComunTests
                 Depositos.Where(d => d.Id != excluir).Select(d => new DepositoDeAhorro(d.Fecha, d.Importe)).ToList());
 
         public Task<IReadOnlyList<UsoDeAhorro>> UsosDeAhorroAsync(CancellationToken ct)
-            => Task.FromResult<IReadOnlyList<UsoDeAhorro>>(Retiradas.Select(r => new UsoDeAhorro(r.Fecha, r.Importe)).ToList());
+            => Task.FromResult<IReadOnlyList<UsoDeAhorro>>(
+                Retiradas.Select(r => new UsoDeAhorro(r.Fecha, r.Importe)).Concat(AhorroCuenta.UsosPorDeudas(DeudasDeDominio())).ToList());
 
         public async Task<DatosAhorro> DatosAhorroAsync(CancellationToken ct)
-            => new(Vigentes(), await DepositosAsync(null, ct), Retiradas.Sum(r => r.Importe), 0m);
+            => new(Vigentes(), await DepositosAsync(null, ct), Retiradas.Sum(r => r.Importe),
+                AhorroCuenta.UsosPorDeudas(DeudasDeDominio()).Sum(u => u.Importe));
 
         // Los fakes solo modelan el fondo de Hogar: lo del ahorro se prueba en los tests de dominio y de la BD.
         public Task<decimal> GastadoACargoAsync(Guid miembroId, bool desdeAhorro, CancellationToken ct)
@@ -632,9 +797,16 @@ public class ServicioCuentaComunTests
 
         public List<MovimientoDeudaCuenta> Deudas { get; } = [];
 
+        private IEnumerable<MovimientoDeuda> DeudasDeDominio()
+            => Deudas.Select(d => new MovimientoDeuda(d.MiembroId, d.Fecha, d.Importe, d.Tipo, d.DesdeAhorro, d.Id, d.Concepto));
+
         public Task<IReadOnlyList<MovimientoDeuda>> DeudasAsync(CancellationToken ct)
-            => Task.FromResult<IReadOnlyList<MovimientoDeuda>>(
-                Deudas.Select(d => new MovimientoDeuda(d.MiembroId, d.Fecha, d.Importe, d.Tipo, d.DesdeAhorro)).ToList());
+            => Task.FromResult<IReadOnlyList<MovimientoDeuda>>(DeudasDeDominio().ToList());
+
+        public Task<MovimientoDeuda?> DeudaAsync(Guid id, CancellationToken ct)
+            => Task.FromResult(DeudasDeDominio().FirstOrDefault(d => d.Id == id));
+
+        public Task<bool> EliminarDeudaAsync(Guid id, CancellationToken ct) => Task.FromResult(Deudas.RemoveAll(d => d.Id == id) > 0);
 
         public Task GuardarDeudaAsync(MovimientoDeudaCuenta deuda, CancellationToken ct)
         {

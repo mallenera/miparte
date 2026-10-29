@@ -87,6 +87,59 @@ public class ServidorDemoDeudaYListaTests
         Assert.Equal(HttpStatusCode.BadRequest, error.Codigo);
     }
 
+    [Fact]
+    public async Task La_demo_lista_los_movimientos_del_mes_y_permite_borrarlos()
+    {
+        var api = Cliente();
+        var yo = await Yo(api);
+        var creado = await api.CrearDeudaAsync(new CrearDeudaCuentaRequest(yo.Id, "adelanto", 40m, new DateOnly(2026, 10, 5), "Fontanero"));
+
+        var cuenta = await api.ObtenerCuentaComunAsync("2026-10");
+        var movimiento = Assert.Single(cuenta.MovimientosDeuda!);
+        Assert.Equal((creado.Id, "Fontanero", 40m), (movimiento.Id, movimiento.Concepto, movimiento.Importe));
+
+        await api.EliminarDeudaAsync(creado.Id);
+
+        var despues = await api.ObtenerCuentaComunAsync("2026-10");
+        Assert.Empty(despues.MovimientosDeuda!);
+        Assert.Empty(despues.Deudas!);
+    }
+
+    [Fact]
+    public async Task En_la_demo_un_adelanto_ya_devuelto_no_se_puede_borrar_y_uno_inexistente_no_se_encuentra()
+    {
+        var api = Cliente();
+        var yo = await Yo(api);
+        var adelanto = await api.CrearDeudaAsync(new CrearDeudaCuentaRequest(yo.Id, "adelanto", 50m, null, null));
+        await api.CrearDeudaAsync(new CrearDeudaCuentaRequest(yo.Id, "devolucion", 20m, null, null));
+
+        var rechazado = await Assert.ThrowsAsync<ApiException>(() => api.EliminarDeudaAsync(adelanto.Id));
+        var ausente = await Assert.ThrowsAsync<ApiException>(() => api.EliminarDeudaAsync(Guid.NewGuid()));
+
+        Assert.Equal(HttpStatusCode.Conflict, rechazado.Codigo);
+        Assert.Equal(HttpStatusCode.NotFound, ausente.Codigo);
+    }
+
+    [Fact]
+    public async Task En_la_demo_el_ahorro_cuenta_lo_que_la_cuenta_adelanta_desde_el_ahorro()
+    {
+        var api = Cliente();
+        var yo = await Yo(api);
+        await api.CrearDepositoAhorroAsync(new CrearDepositoAhorroRequest(yo.Id, 100m, null, null)); // para no depender de lo que traiga la demo
+        var disponible = (await api.ObtenerCuentaComunAsync("2026-10")).AhorroDisponible;
+
+        // Adelantar más de lo que hay en el ahorro se rechaza; adelantar lo que hay lo deja a cero, y una devolución lo repone.
+        var exceso = await Assert.ThrowsAsync<ApiException>(() =>
+            api.CrearDeudaAsync(new CrearDeudaCuentaRequest(yo.Id, "adelanto", disponible + 1m, null, null, DesdeAhorro: true)));
+        Assert.Equal(HttpStatusCode.Conflict, exceso.Codigo);
+        await api.CrearDeudaAsync(new CrearDeudaCuentaRequest(yo.Id, "adelanto", disponible, null, null, DesdeAhorro: true));
+        Assert.Equal(0m, (await api.ObtenerCuentaComunAsync("2026-10")).AhorroDisponible);
+
+        await api.CrearDeudaAsync(new CrearDeudaCuentaRequest(yo.Id, "devolucion", 10m, null, null, DesdeAhorro: true));
+
+        Assert.Equal(10m, (await api.ObtenerCuentaComunAsync("2026-10")).AhorroDisponible);
+    }
+
     // ----- Lista de la compra -----
 
     [Fact]

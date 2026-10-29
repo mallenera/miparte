@@ -146,6 +146,7 @@ public sealed partial class ServidorDemo
             ("lista-compra", 5, "PUT") when subruta == "publica" && id is { } i => await MarcarProductoPublico(peticion, i, (await Cuerpo<MarcarProductoCompraRequest>())!, ct),
             ("cuenta-comun", 3, "POST") when subruta == "reembolsos" => await CrearReembolso((await Cuerpo<CrearReembolsoRequest>())!, ct),
             ("cuenta-comun", 3, "POST") when subruta == "deudas" => await CrearDeuda((await Cuerpo<CrearDeudaCuentaRequest>())!, ct),
+            ("cuenta-comun", 4, "DELETE") when subruta == "deudas" && id is { } i => Sin(await _cuenta.EliminarDeudaAsync(i, ct)),
             ("cuenta-comun", 4, "DELETE") when subruta == "reembolsos" && id is { } i => Sin(await _cuenta.EliminarReembolsoAsync(i, ct)),
             ("cuenta-comun", 3, "GET") when subruta == "movimientos" => await MovimientosCuentaComun(uri, ct),
             ("cuenta-comun", 3, "GET") when subruta == "ingresos" => Ok((await _cuenta.ListarIngresosAsync(ct)).Select(i => i.ADto()).ToList()),

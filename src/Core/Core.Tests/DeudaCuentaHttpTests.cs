@@ -217,6 +217,144 @@ public class DeudaCuentaHttpTests
         Assert.Equal(estado.Efectivo, banco.EfectivoFinal);
     }
 
+    // ----- Borrar movimientos de deuda y verlos por mes -----
+
+    private static async Task<Guid> NuevaDeuda(HttpClient c, Guid miembro, string tipo, decimal importe, bool desdeAhorro = false, string? concepto = null, DateOnly? fecha = null)
+    {
+        var r = await c.PostAsJsonAsync("/api/cuenta-comun/deudas", new CrearDeudaCuentaRequest(miembro, tipo, importe, fecha ?? Octubre, concepto, desdeAhorro));
+        return (await Leer<MovimientoDeudaCuentaDto>(r, HttpStatusCode.Created)).Id;
+    }
+
+    [Fact]
+    public async Task ElEstadoDelMes_ListaLosMovimientosDeDeuda_ConIdConceptoYFondo()
+    {
+        var e = await Montar(ahorro: 50m);
+        var adelanto = await NuevaDeuda(e.Admin, e.Ana, "adelanto", 40m, concepto: "Fontanero");
+        await NuevaDeuda(e.Admin, e.Ana, "devolucion", 15m, desdeAhorro: false, fecha: new DateOnly(2026, 10, 6));
+        await NuevaDeuda(e.Admin, e.Ana, "adelanto", 10m, desdeAhorro: true, fecha: new DateOnly(2026, 9, 12)); // de otro mes
+
+        var octubre = await Estado(e.Admin);
+
+        Assert.Equal(["adelanto", "devolucion"], octubre.MovimientosDeuda!.Select(m => m.Tipo));
+        var primero = octubre.MovimientosDeuda![0];
+        Assert.Equal((adelanto, "Fontanero", false, 40m), (primero.Id, primero.Concepto, primero.DesdeAhorro, primero.Importe));
+        // Septiembre solo tiene el suyo.
+        var septiembre = await Leer<CuentaComunResponse>(await e.Admin.GetAsync("/api/cuenta-comun?mes=2026-09"));
+        Assert.Equal([true], septiembre.MovimientosDeuda!.Select(m => m.DesdeAhorro));
+    }
+
+    [Fact]
+    public async Task ElDetalleDelMes_PoneElAdelantoAntesQueLaDevolucionDelMismoDia()
+    {
+        var e = await Montar();
+        // Tres movimientos del mismo día: los ids son aleatorios, así que el orden tiene que salir del tipo y no del azar.
+        for (var vuelta = 0; vuelta < 3; vuelta++)
+        {
+            await NuevaDeuda(e.Admin, e.Ana, "adelanto", 40m, fecha: Octubre);
+            await NuevaDeuda(e.Admin, e.Ana, "devolucion", 10m, fecha: Octubre);
+            await NuevaDeuda(e.Admin, e.Ana, "compensacion", 5m, fecha: Octubre);
+        }
+
+        var tipos = (await Estado(e.Admin)).MovimientosDeuda!.Select(m => m.Tipo);
+
+        Assert.Equal(["adelanto", "adelanto", "adelanto", "devolucion", "devolucion", "devolucion", "compensacion", "compensacion", "compensacion"], tipos);
+    }
+
+    [Fact]
+    public async Task BorrarUnAdelanto_LoQuita_YElEfectivoYLaDeudaVuelven()
+    {
+        var e = await Montar();
+        var antes = await Estado(e.Admin);
+        var adelanto = await NuevaDeuda(e.Admin, e.Ana, "adelanto", 40m);
+
+        var r = await e.Admin.DeleteAsync($"/api/cuenta-comun/deudas/{adelanto}");
+        var despues = await Estado(e.Admin);
+
+        Assert.Equal(HttpStatusCode.NoContent, r.StatusCode);
+        Assert.Equal(antes.Efectivo, despues.Efectivo);
+        Assert.Empty(despues.Deudas!);
+        Assert.Empty(despues.MovimientosDeuda!);
+    }
+
+    [Fact]
+    public async Task BorrarUnAdelantoYaDevuelto_Es409ConLoQueFalta_YLaDevolucionSePuedeBorrar()
+    {
+        var e = await Montar();
+        var adelanto = await NuevaDeuda(e.Admin, e.Ana, "adelanto", 50m);
+        var devolucion = await NuevaDeuda(e.Admin, e.Ana, "devolucion", 20m);
+
+        var rechazado = await e.Admin.DeleteAsync($"/api/cuenta-comun/deudas/{adelanto}");
+        var cuerpo = await Leer<JsonElement>(rechazado, HttpStatusCode.Conflict);
+        Assert.Equal(20m, cuerpo.GetProperty("falta").GetDecimal());
+
+        Assert.Equal(HttpStatusCode.NoContent, (await e.Admin.DeleteAsync($"/api/cuenta-comun/deudas/{devolucion}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await e.Admin.DeleteAsync($"/api/cuenta-comun/deudas/{adelanto}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task BorrarUnaDeudaQueNoExiste_Es404_YSinElPermiso403()
+    {
+        var sin = await Montar(permisosDeBeto: []);
+        var con = await Montar(permisosDeBeto: [CatalogoPermisos.CuentaMovimientos]);
+        var adelanto = await NuevaDeuda(sin.Admin, sin.Ana, "adelanto", 10m);
+
+        Assert.Equal(HttpStatusCode.NotFound, (await con.Miembro.DeleteAsync($"/api/cuenta-comun/deudas/{Guid.NewGuid()}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await sin.Miembro.DeleteAsync($"/api/cuenta-comun/deudas/{adelanto}")).StatusCode);
+        Assert.Single((await Estado(sin.Admin)).Deudas!);
+    }
+
+    [Fact]
+    public async Task UnaDeudaDeOtroHogar_NoSePuedeBorrar()
+    {
+        var uno = await Montar();
+        var otro = await Montar();
+        var ajena = await NuevaDeuda(otro.Admin, otro.Ana, "adelanto", 10m);
+
+        var r = await uno.Admin.DeleteAsync($"/api/cuenta-comun/deudas/{ajena}");
+
+        Assert.Equal(HttpStatusCode.NotFound, r.StatusCode);
+        Assert.Single((await Estado(otro.Admin)).Deudas!);
+    }
+
+    [Fact]
+    public async Task BorrarUnaDevolucionDelAhorroYaUsada_Es409()
+    {
+        var e = await Montar(ahorro: 50m); // dos meses de 50: 100 de ahorro
+        await NuevaDeuda(e.Admin, e.Ana, "adelanto", 100m, desdeAhorro: true);
+        var devolucion = await NuevaDeuda(e.Admin, e.Ana, "devolucion", 100m, desdeAhorro: true);
+        // Se vuelve a usar el ahorro repuesto: ya no se puede quitar lo devuelto.
+        await NuevaDeuda(e.Admin, e.Beto, "adelanto", 100m, desdeAhorro: true);
+
+        var r = await e.Admin.DeleteAsync($"/api/cuenta-comun/deudas/{devolucion}");
+
+        var cuerpo = await Leer<JsonElement>(r, HttpStatusCode.Conflict);
+        Assert.Equal(100m, cuerpo.GetProperty("falta").GetDecimal());
+    }
+
+    [Fact]
+    public async Task RebajarElAhorroDeUnaAportacion_TieneEnCuentaLoAdelantadoDesdeElAhorro()
+    {
+        var e = await Montar(ahorro: 50m);
+        await NuevaDeuda(e.Admin, e.Ana, "adelanto", 100m, desdeAhorro: true); // gasta todo el ahorro de septiembre y octubre
+
+        var r = await e.Admin.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(e.Ana, new DateOnly(2026, 9, 1), 300m, 0m));
+
+        Assert.Equal(HttpStatusCode.Conflict, r.StatusCode);
+    }
+
+    [Fact]
+    public async Task ElGastoDesdeElAhorro_TieneEnCuentaLoAdelantadoPorLaCuentaDesdeElAhorro()
+    {
+        var e = await Montar(ahorro: 50m);
+        await NuevaDeuda(e.Admin, e.Ana, "adelanto", 90m, desdeAhorro: true); // quedan 10 de ahorro
+
+        var r = await e.Admin.PostAsJsonAsync("/api/cuenta-comun/deudas",
+            new CrearDeudaCuentaRequest(e.Ana, "adelanto", 20m, Octubre, null, DesdeAhorro: true));
+
+        var cuerpo = await Leer<JsonElement>(r, HttpStatusCode.Conflict);
+        Assert.Equal(10m, cuerpo.GetProperty("disponible").GetDecimal());
+    }
+
     [Fact]
     public async Task ResumenMensual_RecogeLosMovimientos_ConElMismoEfectivoQueElEstado()
     {

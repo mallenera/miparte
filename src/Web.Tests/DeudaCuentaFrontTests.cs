@@ -179,6 +179,41 @@ public class DeudaCuentaFrontTests
     }
 
     [Theory]
+    [InlineData("adelanto", "Adelanto eliminado")]
+    [InlineData("devolucion", "Devolución eliminado")]
+    [InlineData("compensacion", "Compensación eliminado")]
+    public async Task Borrar_un_movimiento_de_deuda_lo_envia_y_avisa(string tipo, string aviso)
+    {
+        var (m, api) = Cuenta();
+        var id = Guid.NewGuid();
+        api.Responde($"DELETE /api/cuenta-comun/deudas/{id}", HttpStatusCode.NoContent);
+        await m.CargarAsync();
+        m.ConfirmandoEliminar = id;
+
+        var resultado = await m.EliminarDeudaAsync(new MovimientoDeudaCuentaDto(id, AnaId, Hoy, 10m, tipo, false, null));
+
+        Assert.Equal(aviso, resultado);
+        Assert.Contains($"DELETE /api/cuenta-comun/deudas/{id}", api.Recibidas);
+        Assert.Null(m.ConfirmandoEliminar);
+    }
+
+    [Fact]
+    public async Task Un_rechazo_al_borrar_una_deuda_queda_en_Error_y_no_cierra_la_confirmacion_a_medias()
+    {
+        var (m, api) = Cuenta();
+        var id = Guid.NewGuid();
+        api.Error($"DELETE /api/cuenta-comun/deudas/{id}", HttpStatusCode.Conflict, "No se puede borrar este adelanto.");
+        await m.CargarAsync();
+        m.ConfirmandoEliminar = id;
+
+        var resultado = await m.EliminarDeudaAsync(new MovimientoDeudaCuentaDto(id, AnaId, Hoy, 10m, "adelanto", false, null));
+
+        Assert.Null(resultado);
+        Assert.Contains("No se puede borrar", m.Error);
+        Assert.False(m.Enviando);
+    }
+
+    [Theory]
     [InlineData("adelanto", "Adelanto")]
     [InlineData("devolucion", "Devolución")]
     [InlineData("compensacion", "Compensación")]

@@ -191,6 +191,57 @@ public class ApiPostgresTests
     }
 
     [SkippableFact]
+    public async Task DeudasDelMesYBorrado_FuncionanSobrePostgres_ConElAhorroIncluido()
+    {
+        Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");
+        await using var e = new Entorno();
+        var user = await e.CrearUsuarioAsync();
+        var hogar = await CrearHogar(e.Cliente(user), "Casa borrar deudas", "Ana");
+        var c = e.Cliente(user, hogar.Id);
+        var ana = (await Leer<List<MiembroDto>>(await c.GetAsync("/api/miembros"))).Single();
+        await Leer<JsonElement>(await c.PutAsJsonAsync("/api/cuenta-comun/activacion", new ActivarCuentaComunRequest(true)));
+        await Leer<JsonElement>(await c.PutAsJsonAsync("/api/cuenta-comun/ahorro/activacion", new ActivarAhorroRequest(true)));
+        await Leer<JsonElement>(await c.PutAsJsonAsync("/api/cuenta-comun/aportaciones", new FijarAportacionRequest(ana.Id, new DateOnly(2026, 9, 1), 300m, 50m)));
+
+        async Task<MovimientoDeudaCuentaDto> Nueva(string tipo, decimal importe, bool ahorro, DateOnly fecha, string? concepto = null)
+            => await Leer<MovimientoDeudaCuentaDto>(
+                await c.PostAsJsonAsync("/api/cuenta-comun/deudas", new CrearDeudaCuentaRequest(ana.Id, tipo, importe, fecha, concepto, ahorro)), HttpStatusCode.Created);
+
+        var adelantoHogar = await Nueva("adelanto", 40m, false, new DateOnly(2026, 10, 5), "Fontanero");
+        var adelantoAhorro = await Nueva("adelanto", 60m, true, new DateOnly(2026, 10, 6));
+        var devolucionAhorro = await Nueva("devolucion", 60m, true, new DateOnly(2026, 10, 7));
+        await Nueva("adelanto", 10m, false, new DateOnly(2026, 9, 12)); // de otro mes
+
+        // El detalle del mes sale de la consulta SQL agrupada: uno a uno, con id, concepto y fondo, y solo los de octubre.
+        var octubre = await Leer<CuentaComunResponse>(await c.GetAsync("/api/cuenta-comun?mes=2026-10"));
+        Assert.Equal([adelantoHogar.Id, adelantoAhorro.Id, devolucionAhorro.Id], octubre.MovimientosDeuda!.Select(m => m.Id));
+        Assert.Equal("Fontanero", octubre.MovimientosDeuda![0].Concepto);
+        Assert.Equal([false, true, true], octubre.MovimientosDeuda!.Select(m => m.DesdeAhorro));
+        // Ahorro: 50 + 50 (sep. y oct.) − 60 + 60 = 100; el estado y el extracto bancario suman lo mismo.
+        Assert.Equal(100m, octubre.AhorroDisponible);
+        var banco = await Leer<MovimientosCuentaComunResponse>(await c.GetAsync("/api/cuenta-comun/movimientos?desde=2026-10-01&hasta=2026-10-31"));
+        Assert.Equal(octubre.Efectivo, banco.EfectivoFinal);
+        Assert.Equal(octubre.AhorroDisponible, banco.AhorroFinal);
+        Assert.Contains(banco.Movimientos, m => m.Tipo == "adelanto_persona" && m.Id == adelantoHogar.Id && m.Concepto == "Fontanero");
+
+        // El ahorro repuesto por la devolución ya respalda un adelanto mayor: sin ella faltarían 60.
+        var grande = await Nueva("adelanto", 100m, true, new DateOnly(2026, 10, 8));
+        var rechazado = await c.DeleteAsync($"/api/cuenta-comun/deudas/{devolucionAhorro.Id}");
+        var cuerpo = await Leer<JsonElement>(rechazado, HttpStatusCode.Conflict);
+        Assert.Equal(60m, cuerpo.GetProperty("falta").GetDecimal());
+
+        // Con el adelanto de 60 fuera la deuda del ahorro baja a 40: el de 100 ya no se puede borrar sin dejar la devolución sin deuda.
+        Assert.Equal(HttpStatusCode.NoContent, (await c.DeleteAsync($"/api/cuenta-comun/deudas/{adelantoAhorro.Id}")).StatusCode);
+        var sinSitio = await c.DeleteAsync($"/api/cuenta-comun/deudas/{grande.Id}");
+        Assert.Equal(60m, (await Leer<JsonElement>(sinSitio, HttpStatusCode.Conflict)).GetProperty("falta").GetDecimal());
+        // Uno suelto sí se borra, y desaparece del detalle.
+        Assert.Equal(HttpStatusCode.NoContent, (await c.DeleteAsync($"/api/cuenta-comun/deudas/{adelantoHogar.Id}")).StatusCode);
+        var despues = await Leer<CuentaComunResponse>(await c.GetAsync("/api/cuenta-comun?mes=2026-10"));
+        Assert.DoesNotContain(despues.MovimientosDeuda!, m => m.Id == adelantoHogar.Id);
+        Assert.Equal(HttpStatusCode.NotFound, (await c.DeleteAsync($"/api/cuenta-comun/deudas/{adelantoHogar.Id}")).StatusCode);
+    }
+
+    [SkippableFact]
     public async Task DeudasDeLaCuenta_SeRegistranYCuadranEnEstadoYBanco_EnPostgres()
     {
         Skip.If(string.IsNullOrEmpty(Cadena), "MIPARTE_TEST_DB no definida");

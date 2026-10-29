@@ -279,8 +279,8 @@ public sealed class ServicioCuentaComun(IRepositorioCuentaComun repositorio, Tim
         var deudas = await repositorio.DeudasAsync(ct);
         if (tipo == TipoMovimientoDeuda.Adelanto && m.DesdeAhorro)
         {
-            // Un adelanto del ahorro lo saca de él: no puede dejarlo por debajo de lo que ya hay, teniendo en cuenta las deudas.
-            var disponible = AhorroCuenta.Disponible(fecha, await repositorio.DatosAhorroAsync(ct)) + EfectoEnAhorro(deudas);
+            // Un adelanto del ahorro lo saca de él: no puede dejarlo por debajo de lo que ya hay (los datos del ahorro ya cuentan las deudas).
+            var disponible = AhorroCuenta.Disponible(fecha, await repositorio.DatosAhorroAsync(ct));
             if (m.Importe > disponible)
             {
                 var visible = Math.Max(0m, disponible);
@@ -324,6 +324,38 @@ public sealed class ServicioCuentaComun(IRepositorioCuentaComun repositorio, Tim
         return Resultado<MovimientoDeudaCuenta>.Ok(d);
     }
 
+    /// <summary>
+    /// Borra un movimiento de deuda. No encontrado si no existe; conflicto si es un adelanto al que ya se han aplicado devoluciones o
+    /// compensaciones (la deuda quedaría negativa) o si es una devolución o compensación del ahorro cuyo importe ya se ha usado
+    /// (el ahorro quedaría sin respaldo).
+    /// </summary>
+    public async Task<Resultado<bool>> EliminarDeudaAsync(Guid id, CancellationToken ct)
+    {
+        var d = await repositorio.DeudaAsync(id, ct);
+        if (d is null) return Resultado<bool>.NoEncontrado();
+
+        if (d.Tipo == TipoMovimientoDeuda.Adelanto)
+        {
+            var resto = DeudaDe(await repositorio.DeudasAsync(ct), d.MiembroId, d.DesdeAhorro) - d.Importe;
+            if (resto < 0m)
+                return Resultado<bool>.Conflicto(
+                    $"No se puede borrar este adelanto: dejaría devoluciones o compensaciones sin deuda ({-resto:0.00}).",
+                    new Dictionary<string, object> { ["falta"] = -resto });
+        }
+
+        // Quitar una devolución o una compensación del ahorro es quitarle dinero: no puede dejar sin respaldo lo ya usado. Borrarla equivale a
+        // añadir un uso del mismo importe en su fecha.
+        if (d.DesdeAhorro && d.Tipo != TipoMovimientoDeuda.Adelanto)
+        {
+            var usos = (await repositorio.UsosDeAhorroAsync(ct)).Append(new UsoDeAhorro(d.Fecha, d.Importe)).ToList();
+            var holgura = HolguraAhorro.Calcular(await repositorio.AportacionesAsync(ct), await repositorio.DepositosAsync(null, ct), usos);
+            if (holgura is < 0m) return SinRespaldo<bool>("borrar este movimiento", -holgura.Value);
+        }
+
+        await repositorio.EliminarDeudaAsync(id, ct);
+        return Resultado<bool>.Ok(true);
+    }
+
     /// <summary>Lo que una persona debe a un fondo: los adelantos suman y las devoluciones y compensaciones restan.</summary>
     private static decimal DeudaDe(IEnumerable<MovimientoDeuda> deudas, Guid miembroId, bool desdeAhorro)
         => deudas.Where(d => d.MiembroId == miembroId && d.DesdeAhorro == desdeAhorro)
@@ -334,11 +366,6 @@ public sealed class ServicioCuentaComun(IRepositorioCuentaComun repositorio, Tim
         => await repositorio.GastadoACargoAsync(miembroId, desdeAhorro, ct) - await repositorio.ReembolsadoAsync(miembroId, desdeAhorro, ct)
             - deudas.Where(d => d.MiembroId == miembroId && d.DesdeAhorro == desdeAhorro && d.Tipo == TipoMovimientoDeuda.Compensacion)
                 .Sum(d => d.Importe);
-
-    /// <summary>Cuánto cambian las deudas el ahorro: un adelanto lo baja; una devolución o una compensación del ahorro lo suben.</summary>
-    private static decimal EfectoEnAhorro(IEnumerable<MovimientoDeuda> deudas)
-        => deudas.Where(d => d.DesdeAhorro)
-            .Sum(d => d.Tipo == TipoMovimientoDeuda.Adelanto ? -d.Importe : d.Importe);
 
     private DateOnly Hoy => DateOnly.FromDateTime(reloj.GetUtcNow().UtcDateTime);
 

@@ -99,6 +99,12 @@ public sealed partial class CoreApiClient
     public Task<MovimientoDeudaCuentaDto> CrearDeudaAsync(CrearDeudaCuentaRequest peticion, CancellationToken ct = default) =>
         _nucleo.EnviarAsync<MovimientoDeudaCuentaDto>(HttpMethod.Post, "api/cuenta-comun/deudas", peticion, ct);
 
+    /// <summary>Borra un movimiento de deuda con la cuenta común (<c>DELETE /api/cuenta-comun/deudas/{id}</c>).</summary>
+    /// <param name="id">Movimiento a borrar.</param>
+    /// <param name="ct">Cancelación.</param>
+    public Task EliminarDeudaAsync(Guid id, CancellationToken ct = default) =>
+        _nucleo.EnviarSinRespuestaAsync(HttpMethod.Delete, $"api/cuenta-comun/deudas/{id}", ct);
+
     /// <summary>Registra un reembolso de la cuenta común a quien adelantó gastos (<c>POST /api/cuenta-comun/reembolsos</c>).</summary>
     /// <param name="peticion">Miembro, importe, fecha y concepto.</param>
     /// <param name="ct">Token de cancelación.</param>

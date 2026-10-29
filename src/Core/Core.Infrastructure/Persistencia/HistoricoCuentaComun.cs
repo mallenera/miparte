@@ -14,7 +14,8 @@ public sealed class HistoricoCuentaComun
 {
     private const int TipoAportacion = 0, TipoReembolsoMes = 1, TipoRetiradaMes = 2, TipoDepositoMes = 3, TipoReembolsos = 4,
         TipoGastos = 5, TipoGastosMes = 6, TipoRetiradas = 7, TipoDepositos = 8, TipoNombre = 9, TipoFunciones = 10, TipoIngresos = 11,
-        TipoDeudaAdelanto = 12, TipoDeudaDevolucion = 13, TipoDeudaCompensacion = 14;
+        TipoDeudaAdelanto = 12, TipoDeudaDevolucion = 13, TipoDeudaCompensacion = 14,
+        TipoDeudaMesAdelanto = 15, TipoDeudaMesDevolucion = 16, TipoDeudaMesCompensacion = 17;
 
     /// <summary>
     /// Fila común a todas las partes de la consulta: EF las une con <c>UNION ALL</c> y para eso necesitan la misma forma. Los
@@ -156,6 +157,9 @@ public sealed class HistoricoCuentaComun
                     Tipo = TipoDepositoMes, Id = d.Id, MiembroId = d.MiembroId, Fecha = d.Fecha,
                     Importe = d.Importe, Ahorro = 0m, Marca = false, Marca2 = false, Texto = d.Concepto ?? "",
                 }))
+                .Concat(DeudasDelMesFilas(db, inicio, fin, TipoMovimientoDeuda.Adelanto, TipoDeudaMesAdelanto))
+                .Concat(DeudasDelMesFilas(db, inicio, fin, TipoMovimientoDeuda.Devolucion, TipoDeudaMesDevolucion))
+                .Concat(DeudasDelMesFilas(db, inicio, fin, TipoMovimientoDeuda.Compensacion, TipoDeudaMesCompensacion))
                 .Concat(db.Miembros.Select(m => new Fila
                 {
                     Tipo = TipoNombre, Id = m.Id, MiembroId = m.Id, Fecha = inicio,
@@ -183,6 +187,14 @@ public sealed class HistoricoCuentaComun
                 Tipo = tipoFila, Id = vacio, MiembroId = g.Key.MiembroId, Fecha = inicio,
                 Importe = g.Sum(x => x.Importe), Ahorro = 0m, Marca = g.Key.DesdeAhorro, Marca2 = g.Key.EnMes, Texto = "",
             });
+
+    /// <summary>Movimientos de deuda de un tipo con fecha dentro del mes, uno a uno (para mostrarlos y poder borrarlos).</summary>
+    private static IQueryable<Fila> DeudasDelMesFilas(MiParteDbContext db, DateOnly inicio, DateOnly fin, TipoMovimientoDeuda tipo, int tipoFila)
+        => db.MovimientosDeudaCuenta.Where(d => d.Tipo == tipo && d.Fecha >= inicio && d.Fecha < fin).Select(d => new Fila
+        {
+            Tipo = tipoFila, Id = d.Id, MiembroId = d.MiembroId, Fecha = d.Fecha, Importe = d.Importe, Ahorro = 0m,
+            Marca = d.DesdeAhorro, Marca2 = false, Texto = d.Concepto ?? "",
+        });
 
     private IEnumerable<Fila> De(int tipo) => _filas.Where(f => f.Tipo == tipo);
 
@@ -241,6 +253,22 @@ public sealed class HistoricoCuentaComun
                 _ => TipoMovimientoDeuda.Compensacion,
             },
             f.Marca))
+        .ToList();
+
+    /// <summary>Movimientos de deuda con fecha en el mes, uno a uno y con su identificador (solo con <c>detalleDelMes</c>).</summary>
+    public List<MovimientoDeuda> DeudasDelMes => _filas
+        .Where(f => f.Tipo is TipoDeudaMesAdelanto or TipoDeudaMesDevolucion or TipoDeudaMesCompensacion)
+        // En un mismo día, primero lo que genera la deuda y después lo que la salda (adelanto, devolución, compensación).
+        .OrderBy(f => f.Fecha).ThenBy(f => f.Tipo).ThenBy(f => f.Id)
+        .Select(f => new MovimientoDeuda(
+            f.MiembroId, f.Fecha, f.Importe,
+            f.Tipo switch
+            {
+                TipoDeudaMesAdelanto => TipoMovimientoDeuda.Adelanto,
+                TipoDeudaMesDevolucion => TipoMovimientoDeuda.Devolucion,
+                _ => TipoMovimientoDeuda.Compensacion,
+            },
+            f.Marca, f.Id, Texto(f)))
         .ToList();
 
     /// <summary>Nombre de cada miembro por id (solo con <c>detalleDelMes</c>).</summary>

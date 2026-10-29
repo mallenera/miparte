@@ -443,6 +443,125 @@ public class ComponentesTests : BunitContext
         Assert.Equal(2, api.Recibidas.Count(r => r == "GET /api/cuenta-comun/movimientos"));
     }
 
+    private static CuentaComunResponse CuentaConMovimientosDeuda(params MovimientoDeudaCuentaDto[] movimientos) =>
+        new("2026-10", 1000m, 1000m, 0m, 1000m, [], 1000m, [], [], Deudas: [], MovimientosDeuda: movimientos);
+
+    private static readonly Guid DeudaId = Guid.NewGuid();
+
+    [Fact]
+    public void Cuenta_comun_lista_los_movimientos_de_deuda_del_mes_con_su_persona_fondo_y_concepto()
+    {
+        var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, CuentaConMovimientosDeuda(
+                new MovimientoDeudaCuentaDto(DeudaId, AnaId, new DateOnly(2026, 10, 5), 40m, "adelanto", false, "Fontanero"),
+                new MovimientoDeudaCuentaDto(Guid.NewGuid(), AnaId, new DateOnly(2026, 10, 7), 15m, "devolucion", true, null)));
+        Registrar(api);
+
+        var c = Render<VistaCuentaComun>();
+
+        var filas = c.FindAll("section[aria-labelledby=t-deudas] .gastorow");
+        Assert.Equal(2, filas.Count);
+        Assert.Contains("Adelanto · Ana (de Hogar)", filas[0].TextContent);
+        Assert.Contains("05/10/2026 · Fontanero", filas[0].TextContent);
+        Assert.Contains("40,00", filas[0].TextContent);
+        Assert.Contains("Devolución · Ana (del ahorro)", filas[1].TextContent);
+        Assert.Contains("Movimientos de", c.Find("section[aria-labelledby=t-deudas]").TextContent);
+    }
+
+    [Fact]
+    public void Cuenta_comun_sin_movimientos_de_deuda_no_muestra_la_lista()
+    {
+        var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, CuentaConMovimientosDeuda());
+        Registrar(api);
+
+        var c = Render<VistaCuentaComun>();
+
+        Assert.Empty(c.FindAll("section[aria-labelledby=t-deudas] .gastorow"));
+        Assert.DoesNotContain("Movimientos de", c.Find("section[aria-labelledby=t-deudas]").TextContent);
+    }
+
+    [Fact]
+    public void Cuenta_comun_borra_un_movimiento_de_deuda_tras_confirmar()
+    {
+        var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, CuentaConMovimientosDeuda(
+                new MovimientoDeudaCuentaDto(DeudaId, AnaId, new DateOnly(2026, 10, 5), 40m, "adelanto", false, null)))
+            .Responde($"DELETE /api/cuenta-comun/deudas/{DeudaId}", HttpStatusCode.NoContent);
+        Registrar(api);
+        var c = Render<VistaCuentaComun>();
+
+        c.Find("section[aria-labelledby=t-deudas] button.linkbtn.danger").Click();
+        Assert.DoesNotContain($"DELETE /api/cuenta-comun/deudas/{DeudaId}", api.Recibidas); // pide confirmación antes
+        Assert.Contains("¿Eliminar?", c.Find("section[aria-labelledby=t-deudas]").TextContent);
+
+        c.FindAll("section[aria-labelledby=t-deudas] button.linkbtn.danger").First(b => b.TextContent == "Sí").Click();
+
+        Assert.Contains($"DELETE /api/cuenta-comun/deudas/{DeudaId}", api.Recibidas);
+    }
+
+    [Fact]
+    public void Cuenta_comun_permite_cancelar_el_borrado_de_una_deuda()
+    {
+        var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, CuentaConMovimientosDeuda(
+                new MovimientoDeudaCuentaDto(DeudaId, AnaId, new DateOnly(2026, 10, 5), 40m, "adelanto", false, null)));
+        Registrar(api);
+        var c = Render<VistaCuentaComun>();
+
+        c.Find("section[aria-labelledby=t-deudas] button.linkbtn.danger").Click();
+        c.FindAll("section[aria-labelledby=t-deudas] button.linkbtn").First(b => b.TextContent == "No").Click();
+
+        Assert.DoesNotContain("¿Eliminar?", c.Find("section[aria-labelledby=t-deudas]").TextContent);
+        Assert.DoesNotContain(api.Recibidas, r => r.StartsWith("DELETE"));
+    }
+
+    [Fact]
+    public void Cuenta_comun_sin_el_permiso_de_movimientos_ve_los_movimientos_de_deuda_pero_no_puede_borrarlos()
+    {
+        var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, CuentaConMovimientosDeuda(
+                new MovimientoDeudaCuentaDto(DeudaId, AnaId, new DateOnly(2026, 10, 5), 40m, "adelanto", false, null)));
+        Registrar(api);
+        _permisos.Fijar([]);
+
+        var c = Render<VistaCuentaComun>();
+
+        Assert.Single(c.FindAll("section[aria-labelledby=t-deudas] .gastorow"));
+        Assert.Empty(c.FindAll("section[aria-labelledby=t-deudas] button.linkbtn.danger"));
+    }
+
+    [Fact]
+    public void Cuenta_comun_muestra_por_que_no_se_puede_borrar_un_adelanto()
+    {
+        var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, CuentaConMovimientosDeuda(
+                new MovimientoDeudaCuentaDto(DeudaId, AnaId, new DateOnly(2026, 10, 5), 40m, "adelanto", false, null)))
+            .Error($"DELETE /api/cuenta-comun/deudas/{DeudaId}", HttpStatusCode.Conflict,
+                "No se puede borrar este adelanto: dejaría devoluciones o compensaciones sin deuda (20.00).");
+        Registrar(api);
+        var c = Render<VistaCuentaComun>();
+
+        c.Find("section[aria-labelledby=t-deudas] button.linkbtn.danger").Click();
+        c.FindAll("section[aria-labelledby=t-deudas] button.linkbtn.danger").First(b => b.TextContent == "Sí").Click();
+
+        Assert.Contains("dejaría devoluciones o compensaciones sin deuda", c.Markup);
+        // Además del aviso de la primera tarjeta, el motivo sale como aviso visible donde se actuó.
+        Assert.Contains("dejaría devoluciones", Services.GetRequiredService<ServicioAvisos>().Texto);
+    }
+
     [Fact]
     public void Cuenta_comun_no_permite_enviar_un_importe_invalido_de_deuda()
     {

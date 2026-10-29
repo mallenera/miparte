@@ -292,6 +292,36 @@ else if (_m.Estado is not null)
             }
         }
 
+        @if (_m.Estado.MovimientosDeuda is { Count: > 0 } movimientosDeuda)
+        {
+            <h3 class="u-titulo-form u-mt12">Movimientos de @_m.NombreMes</h3>
+            @foreach (var d in movimientosDeuda)
+            {
+                <div class="gastorow" @key="d.Id">
+                    <div class="g-main">
+                        <div class="g-concepto">@ModeloCuentaComun.NombreTipoDeuda(d.Tipo) · @Formato.NombreMiembro(d.MiembroId, _m.Miembros) @(d.DesdeAhorro ? "(del ahorro)" : "(de Hogar)")</div>
+                        <div class="muted g-meta">@d.Fecha.ToString("dd/MM/yyyy", Es)@(string.IsNullOrWhiteSpace(d.Concepto) ? "" : " · " + d.Concepto)</div>
+                    </div>
+                    <div class="g-importe">@Formato.Euros(d.Importe)</div>
+                    @if (PuedeCuenta)
+                    {
+                        <div class="c-acc">
+                            @if (_m.ConfirmandoEliminar == d.Id)
+                            {
+                                <span class="muted">¿Eliminar?</span>
+                                <button class="linkbtn danger" type="button" @onclick="() => EliminarDeudaAsync(d)">Sí</button>
+                                <button class="linkbtn" type="button" @onclick="() => _m.ConfirmandoEliminar = null">No</button>
+                            }
+                            else
+                            {
+                                <button class="linkbtn danger" type="button" aria-label="Eliminar @ModeloCuentaComun.NombreTipoDeuda(d.Tipo).ToLowerInvariant() de @Formato.NombreMiembro(d.MiembroId, _m.Miembros)" @onclick="() => _m.ConfirmandoEliminar = d.Id">Eliminar</button>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        }
+
         @if (PuedeCuenta)
         {
             <form class="addcat" id="form-deuda" @onsubmit="RegistrarDeudaAsync">
@@ -487,6 +517,8 @@ else if (_m.Estado is not null)
 
     private Task RegistrarDeudaAsync() => Mostrar(_m.RegistrarDeudaAsync());
 
+    private Task EliminarDeudaAsync(MovimientoDeudaCuentaDto d) => Mostrar(_m.EliminarDeudaAsync(d));
+
     private Task IngresarAhorroAsync() => Mostrar(_m.IngresarAhorroAsync());
 
     private Task FijarSaldoInicialAsync() => Mostrar(_m.FijarSaldoInicialAsync());
@@ -506,7 +538,13 @@ else if (_m.Estado is not null)
 
     private async Task Mostrar(Task<string?> operacion)
     {
-        if (await operacion is not { } aviso) return;
+        if (await operacion is not { } aviso)
+        {
+            // El error también sale arriba, en la primera tarjeta, que puede quedar lejos de donde se actuó: se repite como aviso visible.
+            if (_m.Error is { } error) Avisos.Mostrar(error, TimeSpan.FromSeconds(6));
+            return;
+        }
+
         Avisos.Mostrar(aviso);
         // Lo que se acaba de registrar tiene que verse también en el extracto de Movimientos.
         if (_movimientos is not null) await _movimientos.RecargarAsync();

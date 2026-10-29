@@ -29,6 +29,7 @@ public static class CuentaComunEndpoints
         app.MapDelete("/api/cuenta-comun/reembolsos/{id:guid}", BorrarReembolsoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
         app.MapGet("/api/cuenta-comun/ingresos", ListarIngresosAsync).RequireAuthorization();
         app.MapPost("/api/cuenta-comun/deudas", CrearDeudaAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
+        app.MapDelete("/api/cuenta-comun/deudas/{id:guid}", BorrarDeudaAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
         app.MapPost("/api/cuenta-comun/ingresos", CrearIngresoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
         app.MapDelete("/api/cuenta-comun/ingresos/{id:guid}", BorrarIngresoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.CuentaMovimientos);
         app.MapPost("/api/cuenta-comun/depositos-ahorro", CrearDepositoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.AhorroMovimientos);
@@ -147,6 +148,15 @@ public static class CuentaComunEndpoints
         var r = await servicio.RegistrarDeudaAsync(new RegistrarMovimiento(hogarId, req.MiembroId, req.Importe, req.Fecha, req.Concepto, req.DesdeAhorro), tipoDeuda, ct);
         if (r.Error is { } error) return ApiComun.Respuesta(error);
         return Results.Created($"/api/cuenta-comun/deudas/{r.Valor!.Id}", r.Valor.ADto());
+    }
+
+    /// <summary>DELETE /api/cuenta-comun/deudas/{id}: borra un movimiento de deuda. 409 sin hogar o si dejaría la deuda negativa (un adelanto ya devuelto o compensado) o el ahorro sin respaldo; 404 si no existe; 204 si se borra.</summary>
+    private static async Task<IResult> BorrarDeudaAsync(
+        Guid id, [FromServices] ServicioCuentaComun servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
+    {
+        if (hogar.HogarId is null) return ApiComun.SinHogar();
+        var r = await servicio.EliminarDeudaAsync(id, ct);
+        return r.Error is { } error ? ApiComun.Respuesta(error) : Results.NoContent();
     }
 
     /// <summary>POST /api/cuenta-comun/reembolsos: registra un pago de la cuenta a quien adelantó gastos. 400 si el importe es inválido o el miembro no es del hogar; 409 sin hogar o si supera lo pendiente de reembolsar al miembro. 201 si se crea.</summary>

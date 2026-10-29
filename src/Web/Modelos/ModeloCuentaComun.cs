@@ -399,6 +399,15 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
             return "Ingreso eliminado";
         });
 
+    /// <summary>Elimina un movimiento de deuda (adelanto, devolución o compensación). La API lo rechaza si dejaría la deuda negativa o el ahorro sin respaldo.</summary>
+    public Task<string?> EliminarDeudaAsync(MovimientoDeudaCuentaDto d) =>
+        EjecutarAsync(async () =>
+        {
+            await api.EliminarDeudaAsync(d.Id);
+            ConfirmandoEliminar = null;
+            return $"{NombreTipoDeuda(d.Tipo)} eliminado";
+        });
+
     /// <summary>Elimina un reembolso.</summary>
     public Task<string?> EliminarAsync(ReembolsoCuentaDto r) =>
         EjecutarAsync(async () =>

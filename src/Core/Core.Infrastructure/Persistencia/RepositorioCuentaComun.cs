@@ -60,7 +60,7 @@ public sealed class RepositorioCuentaComun(MiParteDbContext db) : IRepositorioCu
                 h.Frecuencia, h.Ingresos, h.Deudas),
             h.AhorroActivo,
             h.Aportaciones.Select(a => new AportacionRegistrada(a.Id, a.MiembroId, a.Fecha, a.Importe, a.Ahorro)).ToList(),
-            h.ReembolsosDelMes, h.RetiradasDelMes, h.DepositosDelMes, h.Nombres);
+            h.ReembolsosDelMes, h.RetiradasDelMes, h.DepositosDelMes, h.Nombres, h.DeudasDelMes);
     }
 
     /// <inheritdoc />
@@ -80,7 +80,7 @@ public sealed class RepositorioCuentaComun(MiParteDbContext db) : IRepositorioCu
             .Where(g => g.ACargoCuentaComun && g.PagadoPor != null && g.PagadoDesdeAhorro && g.Fecha <= hasta)
             .Select(g => new GastoPagadoPorCuenta(g.Id, g.Fecha, g.Importe, g.CategoriaId, g.Concepto, true, g.PagadoPor)).ToListAsync(ct);
         var deudas = await db.MovimientosDeudaCuenta.AsNoTracking().Where(x => x.Fecha <= hasta)
-            .Select(x => new MovimientoDeuda(x.MiembroId, x.Fecha, x.Importe, x.Tipo, x.DesdeAhorro)).ToListAsync(ct);
+            .Select(x => new MovimientoDeuda(x.MiembroId, x.Fecha, x.Importe, x.Tipo, x.DesdeAhorro, x.Id, x.Concepto)).ToListAsync(ct);
         return new DatosMovimientosBanco(
             await AportacionesAsync(ct), await SaldoInicialAsync(ct), gastos, reembolsos, ingresos, depositos, retiradas, adelantados,
             Deudas: deudas);
@@ -89,7 +89,22 @@ public sealed class RepositorioCuentaComun(MiParteDbContext db) : IRepositorioCu
     /// <inheritdoc />
     public async Task<IReadOnlyList<MovimientoDeuda>> DeudasAsync(CancellationToken ct)
         => await db.MovimientosDeudaCuenta.AsNoTracking()
-            .Select(x => new MovimientoDeuda(x.MiembroId, x.Fecha, x.Importe, x.Tipo, x.DesdeAhorro)).ToListAsync(ct);
+            .Select(x => new MovimientoDeuda(x.MiembroId, x.Fecha, x.Importe, x.Tipo, x.DesdeAhorro, x.Id, x.Concepto)).ToListAsync(ct);
+
+    /// <inheritdoc />
+    public async Task<MovimientoDeuda?> DeudaAsync(Guid id, CancellationToken ct)
+        => await db.MovimientosDeudaCuenta.AsNoTracking().Where(x => x.Id == id)
+            .Select(x => new MovimientoDeuda(x.MiembroId, x.Fecha, x.Importe, x.Tipo, x.DesdeAhorro, x.Id, x.Concepto)).FirstOrDefaultAsync(ct);
+
+    /// <inheritdoc />
+    public async Task<bool> EliminarDeudaAsync(Guid id, CancellationToken ct)
+    {
+        var d = await db.MovimientosDeudaCuenta.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (d is null) return false;
+        db.MovimientosDeudaCuenta.Remove(d);
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
 
     /// <inheritdoc />
     public async Task GuardarDeudaAsync(MovimientoDeudaCuenta deuda, CancellationToken ct)
@@ -135,7 +150,7 @@ public sealed class RepositorioCuentaComun(MiParteDbContext db) : IRepositorioCu
     {
         var retiradas = await db.RetiradasAhorro.Select(r => new UsoDeAhorro(r.Fecha, r.Importe)).ToListAsync(ct);
         var gastos = await db.Gastos.Where(g => g.PagadoDesdeAhorro).Select(g => new UsoDeAhorro(g.Fecha, g.Importe)).ToListAsync(ct);
-        return [.. retiradas, .. gastos];
+        return [.. retiradas, .. gastos, .. AhorroCuenta.UsosPorDeudas(await DeudasAsync(ct))];
     }
 
     /// <inheritdoc />
@@ -255,6 +270,9 @@ internal static class ConsultasAhorro
         var depositos = await db.DepositosAhorro.Select(d => new DepositoDeAhorro(d.Fecha, d.Importe)).ToListAsync(ct);
         var retirado = await db.RetiradasAhorro.SumAsync(r => r.Importe, ct);
         var gastado = await db.Gastos.Where(g => g.PagadoDesdeAhorro && g.Id != excluirGasto).SumAsync(g => g.Importe, ct);
+        // Lo que la cuenta adelanta desde el ahorro sale de él; lo que se devuelve o compensa entra. Cuenta como lo gastado desde el ahorro.
+        var deudas = await db.MovimientosDeudaCuenta.Where(d => d.DesdeAhorro).Select(d => new { d.Tipo, d.Importe }).ToListAsync(ct);
+        gastado += deudas.Sum(d => d.Tipo == TipoMovimientoDeuda.Adelanto ? d.Importe : -d.Importe);
         return new DatosAhorro(aportaciones, depositos, retirado, gastado);
     }
 }

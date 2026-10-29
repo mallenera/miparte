@@ -113,7 +113,9 @@ public static class Dtos
                 p.ParteSaldo, p.ParteAhorro, p.Pendiente)).ToList(),
             d.AhorroActivo, ADto(s.Extracto), s.SaldoInicial is { } si ? new SaldoInicialDto(si.Fecha, si.Importe) : null,
             TextoFrecuenciaAportacion.ATexto(d.Historico.Frecuencia), ADto(s.Resumen),
-            e.Deudas?.Select(x => new DeudaCuentaDto(x.MiembroId, nombres.GetValueOrDefault(x.MiembroId, ""), x.Importe, x.DesdeAhorro)).ToList());
+            e.Deudas?.Select(x => new DeudaCuentaDto(x.MiembroId, nombres.GetValueOrDefault(x.MiembroId, ""), x.Importe, x.DesdeAhorro)).ToList(),
+            d.DeudasDelMes?.Select(x => new MovimientoDeudaCuentaDto(
+                x.Id ?? Guid.Empty, x.MiembroId, x.Fecha, x.Importe, TextoTipoDeuda(x.Tipo), x.DesdeAhorro, x.Concepto)).ToList());
     }
 
     /// <summary>Movimiento de deuda de la cuenta común tal como se devuelve al crearlo.</summary>

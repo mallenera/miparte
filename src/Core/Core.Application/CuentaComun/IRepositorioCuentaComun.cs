@@ -51,7 +51,10 @@ public interface IRepositorioCuentaComun
     /// <summary>Todos los depósitos de ahorro; <paramref name="excluir"/> deja fuera uno.</summary>
     Task<IReadOnlyList<DepositoDeAhorro>> DepositosAsync(Guid? excluir, CancellationToken ct);
 
-    /// <summary>Todo lo que ya salió del ahorro: retiradas y gastos pagados desde él.</summary>
+    /// <summary>
+    /// Todo lo que ya salió del ahorro: retiradas, gastos pagados desde él y las deudas con el ahorro, estas últimas con signo
+    /// (un adelanto sale; una devolución o una compensación entran, como un uso negativo).
+    /// </summary>
     Task<IReadOnlyList<UsoDeAhorro>> UsosDeAhorroAsync(CancellationToken ct);
 
     /// <summary>Datos para calcular el ahorro disponible.</summary>
@@ -77,6 +80,12 @@ public interface IRepositorioCuentaComun
 
     /// <summary>Guarda un movimiento de deuda nuevo (adelanto, devolución o compensación).</summary>
     Task GuardarDeudaAsync(MovimientoDeudaCuenta deuda, CancellationToken ct);
+
+    /// <summary>Un movimiento de deuda con su identificador y concepto, o null si no existe en el hogar.</summary>
+    Task<MovimientoDeuda?> DeudaAsync(Guid id, CancellationToken ct);
+
+    /// <summary>Borra un movimiento de deuda; false si no existe en el hogar.</summary>
+    Task<bool> EliminarDeudaAsync(Guid id, CancellationToken ct);
 
     /// <summary>Guarda un ingreso a la cuenta común nuevo.</summary>
     Task GuardarIngresoAsync(IngresoCuentaComun ingreso, CancellationToken ct);

@@ -82,7 +82,7 @@ public sealed record ExtractoCuentaComun(
 /// <paramref name="Aportado"/> es lo aportado para gastos (sin ahorro) y <paramref name="Ahorrado"/> lo apartado a ahorro
 /// (aportaciones más depósitos suyos). <paramref name="PorcentajeGastos"/> y <paramref name="PorcentajeAhorro"/> son su peso sobre el total (0-100, 2 decimales).
 /// <paramref name="ParteSaldo"/> es su porción del saldo de gastos y <paramref name="ParteAhorro"/> la del ahorro disponible.
-/// <paramref name="Pendiente"/> es lo que la cuenta le debe por gastos que adelantó.
+/// <paramref name="Pendiente"/> es lo que la cuenta le debe por gastos que adelantó, descontados los adelantos de la cuenta (negativo: lo que ella le debe).
 /// </summary>
 public sealed record PartePersona(
     Guid MiembroId, decimal Aportado, decimal Ahorrado, decimal PorcentajeGastos, decimal PorcentajeAhorro,
@@ -90,7 +90,8 @@ public sealed record PartePersona(
 
 /// <summary>
 /// Lo que la cuenta común debe a un miembro por gastos que adelantó y aún no le ha reembolsado, del fondo de Hogar o del ahorro
-/// (<paramref name="DesdeAhorro"/>). Un miembro puede tener dos pendientes, uno por fondo.
+/// (<paramref name="DesdeAhorro"/>). Un adelanto de la cuenta lo descuenta y una devolución lo sube; puede quedar negativo, y entonces
+/// es lo que la persona debe a la cuenta hasta que la devuelva. Un miembro puede tener dos pendientes, uno por fondo.
 /// </summary>
 public sealed record PendienteMiembro(Guid MiembroId, decimal Importe, bool DesdeAhorro = false);
 
@@ -194,12 +195,20 @@ public static class CuentaComun
         var depositado = depositosHasta.Sum(d => d.Importe);
         var depositadoMes = depositosHasta.Where(d => d.Fecha >= mes).Sum(d => d.Importe);
 
-        // Una compensación resta de lo que la cuenta le debe a la persona, así que también cuenta como pendiente negativo.
+        // Gastos adelantados por cada persona, menos lo reembolsado: lo que la cuenta le debe antes de los movimientos de deuda.
         var movimientosDeuda = (deudas ?? []).Where(d => d.Fecha < fin).ToList();
         var compensado = movimientosDeuda.Where(d => d.Tipo == TipoMovimientoDeuda.Compensacion).ToList();
-        var pendientes = gastosHasta.Where(g => g.PagadoPor is not null).Select(g => (Id: g.PagadoPor!.Value, g.DesdeAhorro, Importe: g.Importe))
+        var adelantadoPorPersona = gastosHasta.Where(g => g.PagadoPor is not null).Select(g => (Id: g.PagadoPor!.Value, g.DesdeAhorro, Importe: g.Importe))
             .Concat(reembolsosHasta.Select(r => (Id: r.MiembroId, r.DesdeAhorro, Importe: -r.Importe)))
-            .Concat(compensado.Select(c => (Id: c.MiembroId, c.DesdeAhorro, Importe: -c.Importe)))
+            .ToList();
+        // Lo que hay en caja de cada persona: también resta lo compensado, que sale de la cuenta (o de su ahorro) sin mover el saldo.
+        var enCaja = adelantadoPorPersona.Concat(compensado.Select(c => (Id: c.MiembroId, c.DesdeAhorro, Importe: -c.Importe))).ToList();
+        // Lo que la cuenta le debe: un adelanto lo descuenta (puede quedar negativo, y entonces es lo que la persona debe) y una
+        // devolución lo sube hasta que llega a cero. Una compensación no cambia esta cifra: resta a la vez lo que la cuenta le debe
+        // y lo que ella le debe. Se recalcula siempre desde los movimientos, nunca se guarda.
+        var pendientes = adelantadoPorPersona
+            .Concat(movimientosDeuda.Where(d => d.Tipo != TipoMovimientoDeuda.Compensacion)
+                .Select(d => (Id: d.MiembroId, d.DesdeAhorro, Importe: d.Tipo == TipoMovimientoDeuda.Adelanto ? -d.Importe : d.Importe)))
             .GroupBy(x => (x.Id, x.DesdeAhorro))
             .Select(x => new PendienteMiembro(x.Key.Id, x.Sum(y => y.Importe), x.Key.DesdeAhorro))
             .Where(p => p.Importe != 0).OrderBy(p => p.MiembroId).ThenBy(p => p.DesdeAhorro).ToList();
@@ -210,10 +219,14 @@ public static class CuentaComun
         // Un adelanto de Hogar saca dinero de la cuenta; una devolución lo mete; una compensación lo deja en la cuenta sin moverlo.
         var saldo = aportado - ahorro - gastado + inicial + ingresado - deuda.AdelantadoHogar + deuda.DevueltoHogar + deuda.CompensadoHogar;
         var ahorroDeuda = -deuda.AdelantadoAhorro + deuda.DevueltoAhorro + deuda.CompensadoAhorro;
+        // El efectivo es el saldo más lo que hay en caja: el adelanto ya sacó su dinero en el saldo, y no se descuenta otra vez de la caja.
+        var efectivo = saldo + enCaja.Sum(x => x.Importe);
+        var deudasPersonas = pendientes.Where(p => p.Importe < 0)
+            .Select(p => new DeudaMiembro(p.MiembroId, -p.Importe, p.DesdeAhorro)).ToList();
         return new EstadoCuentaComun(
-            aportadoMes, aportado, gastado, saldo, pendientes, saldo + pendientes.Sum(p => p.Importe),
+            aportadoMes, aportado, gastado, saldo, pendientes, efectivo,
             ahorroMes + depositadoMes, ahorro + depositado, retirado, ahorro + depositado - retirado - ahorroGastado + ahorroDeuda,
-            depositado, ahorroGastado, ingresado, Deudas(movimientosDeuda));
+            depositado, ahorroGastado, ingresado, deudasPersonas);
     }
 
     /// <summary>Totales de los movimientos de deuda, separados por fondo y tipo.</summary>

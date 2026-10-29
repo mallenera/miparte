@@ -85,6 +85,24 @@ public class ModeloConfiguracionHogarTests
     }
 
     [Fact]
+    public async Task Activar_la_lista_de_la_compra_la_guarda_y_no_toca_las_demas_funciones()
+    {
+        var (m, api, hogar) = Crear(cuenta: true);
+        api.Responde("PUT /api/lista-compra/activacion", HttpStatusCode.OK, new { activa = true });
+        await m.CargarAsync();
+        Assert.False(m.ListaCompraActiva);
+        var clave = m.ClaveListaCompra;
+
+        var aviso = await m.CambiarListaCompraAsync(true);
+
+        Assert.Equal("Lista de la compra activada", aviso);
+        Assert.Equal("{\"activa\":true}", api.Cuerpos["PUT /api/lista-compra/activacion"]);
+        Assert.True(hogar.HogarActual!.ListaCompraActiva);
+        Assert.True(hogar.HogarActual.CuentaComunActiva);
+        Assert.NotEqual(clave, m.ClaveListaCompra);
+    }
+
+    [Fact]
     public async Task Desactivar_las_recurrentes_las_guarda_sin_tocar_las_demas_funciones()
     {
         var (m, api, hogar) = Crear(cuenta: true, ahorro: true);

@@ -74,6 +74,14 @@ else
             <p class="muted">Crea cada mes los gastos de las plantillas (alquiler, suscripciones…). Desactivarlo deja las plantillas pausadas, sin borrarlas.</p>
         </div>
         <div class="u-mt12">
+            <label class="chk">
+                <input type="checkbox" @key="_m.ClaveListaCompra" checked="@_m.ListaCompraActiva" disabled="@(!PuedeFunciones || _m.GuardandoFunciones)"
+                       @onchange="e => CambiarListaCompraAsync((bool)e.Value!)" />
+                Activar lista de la compra
+            </label>
+            <p class="muted">Una lista compartida de productos por comprar, con enlaces QR para añadir sin cuenta. Desactivarla conserva lo guardado, pero bloquea los cambios hasta volver a activarla.</p>
+        </div>
+        <div class="u-mt12">
             <label class="filtro">Liquidación
                 <select @key="_m.ClaveLiquidacion" disabled="@(!PuedeFunciones || _m.GuardandoFunciones)"
                         @onchange="e => CambiarLiquidacionAsync((string)e.Value!)">
@@ -336,6 +344,8 @@ else
     private Task CambiarAhorroAsync(bool activo) => Mostrar(_m.CambiarAhorroAsync(activo));
 
     private Task CambiarRecurrentesAsync(bool activas) => Mostrar(_m.CambiarRecurrentesAsync(activas));
+
+    private Task CambiarListaCompraAsync(bool activa) => Mostrar(_m.CambiarListaCompraAsync(activa));
 
     private Task CambiarLiquidacionAsync(string modo) => Mostrar(_m.CambiarLiquidacionAsync(modo));
 

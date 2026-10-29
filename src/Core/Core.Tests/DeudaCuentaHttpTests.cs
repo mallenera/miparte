@@ -122,22 +122,24 @@ public class DeudaCuentaHttpTests
         Assert.Equal("adelanto", creado.Tipo);
         Assert.Equal(antes - 40m, despues.Efectivo);
         var deuda = Assert.Single(despues.Deudas!);
-        Assert.Equal((e.Ana, 40m, false), (deuda.MiembroId, deuda.Importe, deuda.DesdeAhorro));
+        // Ana le debía 30 por su gasto: el adelanto de 40 se descuenta de eso y ella le debe 10 a la cuenta.
+        Assert.Equal((e.Ana, 10m, false), (deuda.MiembroId, deuda.Importe, deuda.DesdeAhorro));
         Assert.Equal("Ana", deuda.Nombre);
     }
 
     [Fact]
     public async Task Devolucion_NoPuedeSuperarLaDeuda_YLaSaldaCuandoEsExacta()
     {
+        // Beto no tiene gastos adelantados: lo que debe es lo que la cuenta le ha adelantado.
         var e = await Montar();
-        await Registrar(e.Admin, e.Ana, "adelanto", 40m);
+        await Registrar(e.Admin, e.Beto, "adelanto", 40m);
 
-        var exceso = await Registrar(e.Admin, e.Ana, "devolucion", 100m);
+        var exceso = await Registrar(e.Admin, e.Beto, "devolucion", 100m);
         var cuerpo = await Leer<JsonElement>(exceso, HttpStatusCode.Conflict);
         Assert.Equal(40m, cuerpo.GetProperty("debe").GetDecimal());
 
         var antes = (await Estado(e.Admin)).Efectivo;
-        await Leer<MovimientoDeudaCuentaDto>(await Registrar(e.Admin, e.Ana, "devolucion", 40m), HttpStatusCode.Created);
+        await Leer<MovimientoDeudaCuentaDto>(await Registrar(e.Admin, e.Beto, "devolucion", 40m), HttpStatusCode.Created);
         var despues = await Estado(e.Admin);
 
         Assert.Empty(despues.Deudas!);
@@ -165,7 +167,8 @@ public class DeudaCuentaHttpTests
         var e = await Montar();
         await Registrar(e.Admin, e.Ana, "adelanto", 20m);
         var antes = await Estado(e.Admin);
-        Assert.Equal(30m, antes.Pendientes.Single().Importe);
+        // La cuenta le debía 30 y le ha adelantado 20: le quedan 10 a su favor.
+        Assert.Equal(10m, antes.Pendientes.Single().Importe);
 
         await Leer<MovimientoDeudaCuentaDto>(await Registrar(e.Admin, e.Ana, "compensacion", 20m), HttpStatusCode.Created);
         var despues = await Estado(e.Admin);
@@ -203,8 +206,9 @@ public class DeudaCuentaHttpTests
     public async Task ExtractoBancario_MuestraLosMovimientos_YCuadraConElEfectivo()
     {
         var e = await Montar();
+        // Ana adelantó 30 y la cuenta le ha adelantado 40: ella debe 10 neto, así que la devolución es de 10.
         await Registrar(e.Admin, e.Ana, "adelanto", 40m);
-        await Registrar(e.Admin, e.Ana, "devolucion", 15m);
+        await Registrar(e.Admin, e.Ana, "devolucion", 10m);
         await Registrar(e.Admin, e.Ana, "compensacion", 10m);
 
         var banco = await Leer<MovimientosCuentaComunResponse>(
@@ -212,7 +216,7 @@ public class DeudaCuentaHttpTests
         var estado = await Estado(e.Admin);
 
         Assert.Contains(banco.Movimientos, m => m.Tipo == "adelanto_persona" && m.Importe == -40m);
-        Assert.Contains(banco.Movimientos, m => m.Tipo == "devolucion_deuda" && m.Importe == 15m);
+        Assert.Contains(banco.Movimientos, m => m.Tipo == "devolucion_deuda" && m.Importe == 10m);
         Assert.Contains(banco.Movimientos, m => m.Tipo == "compensacion_deuda" && m.Importe == 0m);
         Assert.Equal(estado.Efectivo, banco.EfectivoFinal);
     }
@@ -230,7 +234,7 @@ public class DeudaCuentaHttpTests
     {
         var e = await Montar(ahorro: 50m);
         var adelanto = await NuevaDeuda(e.Admin, e.Ana, "adelanto", 40m, concepto: "Fontanero");
-        await NuevaDeuda(e.Admin, e.Ana, "devolucion", 15m, desdeAhorro: false, fecha: new DateOnly(2026, 10, 6));
+        await NuevaDeuda(e.Admin, e.Ana, "devolucion", 10m, desdeAhorro: false, fecha: new DateOnly(2026, 10, 6));
         await NuevaDeuda(e.Admin, e.Ana, "adelanto", 10m, desdeAhorro: true, fecha: new DateOnly(2026, 9, 12)); // de otro mes
 
         var octubre = await Estado(e.Admin);
@@ -296,7 +300,7 @@ public class DeudaCuentaHttpTests
     {
         var sin = await Montar(permisosDeBeto: []);
         var con = await Montar(permisosDeBeto: [CatalogoPermisos.CuentaMovimientos]);
-        var adelanto = await NuevaDeuda(sin.Admin, sin.Ana, "adelanto", 10m);
+        var adelanto = await NuevaDeuda(sin.Admin, sin.Beto, "adelanto", 10m);
 
         Assert.Equal(HttpStatusCode.NotFound, (await con.Miembro.DeleteAsync($"/api/cuenta-comun/deudas/{Guid.NewGuid()}")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await sin.Miembro.DeleteAsync($"/api/cuenta-comun/deudas/{adelanto}")).StatusCode);
@@ -308,7 +312,7 @@ public class DeudaCuentaHttpTests
     {
         var uno = await Montar();
         var otro = await Montar();
-        var ajena = await NuevaDeuda(otro.Admin, otro.Ana, "adelanto", 10m);
+        var ajena = await NuevaDeuda(otro.Admin, otro.Beto, "adelanto", 10m);
 
         var r = await uno.Admin.DeleteAsync($"/api/cuenta-comun/deudas/{ajena}");
 
@@ -360,7 +364,7 @@ public class DeudaCuentaHttpTests
     {
         var e = await Montar();
         await Registrar(e.Admin, e.Ana, "adelanto", 40m);
-        await Registrar(e.Admin, e.Ana, "devolucion", 15m);
+        await Registrar(e.Admin, e.Ana, "devolucion", 10m);
 
         var estado = await Estado(e.Admin);
         var hogar = estado.Resumen!.Hogar;
@@ -368,6 +372,6 @@ public class DeudaCuentaHttpTests
         Assert.Equal(estado.Efectivo, hogar.Disponible);
         Assert.Equal(hogar.Inicial + hogar.Ingresos + hogar.IngresosSueltos - hogar.Gastos - hogar.Reembolsos, hogar.Disponible);
         Assert.True(hogar.Gastos >= 40m);
-        Assert.True(hogar.IngresosSueltos >= 15m);
+        Assert.True(hogar.IngresosSueltos >= 10m);
     }
 }

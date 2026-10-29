@@ -87,7 +87,11 @@ public class CuentaComunDeudaEscenariosTests
     {
         var estado = Estado(Octubre, Deudas);
 
-        Assert.Equal(estado.Saldo + estado.Pendientes.Sum(p => p.Importe), estado.Efectivo);
+        // Los pendientes ya descuentan los adelantos y suman las devoluciones, pero no las compensaciones; el efectivo sí las resta.
+        var adelantos = Deudas.Where(d => d.Tipo == TipoMovimientoDeuda.Adelanto).Sum(d => d.Importe);
+        var devoluciones = Deudas.Where(d => d.Tipo == TipoMovimientoDeuda.Devolucion).Sum(d => d.Importe);
+        var compensaciones = Deudas.Where(d => d.Tipo == TipoMovimientoDeuda.Compensacion).Sum(d => d.Importe);
+        Assert.Equal(estado.Saldo + estado.Pendientes.Sum(p => p.Importe) + adelantos - devoluciones - compensaciones, estado.Efectivo);
     }
 
     [Fact]

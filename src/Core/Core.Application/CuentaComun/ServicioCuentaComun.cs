@@ -292,7 +292,10 @@ public sealed class ServicioCuentaComun(IRepositorioCuentaComun repositorio, Tim
 
         if (tipo is TipoMovimientoDeuda.Devolucion or TipoMovimientoDeuda.Compensacion)
         {
-            var debe = DeudaDe(deudas, m.MiembroId, m.DesdeAhorro);
+            // Una devolución cubre lo que ella debe neto (lo que la cuenta le debe ya descontado); una compensación, lo que lleva adelantado.
+            var debe = tipo == TipoMovimientoDeuda.Devolucion
+                ? Math.Max(0m, -await SaldoConPersonaAsync(m.MiembroId, m.DesdeAhorro, deudas, ct))
+                : DeudaDe(deudas, m.MiembroId, m.DesdeAhorro);
             if (m.Importe > debe)
             {
                 var visible = Math.Max(0m, debe);
@@ -360,6 +363,18 @@ public sealed class ServicioCuentaComun(IRepositorioCuentaComun repositorio, Tim
     private static decimal DeudaDe(IEnumerable<MovimientoDeuda> deudas, Guid miembroId, bool desdeAhorro)
         => deudas.Where(d => d.MiembroId == miembroId && d.DesdeAhorro == desdeAhorro)
             .Sum(d => d.Tipo == TipoMovimientoDeuda.Adelanto ? d.Importe : -d.Importe);
+
+    /// <summary>
+    /// Lo que la cuenta le debe a la persona en un fondo, igual que el dominio: los gastos que adelantó menos lo reembolsado, descontado
+    /// lo que la cuenta le ha adelantado y más lo que ella ha devuelto. Negativo: lo que ella debe. Las compensaciones no entran (restan a la vez en los dos lados).
+    /// </summary>
+    private async Task<decimal> SaldoConPersonaAsync(Guid miembroId, bool desdeAhorro, IEnumerable<MovimientoDeuda> deudas, CancellationToken ct)
+    {
+        var propios = deudas.Where(d => d.MiembroId == miembroId && d.DesdeAhorro == desdeAhorro).ToList();
+        return await repositorio.GastadoACargoAsync(miembroId, desdeAhorro, ct) - await repositorio.ReembolsadoAsync(miembroId, desdeAhorro, ct)
+            - propios.Where(d => d.Tipo == TipoMovimientoDeuda.Adelanto).Sum(d => d.Importe)
+            + propios.Where(d => d.Tipo == TipoMovimientoDeuda.Devolucion).Sum(d => d.Importe);
+    }
 
     /// <summary>Lo que el fondo le debe a la persona por gastos que adelantó y aún no se le han reembolsado ni compensado.</summary>
     private async Task<decimal> PendienteDeFondoAsync(Guid miembroId, bool desdeAhorro, IEnumerable<MovimientoDeuda> deudas, CancellationToken ct)

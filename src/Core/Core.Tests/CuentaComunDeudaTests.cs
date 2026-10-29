@@ -48,6 +48,7 @@ public class CuentaComunDeudaTests
         var compensada = CuentaComun.Calcular(Septiembre, Aportaciones, gastos, [], deudas: [adelanto, compensacion]);
 
         Assert.Equal(sinCompensar.Efectivo, compensada.Efectivo);
+        // La compensación resta a la vez lo que la cuenta le debe y lo que ella le debe: lo pendiente sigue siendo 30 − 10.
         Assert.Equal(20m, compensada.Pendientes.Single().Importe);
         Assert.Equal(sinCompensar.Saldo + 10m, compensada.Saldo);
         Assert.Empty(compensada.Deudas!);
@@ -64,6 +65,42 @@ public class CuentaComunDeudaTests
 
         Assert.Equal(sinCompensar.Efectivo - 10m, compensada.Efectivo);
         Assert.Equal(sinCompensar.AhorroDisponible + 10m, compensada.AhorroDisponible);
+    }
+
+    [Fact]
+    public void Adelanto_DescuentaLoQueLaCuentaLeDebe_YPuedeQuedarNegativoHastaQueLoDevuelve()
+    {
+        var gastos = new[] { new GastoDeCuenta(Ana, Septiembre.AddDays(2), 30m) };
+        var adelanto = new MovimientoDeuda(Ana, Septiembre.AddDays(3), 40m, TipoMovimientoDeuda.Adelanto);
+        var devolucion = new MovimientoDeuda(Ana, Septiembre.AddDays(4), 10m, TipoMovimientoDeuda.Devolucion);
+
+        var adelantado = CuentaComun.Calcular(Septiembre, Aportaciones, gastos, [], deudas: [adelanto]);
+        var devuelto = CuentaComun.Calcular(Septiembre, Aportaciones, gastos, [], deudas: [adelanto, devolucion]);
+
+        // La cuenta le debía 30 y le ha adelantado 40: ahora ella le debe 10, y el efectivo baja los 40 que salieron.
+        Assert.Equal(-10m, adelantado.Pendientes.Single().Importe);
+        Assert.Equal([new DeudaMiembro(Ana, 10m)], adelantado.Deudas!);
+        Assert.Equal(60m, adelantado.Efectivo);
+
+        // Con su devolución de 10 vuelve a cero: no queda pendiente ni deuda, y el efectivo recupera lo devuelto.
+        Assert.Empty(devuelto.Pendientes);
+        Assert.Empty(devuelto.Deudas!);
+        Assert.Equal(70m, devuelto.Efectivo);
+    }
+
+    [Fact]
+    public void AdelantoDelAhorro_DescuentaDeLoQueLaCuentaDebeEnElAhorro_YPuedeQuedarNegativo()
+    {
+        var gastos = new[] { new GastoDeCuenta(Ana, Septiembre.AddDays(2), 30m, DesdeAhorro: true) };
+        var deudas = new[] { new MovimientoDeuda(Ana, Septiembre.AddDays(3), 102m, TipoMovimientoDeuda.Adelanto, DesdeAhorro: true) };
+
+        var sinAdelanto = CuentaComun.Calcular(Septiembre, Aportaciones, gastos, []);
+        var adelantado = CuentaComun.Calcular(Septiembre, Aportaciones, gastos, [], deudas: deudas);
+
+        // El ahorro le debía 30 por su gasto y la cuenta le adelanta 102: ella le debe 72 al ahorro. El efectivo no cambia (el dinero sale del ahorro).
+        Assert.Equal(-72m, adelantado.Pendientes.Single(p => p.DesdeAhorro).Importe);
+        Assert.Equal([new DeudaMiembro(Ana, 72m, true)], adelantado.Deudas!);
+        Assert.Equal(sinAdelanto.Efectivo, adelantado.Efectivo);
     }
 
     [Fact]

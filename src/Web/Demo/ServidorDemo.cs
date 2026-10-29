@@ -385,7 +385,7 @@ public sealed partial class ServidorDemo
             return Mal(HttpStatusCode.BadRequest, "El texto del QR debe tener entre 1 y 500 caracteres.");
         using var generador = new QRCoder.QRCodeGenerator();
         using var datos = generador.CreateQrCode(r.Texto, QRCoder.QRCodeGenerator.ECCLevel.M);
-        return Ok(new QrListaResponse(new QRCoder.SvgQRCode(datos).GetGraphic(8, "#24161A", "#FFFFFF")));
+        return Ok(new QrListaResponse(new QRCoder.SvgQRCode(datos).GetGraphic(8, "#24161A", "#FFFFFF", true, QRCoder.SvgQRCode.SizingMode.ViewBoxAttribute)));
     }
 
     /// <summary>Token del enlace QR de la cabecera X-Enlace-Lista, o null.</summary>

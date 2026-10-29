@@ -80,6 +80,10 @@ public class ListaCompraComponentesTests : BunitContext
         Assert.Equal(2, filas.Count);
         Assert.Contains("Leche", filas[0].TextContent);
         Assert.Contains("Pan", filas[1].TextContent);
+        // Un producto pendiente se pinta sin marcar y uno en el carro, marcado (un atributo checked="false" lo marcaría igualmente).
+        var casillas = c.FindAll("input[type=checkbox]");
+        Assert.False(casillas[0].HasAttribute("checked"));
+        Assert.True(casillas[1].HasAttribute("checked"));
     }
 
     [Fact]

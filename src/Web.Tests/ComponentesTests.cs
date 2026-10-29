@@ -421,6 +421,29 @@ public class ComponentesTests : BunitContext
     }
 
     [Fact]
+    public void Cuenta_comun_refresca_los_movimientos_tras_registrar_una_deuda()
+    {
+        var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);
+        var api = new ApiFalsa()
+            .Responde("GET /api/miembros", HttpStatusCode.OK, new[] { ana })
+            .Responde("GET /api/categorias", HttpStatusCode.OK, Array.Empty<CategoriaDto>())
+            .Responde("GET /api/cuenta-comun", HttpStatusCode.OK, CuentaConDeudas())
+            .Responde("GET /api/cuenta-comun/movimientos", HttpStatusCode.OK,
+                new MovimientosCuentaComunResponse(new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 7), 0m, 0m, 0m, 0m, []))
+            .Responde("POST /api/cuenta-comun/deudas", HttpStatusCode.Created,
+                new MovimientoDeudaCuentaDto(Guid.NewGuid(), AnaId, new DateOnly(2026, 10, 7), 40m, "adelanto", false, null));
+        Registrar(api);
+        var c = Render<VistaCuentaComun>();
+        Assert.Equal(1, api.Recibidas.Count(r => r == "GET /api/cuenta-comun/movimientos"));
+
+        c.Find("#form-deuda input[placeholder='0,00']").Input("40");
+        c.Find("#form-deuda").Submit();
+
+        // El extracto de Movimientos se vuelve a pedir para que la línea nueva aparezca sin recargar la página.
+        Assert.Equal(2, api.Recibidas.Count(r => r == "GET /api/cuenta-comun/movimientos"));
+    }
+
+    [Fact]
     public void Cuenta_comun_no_permite_enviar_un_importe_invalido_de_deuda()
     {
         var ana = ApiFalsa.Miembro("Ana", esYo: true, id: AnaId);

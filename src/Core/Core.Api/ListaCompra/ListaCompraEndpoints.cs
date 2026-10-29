@@ -118,7 +118,7 @@ public static class ListaCompraEndpoints
             return ApiComun.Invalido("El texto del QR debe tener entre 1 y 500 caracteres.");
         using var generador = new QRCodeGenerator();
         using var datos = generador.CreateQrCode(req.Texto, QRCodeGenerator.ECCLevel.M);
-        var svg = new SvgQRCode(datos).GetGraphic(8, "#24161A", "#FFFFFF");
+        var svg = new SvgQRCode(datos).GetGraphic(8, "#24161A", "#FFFFFF", true, SvgQRCode.SizingMode.ViewBoxAttribute);
         return Results.Ok(new QrListaResponse(svg));
     }
 

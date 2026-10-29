@@ -300,6 +300,14 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
         _ => "Adelanto",
     };
 
+    /// <summary>Frase que explica qué hace cada tipo de movimiento de deuda, para mostrarla junto al selector.</summary>
+    public static string AyudaTipoDeuda(string tipo) => tipo switch
+    {
+        "devolucion" => "La persona ingresa dinero para pagar lo que debe.",
+        "compensacion" => "Se resta de lo que la cuenta le debe por reembolsos; no mueve dinero.",
+        _ => "La cuenta pagó algo por la persona: ella le debe ese importe.",
+    };
+
     /// <summary>Registra un adelanto, una devolución o una compensación de la deuda de una persona con la cuenta común.</summary>
     public Task<string?> RegistrarDeudaAsync() =>
         EjecutarAsync(async () =>

@@ -98,7 +98,7 @@ else if (_m.Estado is not null)
         </section>
     }
 
-    <PanelMovimientosCuenta />
+    <PanelMovimientosCuenta @ref="_movimientos" />
 
     <section class="card" aria-labelledby="t-saldo-inicial">
         <div class="card-head"><h2 id="t-saldo-inicial">Saldo inicial</h2></div>
@@ -296,9 +296,10 @@ else if (_m.Estado is not null)
         {
             <form class="addcat" id="form-deuda" @onsubmit="RegistrarDeudaAsync">
                 <h3 class="u-titulo-form">Nuevo movimiento de deuda</h3>
+                <p class="u-titulo-form muted">@ModeloCuentaComun.AyudaTipoDeuda(_m.TipoDeuda)</p>
                 <label>Persona
                     <select value="@_m.Deudor" @onchange="e => _m.Deudor = Guid.Parse(e.Value!.ToString()!)">
-                        @foreach (var m in _m.Miembros)
+                        @foreach (var m in _m.Adultos)
                         {
                             <option value="@m.Id">@m.Nombre</option>
                         }
@@ -306,12 +307,12 @@ else if (_m.Estado is not null)
                 </label>
                 <label>Tipo
                     <select @bind="_m.TipoDeuda">
-                        <option value="adelanto">Adelanto: la cuenta pagó por ella</option>
-                        <option value="devolucion">Devolución: ella ingresa para pagar</option>
-                        <option value="compensacion">Compensación: restar lo que la cuenta le debe</option>
+                        <option value="adelanto">Adelanto</option>
+                        <option value="devolucion">Devolución</option>
+                        <option value="compensacion">Compensación</option>
                     </select>
                 </label>
-                <label class="check"><input type="checkbox" @bind="_m.DeudaDesdeAhorro" /> Del ahorro (no de Hogar)</label>
+                <label class="chk"><input type="checkbox" @bind="_m.DeudaDesdeAhorro" /> Del ahorro (no de Hogar)</label>
                 <label>Importe (€)
                     <input inputmode="decimal" required placeholder="0,00" @bind="_m.ImporteDeuda" @bind:event="oninput" />
                 </label>
@@ -501,8 +502,13 @@ else if (_m.Estado is not null)
     private Task EliminarIngresoAsync(IngresoCuentaComunDto i) => Mostrar(_m.EliminarIngresoAsync(i));
 
     /// <summary>Espera la operación del modelo y, si salió bien, muestra su aviso.</summary>
+    private PanelMovimientosCuenta? _movimientos;
+
     private async Task Mostrar(Task<string?> operacion)
     {
-        if (await operacion is { } aviso) Avisos.Mostrar(aviso);
+        if (await operacion is not { } aviso) return;
+        Avisos.Mostrar(aviso);
+        // Lo que se acaba de registrar tiene que verse también en el extracto de Movimientos.
+        if (_movimientos is not null) await _movimientos.RecargarAsync();
     }
 }

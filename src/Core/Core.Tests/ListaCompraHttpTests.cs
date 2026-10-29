@@ -297,6 +297,9 @@ public class ListaCompraHttpTests
         var qr = await Leer<QrListaResponse>(await e.Admin.PostAsJsonAsync("/api/lista-compra/qr", new QrListaRequest("https://app.test/compra/abc")));
 
         Assert.Contains("<svg", qr.Svg);
+        // Sin viewBox el SVG no se escala al ancho de la tarjeta y se recorta (el QR dejaría de poder escanearse).
+        Assert.Contains("viewBox=", qr.Svg);
+        Assert.DoesNotContain(" width=\"", qr.Svg.Split('>')[0], StringComparison.Ordinal);
         // La CSP del front prohíbe atributos style y scripts: el QR se inserta tal cual en la página.
         Assert.DoesNotContain("style=", qr.Svg, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("<script", qr.Svg, StringComparison.OrdinalIgnoreCase);

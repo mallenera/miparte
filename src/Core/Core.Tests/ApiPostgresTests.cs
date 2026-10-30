@@ -223,6 +223,9 @@ public class ApiPostgresTests
         Assert.Equal(octubre.Efectivo, banco.EfectivoFinal);
         Assert.Equal(octubre.AhorroDisponible, banco.AhorroFinal);
         Assert.Contains(banco.Movimientos, m => m.Tipo == "adelanto_persona" && m.Id == adelantoHogar.Id && m.Concepto == "Fontanero");
+        // El saldo por persona del resumen también resta las deudas: Ana debe 40 (octubre) y 10 (septiembre) de Hogar, y el ahorro cuadra a cero.
+        var resumen = await Leer<ResumenMensualResponse>(await c.GetAsync("/api/resumen?mes=2026-10"));
+        Assert.Equal(-50m, resumen.Miembros.Single(m => m.MiembroId == ana.Id).DebeCuentaComun);
 
         // El ahorro repuesto por la devolución ya respalda un adelanto mayor: sin ella faltarían 60.
         var grande = await Nueva("adelanto", 100m, true, new DateOnly(2026, 10, 8));

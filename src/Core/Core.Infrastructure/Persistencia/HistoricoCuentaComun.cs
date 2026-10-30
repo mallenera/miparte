@@ -63,6 +63,14 @@ public sealed class HistoricoCuentaComun
     public SaldoInicialCuenta? SaldoInicial { get; }
 
     /// <summary>
+    /// El histórico en la forma que usa el cálculo. Es el único sitio que la arma: así el resumen y la pestaña de la cuenta leen
+    /// exactamente lo mismo (un campo que falte aquí faltaría en las dos).
+    /// </summary>
+    public HistoricoCuenta AHistoricoCuenta() => new(
+        Vigentes, Gastos, Reembolsos, Retiradas, Depositos, CuentaActiva, GastadoMes, GastosDelMes, SaldoInicial,
+        Frecuencia, Ingresos, Deudas);
+
+    /// <summary>
     /// Lee en una consulta lo necesario para calcular la cuenta al final del mes que empieza en <paramref name="inicio"/>.
     /// </summary>
     /// <param name="db">Contexto (filtrado por hogar).</param>

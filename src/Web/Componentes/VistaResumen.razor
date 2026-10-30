@@ -55,11 +55,20 @@ else if (_m.Resumen is not null && _m.Liquidacion is not null)
                 <span>@(_m.Resumen.GastosPersonales > 0 ? "No hay gastos del hogar" : "No hay gastos") en @_m.NombreMes.</span>
                 <a class="btn" href="gastos">Añadir un gasto</a>
             </div>
-            @foreach (var m in _m.Resumen.Miembros.Where(m => m.DebeCuentaComun > 0))
+            @foreach (var m in _m.Resumen.Miembros.Where(m => m.DebeCuentaComun > 0 || m.DebeAhorroCuentaComun > 0))
             {
                 <div class="catrow">
                     <div class="c-name"><Avatar Nombre="@m.Nombre" Color="@ColorMiembro.De(m.MiembroId, _m.Miembros)" Tamano="sm" /> @m.Nombre</div>
-                    <div class="c-sel"><span class="chip">La cuenta común le debe&nbsp;<b>@Formato.Euros(m.DebeCuentaComun)</b></span></div>
+                    <div class="c-sel">
+                        @if (m.DebeCuentaComun > 0)
+                        {
+                            <span class="chip">La cuenta común le debe de Hogar&nbsp;<b>@Formato.Euros(m.DebeCuentaComun)</b></span>
+                        }
+                        @if (m.DebeAhorroCuentaComun > 0)
+                        {
+                            <span class="chip">La cuenta común le debe del ahorro&nbsp;<b>@Formato.Euros(m.DebeAhorroCuentaComun)</b></span>
+                        }
+                    </div>
                 </div>
             }
         }
@@ -95,10 +104,15 @@ else if (_m.Resumen is not null && _m.Liquidacion is not null)
                                 <td>
                                     @if (m.DebeCuentaComun != 0m)
                                     {
-                                        <b class="g-importe saldo @(m.DebeCuentaComun > 0 ? "pos" : "neg")">@Saldo(m.DebeCuentaComun)</b>
-                                        <span>@(m.DebeCuentaComun > 0 ? "la cuenta le debe" : "debe a la cuenta")</span>
+                                        <div><span class="muted">Hogar</span> <b class="g-importe saldo @(m.DebeCuentaComun > 0 ? "pos" : "neg")">@Saldo(m.DebeCuentaComun)</b>
+                                        <span>@(m.DebeCuentaComun > 0 ? "la cuenta le debe" : "debe a la cuenta")</span></div>
                                     }
-                                    else
+                                    @if (m.DebeAhorroCuentaComun != 0m)
+                                    {
+                                        <div><span class="muted">Ahorro</span> <b class="g-importe saldo @(m.DebeAhorroCuentaComun > 0 ? "pos" : "neg")">@Saldo(m.DebeAhorroCuentaComun)</b>
+                                        <span>@(m.DebeAhorroCuentaComun > 0 ? "la cuenta le debe" : "debe a la cuenta")</span></div>
+                                    }
+                                    @if (m.DebeCuentaComun == 0m && m.DebeAhorroCuentaComun == 0m)
                                     {
                                         <span class="muted">—</span>
                                     }

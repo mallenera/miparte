@@ -484,7 +484,7 @@ Categoría marcada «predeterminada para gastos» (`predeterminadoGastos`, opcio
 
 `cuentaComun` (solo con la cuenta activada, si no es `null`): `{ "aportadoMes": 500.00, "gastadoMes": 120.00, "saldo": 280.00, "efectivo": 400.00, "pendiente": 120.00, "ahorroMes": 100.00, "ahorroDisponible": 100.00, "gastadoAhorroMes": 0.00 }`, con los saldos acumulados al final del mes (`aportadoMes`, `gastadoMes`, `gastadoAhorroMes` y `ahorroMes` son del propio mes; `gastadoMes` es lo gastado de la cuenta sin lo pagado desde el ahorro, que va en `gastadoAhorroMes`; `pendiente` es el total que la cuenta debe a quienes adelantaron gastos).
 
-`pagado` incluye lo que el miembro adelantó para gastos de la cuenta común; `debeCuentaComun` es lo que la cuenta le debe aún (acumulado hasta el fin del mes, descontados los reembolsos).
+`pagado` incluye lo que el miembro adelantó para gastos de la cuenta común; `debeCuentaComun` es el saldo neto con Hogar al fin del mes: lo que la cuenta le debe aún (descontados los reembolsos) menos lo que ella le debe por adelantos, negativo si lo debe ella. `debeAhorroCuentaComun` es igual con el fondo del ahorro (los gastos adelantados desde el ahorro de la cuenta común).
 
 ### Liquidación
 

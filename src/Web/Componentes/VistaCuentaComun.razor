@@ -267,157 +267,36 @@ else if (_m.Estado is not null)
                 <button class="btn" type="submit" disabled="@(!_m.OperacionValida || _m.Enviando)">@EtiquetaOperacion</button>
             </form>
         }
-    </section>
-
-    <section class="card" aria-labelledby="t-aportaciones">
-        <div class="card-head"><h2 id="t-aportaciones">Aportación mensual</h2></div>
-        <p class="muted">Importe fijo que aporta cada adulto al mes@(_m.Estado.AhorroActivo ? "; una parte puede ir a ahorro y el resto queda para gastos" : ""). Un cambio vale desde el mes elegido en adelante.</p>
-        <div class="u-mt10">
-            @foreach (var a in _m.Adultos)
-            {
-                <div class="catrow">
-                    <div class="c-name"><Avatar Nombre="@a.Nombre" Color="@ColorMiembro.De(a.Id, _m.Miembros)" Tamano="sm" /> @a.Nombre</div>
-                    <div class="c-sel">@Formato.Euros(_m.VigenteDe(a.Id)) al mes@(_m.AhorroVigenteDe(a.Id) > 0 ? $" ({Formato.Euros(_m.AhorroVigenteDe(a.Id))} de ahorro)" : "")</div>
-                </div>
-            }
-            @if (_m.Adultos.Count == 0)
-            {
-                <div class="empty">El hogar no tiene adultos activos.</div>
-            }
-        </div>
-
-    </section>
-
-    <section class="card" aria-labelledby="t-reembolsos">
-        <div class="card-head"><h2 id="t-reembolsos">Reembolsos</h2></div>
-        <p class="muted">Cuando una persona adelanta un gasto de la cuenta, esta le debe ese importe hasta reembolsárselo.</p>
-
-        @if (_m.Estado.Pendientes.Count == 0)
+        <h3 class="u-titulo-form u-mt12">Lista de la cuenta de @_m.NombreMes</h3>
+        @if (_m.Lineas.Count == 0)
         {
-            <div class="empty">No hay reembolsos pendientes.</div>
+            <div class="empty">Todavía no hay aportaciones, deudas ni movimientos.</div>
         }
-        @foreach (var p in _m.Estado.Pendientes)
+        @foreach (var l in _m.Lineas)
         {
-            <div class="catrow">
-                <div class="c-name">@p.Nombre</div>
-                <div class="c-sel">@(p.Importe > 0 ? "La cuenta le debe" : "Debe a la cuenta") @Formato.Euros(Math.Abs(p.Importe)) · @(p.DesdeAhorro ? "del ahorro" : "de Hogar")</div>
-            </div>
-        }
-
-        @foreach (var r in _m.Estado.Reembolsos.OrderByDescending(r => r.Fecha))
-        {
-            <div class="gastorow">
+            <div class="gastorow" @key="l.Clave">
                 <div class="g-main">
-                    <div class="g-concepto">Reembolso a @Formato.NombreMiembro(r.MiembroId, _m.Miembros) @(r.DesdeAhorro ? "(del ahorro)" : "(de Hogar)")</div>
-                    <div class="muted g-meta">@r.Fecha.ToString("dd/MM/yyyy", Es)@(string.IsNullOrWhiteSpace(r.Concepto) ? "" : " · " + r.Concepto)</div>
+                    <div class="g-concepto">@l.Etiqueta · @l.Titulo</div>
+                    <div class="muted g-meta">@l.Detalle@(l.Fecha is { } f ? " · " + f.ToString("dd/MM/yyyy", Es) : "")</div>
                 </div>
-                <div class="g-importe">@Formato.Euros(r.Importe)</div>
-                <div class="c-acc">
-                    @if (_m.ConfirmandoEliminar == r.Id)
-                    {
-                        <span class="muted">¿Eliminar?</span>
-                        <button class="linkbtn danger" type="button" @onclick="() => EliminarAsync(r)">Sí</button>
-                        <button class="linkbtn" type="button" @onclick="() => _m.ConfirmandoEliminar = null">No</button>
-                    }
-                    else
-                    {
-                        <button class="linkbtn danger" type="button" aria-label="Eliminar reembolso a @Formato.NombreMiembro(r.MiembroId, _m.Miembros)" @onclick="() => _m.ConfirmandoEliminar = r.Id">Eliminar</button>
-                    }
-                </div>
-            </div>
-        }
-
-    </section>
-
-    <section class="card" aria-labelledby="t-deudas">
-        <div class="card-head"><h2 id="t-deudas">Deudas con la cuenta</h2></div>
-        <p class="muted">Lo que una persona debe a la cuenta común o a su ahorro porque la cuenta pagó algo por ella. Se salda con una devolución suya, o con una compensación que resta de lo que la cuenta le debe por reembolsos.</p>
-
-        @if (_m.Estado.Deudas is not { Count: > 0 } deudas)
-        {
-            <div class="empty">Nadie debe nada a la cuenta.</div>
-        }
-        else
-        {
-            @foreach (var d in deudas)
-            {
-                <div class="gastorow">
-                    <div class="g-main">
-                        <div class="g-concepto">@Formato.NombreMiembro(d.MiembroId, _m.Miembros)</div>
-                        <div class="muted g-meta">@(d.DesdeAhorro ? "Debe al ahorro" : "Debe a Hogar")</div>
-                    </div>
-                    <div class="g-importe">@Formato.Euros(d.Importe)</div>
-                </div>
-            }
-        }
-
-        @if (_m.Estado.MovimientosDeuda is { Count: > 0 } movimientosDeuda)
-        {
-            <h3 class="u-titulo-form u-mt12">Movimientos de @_m.NombreMes</h3>
-            @foreach (var d in movimientosDeuda)
-            {
-                <div class="gastorow" @key="d.Id">
-                    <div class="g-main">
-                        <div class="g-concepto">@ModeloCuentaComun.NombreTipoDeuda(d.Tipo) · @Formato.NombreMiembro(d.MiembroId, _m.Miembros) @(d.DesdeAhorro ? "(del ahorro)" : "(de Hogar)")</div>
-                        <div class="muted g-meta">@d.Fecha.ToString("dd/MM/yyyy", Es)@(string.IsNullOrWhiteSpace(d.Concepto) ? "" : " · " + d.Concepto)</div>
-                    </div>
-                    <div class="g-importe">@Formato.Euros(d.Importe)</div>
-                    @if (PuedeCuenta)
-                    {
-                        <div class="c-acc">
-                            @if (_m.ConfirmandoEliminar == d.Id)
-                            {
-                                <span class="muted">¿Eliminar?</span>
-                                <button class="linkbtn danger" type="button" @onclick="() => EliminarDeudaAsync(d)">Sí</button>
-                                <button class="linkbtn" type="button" @onclick="() => _m.ConfirmandoEliminar = null">No</button>
-                            }
-                            else
-                            {
-                                <button class="linkbtn danger" type="button" aria-label="Eliminar @ModeloCuentaComun.NombreTipoDeuda(d.Tipo).ToLowerInvariant() de @Formato.NombreMiembro(d.MiembroId, _m.Miembros)" @onclick="() => _m.ConfirmandoEliminar = d.Id">Eliminar</button>
-                            }
-                        </div>
-                    }
-                </div>
-            }
-        }
-
-    </section>
-
-    <section class="card" aria-labelledby="t-ingresos">
-        <div class="card-head"><h2 id="t-ingresos">Ingresos</h2></div>
-        <p class="muted">Dinero que entra a la cuenta común fuera de las aportaciones y del ahorro, por ejemplo lo que pagan las amigas de una cena. Suma al saldo y al efectivo de la cuenta; no cambia los reembolsos.</p>
-
-        @if (_m.IngresosDelMes.Count == 0)
-        {
-            <div class="empty">No hay ingresos este mes.</div>
-        }
-
-        @foreach (var i in _m.IngresosDelMes)
-        {
-            <div class="gastorow">
-                <div class="g-main">
-                    <div class="g-concepto">@(string.IsNullOrWhiteSpace(i.Concepto) ? "Ingreso" : i.Concepto)</div>
-                    <div class="muted g-meta">@i.Fecha.ToString("dd/MM/yyyy", Es) · ingresó @Formato.NombreMiembro(i.MiembroId, _m.Miembros)</div>
-                </div>
-                <div class="g-importe">@Formato.Euros(i.Importe)</div>
-                @if (PuedeCuenta)
+                <div class="g-importe">@Formato.Euros(l.Importe)</div>
+                @if (l.Id is { } id && PuedeCuenta)
                 {
                     <div class="c-acc">
-                        @if (_m.ConfirmandoEliminar == i.Id)
+                        @if (_m.ConfirmandoEliminar == id)
                         {
                             <span class="muted">¿Eliminar?</span>
-                            <button class="linkbtn danger" type="button" @onclick="() => EliminarIngresoAsync(i)">Sí</button>
+                            <button class="linkbtn danger" type="button" @onclick="() => EliminarLineaAsync(l)">Sí</button>
                             <button class="linkbtn" type="button" @onclick="() => _m.ConfirmandoEliminar = null">No</button>
                         }
                         else
                         {
-                            <button class="linkbtn danger" type="button" aria-label="Eliminar ingreso de @Formato.NombreMiembro(i.MiembroId, _m.Miembros)" @onclick="() => _m.ConfirmandoEliminar = i.Id">Eliminar</button>
+                            <button class="linkbtn danger" type="button" aria-label="Eliminar @l.Etiqueta.ToLowerInvariant() de @l.Titulo" @onclick="() => _m.ConfirmandoEliminar = id">Eliminar</button>
                         }
                     </div>
                 }
             </div>
         }
-
         @if (_m.IngresosDelMes.Count > 0)
         {
             <div class="muted g-meta">Total ingresado este mes: @Formato.Euros(_m.TotalIngresosDelMes)</div>
@@ -530,7 +409,7 @@ else if (_m.Estado is not null)
 
     private Task OperarAsync() => Mostrar(_m.RegistrarOperacionAsync());
 
-    private Task EliminarDeudaAsync(MovimientoDeudaCuentaDto d) => Mostrar(_m.EliminarDeudaAsync(d));
+    private Task EliminarLineaAsync(LineaCuenta l) => Mostrar(_m.EliminarLineaAsync(l));
 
     private Task IngresarAhorroAsync() => Mostrar(_m.IngresarAhorroAsync());
 
@@ -540,9 +419,6 @@ else if (_m.Estado is not null)
 
     private Task EliminarDepositoAsync(DepositoAhorroDto d) => Mostrar(_m.EliminarDepositoAsync(d));
 
-    private Task EliminarAsync(ReembolsoCuentaDto r) => Mostrar(_m.EliminarAsync(r));
-
-    private Task EliminarIngresoAsync(IngresoCuentaComunDto i) => Mostrar(_m.EliminarIngresoAsync(i));
 
     /// <summary>Espera la operación del modelo y, si salió bien, muestra su aviso.</summary>
     private PanelMovimientosCuenta? _movimientos;

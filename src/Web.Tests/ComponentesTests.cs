@@ -327,6 +327,10 @@ public class ComponentesTests : BunitContext
         Assert.Contains(perfil.Id.ToString(), cuerpo);
     }
 
+    /// <summary>Filas de la lista de la cuenta sin las aportaciones (que salen siempre, una por adulto).</summary>
+    private static List<AngleSharp.Dom.IElement> FilasSinAportacion(IRenderedComponent<VistaCuentaComun> c) =>
+        c.FindAll("section[aria-labelledby=t-operaciones] .gastorow").Where(f => !f.TextContent.Contains("Aportación mensual")).ToList();
+
     private static CuentaComunResponse Cuenta(decimal saldo, params PendienteCuentaDto[] pendientes) =>
         new("2026-10", 1000m, 1000m, 1000m - saldo, saldo, pendientes, saldo + pendientes.Sum(p => p.Importe), [], []);
 
@@ -344,8 +348,7 @@ public class ComponentesTests : BunitContext
 
         var c = Render<VistaCuentaComun>();
 
-        Assert.Contains("Deudas con la cuenta", c.Markup);
-        Assert.Contains("Nadie debe nada a la cuenta.", c.Markup);
+        Assert.Empty(FilasSinAportacion(c));
         Assert.NotEmpty(c.FindAll("#form-operacion"));
     }
 
@@ -362,7 +365,7 @@ public class ComponentesTests : BunitContext
 
         var c = Render<VistaCuentaComun>();
 
-        var filas = c.FindAll("#t-deudas ~ .gastorow, section[aria-labelledby=t-deudas] .gastorow");
+        var filas = FilasSinAportacion(c);
         Assert.Equal(2, filas.Count);
         Assert.Contains("Ana", filas[0].TextContent);
         Assert.Contains("Debe a Hogar", filas[0].TextContent);
@@ -464,13 +467,15 @@ public class ComponentesTests : BunitContext
 
         var c = Render<VistaCuentaComun>();
 
-        var filas = c.FindAll("section[aria-labelledby=t-deudas] .gastorow");
+        var filas = FilasSinAportacion(c);
         Assert.Equal(2, filas.Count);
-        Assert.Contains("Adelanto · Ana (de Hogar)", filas[0].TextContent);
-        Assert.Contains("05/10/2026 · Fontanero", filas[0].TextContent);
+        Assert.Contains("Adelanto · Ana", filas[0].TextContent);
+        Assert.Contains("De Hogar · Fontanero", filas[0].TextContent);
+        Assert.Contains("05/10/2026", filas[0].TextContent);
         Assert.Contains("40,00", filas[0].TextContent);
-        Assert.Contains("Devolución · Ana (del ahorro)", filas[1].TextContent);
-        Assert.Contains("Movimientos de", c.Find("section[aria-labelledby=t-deudas]").TextContent);
+        Assert.Contains("Devolución · Ana", filas[1].TextContent);
+        Assert.Contains("Del ahorro", filas[1].TextContent);
+        Assert.Contains("Lista de la cuenta de", c.Find("section[aria-labelledby=t-operaciones]").TextContent);
     }
 
     [Fact]
@@ -484,8 +489,7 @@ public class ComponentesTests : BunitContext
 
         var c = Render<VistaCuentaComun>();
 
-        Assert.Empty(c.FindAll("section[aria-labelledby=t-deudas] .gastorow"));
-        Assert.DoesNotContain("Movimientos de", c.Find("section[aria-labelledby=t-deudas]").TextContent);
+        Assert.Empty(FilasSinAportacion(c));
     }
 
     [Fact]
@@ -500,11 +504,11 @@ public class ComponentesTests : BunitContext
         Registrar(api);
         var c = Render<VistaCuentaComun>();
 
-        c.Find("section[aria-labelledby=t-deudas] button.linkbtn.danger").Click();
+        c.Find("section[aria-labelledby=t-operaciones] button.linkbtn.danger").Click();
         Assert.DoesNotContain($"DELETE /api/cuenta-comun/deudas/{DeudaId}", api.Recibidas); // pide confirmación antes
-        Assert.Contains("¿Eliminar?", c.Find("section[aria-labelledby=t-deudas]").TextContent);
+        Assert.Contains("¿Eliminar?", c.Find("section[aria-labelledby=t-operaciones]").TextContent);
 
-        c.FindAll("section[aria-labelledby=t-deudas] button.linkbtn.danger").First(b => b.TextContent == "Sí").Click();
+        c.FindAll("section[aria-labelledby=t-operaciones] button.linkbtn.danger").First(b => b.TextContent == "Sí").Click();
 
         Assert.Contains($"DELETE /api/cuenta-comun/deudas/{DeudaId}", api.Recibidas);
     }
@@ -520,10 +524,10 @@ public class ComponentesTests : BunitContext
         Registrar(api);
         var c = Render<VistaCuentaComun>();
 
-        c.Find("section[aria-labelledby=t-deudas] button.linkbtn.danger").Click();
-        c.FindAll("section[aria-labelledby=t-deudas] button.linkbtn").First(b => b.TextContent == "No").Click();
+        c.Find("section[aria-labelledby=t-operaciones] button.linkbtn.danger").Click();
+        c.FindAll("section[aria-labelledby=t-operaciones] button.linkbtn").First(b => b.TextContent == "No").Click();
 
-        Assert.DoesNotContain("¿Eliminar?", c.Find("section[aria-labelledby=t-deudas]").TextContent);
+        Assert.DoesNotContain("¿Eliminar?", c.Find("section[aria-labelledby=t-operaciones]").TextContent);
         Assert.DoesNotContain(api.Recibidas, r => r.StartsWith("DELETE"));
     }
 
@@ -540,8 +544,8 @@ public class ComponentesTests : BunitContext
 
         var c = Render<VistaCuentaComun>();
 
-        Assert.Single(c.FindAll("section[aria-labelledby=t-deudas] .gastorow"));
-        Assert.Empty(c.FindAll("section[aria-labelledby=t-deudas] button.linkbtn.danger"));
+        Assert.Single(FilasSinAportacion(c));
+        Assert.Empty(c.FindAll("section[aria-labelledby=t-operaciones] button.linkbtn.danger"));
     }
 
     [Fact]
@@ -557,8 +561,8 @@ public class ComponentesTests : BunitContext
         Registrar(api);
         var c = Render<VistaCuentaComun>();
 
-        c.Find("section[aria-labelledby=t-deudas] button.linkbtn.danger").Click();
-        c.FindAll("section[aria-labelledby=t-deudas] button.linkbtn.danger").First(b => b.TextContent == "Sí").Click();
+        c.Find("section[aria-labelledby=t-operaciones] button.linkbtn.danger").Click();
+        c.FindAll("section[aria-labelledby=t-operaciones] button.linkbtn.danger").First(b => b.TextContent == "Sí").Click();
 
         Assert.Contains("dejaría devoluciones o compensaciones sin deuda", c.Markup);
         // Además del aviso de la primera tarjeta, el motivo sale como aviso visible donde se actuó.
@@ -593,7 +597,7 @@ public class ComponentesTests : BunitContext
 
         var c = Render<VistaCuentaComun>();
 
-        Assert.Contains("Ana", c.Find("section[aria-labelledby=t-deudas]").TextContent);
+        Assert.Contains("Ana", c.Find("section[aria-labelledby=t-operaciones]").TextContent);
         Assert.Empty(c.FindAll("#form-operacion"));
     }
 
@@ -736,7 +740,7 @@ public class ComponentesTests : BunitContext
         var c = Render<VistaCuentaComun>();
 
         Assert.True(c.Find("#form-operacion option[value=reembolso]").HasAttribute("disabled"));
-        Assert.Contains("No hay reembolsos pendientes", c.Markup);
+        Assert.DoesNotContain("Reembolso pendiente", c.Markup);
     }
 
     [Fact]

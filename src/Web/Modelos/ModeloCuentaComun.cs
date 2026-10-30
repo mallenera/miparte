@@ -5,6 +5,18 @@ using MiParte.Web.Reparto;
 
 namespace MiParte.Web.Modelos;
 
+/// <summary>Una línea de la lista única de la cuenta común: aportación, saldo de deuda, reembolso pendiente, movimiento, reembolso o ingreso.</summary>
+/// <param name="Clave">Clave estable de la fila, para que Blazor no la recree al cambiar la lista.</param>
+/// <param name="Etiqueta">Tipo de la línea, para mostrarlo.</param>
+/// <param name="Tipo">Clave del tipo: <c>aportacion</c>, <c>deuda</c>, <c>pendiente</c>, <c>movimiento-deuda</c>, <c>reembolso</c> o <c>ingreso</c>.</param>
+/// <param name="Id">Id del movimiento guardado, si se puede borrar; null en aportaciones y saldos.</param>
+/// <param name="Fecha">Fecha del movimiento; null en aportaciones y saldos.</param>
+/// <param name="Titulo">Persona o concepto de la línea.</param>
+/// <param name="Detalle">Dato extra: fondo, sentido de la deuda o quién ingresó.</param>
+/// <param name="Importe">Importe, siempre positivo; el sentido va en <paramref name="Detalle"/>.</param>
+public sealed record LineaCuenta(
+    string Clave, string Etiqueta, string Tipo, Guid? Id, DateOnly? Fecha, string Titulo, string Detalle, decimal Importe);
+
 /// <summary>
 /// Estado y orquestación de la pestaña Cuenta común: saldo del mes, su parte por persona, aportaciones, reembolsos y movimientos del
 /// ahorro. No depende de Blazor; <c>VistaCuentaComun</c> solo enlaza sus campos y pinta.
@@ -364,6 +376,49 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
             ConceptoIngreso = "";
             return "Ingreso registrado";
         });
+
+    /// <summary>
+    /// Todas las líneas de la cuenta, en una sola lista: aportaciones vigentes, saldos de deuda y reembolsos pendientes, y los movimientos
+    /// del mes (deudas, reembolsos e ingresos). Los saldos de deuda salen de <c>Deudas</c> de la respuesta; los reembolsos pendientes solo
+    /// cuentan si la cuenta le debe algo (lo que una persona debe ya sale como deuda).
+    /// </summary>
+    public IReadOnlyList<LineaCuenta> Lineas
+    {
+        get
+        {
+            var lineas = Adultos.Select(a => new LineaCuenta(
+                $"ap-{a.Id}", "Aportación mensual", "aportacion", null, null, a.Nombre, "Cada mes", VigenteDe(a.Id))).ToList();
+            if (Estado is null) return lineas;
+
+            lineas.AddRange((Estado.Deudas ?? []).Select(d => new LineaCuenta(
+                $"deuda-{d.MiembroId}-{d.DesdeAhorro}", "Deuda con la cuenta", "deuda", null, null, NombreDe(d.MiembroId),
+                d.DesdeAhorro ? "Debe al ahorro" : "Debe a Hogar", d.Importe)));
+            lineas.AddRange(Estado.Pendientes.Where(p => p.Importe > 0).Select(p => new LineaCuenta(
+                $"pendiente-{p.MiembroId}-{p.DesdeAhorro}", "Reembolso pendiente", "pendiente", null, null, NombreDe(p.MiembroId),
+                "La cuenta le debe · " + (p.DesdeAhorro ? "del ahorro" : "de Hogar"), p.Importe)));
+            lineas.AddRange((Estado.MovimientosDeuda ?? []).Select(d => new LineaCuenta(
+                $"md-{d.Id}", NombreTipoDeuda(d.Tipo), "movimiento-deuda", d.Id, d.Fecha, NombreDe(d.MiembroId),
+                (d.DesdeAhorro ? "Del ahorro" : "De Hogar") + (string.IsNullOrWhiteSpace(d.Concepto) ? "" : " · " + d.Concepto), d.Importe)));
+            lineas.AddRange(Estado.Reembolsos.Select(r => new LineaCuenta(
+                $"re-{r.Id}", "Reembolso", "reembolso", r.Id, r.Fecha, NombreDe(r.MiembroId), r.Concepto ?? "", r.Importe)));
+            lineas.AddRange(IngresosDelMes.Select(i => new LineaCuenta(
+                $"in-{i.Id}", "Ingreso en la cuenta", "ingreso", i.Id, i.Fecha,
+                string.IsNullOrWhiteSpace(i.Concepto) ? "Ingreso" : i.Concepto, "Ingresó " + NombreDe(i.MiembroId), i.Importe)));
+            return lineas;
+        }
+    }
+
+    /// <summary>Nombre de un miembro, o vacío si no está en el hogar.</summary>
+    private string NombreDe(Guid id) => Miembros.FirstOrDefault(m => m.Id == id)?.Nombre ?? "";
+
+    /// <summary>Borra una línea que es un movimiento guardado (ingreso, reembolso o movimiento de deuda); las demás no se borran.</summary>
+    public Task<string?> EliminarLineaAsync(LineaCuenta l) => l.Tipo switch
+    {
+        "ingreso" => EliminarIngresoAsync(Ingresos.First(i => i.Id == l.Id)),
+        "reembolso" => EliminarAsync(Estado!.Reembolsos.First(r => r.Id == l.Id)),
+        "movimiento-deuda" => EliminarDeudaAsync(Estado!.MovimientosDeuda!.First(d => d.Id == l.Id)),
+        _ => Task.FromResult<string?>(null),
+    };
 
     /// <summary>Registra la operación elegida en el formulario único (aportación, ingreso, reembolso o deuda) con su fecha.</summary>
     public Task<string?> RegistrarOperacionAsync() => Operacion switch

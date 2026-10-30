@@ -87,7 +87,7 @@ public static class ResumenMes
             var delAhorro = (historico.GastosDelMes ?? []).Where(g => g.DesdeAhorro).Sum(g => g.Importe);
             resumenCuenta = new ResumenCuenta(
                 estado.AportadoMes, historico.GastadoMes - delAhorro, estado.Saldo,
-                estado.Efectivo, estado.Pendientes.Where(p => p.Importe > 0m).Sum(p => p.Importe),
+                estado.Efectivo, estado.Pendientes.Sum(p => p.Importe),
                 estado.AhorroMes, estado.AhorroDisponible, delAhorro);
         }
 

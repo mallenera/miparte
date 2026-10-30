@@ -152,6 +152,10 @@ else if (_m.Estado is not null)
                     {
                         <span class="chip">La cuenta le debe&nbsp;<b>@Formato.Euros(p.Pendiente)</b></span>
                     }
+                    else if (p.Pendiente < 0)
+                    {
+                        <span class="chip">Debe a la cuenta&nbsp;<b>@Formato.Euros(-p.Pendiente)</b></span>
+                    }
                 </div>
             </div>
         }

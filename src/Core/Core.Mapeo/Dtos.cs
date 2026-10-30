@@ -77,7 +77,7 @@ public static class Dtos
     /// <summary>Resumen mensual del hogar.</summary>
     public static ResumenMensualResponse ADto(this ResumenDelMes r) => new(
         FormatosApi.FormatoMes(r.Mes), r.GastosTotales,
-        r.PorMiembro.Select(m => new ResumenMiembroDto(m.MiembroId, m.Nombre, m.Pagado, m.Asumido, m.SaldoCuenta, m.Personal)).ToList(),
+        r.PorMiembro.Select(m => new ResumenMiembroDto(m.MiembroId, m.Nombre, m.Pagado, m.Asumido, m.SaldoCuenta, m.Personal, m.SaldoCuentaAhorro)).ToList(),
         r.PorCategoria.Select(c => new ResumenCategoriaDto(
             c.CategoriaId, c.Nombre, c.Total, c.PorMiembro.Select(x => new ImporteMiembroDto(x.MiembroId, x.Importe)).ToList())).ToList(),
         r.Cuenta is { } c2

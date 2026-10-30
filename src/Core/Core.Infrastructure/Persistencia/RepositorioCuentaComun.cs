@@ -55,9 +55,7 @@ public sealed class RepositorioCuentaComun(MiParteDbContext db) : IRepositorioCu
         // Todo lo que necesita el cálculo en una sola consulta y ya agrupado: el histórico no se trae fila a fila.
         var h = await HistoricoCuentaComun.LeerAsync(db, inicio, detalleDelMes: true, ct);
         return new HistoricoCuentaDetallado(
-            new HistoricoCuenta(
-                h.Vigentes, h.Gastos, h.Reembolsos, h.Retiradas, h.Depositos, h.CuentaActiva, h.GastadoMes, h.GastosDelMes, h.SaldoInicial,
-                h.Frecuencia, h.Ingresos, h.Deudas),
+            h.AHistoricoCuenta(),
             h.AhorroActivo,
             h.Aportaciones.Select(a => new AportacionRegistrada(a.Id, a.MiembroId, a.Fecha, a.Importe, a.Ahorro)).ToList(),
             h.ReembolsosDelMes, h.RetiradasDelMes, h.DepositosDelMes, h.Nombres, h.DeudasDelMes);

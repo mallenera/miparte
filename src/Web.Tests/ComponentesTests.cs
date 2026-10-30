@@ -1,5 +1,6 @@
 using System.Net;
 using Bunit;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using MiParte.Contracts;
 using MiParte.Web.Api;
@@ -174,6 +175,54 @@ public class ComponentesTests : BunitContext
 
         Assert.True(c.Find("button[type=submit]").HasAttribute("disabled"));
         Assert.Contains("debe ser 100", c.Find(".sumline").TextContent);
+    }
+
+    [Fact]
+    public void Configuracion_abre_en_miembros_y_no_muestra_las_funciones_hasta_elegir_hogar()
+    {
+        Registrar(ApiConHogar(soyAdmin: true));
+
+        var c = Render<VistaConfiguracionHogar>();
+
+        Assert.Equal("panel-miembros", c.Find("[role=tab][aria-selected=true]").GetAttribute("aria-controls"));
+        Assert.Contains("Miembros de", c.Markup);
+        Assert.DoesNotContain("Funciones del hogar", c.Markup);
+    }
+
+    [Fact]
+    public void La_pestana_de_la_url_muestra_su_seccion()
+    {
+        Registrar(ApiConHogar(soyAdmin: true));
+
+        var c = Render<VistaConfiguracionHogar>(p => p.Add(x => x.Pestana, "hogar"));
+
+        Assert.Equal("Hogar", c.Find("[role=tab][aria-selected=true]").TextContent);
+        Assert.Contains("Funciones del hogar", c.Markup);
+        Assert.DoesNotContain("Miembros de", c.Markup);
+    }
+
+    [Fact]
+    public void Una_pestana_desconocida_en_la_url_cae_en_miembros()
+    {
+        Registrar(ApiConHogar(soyAdmin: true));
+
+        var c = Render<VistaConfiguracionHogar>(p => p.Add(x => x.Pestana, "inventada"));
+
+        Assert.Equal("Miembros", c.Find("[role=tab][aria-selected=true]").TextContent);
+        Assert.Contains("Miembros de", c.Markup);
+    }
+
+    [Fact]
+    public void Elegir_una_pestana_la_deja_en_la_url_y_muestra_sus_permisos()
+    {
+        Registrar(ApiConHogar(soyAdmin: true));
+        var c = Render<VistaConfiguracionHogar>();
+
+        c.FindAll("[role=tab]").First(b => b.TextContent == "Permisos").Click();
+
+        Assert.EndsWith("?pestana=permisos", Services.GetRequiredService<NavigationManager>().Uri);
+        Assert.Contains("Cada adulto con cuenta tiene los permisos", c.Markup);
+        Assert.DoesNotContain("Miembros de", c.Markup);
     }
 
     [Fact]
@@ -1410,11 +1459,12 @@ public class ComponentesTests : BunitContext
         Assert.Contains("Registrar pago", c.Markup);
     }
 
+    /// <summary>Renderiza la configuración en la pestaña Hogar, donde viven las funciones y la eliminación.</summary>
     private async Task<IRenderedComponent<VistaConfiguracionHogar>> ConfiguracionAsync(bool soyAdmin, HogarResumen hogar, ApiFalsa? api = null)
     {
         Registrar(api ?? ApiConHogar(soyAdmin));
         await Services.GetRequiredService<EstadoHogar>().AplicarAsync(new YoResponse(null, [hogar], hogar));
-        return Render<VistaConfiguracionHogar>();
+        return Render<VistaConfiguracionHogar>(p => p.Add(x => x.Pestana, "hogar"));
     }
 
     [Fact]

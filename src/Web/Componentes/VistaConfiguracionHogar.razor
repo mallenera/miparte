@@ -1,4 +1,4 @@
-@* Configuración del hogar (menú del hogar): funciones activadas, miembros, invitaciones y perfiles de reparto del hogar actual. *@
+@* Configuración del hogar (menú del hogar), en pestañas: miembros e invitaciones, permisos, perfiles de reparto y funciones del hogar con su zona de peligro. *@
 @inject CoreApiClient Api
 @inject EstadoHogar Hogar
 @inject ServicioAvisos Avisos
@@ -24,302 +24,337 @@ else
 {
     <AvisosPush />
 
-    <section class="card" aria-labelledby="t-funciones">
-        <div class="card-head"><h2 id="t-funciones">Funciones del hogar</h2></div>
-        <p class="muted">Elige qué partes de la aplicación usa este hogar. Desactivar una función no borra sus datos: solo bloquea nuevos movimientos hasta volver a activarla.</p>
-        @if (_m.ErrorFunciones is not null)
+    <nav class="pestanas" role="tablist" aria-label="Secciones de la configuración">
+        @foreach (var (id, etiqueta) in Pestanas)
         {
-            <div class="aviso err u-mt12" role="alert">@_m.ErrorFunciones</div>
+            var seleccionada = _pestana == id;
+            <button class="pestana" type="button" role="tab" id="tab-@id" aria-controls="panel-@id"
+                    aria-selected="@(seleccionada.ToString().ToLowerInvariant())" tabindex="@(seleccionada ? 0 : -1)"
+                    @onclick="() => Elegir(id)">@etiqueta</button>
         }
-        <div class="u-mt12">
-            <label class="chk">
-                <input type="checkbox" @key="_m.ClaveCuenta" checked="@_m.CuentaComunActiva" disabled="@(!PuedeFunciones || _m.GuardandoFunciones)"
-                       @onchange="e => CambiarCuentaComunAsync((bool)e.Value!)" />
-                Habilitar cuenta común
-            </label>
-            <p class="muted">Un fondo del hogar al que cada adulto aporta una cantidad fija al mes, para pagar gastos sin repartirlos y reembolsar a quien adelanta dinero.</p>
-        </div>
-        <div class="u-mt12">
-            <label class="chk">
-                <input type="checkbox" @key="_m.ClaveAhorro" checked="@(_m.CuentaComunActiva && _m.AhorroActivo)"
-                       disabled="@(!PuedeFunciones || !_m.CuentaComunActiva || _m.GuardandoFunciones)"
-                       @onchange="e => CambiarAhorroAsync((bool)e.Value!)" />
-                Activar ahorro
-            </label>
-            <p class="muted">@(_m.CuentaComunActiva ? "Parte de las aportaciones que se aparta, con ingresos, retiradas y gastos pagados desde el ahorro." : "Necesita la cuenta común habilitada.")</p>
-        </div>
-        @if (_m.CuentaComunActiva)
-        {
-            <div class="u-mt12">
-                <label class="filtro">Frecuencia de las aportaciones
-                    <select @key="_m.ClaveFrecuencia" disabled="@(!PuedeFunciones || _m.GuardandoFunciones)"
-                            @onchange="e => CambiarFrecuenciaAsync((string)e.Value!)">
-                        <option value="@FrecuenciasAportacion.Mensual" selected="@(_m.AportacionFrecuencia == FrecuenciasAportacion.Mensual)">Cada mes</option>
-                        <option value="@FrecuenciasAportacion.Bimestral" selected="@(_m.AportacionFrecuencia == FrecuenciasAportacion.Bimestral)">Cada dos meses</option>
-                        <option value="@FrecuenciasAportacion.Trimestral" selected="@(_m.AportacionFrecuencia == FrecuenciasAportacion.Trimestral)">Cada tres meses</option>
-                        <option value="@FrecuenciasAportacion.Semestral" selected="@(_m.AportacionFrecuencia == FrecuenciasAportacion.Semestral)">Cada seis meses</option>
-                        <option value="@FrecuenciasAportacion.Anual" selected="@(_m.AportacionFrecuencia == FrecuenciasAportacion.Anual)">Cada año</option>
-                        <option value="@FrecuenciasAportacion.Unica" selected="@(_m.AportacionFrecuencia == FrecuenciasAportacion.Unica)">Una sola vez</option>
-                    </select>
-                </label>
-                <p class="muted">Cada cobro cubre un periodo: con «Cada dos meses», cada adulto aporta su cantidad una vez cada dos meses. «Una sola vez» es una única aportación por persona para el grupo.</p>
-            </div>
-        }
-        <div class="u-mt12">
-            <label class="chk">
-                <input type="checkbox" @key="_m.ClaveRecurrentes" checked="@_m.RecurrentesActivas" disabled="@(!PuedeFunciones || _m.GuardandoFunciones)"
-                       @onchange="e => CambiarRecurrentesAsync((bool)e.Value!)" />
-                Activar recurrentes
-            </label>
-            <p class="muted">Crea cada mes los gastos de las plantillas (alquiler, suscripciones…). Desactivarlo deja las plantillas pausadas, sin borrarlas.</p>
-        </div>
-        <div class="u-mt12">
-            <label class="chk">
-                <input type="checkbox" @key="_m.ClaveListaCompra" checked="@_m.ListaCompraActiva" disabled="@(!PuedeFunciones || _m.GuardandoFunciones)"
-                       @onchange="e => CambiarListaCompraAsync((bool)e.Value!)" />
-                Activar lista de la compra
-            </label>
-            <p class="muted">Una lista compartida de productos por comprar, con enlaces QR para añadir sin cuenta. Desactivarla conserva lo guardado, pero bloquea los cambios hasta volver a activarla.</p>
-        </div>
-        <div class="u-mt12">
-            <label class="filtro">Liquidación
-                <select @key="_m.ClaveLiquidacion" disabled="@(!PuedeFunciones || _m.GuardandoFunciones)"
-                        @onchange="e => CambiarLiquidacionAsync((string)e.Value!)">
-                    <option value="@ModosLiquidacion.Mensual" selected="@(_m.LiquidacionModo == ModosLiquidacion.Mensual)">Mensual</option>
-                    <option value="@ModosLiquidacion.Ciclos" selected="@(_m.LiquidacionModo == ModosLiquidacion.Ciclos)">Por ciclos</option>
-                </select>
-            </label>
-            <p class="muted">
-                @if (_m.LiquidacionModo == ModosLiquidacion.Ciclos)
-                {
-                    <span>Por ciclos: cada vez que el grupo quiera cerrar la liquidación (por ejemplo, al terminar un fin de semana) se liquidan los gastos pendientes desde el cierre anterior. Los gastos siguen visibles.</span>
-                }
-                else
-                {
-                    <span>Mensual: un saldo por mes natural, como hasta ahora.</span>
-                }
-                Cambiar de modo no altera los gastos ni los cierres ya hechos; los gastos que aún no se han liquidado por ciclos entrarán en el primer cierre.
-            </p>
-        </div>
-        @if (!PuedeFunciones)
-        {
-            <p class="muted u-mt12">No tienes permiso para cambiar estas funciones. Pídeselo a un administrador del hogar.</p>
-        }
-    </section>
+    </nav>
 
-    @if (_m.Periodo is { } periodo)
-    {
-        <section class="card" aria-labelledby="t-periodo">
-            <div class="card-head"><h2 id="t-periodo">Periodo del viaje</h2></div>
-            <p class="u-mt12">Periodo del grupo: @TextoPeriodo(periodo).</p>
-            @if (_m.PeriodoCerrado)
-            {
-                <p class="muted u-mt12">El periodo está cerrado: sus gastos no se pueden editar ni borrar, y su liquidación final ya está hecha.</p>
-            }
-            else
-            {
-                <p class="muted u-mt12">Al cerrar el viaje, sus gastos quedan bloqueados: no se podrán editar ni borrar. Los gastos pendientes se liquidan en un cierre final.</p>
-                @if (_m.ConfirmandoCierre)
-                {
-                    <div class="aviso warn u-mt12" role="alert">¿Cerrar el viaje? Sus gastos quedarán bloqueados hasta que se reabra el periodo.</div>
-                    <div class="u-mt12">
-                        <button class="btn btn-danger" type="button" disabled="@_m.CerrandoPeriodo" @onclick="CerrarPeriodoAsync">Sí, cerrar viaje</button>
-                        <button class="linkbtn" type="button" disabled="@_m.CerrandoPeriodo" @onclick="() => _m.ConfirmandoCierre = false">Cancelar</button>
+    <div role="tabpanel" id="panel-@_pestana" aria-labelledby="tab-@_pestana">
+        @if (_pestana == "miembros")
+        {
+            <div class="cols-even">
+                <section class="card" aria-labelledby="t-miembros">
+                    <div class="card-head">
+                        <h2 id="t-miembros">Miembros de @Hogar.HogarActual?.Nombre</h2>
+                        <span class="tag">@(_m.Miembros.Count) @(_m.Miembros.Count == 1 ? "persona" : "personas")</span>
                     </div>
-                }
-                else
-                {
-                    <button class="btn btn-sm u-mt12" type="button" disabled="@_m.CerrandoPeriodo" @onclick="() => _m.ConfirmandoCierre = true">Cerrar viaje</button>
-                }
-                @if (_m.ErrorPeriodo is not null)
-                {
-                    <div class="aviso err u-mt12" role="alert">@_m.ErrorPeriodo</div>
-                }
-            }
-        </section>
-    }
-
-    <div class="cols-even">
-        <section class="card" aria-labelledby="t-miembros">
-            <div class="card-head">
-                <h2 id="t-miembros">Miembros de @Hogar.HogarActual?.Nombre</h2>
-                <span class="tag">@(_m.Miembros.Count) @(_m.Miembros.Count == 1 ? "persona" : "personas")</span>
-            </div>
-            @if (_m.ErrorMiembros is not null)
-            {
-                <div class="aviso err" role="alert">@_m.ErrorMiembros</div>
-            }
-            <div class="mlist">
-                @foreach (var m in _m.Miembros)
-                {
-                    var miembro = m;
-                    <div class="mrow">
-                        <Avatar Nombre="@miembro.Nombre" Color="@ColorMiembro.De(miembro.Id, _m.Miembros)" Tamano="lg" />
-                        @if (_m.Renombrando == miembro.Id)
+                    @if (_m.ErrorMiembros is not null)
+                    {
+                        <div class="aviso err" role="alert">@_m.ErrorMiembros</div>
+                    }
+                    <div class="mlist">
+                        @foreach (var m in _m.Miembros)
                         {
-                            <form class="renombrar" @onsubmit="() => GuardarNombreAsync(miembro)">
-                                <label class="sr" for="nombre-@miembro.Id">Nombre de @miembro.Nombre</label>
-                                <input id="nombre-@miembro.Id" maxlength="100" @bind="_m.NombreNuevo" @bind:event="oninput" />
-                                <button class="btn btn-sm" type="submit" disabled="@(string.IsNullOrWhiteSpace(_m.NombreNuevo))">Guardar</button>
-                                <button class="linkbtn" type="button" @onclick="() => _m.Renombrando = null">Cancelar</button>
-                            </form>
-                        }
-                        else
-                        {
-                            <div class="mname">
-                                <strong>@miembro.Nombre</strong>
-                                @if (miembro.EsYo) { <span class="tag cur">Tú</span> }
-                                @if (miembro.Rol == "admin") { <span class="tag admin">Admin</span> }
-                                @if (miembro.Tipo == TiposMiembro.ACargo) { <span class="tag">A cargo</span> }
-                                else if (!miembro.Vinculado) { <span class="tag off">Sin cuenta</span> }
-                            </div>
-                            <div class="mmeta">
-                                @if (miembro.Tipo == TiposMiembro.ACargo && miembro.ResponsableId is { } resp)
+                            var miembro = m;
+                            <div class="mrow">
+                                <Avatar Nombre="@miembro.Nombre" Color="@ColorMiembro.De(miembro.Id, _m.Miembros)" Tamano="lg" />
+                                @if (_m.Renombrando == miembro.Id)
                                 {
-                                    <span>Responsable: @_m.NombreDe(resp)</span>
-                                }
-                            </div>
-                            <div class="macc">
-                                @if (_m.ConfirmandoDesactivar == miembro.Id)
-                                {
-                                    <span class="muted">¿Desactivar a @miembro.Nombre?</span>
-                                    <button class="linkbtn danger" type="button" @onclick="() => DesactivarAsync(miembro)">Sí, desactivar</button>
-                                    <button class="linkbtn" type="button" @onclick="() => _m.ConfirmandoDesactivar = null">Cancelar</button>
+                                    <form class="renombrar" @onsubmit="() => GuardarNombreAsync(miembro)">
+                                        <label class="sr" for="nombre-@miembro.Id">Nombre de @miembro.Nombre</label>
+                                        <input id="nombre-@miembro.Id" maxlength="100" @bind="_m.NombreNuevo" @bind:event="oninput" />
+                                        <button class="btn btn-sm" type="submit" disabled="@(string.IsNullOrWhiteSpace(_m.NombreNuevo))">Guardar</button>
+                                        <button class="linkbtn" type="button" @onclick="() => _m.Renombrando = null">Cancelar</button>
+                                    </form>
                                 }
                                 else
                                 {
-                                    @if (PuedeMiembros || miembro.EsYo)
-                                    {
-                                        <button class="linkbtn" type="button" aria-label="Renombrar a @miembro.Nombre"
-                                                @onclick="() => EmpezarRenombrar(miembro)">Renombrar</button>
-                                    }
-                                    @if (PuedePermisos && miembro.Tipo == TiposMiembro.Adulto && miembro.Vinculado && !miembro.EsYo)
-                                    {
-                                        <button class="linkbtn" type="button" @onclick="() => CambiarRolAsync(miembro)">
-                                            @(miembro.Rol == "admin" ? "Quitar admin" : "Hacer admin")
-                                        </button>
-                                    }
-                                    @if (PuedeInvitar && miembro.Tipo == TiposMiembro.Adulto && !miembro.Vinculado)
-                                    {
-                                        <button class="linkbtn" type="button" aria-label="Invitar a @miembro.Nombre"
-                                                @onclick="() => InvitarAsync(miembro.Id)">Invitar</button>
-                                    }
-                                    @if (PuedeMiembros && !miembro.EsYo)
-                                    {
-                                        <button class="linkbtn danger" type="button" aria-label="Desactivar a @miembro.Nombre"
-                                                @onclick="() => _m.ConfirmandoDesactivar = miembro.Id">Desactivar</button>
-                                    }
+                                    <div class="mname">
+                                        <strong>@miembro.Nombre</strong>
+                                        @if (miembro.EsYo) { <span class="tag cur">Tú</span> }
+                                        @if (miembro.Rol == "admin") { <span class="tag admin">Admin</span> }
+                                        @if (miembro.Tipo == TiposMiembro.ACargo) { <span class="tag">A cargo</span> }
+                                        else if (!miembro.Vinculado) { <span class="tag off">Sin cuenta</span> }
+                                    </div>
+                                    <div class="mmeta">
+                                        @if (miembro.Tipo == TiposMiembro.ACargo && miembro.ResponsableId is { } resp)
+                                        {
+                                            <span>Responsable: @_m.NombreDe(resp)</span>
+                                        }
+                                    </div>
+                                    <div class="macc">
+                                        @if (_m.ConfirmandoDesactivar == miembro.Id)
+                                        {
+                                            <span class="muted">¿Desactivar a @miembro.Nombre?</span>
+                                            <button class="linkbtn danger" type="button" @onclick="() => DesactivarAsync(miembro)">Sí, desactivar</button>
+                                            <button class="linkbtn" type="button" @onclick="() => _m.ConfirmandoDesactivar = null">Cancelar</button>
+                                        }
+                                        else
+                                        {
+                                            @if (PuedeMiembros || miembro.EsYo)
+                                            {
+                                                <button class="linkbtn" type="button" aria-label="Renombrar a @miembro.Nombre"
+                                                        @onclick="() => EmpezarRenombrar(miembro)">Renombrar</button>
+                                            }
+                                            @if (PuedePermisos && miembro.Tipo == TiposMiembro.Adulto && miembro.Vinculado && !miembro.EsYo)
+                                            {
+                                                <button class="linkbtn" type="button" @onclick="() => CambiarRolAsync(miembro)">
+                                                    @(miembro.Rol == "admin" ? "Quitar admin" : "Hacer admin")
+                                                </button>
+                                            }
+                                            @if (PuedeInvitar && miembro.Tipo == TiposMiembro.Adulto && !miembro.Vinculado)
+                                            {
+                                                <button class="linkbtn" type="button" aria-label="Invitar a @miembro.Nombre"
+                                                        @onclick="() => InvitarAsync(miembro.Id)">Invitar</button>
+                                            }
+                                            @if (PuedeMiembros && !miembro.EsYo)
+                                            {
+                                                <button class="linkbtn danger" type="button" aria-label="Desactivar a @miembro.Nombre"
+                                                        @onclick="() => _m.ConfirmandoDesactivar = miembro.Id">Desactivar</button>
+                                            }
+                                        }
+                                    </div>
                                 }
                             </div>
                         }
                     </div>
-                }
-            </div>
 
-            @if (PuedeMiembros)
-            {
-                <form class="addm" @onsubmit="AnadirMiembroAsync">
-                    <label>Nombre
-                        <input maxlength="100" placeholder="Nombre de la persona" @bind="_m.NuevoNombre" @bind:event="oninput" />
-                    </label>
-                    <label>Tipo
-                        <select @bind="_m.NuevoTipo">
-                            <option value="@TiposMiembro.Adulto">Adulto</option>
-                            <option value="@TiposMiembro.ACargo">A cargo</option>
-                        </select>
-                    </label>
-                    @if (_m.NuevoTipo == TiposMiembro.ACargo)
+                    @if (PuedeMiembros)
                     {
-                        <label>Responsable
-                            <select @bind="_m.NuevoResponsable">
-                                <option value="">Elige un adulto…</option>
-                                @foreach (var a in _m.Adultos)
-                                {
-                                    <option value="@a.Id">@a.Nombre</option>
-                                }
-                            </select>
-                        </label>
+                        <form class="addm" @onsubmit="AnadirMiembroAsync">
+                            <label>Nombre
+                                <input maxlength="100" placeholder="Nombre de la persona" @bind="_m.NuevoNombre" @bind:event="oninput" />
+                            </label>
+                            <label>Tipo
+                                <select @bind="_m.NuevoTipo">
+                                    <option value="@TiposMiembro.Adulto">Adulto</option>
+                                    <option value="@TiposMiembro.ACargo">A cargo</option>
+                                </select>
+                            </label>
+                            @if (_m.NuevoTipo == TiposMiembro.ACargo)
+                            {
+                                <label>Responsable
+                                    <select @bind="_m.NuevoResponsable">
+                                        <option value="">Elige un adulto…</option>
+                                        @foreach (var a in _m.Adultos)
+                                        {
+                                            <option value="@a.Id">@a.Nombre</option>
+                                        }
+                                    </select>
+                                </label>
+                            }
+                            <button class="btn" type="submit" disabled="@(!_m.NuevoMiembroValido)">Añadir</button>
+                        </form>
                     }
-                    <button class="btn" type="submit" disabled="@(!_m.NuevoMiembroValido)">Añadir</button>
-                </form>
-            }
-            else
-            {
-                <p class="muted u-mt14">No tienes permiso para añadir o desactivar miembros.</p>
-            }
-        </section>
+                    else
+                    {
+                        <p class="muted u-mt14">No tienes permiso para añadir o desactivar miembros.</p>
+                    }
+                </section>
 
-        <div class="card-stack">
-            <section class="card" id="card-invite" aria-labelledby="t-invitar">
-                <h2 id="t-invitar">Invitar a alguien con cuenta</h2>
-                <p class="muted">Genera un enlace de un solo uso que caduca a los 7 días. Quien lo abra solo tiene que iniciar sesión (o crear su cuenta) y aceptar; también puede pegar el código en «Unirme con una invitación».</p>
-                @if (_m.ErrorInvitacion is not null)
-                {
-                    <div class="aviso err u-mt12" role="alert">@_m.ErrorInvitacion</div>
-                }
-                @if (_m.Invitacion is { } inv)
-                {
-                    <div class="invite" role="status">
-                        <span class="lab2">Enlace@(_m.InvitacionPara is null ? "" : " para " + _m.InvitacionPara)</span>
-                        <code class="token" id="enlace-invitacion">@Enlace(inv)</code>
-                        <span class="lab2">Código</span>
-                        <code class="token" id="token-invitacion">@inv.Token</code>
-                        <div class="aviso warn">Cópialo ahora: por seguridad no se vuelve a mostrar. Caduca el @inv.CaducaEn.ToLocalTime().ToString("dd/MM/yyyy HH:mm").</div>
-                        <div class="actions u-mt0">
-                            <button class="btn btn-sm" type="button" @onclick="CompartirAsync">Compartir enlace</button>
-                            <button class="btn btn-sm btn-ghost" type="button" @onclick="CopiarEnlaceAsync">Copiar enlace</button>
-                            <button class="btn btn-sm btn-ghost" type="button" @onclick="CopiarAsync">Copiar código</button>
-                            <button class="linkbtn" type="button" @onclick="_m.OcultarInvitacion">Cerrar aviso</button>
+                <div class="card-stack">
+                    <section class="card" id="card-invite" aria-labelledby="t-invitar">
+                        <h2 id="t-invitar">Invitar a alguien con cuenta</h2>
+                        <p class="muted">Genera un enlace de un solo uso que caduca a los 7 días. Quien lo abra solo tiene que iniciar sesión (o crear su cuenta) y aceptar; también puede pegar el código en «Unirme con una invitación».</p>
+                        @if (_m.ErrorInvitacion is not null)
+                        {
+                            <div class="aviso err u-mt12" role="alert">@_m.ErrorInvitacion</div>
+                        }
+                        @if (_m.Invitacion is { } inv)
+                        {
+                            <div class="invite" role="status">
+                                <span class="lab2">Enlace@(_m.InvitacionPara is null ? "" : " para " + _m.InvitacionPara)</span>
+                                <code class="token" id="enlace-invitacion">@Enlace(inv)</code>
+                                <span class="lab2">Código</span>
+                                <code class="token" id="token-invitacion">@inv.Token</code>
+                                <div class="aviso warn">Cópialo ahora: por seguridad no se vuelve a mostrar. Caduca el @inv.CaducaEn.ToLocalTime().ToString("dd/MM/yyyy HH:mm").</div>
+                                <div class="actions u-mt0">
+                                    <button class="btn btn-sm" type="button" @onclick="CompartirAsync">Compartir enlace</button>
+                                    <button class="btn btn-sm btn-ghost" type="button" @onclick="CopiarEnlaceAsync">Copiar enlace</button>
+                                    <button class="btn btn-sm btn-ghost" type="button" @onclick="CopiarAsync">Copiar código</button>
+                                    <button class="linkbtn" type="button" @onclick="_m.OcultarInvitacion">Cerrar aviso</button>
+                                </div>
+                            </div>
+                        }
+                        <div class="actions">
+                            <button class="btn btn-orange" type="button" disabled="@(!PuedeInvitar || _m.CreandoInvitacion)" @onclick="() => InvitarAsync(null)">
+                                @(_m.Invitacion is null ? "Invitar miembro" : "Generar otro enlace")
+                            </button>
+                            @if (!PuedeInvitar)
+                            {
+                                <span class="muted">No tienes permiso para invitar.</span>
+                            }
                         </div>
-                    </div>
-                }
-                <div class="actions">
-                    <button class="btn btn-orange" type="button" disabled="@(!PuedeInvitar || _m.CreandoInvitacion)" @onclick="() => InvitarAsync(null)">
-                        @(_m.Invitacion is null ? "Invitar miembro" : "Generar otro enlace")
-                    </button>
-                    @if (!PuedeInvitar)
-                    {
-                        <span class="muted">No tienes permiso para invitar.</span>
-                    }
+                    </section>
                 </div>
-            </section>
-        </div>
-    </div>
-
-    <PanelPerfiles Perfiles="_m.Perfiles" Miembros="_m.Miembros" PuedeGestionar="Permisos.Tiene(Claves.PerfilesGestionar)" OnCambiado="_m.CargarSinParpadeoAsync" />
-
-    <PanelPermisos Miembros="_m.Miembros" Puede="PuedePermisos" OnCambiado="_m.CargarSinParpadeoAsync" />
-
-    <section class="card peligro" aria-labelledby="t-eliminar">
-        <div class="card-head"><h2 id="t-eliminar">Eliminar hogar</h2></div>
-        <div class="aviso err" role="alert">
-            <b>Esta acción es irreversible.</b> Eliminar «@Hogar.HogarActual?.Nombre» borra de forma definitiva el hogar y todos sus datos:
-            miembros, gastos y recurrentes, cuenta común y ahorro, cierres de mes, categorías, perfiles de reparto, invitaciones y el
-            historial de cambios. No se puede deshacer ni recuperar, y todas las personas del hogar perderán el acceso.
-        </div>
-        @if (_m.ErrorEliminar is not null)
-        {
-            <div class="aviso err u-mt12" role="alert">@_m.ErrorEliminar</div>
+            </div>
         }
-        @if (!PuedeEliminar)
+        else if (_pestana == "permisos")
         {
-            <p class="muted u-mt12">No tienes permiso para eliminar el hogar. Pídeselo a un administrador del hogar.</p>
+            <PanelPermisos Miembros="_m.Miembros" Puede="PuedePermisos" OnCambiado="_m.CargarSinParpadeoAsync" />
+        }
+        else if (_pestana == "perfiles")
+        {
+            <PanelPerfiles Perfiles="_m.Perfiles" Miembros="_m.Miembros" PuedeGestionar="Permisos.Tiene(Claves.PerfilesGestionar)" OnCambiado="_m.CargarSinParpadeoAsync" />
         }
         else
         {
-            <form class="addm" @onsubmit="EliminarHogarAsync" @onsubmit:preventDefault>
-                <label>Para confirmarlo, escribe el nombre del hogar: <b>@Hogar.HogarActual?.Nombre</b>
-                    <input id="confirmar-eliminar" autocomplete="off" maxlength="100" @bind="_m.ConfirmarNombre" @bind:event="oninput" />
-                </label>
-                <button class="btn btn-danger" type="submit" disabled="@(!_m.NombreCoincide || _m.Eliminando)">Eliminar hogar definitivamente</button>
-            </form>
+            <section class="card" aria-labelledby="t-funciones">
+                <div class="card-head"><h2 id="t-funciones">Funciones del hogar</h2></div>
+                <p class="muted">Elige qué partes de la aplicación usa este hogar. Desactivar una función no borra sus datos: solo bloquea nuevos movimientos hasta volver a activarla.</p>
+                @if (_m.ErrorFunciones is not null)
+                {
+                    <div class="aviso err u-mt12" role="alert">@_m.ErrorFunciones</div>
+                }
+                <div class="u-mt12">
+                    <label class="chk">
+                        <input type="checkbox" @key="_m.ClaveCuenta" checked="@_m.CuentaComunActiva" disabled="@(!PuedeFunciones || _m.GuardandoFunciones)"
+                               @onchange="e => CambiarCuentaComunAsync((bool)e.Value!)" />
+                        Habilitar cuenta común
+                    </label>
+                    <p class="muted">Un fondo del hogar al que cada adulto aporta una cantidad fija al mes, para pagar gastos sin repartirlos y reembolsar a quien adelanta dinero.</p>
+                </div>
+                <div class="u-mt12">
+                    <label class="chk">
+                        <input type="checkbox" @key="_m.ClaveAhorro" checked="@(_m.CuentaComunActiva && _m.AhorroActivo)"
+                               disabled="@(!PuedeFunciones || !_m.CuentaComunActiva || _m.GuardandoFunciones)"
+                               @onchange="e => CambiarAhorroAsync((bool)e.Value!)" />
+                        Activar ahorro
+                    </label>
+                    <p class="muted">@(_m.CuentaComunActiva ? "Parte de las aportaciones que se aparta, con ingresos, retiradas y gastos pagados desde el ahorro." : "Necesita la cuenta común habilitada.")</p>
+                </div>
+                @if (_m.CuentaComunActiva)
+                {
+                    <div class="u-mt12">
+                        <label class="filtro">Frecuencia de las aportaciones
+                            <select @key="_m.ClaveFrecuencia" disabled="@(!PuedeFunciones || _m.GuardandoFunciones)"
+                                    @onchange="e => CambiarFrecuenciaAsync((string)e.Value!)">
+                                <option value="@FrecuenciasAportacion.Mensual" selected="@(_m.AportacionFrecuencia == FrecuenciasAportacion.Mensual)">Cada mes</option>
+                                <option value="@FrecuenciasAportacion.Bimestral" selected="@(_m.AportacionFrecuencia == FrecuenciasAportacion.Bimestral)">Cada dos meses</option>
+                                <option value="@FrecuenciasAportacion.Trimestral" selected="@(_m.AportacionFrecuencia == FrecuenciasAportacion.Trimestral)">Cada tres meses</option>
+                                <option value="@FrecuenciasAportacion.Semestral" selected="@(_m.AportacionFrecuencia == FrecuenciasAportacion.Semestral)">Cada seis meses</option>
+                                <option value="@FrecuenciasAportacion.Anual" selected="@(_m.AportacionFrecuencia == FrecuenciasAportacion.Anual)">Cada año</option>
+                                <option value="@FrecuenciasAportacion.Unica" selected="@(_m.AportacionFrecuencia == FrecuenciasAportacion.Unica)">Una sola vez</option>
+                            </select>
+                        </label>
+                        <p class="muted">Cada cobro cubre un periodo: con «Cada dos meses», cada adulto aporta su cantidad una vez cada dos meses. «Una sola vez» es una única aportación por persona para el grupo.</p>
+                    </div>
+                }
+                <div class="u-mt12">
+                    <label class="chk">
+                        <input type="checkbox" @key="_m.ClaveRecurrentes" checked="@_m.RecurrentesActivas" disabled="@(!PuedeFunciones || _m.GuardandoFunciones)"
+                               @onchange="e => CambiarRecurrentesAsync((bool)e.Value!)" />
+                        Activar recurrentes
+                    </label>
+                    <p class="muted">Crea cada mes los gastos de las plantillas (alquiler, suscripciones…). Desactivarlo deja las plantillas pausadas, sin borrarlas.</p>
+                </div>
+                <div class="u-mt12">
+                    <label class="chk">
+                        <input type="checkbox" @key="_m.ClaveListaCompra" checked="@_m.ListaCompraActiva" disabled="@(!PuedeFunciones || _m.GuardandoFunciones)"
+                               @onchange="e => CambiarListaCompraAsync((bool)e.Value!)" />
+                        Activar lista de la compra
+                    </label>
+                    <p class="muted">Una lista compartida de productos por comprar, con enlaces QR para añadir sin cuenta. Desactivarla conserva lo guardado, pero bloquea los cambios hasta volver a activarla.</p>
+                </div>
+                <div class="u-mt12">
+                    <label class="filtro">Liquidación
+                        <select @key="_m.ClaveLiquidacion" disabled="@(!PuedeFunciones || _m.GuardandoFunciones)"
+                                @onchange="e => CambiarLiquidacionAsync((string)e.Value!)">
+                            <option value="@ModosLiquidacion.Mensual" selected="@(_m.LiquidacionModo == ModosLiquidacion.Mensual)">Mensual</option>
+                            <option value="@ModosLiquidacion.Ciclos" selected="@(_m.LiquidacionModo == ModosLiquidacion.Ciclos)">Por ciclos</option>
+                        </select>
+                    </label>
+                    <p class="muted">
+                        @if (_m.LiquidacionModo == ModosLiquidacion.Ciclos)
+                        {
+                            <span>Por ciclos: cada vez que el grupo quiera cerrar la liquidación (por ejemplo, al terminar un fin de semana) se liquidan los gastos pendientes desde el cierre anterior. Los gastos siguen visibles.</span>
+                        }
+                        else
+                        {
+                            <span>Mensual: un saldo por mes natural, como hasta ahora.</span>
+                        }
+                        Cambiar de modo no altera los gastos ni los cierres ya hechos; los gastos que aún no se han liquidado por ciclos entrarán en el primer cierre.
+                    </p>
+                </div>
+                @if (!PuedeFunciones)
+                {
+                    <p class="muted u-mt12">No tienes permiso para cambiar estas funciones. Pídeselo a un administrador del hogar.</p>
+                }
+            </section>
+
+            @if (_m.Periodo is { } periodo)
+            {
+                <section class="card" aria-labelledby="t-periodo">
+                    <div class="card-head"><h2 id="t-periodo">Periodo del viaje</h2></div>
+                    <p class="u-mt12">Periodo del grupo: @TextoPeriodo(periodo).</p>
+                    @if (_m.PeriodoCerrado)
+                    {
+                        <p class="muted u-mt12">El periodo está cerrado: sus gastos no se pueden editar ni borrar, y su liquidación final ya está hecha.</p>
+                    }
+                    else
+                    {
+                        <p class="muted u-mt12">Al cerrar el viaje, sus gastos quedan bloqueados: no se podrán editar ni borrar. Los gastos pendientes se liquidan en un cierre final.</p>
+                        @if (_m.ConfirmandoCierre)
+                        {
+                            <div class="aviso warn u-mt12" role="alert">¿Cerrar el viaje? Sus gastos quedarán bloqueados hasta que se reabra el periodo.</div>
+                            <div class="u-mt12">
+                                <button class="btn btn-danger" type="button" disabled="@_m.CerrandoPeriodo" @onclick="CerrarPeriodoAsync">Sí, cerrar viaje</button>
+                                <button class="linkbtn" type="button" disabled="@_m.CerrandoPeriodo" @onclick="() => _m.ConfirmandoCierre = false">Cancelar</button>
+                            </div>
+                        }
+                        else
+                        {
+                            <button class="btn btn-sm u-mt12" type="button" disabled="@_m.CerrandoPeriodo" @onclick="() => _m.ConfirmandoCierre = true">Cerrar viaje</button>
+                        }
+                        @if (_m.ErrorPeriodo is not null)
+                        {
+                            <div class="aviso err u-mt12" role="alert">@_m.ErrorPeriodo</div>
+                        }
+                    }
+                </section>
+            }
+
+            <section class="card peligro" aria-labelledby="t-eliminar">
+                <div class="card-head"><h2 id="t-eliminar">Eliminar hogar</h2></div>
+                <div class="aviso err" role="alert">
+                    <b>Esta acción es irreversible.</b> Eliminar «@Hogar.HogarActual?.Nombre» borra de forma definitiva el hogar y todos sus datos:
+                    miembros, gastos y recurrentes, cuenta común y ahorro, cierres de mes, categorías, perfiles de reparto, invitaciones y el
+                    historial de cambios. No se puede deshacer ni recuperar, y todas las personas del hogar perderán el acceso.
+                </div>
+                @if (_m.ErrorEliminar is not null)
+                {
+                    <div class="aviso err u-mt12" role="alert">@_m.ErrorEliminar</div>
+                }
+                @if (!PuedeEliminar)
+                {
+                    <p class="muted u-mt12">No tienes permiso para eliminar el hogar. Pídeselo a un administrador del hogar.</p>
+                }
+                else
+                {
+                    <form class="addm" @onsubmit="EliminarHogarAsync" @onsubmit:preventDefault>
+                        <label>Para confirmarlo, escribe el nombre del hogar: <b>@Hogar.HogarActual?.Nombre</b>
+                            <input id="confirmar-eliminar" autocomplete="off" maxlength="100" @bind="_m.ConfirmarNombre" @bind:event="oninput" />
+                        </label>
+                        <button class="btn btn-danger" type="submit" disabled="@(!_m.NombreCoincide || _m.Eliminando)">Eliminar hogar definitivamente</button>
+                    </form>
+                }
+            </section>
         }
-    </section>
+    </div>
 }
 
 
 @code {
     private ModeloConfiguracionHogar _m = default!;
+
+    /// <summary>Pestaña pedida en la URL (<c>?pestana=</c>); si falta o no existe, se muestra Miembros.</summary>
+    [Parameter] public string? Pestana { get; set; }
+
+    /// <summary>Pestañas del menú de configuración: identificador en la URL y etiqueta visible.</summary>
+    private static readonly (string Id, string Etiqueta)[] Pestanas =
+    [
+        ("miembros", "Miembros"),
+        ("permisos", "Permisos"),
+        ("perfiles", "Perfiles"),
+        ("hogar", "Hogar"),
+    ];
+
+    private string _pestana = "miembros";
 
     private bool PuedeMiembros => Permisos.Tiene(Claves.MiembrosGestionar);
 
@@ -337,7 +372,20 @@ else
         return CargarAsync();
     }
 
+    protected override void OnParametersSet() => _pestana = ValidarPestana(Pestana);
+
     private Task CargarAsync() => _m.CargarAsync();
+
+    /// <summary>Cambia de pestaña y la deja en la URL, para que sobreviva a recargar la página y al botón atrás.</summary>
+    private void Elegir(string id)
+    {
+        _pestana = id;
+        var ruta = Navegacion.Uri.Split('?')[0];
+        Navegacion.NavigateTo($"{ruta}?pestana={id}", replace: true);
+    }
+
+    private static string ValidarPestana(string? pestana) =>
+        Pestanas.Any(p => p.Id == pestana) ? pestana! : "miembros";
 
     private Task CambiarCuentaComunAsync(bool activa) => Mostrar(_m.CambiarCuentaComunAsync(activa));
 

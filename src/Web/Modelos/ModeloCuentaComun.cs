@@ -136,7 +136,7 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
     {
         "ingreso" => IngresoValido,
         "reembolso" => (Estado?.Pendientes.Count ?? 0) > 0 && ReembolsoValido,
-        "deuda" => DeudaValida,
+        "adelanto" or "devolucion" or "compensacion" => DeudaValida,
         _ => AportacionValida,
     };
 
@@ -420,12 +420,22 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
         _ => Task.FromResult<string?>(null),
     };
 
+    /// <summary>Si la operación elegida es un movimiento de deuda (adelanto, devolución o compensación).</summary>
+    public bool EsOperacionDeuda => Operacion is "adelanto" or "devolucion" or "compensacion";
+
+    /// <summary>Registra el movimiento de deuda de la operación elegida: el tipo sale de la propia operación.</summary>
+    private Task<string?> RegistrarDeudaOperacionAsync()
+    {
+        TipoDeuda = Operacion;
+        return RegistrarDeudaAsync();
+    }
+
     /// <summary>Registra la operación elegida en el formulario único (aportación, ingreso, reembolso o deuda) con su fecha.</summary>
     public Task<string?> RegistrarOperacionAsync() => Operacion switch
     {
         "ingreso" => IngresarAsync(),
         "reembolso" => ReembolsarAsync(),
-        "deuda" => RegistrarDeudaAsync(),
+        "adelanto" or "devolucion" or "compensacion" => RegistrarDeudaOperacionAsync(),
         _ => FijarAportacionAsync(),
     };
 

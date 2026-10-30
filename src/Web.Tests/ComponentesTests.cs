@@ -388,7 +388,7 @@ public class ComponentesTests : BunitContext
         Registrar(api);
         var c = Render<VistaCuentaComun>();
 
-        c.Find("#form-operacion select").Change("deuda");
+        c.Find("#form-operacion select").Change("adelanto");
         c.Find("#form-operacion input[placeholder='0,00']").Input("40");
         c.Find("#form-operacion").Submit();
 
@@ -412,9 +412,9 @@ public class ComponentesTests : BunitContext
         Registrar(api);
         var c = Render<VistaCuentaComun>();
 
-        c.Find("#form-operacion select").Change("deuda");
+        c.Find("#form-operacion select").Change("adelanto");
         c.FindAll("#form-operacion select")[1].Change(LuisId.ToString());
-        c.FindAll("#form-operacion select")[2].Change("compensacion");
+        c.Find("#form-operacion select").Change("compensacion");
         c.Find("#form-operacion input[type=checkbox]").Change(true);
         c.Find("#form-operacion input[placeholder='0,00']").Input("10");
         c.Find("#form-operacion").Submit();
@@ -439,7 +439,7 @@ public class ComponentesTests : BunitContext
                 new MovimientoDeudaCuentaDto(Guid.NewGuid(), AnaId, new DateOnly(2026, 10, 7), 40m, "adelanto", false, null));
         Registrar(api);
         var c = Render<VistaCuentaComun>();
-        c.Find("#form-operacion select").Change("deuda");
+        c.Find("#form-operacion select").Change("adelanto");
         Assert.Equal(1, api.Recibidas.Count(r => r == "GET /api/cuenta-comun/movimientos"));
 
         c.Find("#form-operacion input[placeholder='0,00']").Input("40");
@@ -579,7 +579,7 @@ public class ComponentesTests : BunitContext
         Registrar(api);
         var c = Render<VistaCuentaComun>();
 
-        c.Find("#form-operacion select").Change("deuda");
+        c.Find("#form-operacion select").Change("adelanto");
         c.Find("#form-operacion input[placeholder='0,00']").Input("abc");
 
         Assert.True(c.Find("#form-operacion button[type=submit]").HasAttribute("disabled"));
@@ -612,8 +612,8 @@ public class ComponentesTests : BunitContext
         Registrar(api);
         var c = Render<VistaCuentaComun>();
 
-        c.Find("#form-operacion select").Change("deuda");
-        c.FindAll("#form-operacion select")[2].Change("devolucion");
+        c.Find("#form-operacion select").Change("adelanto");
+        c.Find("#form-operacion select").Change("devolucion");
         c.Find("#form-operacion input[placeholder='0,00']").Input("100");
         c.Find("#form-operacion").Submit();
 

@@ -176,7 +176,9 @@ else if (_m.Estado is not null)
                         <option value="aportacion">Fijar la aportación mensual de un adulto</option>
                         <option value="ingreso">Ingresar dinero en la cuenta</option>
                         <option value="reembolso" disabled="@(_m.Estado.Pendientes.Count == 0)">Reembolsar a quien adelantó un gasto</option>
-                        <option value="deuda">Registrar una deuda con la cuenta</option>
+                        <option value="adelanto">Adelantar un gasto a una persona (la cuenta paga por ella)</option>
+                        <option value="devolucion">Devolución: una persona paga lo que debe</option>
+                        <option value="compensacion">Compensar una deuda con lo que la cuenta le debe</option>
                     </select>
                 </label>
                 <label>Fecha
@@ -237,22 +239,15 @@ else if (_m.Estado is not null)
                         <input maxlength="200" placeholder="Opcional" @bind="_m.ConceptoReembolso" @bind:event="oninput" />
                     </label>
                 }
-                else
+                else if (_m.EsOperacionDeuda)
                 {
-                    <p class="u-titulo-form muted">@ModeloCuentaComun.AyudaTipoDeuda(_m.TipoDeuda)</p>
+                    <p class="u-titulo-form muted">@ModeloCuentaComun.AyudaTipoDeuda(_m.Operacion)</p>
                     <label>Persona
                         <select value="@_m.Deudor" @onchange="e => _m.Deudor = Guid.Parse(e.Value!.ToString()!)">
                             @foreach (var m in _m.Adultos)
                             {
                                 <option value="@m.Id">@m.Nombre</option>
                             }
-                        </select>
-                    </label>
-                    <label>Tipo
-                        <select @bind="_m.TipoDeuda">
-                            <option value="adelanto">Adelanto</option>
-                            <option value="devolucion">Devolución</option>
-                            <option value="compensacion">Compensación</option>
                         </select>
                     </label>
                     <label class="chk"><input type="checkbox" @bind="_m.DeudaDesdeAhorro" /> Del ahorro (no de Hogar)</label>
@@ -403,7 +398,7 @@ else if (_m.Estado is not null)
     {
         "ingreso" => "Ingresar",
         "reembolso" => "Reembolsar",
-        "deuda" => "Registrar",
+        "adelanto" or "devolucion" or "compensacion" => "Registrar",
         _ => $"Fijar desde {_m.FechaOperacion.ToString("MMMM yyyy", Es)}",
     };
 

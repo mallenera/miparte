@@ -401,6 +401,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .cols-even { display: grid; gap: 24px; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); align-items: start; }
 @media (max-width: 880px) { .cols-even { grid-template-columns: minmax(0, 1fr); } }
 .card-stack { display: grid; gap: 24px; min-width: 0; }
+/* Pestañas de la configuración del hogar: en móvil se desplazan en horizontal en vez de apilarse. */
+.pestanas { display: flex; gap: 4px; margin: 8px 0 24px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--line); }
+.pestanas::-webkit-scrollbar { display: none; }
+.pestana { flex: 0 0 auto; min-height: 44px; padding: 10px 14px; margin-bottom: -1px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--ink-2); font: 700 .92rem/1 var(--font-body); cursor: pointer; white-space: nowrap; }
+.pestana:hover { color: var(--ink); }
+.pestana[aria-selected="true"] { color: var(--wine-text); border-bottom-color: var(--wine); }
+.pestana:focus-visible { outline: 2px solid var(--cta); outline-offset: -2px; border-radius: 6px; }
 .page-title { font: 600 1.9rem/1.15 var(--font-display); letter-spacing: -.01em; }
 
 /* Resumen compartible: texto de la liquidación (también sirve de plan B para copiarlo a mano) y sus acciones */
@@ -731,7 +738,7 @@ section.card + section.card { margin-top: 24px; }
 @media (pointer: coarse) {
     .iconbtn { width: 44px; height: 44px; }
     .menubtn { height: 44px; }
-    .btn-sm, .mrow select, .mrow .renombrar input { min-height: 44px; }
+    .btn-sm, .mrow select, .mrow .renombrar input, .mrow .macc .linkbtn { min-height: 44px; }
     .mitem { padding-block: 12px; }
     .linkbtn { padding-block: 10px; }
     .seg button { padding-block: 10px; }

@@ -5,5 +5,10 @@
 <PageTitle>Configuración del hogar · Mi parte, tu parte</PageTitle>
 
 <RequiereHogar>
-    <VistaConfiguracionHogar />
+    <VistaConfiguracionHogar Pestana="Pestana" />
 </RequiereHogar>
+
+@code {
+    /// <summary>Pestaña de la configuración en la URL (<c>?pestana=permisos</c>, etc.).</summary>
+    [SupplyParameterFromQuery] public string? Pestana { get; set; }
+}

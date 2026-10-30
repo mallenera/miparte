@@ -63,6 +63,9 @@ public interface IRepositorioCuentaComun
     /// <summary>Total que la cuenta ya ha reembolsado al miembro.</summary>
     Task<decimal> ReembolsadoAsync(Guid miembroId, CancellationToken ct);
 
+    /// <summary>Total de ingresos sueltos que ha hecho el miembro en la cuenta común.</summary>
+    Task<decimal> IngresadoPorAsync(Guid miembroId, CancellationToken ct);
+
     /// <summary>Fija la aportación del miembro desde el mes, sustituyendo la de ese mes si ya existía.</summary>
     Task<AportacionCuenta> FijarAportacionAsync(Guid hogarId, Guid miembroId, DateOnly desde, decimal importe, decimal ahorro, CancellationToken ct);
 

@@ -93,6 +93,20 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
     /// <summary>Concepto del ingreso a la cuenta común (de dónde viene).</summary>
     public string ConceptoIngreso { get; set; } = "";
 
+    /// <summary>Qué hace la operación del formulario único: <c>aportacion</c>, <c>ingreso</c> o <c>reembolso</c>.</summary>
+    public string Operacion { get; set; } = "aportacion";
+
+    /// <summary>Fecha de la operación; la aportación cuenta desde el mes de esta fecha.</summary>
+    public DateOnly FechaOperacion { get; set; } = hoy;
+
+    /// <summary>La operación elegida tiene sus datos válidos (y hay deuda, si es un reembolso).</summary>
+    public bool OperacionValida => Operacion switch
+    {
+        "ingreso" => IngresoValido,
+        "reembolso" => (Estado?.Pendientes.Count ?? 0) > 0 && ReembolsoValido,
+        _ => AportacionValida,
+    };
+
     /// <summary>Importe del ingreso al ahorro.</summary>
     public string ImporteDeposito { get; set; } = "";
 
@@ -245,7 +259,8 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
             if (Estado!.AhorroActivo && !string.IsNullOrWhiteSpace(AhorroAportacion)
                 && (!EntradaImporte.TryParse(AhorroAportacion, permitirCero: true, out ahorro) || ahorro > importe))
                 throw new ApiException(System.Net.HttpStatusCode.BadRequest, "El ahorro debe estar entre 0 y la aportación, con máximo 2 decimales.");
-            await api.FijarAportacionAsync(new FijarAportacionRequest(Aportante, _mes, importe, ahorro));
+            var mes = new DateOnly(FechaOperacion.Year, FechaOperacion.Month, 1);
+            await api.FijarAportacionAsync(new FijarAportacionRequest(Aportante, mes, importe, ahorro));
             return "Aportación guardada";
         });
 
@@ -254,7 +269,7 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
         EjecutarAsync(async () =>
         {
             var importe = Importe(ImporteReembolso);
-            await api.CrearReembolsoAsync(new CrearReembolsoRequest(Reembolsado, importe, null, Texto(ConceptoReembolso)));
+            await api.CrearReembolsoAsync(new CrearReembolsoRequest(Reembolsado, importe, FechaOperacion, Texto(ConceptoReembolso)));
             ImporteReembolso = "";
             ConceptoReembolso = "";
             return "Reembolso registrado";
@@ -268,12 +283,19 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
         EjecutarAsync(async () =>
         {
             var importe = Importe(ImporteIngreso);
-            var fecha = _mes == new DateOnly(hoy.Year, hoy.Month, 1) ? (DateOnly?)null : _mes;
-            await api.CrearIngresoCuentaComunAsync(new CrearIngresoCuentaComunRequest(Ingresante, importe, fecha, Texto(ConceptoIngreso)));
+            await api.CrearIngresoCuentaComunAsync(new CrearIngresoCuentaComunRequest(Ingresante, importe, FechaOperacion, Texto(ConceptoIngreso)));
             ImporteIngreso = "";
             ConceptoIngreso = "";
             return "Ingreso registrado";
         });
+
+    /// <summary>Registra la operación elegida en el formulario único (aportación, ingreso o reembolso) con su fecha.</summary>
+    public Task<string?> RegistrarOperacionAsync() => Operacion switch
+    {
+        "ingreso" => IngresarAsync(),
+        "reembolso" => ReembolsarAsync(),
+        _ => FijarAportacionAsync(),
+    };
 
     /// <summary>Elimina un ingreso a la cuenta común.</summary>
     public Task<string?> EliminarIngresoAsync(IngresoCuentaComunDto i) =>

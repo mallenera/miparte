@@ -357,8 +357,8 @@ public class ComponentesTests : BunitContext
         Registrar(api);
         var c = Render<VistaCuentaComun>();
 
-        c.Find("#form-aportacion input").Input("600,50");
-        c.Find("#form-aportacion").Submit();
+        c.Find("#form-operacion input[inputmode=decimal]").Input("600,50");
+        c.Find("#form-operacion").Submit();
 
         var cuerpo = api.Cuerpos["PUT /api/cuenta-comun/aportaciones"];
         Assert.Contains(AnaId.ToString(), cuerpo);
@@ -379,8 +379,9 @@ public class ComponentesTests : BunitContext
         var c = Render<VistaCuentaComun>();
 
         Assert.Contains("La cuenta le debe", c.Markup);
-        c.Find("#form-reembolso input").Input("400");
-        c.Find("#form-reembolso").Submit();
+        c.Find("#form-operacion select").Change("reembolso");
+        c.Find("#form-operacion input[inputmode=decimal]").Input("400");
+        c.Find("#form-operacion").Submit();
 
         var cuerpo = api.Cuerpos["POST /api/cuenta-comun/reembolsos"];
         Assert.Contains(AnaId.ToString(), cuerpo);
@@ -399,12 +400,12 @@ public class ComponentesTests : BunitContext
         Registrar(api);
         var c = Render<VistaCuentaComun>();
 
-        c.Find("#form-aportacion input").Input("600");
+        c.Find("#form-operacion input[inputmode=decimal]").Input("600");
         c.Find("#ahorro-aportacion").Input("700");
-        Assert.True(c.Find("#form-aportacion button").HasAttribute("disabled")); // ahorro > importe
+        Assert.True(c.Find("#form-operacion button").HasAttribute("disabled")); // ahorro > importe
 
         c.Find("#ahorro-aportacion").Input("100,50");
-        c.Find("#form-aportacion").Submit();
+        c.Find("#form-operacion").Submit();
 
         var cuerpo = api.Cuerpos["PUT /api/cuenta-comun/aportaciones"];
         Assert.Contains("\"importe\":600", cuerpo);
@@ -446,8 +447,8 @@ public class ComponentesTests : BunitContext
 
         var c = Render<VistaCuentaComun>();
 
-        Assert.Empty(c.FindAll("#form-reembolso"));
-        Assert.Contains("No hay reembolsos pendientes", c.Markup);
+        Assert.True(c.Find("#form-operacion option[value=reembolso]").HasAttribute("disabled"));
+        Assert.Contains("No hay deudas pendientes", c.Markup);
     }
 
     [Fact]
@@ -1020,7 +1021,7 @@ public class ComponentesTests : BunitContext
         var c = Render<VistaCuentaComun>();
 
         Assert.Contains("Sin activar", c.Markup);
-        Assert.Empty(c.FindAll("#form-aportacion"));
+        Assert.Empty(c.FindAll("#form-operacion"));
         Assert.Equal("hogar/configuracion", c.Find("a.btn").GetAttribute("href"));
     }
 
@@ -1038,8 +1039,8 @@ public class ComponentesTests : BunitContext
         Assert.Empty(c.FindAll("#ahorro"));
         Assert.Empty(c.FindAll("#t-ahorro"));
         Assert.Empty(c.FindAll("#ahorro-aportacion"));
-        c.Find("#form-aportacion input[inputmode=decimal]").Input("100");
-        c.Find("#form-aportacion").Submit();
+        c.Find("#form-operacion input[inputmode=decimal]").Input("100");
+        c.Find("#form-operacion").Submit();
 
         Assert.Contains("\"ahorro\":0", api.Cuerpos["PUT /api/cuenta-comun/aportaciones"]);
     }

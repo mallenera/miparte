@@ -133,6 +133,10 @@ public sealed class RepositorioCuentaComun(MiParteDbContext db) : IRepositorioCu
         => await db.ReembolsosCuenta.Where(r => r.MiembroId == miembroId).SumAsync(r => r.Importe, ct);
 
     /// <inheritdoc />
+    public async Task<decimal> IngresadoPorAsync(Guid miembroId, CancellationToken ct)
+        => await db.IngresosCuentaComun.Where(i => i.MiembroId == miembroId).SumAsync(i => i.Importe, ct);
+
+    /// <inheritdoc />
     public async Task<AportacionCuenta> FijarAportacionAsync(
         Guid hogarId, Guid miembroId, DateOnly desde, decimal importe, decimal ahorro, CancellationToken ct)
     {

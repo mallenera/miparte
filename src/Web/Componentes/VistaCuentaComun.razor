@@ -214,55 +214,31 @@ else if (_m.Estado is not null)
         }
     </section>
 
-    <section class="card" aria-labelledby="t-aportaciones">
-        <div class="card-head"><h2 id="t-aportaciones">Aportación mensual</h2></div>
-        <p class="muted">Importe fijo que aporta cada adulto al mes@(_m.Estado.AhorroActivo ? "; una parte puede ir a ahorro y el resto queda para gastos" : ""). Un cambio vale desde el mes elegido en adelante.</p>
-        <div class="u-mt10">
-            @foreach (var a in _m.Adultos)
-            {
-                <div class="catrow">
-                    <div class="c-name"><Avatar Nombre="@a.Nombre" Color="@ColorMiembro.De(a.Id, _m.Miembros)" Tamano="sm" /> @a.Nombre</div>
-                    <div class="c-sel">@Formato.Euros(_m.VigenteDe(a.Id)) al mes@(_m.AhorroVigenteDe(a.Id) > 0 ? $" ({Formato.Euros(_m.AhorroVigenteDe(a.Id))} de ahorro)" : "")</div>
-                </div>
-            }
-            @if (_m.Adultos.Count == 0)
-            {
-                <div class="empty">El hogar no tiene adultos activos.</div>
-            }
-        </div>
+    <section class="card" aria-labelledby="t-operaciones">
+        <div class="card-head"><h2 id="t-operaciones">Aportaciones, deudas e ingresos</h2></div>
+        <p class="muted">
+            Todo lo que mueve dinero entre las personas y la cuenta, en un solo sitio. Elige qué quieres hacer y la fecha de la operación:
+            una aportación cuenta desde el mes de esa fecha.
+        </p>
 
-        @if (_m.Adultos.Count > 0 && PuedeCuenta)
+        <h3 class="u-titulo-form">Aportaciones vigentes</h3>
+        @foreach (var a in _m.Adultos)
         {
-            <form class="addcat" id="form-aportacion" @onsubmit="FijarAportacionAsync">
-                <label>Adulto
-                    <select @bind="_m.Aportante" @bind:after="_m.AlCambiarAportante">
-                        @foreach (var a in _m.Adultos)
-                        {
-                            <option value="@a.Id">@a.Nombre</option>
-                        }
-                    </select>
-                </label>
-                <label>Importe al mes (€)
-                    <input inputmode="decimal" required placeholder="0,00" @bind="_m.ImporteAportacion" @bind:event="oninput" />
-                </label>
-                @if (_m.Estado.AhorroActivo)
-                {
-                    <label>De ese importe, a ahorro (€)
-                        <input id="ahorro-aportacion" inputmode="decimal" placeholder="0,00" @bind="_m.AhorroAportacion" @bind:event="oninput" />
-                    </label>
-                }
-                <button class="btn" type="submit" disabled="@(!_m.AportacionValida || _m.Enviando)">Fijar desde @_m.NombreMes</button>
-            </form>
+            <div class="catrow">
+                <div class="c-name"><Avatar Nombre="@a.Nombre" Color="@ColorMiembro.De(a.Id, _m.Miembros)" Tamano="sm" /> @a.Nombre</div>
+                <div class="c-sel">@Formato.Euros(_m.VigenteDe(a.Id)) al mes@(_m.AhorroVigenteDe(a.Id) > 0 ? $" ({Formato.Euros(_m.AhorroVigenteDe(a.Id))} de ahorro)" : "")</div>
+            </div>
         }
-    </section>
+        @if (_m.Adultos.Count == 0)
+        {
+            <div class="empty">El hogar no tiene adultos activos.</div>
+        }
 
-    <section class="card" aria-labelledby="t-reembolsos">
-        <div class="card-head"><h2 id="t-reembolsos">Reembolsos</h2></div>
-        <p class="muted">Cuando una persona adelanta un gasto de la cuenta, esta le debe ese importe hasta reembolsárselo.</p>
-
+        <h3 class="u-titulo-form">Deudas pendientes</h3>
+        <p class="muted">Gastos que una persona ha adelantado y la cuenta aún no le ha devuelto, descontado lo que ya ha ingresado en la cuenta.</p>
         @if (_m.Estado.Pendientes.Count == 0)
         {
-            <div class="empty">No hay reembolsos pendientes.</div>
+            <div class="empty">No hay deudas pendientes.</div>
         }
         @foreach (var p in _m.Estado.Pendientes)
         {
@@ -272,6 +248,36 @@ else if (_m.Estado is not null)
             </div>
         }
 
+        <h3 class="u-titulo-form">Movimientos de @_m.NombreMes</h3>
+        @if (_m.IngresosDelMes.Count == 0 && _m.Estado.Reembolsos.Count == 0)
+        {
+            <div class="empty">No hay ingresos ni reembolsos este mes.</div>
+        }
+        @foreach (var i in _m.IngresosDelMes)
+        {
+            <div class="gastorow">
+                <div class="g-main">
+                    <div class="g-concepto">Ingreso: @(string.IsNullOrWhiteSpace(i.Concepto) ? "sin concepto" : i.Concepto)</div>
+                    <div class="muted g-meta">@i.Fecha.ToString("dd/MM/yyyy", Es) · ingresó @Formato.NombreMiembro(i.MiembroId, _m.Miembros)</div>
+                </div>
+                <div class="g-importe">@Formato.Euros(i.Importe)</div>
+                @if (PuedeCuenta)
+                {
+                    <div class="c-acc">
+                        @if (_m.ConfirmandoEliminar == i.Id)
+                        {
+                            <span class="muted">¿Eliminar?</span>
+                            <button class="linkbtn danger" type="button" @onclick="() => EliminarIngresoAsync(i)">Sí</button>
+                            <button class="linkbtn" type="button" @onclick="() => _m.ConfirmandoEliminar = null">No</button>
+                        }
+                        else
+                        {
+                            <button class="linkbtn danger" type="button" aria-label="Eliminar ingreso de @Formato.NombreMiembro(i.MiembroId, _m.Miembros)" @onclick="() => _m.ConfirmandoEliminar = i.Id">Eliminar</button>
+                        }
+                    </div>
+                }
+            </div>
+        }
         @foreach (var r in _m.Estado.Reembolsos.OrderByDescending(r => r.Fecha))
         {
             <div class="gastorow">
@@ -294,89 +300,82 @@ else if (_m.Estado is not null)
                 </div>
             </div>
         }
-
-        @if (_m.Estado.Pendientes.Count > 0 && PuedeCuenta)
-        {
-            <form class="addcat" id="form-reembolso" @onsubmit="ReembolsarAsync">
-                <h3 class="u-titulo-form">Nuevo reembolso</h3>
-                <label>A
-                    <select @bind="_m.Reembolsado">
-                        @foreach (var p in _m.Estado.Pendientes)
-                        {
-                            <option value="@p.MiembroId">@p.Nombre</option>
-                        }
-                    </select>
-                </label>
-                <label>Importe (€)
-                    <input inputmode="decimal" required placeholder="0,00" @bind="_m.ImporteReembolso" @bind:event="oninput" />
-                </label>
-                <label>Concepto
-                    <input maxlength="200" placeholder="Opcional" @bind="_m.ConceptoReembolso" @bind:event="oninput" />
-                </label>
-                <button class="btn" type="submit" disabled="@(!_m.ReembolsoValido || _m.Enviando)">Reembolsar</button>
-            </form>
-        }
-    </section>
-
-    <section class="card" aria-labelledby="t-ingresos">
-        <div class="card-head"><h2 id="t-ingresos">Ingresos</h2></div>
-        <p class="muted">Dinero que entra a la cuenta común fuera de las aportaciones y del ahorro, por ejemplo lo que pagan las amigas de una cena. Suma al saldo y al efectivo de la cuenta; no cambia los reembolsos.</p>
-
-        @if (_m.IngresosDelMes.Count == 0)
-        {
-            <div class="empty">No hay ingresos este mes.</div>
-        }
-
-        @foreach (var i in _m.IngresosDelMes)
-        {
-            <div class="gastorow">
-                <div class="g-main">
-                    <div class="g-concepto">@(string.IsNullOrWhiteSpace(i.Concepto) ? "Ingreso" : i.Concepto)</div>
-                    <div class="muted g-meta">@i.Fecha.ToString("dd/MM/yyyy", Es) · ingresó @Formato.NombreMiembro(i.MiembroId, _m.Miembros)</div>
-                </div>
-                <div class="g-importe">@Formato.Euros(i.Importe)</div>
-                @if (PuedeCuenta)
-                {
-                    <div class="c-acc">
-                        @if (_m.ConfirmandoEliminar == i.Id)
-                        {
-                            <span class="muted">¿Eliminar?</span>
-                            <button class="linkbtn danger" type="button" @onclick="() => EliminarIngresoAsync(i)">Sí</button>
-                            <button class="linkbtn" type="button" @onclick="() => _m.ConfirmandoEliminar = null">No</button>
-                        }
-                        else
-                        {
-                            <button class="linkbtn danger" type="button" aria-label="Eliminar ingreso de @Formato.NombreMiembro(i.MiembroId, _m.Miembros)" @onclick="() => _m.ConfirmandoEliminar = i.Id">Eliminar</button>
-                        }
-                    </div>
-                }
-            </div>
-        }
-
         @if (_m.IngresosDelMes.Count > 0)
         {
             <div class="muted g-meta">Total ingresado este mes: @Formato.Euros(_m.TotalIngresosDelMes)</div>
         }
 
-        @if (PuedeCuenta)
+        @if (_m.Adultos.Count > 0 && PuedeCuenta)
         {
-            <form class="addcat" id="form-ingreso-cuenta" @onsubmit="IngresarAsync">
-                <h3 class="u-titulo-form">Nuevo ingreso</h3>
-                <label>Lo ingresa
-                    <select @bind="_m.Ingresante">
-                        @foreach (var miembro in _m.Miembros.Where(x => x.Activo))
-                        {
-                            <option value="@miembro.Id">@miembro.Nombre</option>
-                        }
+            <form class="addcat" id="form-operacion" @onsubmit="OperarAsync">
+                <h3 class="u-titulo-form">¿Qué quieres hacer?</h3>
+                <label>Operación
+                    <select @bind="_m.Operacion">
+                        <option value="aportacion">Fijar la aportación mensual de un adulto</option>
+                        <option value="ingreso">Ingresar dinero en la cuenta</option>
+                        <option value="reembolso" disabled="@(_m.Estado.Pendientes.Count == 0)">Reembolsar una deuda</option>
                     </select>
                 </label>
-                <label>Importe (€)
-                    <input inputmode="decimal" required placeholder="0,00" @bind="_m.ImporteIngreso" @bind:event="oninput" />
+                <label>Fecha
+                    <input type="date" required @bind="_m.FechaOperacion" />
                 </label>
-                <label>Concepto
-                    <input maxlength="200" placeholder="Por ejemplo, Cena amigas" @bind="_m.ConceptoIngreso" @bind:event="oninput" />
-                </label>
-                <button class="btn" type="submit" disabled="@(!_m.IngresoValido || _m.Enviando)">Ingresar</button>
+
+                @if (_m.Operacion == "aportacion")
+                {
+                    <label>Adulto
+                        <select @bind="_m.Aportante" @bind:after="_m.AlCambiarAportante">
+                            @foreach (var a in _m.Adultos)
+                            {
+                                <option value="@a.Id">@a.Nombre</option>
+                            }
+                        </select>
+                    </label>
+                    <label>Importe al mes (€)
+                        <input inputmode="decimal" required placeholder="0,00" @bind="_m.ImporteAportacion" @bind:event="oninput" />
+                    </label>
+                    @if (_m.Estado.AhorroActivo)
+                    {
+                        <label>De ese importe, a ahorro (€)
+                            <input id="ahorro-aportacion" inputmode="decimal" placeholder="0,00" @bind="_m.AhorroAportacion" @bind:event="oninput" />
+                        </label>
+                    }
+                }
+                else if (_m.Operacion == "ingreso")
+                {
+                    <label>Lo ingresa
+                        <select @bind="_m.Ingresante">
+                            @foreach (var miembro in _m.Miembros.Where(x => x.Activo))
+                            {
+                                <option value="@miembro.Id">@miembro.Nombre</option>
+                            }
+                        </select>
+                    </label>
+                    <label>Importe (€)
+                        <input inputmode="decimal" required placeholder="0,00" @bind="_m.ImporteIngreso" @bind:event="oninput" />
+                    </label>
+                    <label>Concepto
+                        <input maxlength="200" placeholder="Por ejemplo, Cena amigas" @bind="_m.ConceptoIngreso" @bind:event="oninput" />
+                    </label>
+                }
+                else if (_m.Estado.Pendientes.Count > 0)
+                {
+                    <label>A
+                        <select @bind="_m.Reembolsado">
+                            @foreach (var p in _m.Estado.Pendientes)
+                            {
+                                <option value="@p.MiembroId">@p.Nombre</option>
+                            }
+                        </select>
+                    </label>
+                    <label>Importe (€)
+                        <input inputmode="decimal" required placeholder="0,00" @bind="_m.ImporteReembolso" @bind:event="oninput" />
+                    </label>
+                    <label>Concepto
+                        <input maxlength="200" placeholder="Opcional" @bind="_m.ConceptoReembolso" @bind:event="oninput" />
+                    </label>
+                }
+
+                <button class="btn" type="submit" disabled="@(!_m.OperacionValida || _m.Enviando)">@EtiquetaOperacion</button>
             </form>
         }
     </section>
@@ -475,9 +474,15 @@ else if (_m.Estado is not null)
         await _m.CargarAsync();
     }
 
-    private Task FijarAportacionAsync() => Mostrar(_m.FijarAportacionAsync());
+    /// <summary>Texto del botón según la operación elegida.</summary>
+    private string EtiquetaOperacion => _m.Operacion switch
+    {
+        "ingreso" => "Ingresar",
+        "reembolso" => "Reembolsar",
+        _ => $"Fijar desde {_m.FechaOperacion.ToString("MMMM yyyy", Es)}",
+    };
 
-    private Task ReembolsarAsync() => Mostrar(_m.ReembolsarAsync());
+    private Task OperarAsync() => Mostrar(_m.RegistrarOperacionAsync());
 
     private Task IngresarAhorroAsync() => Mostrar(_m.IngresarAhorroAsync());
 
@@ -488,8 +493,6 @@ else if (_m.Estado is not null)
     private Task EliminarDepositoAsync(DepositoAhorroDto d) => Mostrar(_m.EliminarDepositoAsync(d));
 
     private Task EliminarAsync(ReembolsoCuentaDto r) => Mostrar(_m.EliminarAsync(r));
-
-    private Task IngresarAsync() => Mostrar(_m.IngresarAsync());
 
     private Task EliminarIngresoAsync(IngresoCuentaComunDto i) => Mostrar(_m.EliminarIngresoAsync(i));
 

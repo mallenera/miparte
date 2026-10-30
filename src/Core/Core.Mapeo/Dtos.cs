@@ -100,7 +100,10 @@ public static class Dtos
         var nombres = d.Nombres;
         return new CuentaComunResponse(
             FormatosApi.FormatoMes(s.Mes), e.AportadoMes, e.Aportado, e.Gastado, e.Saldo,
-            e.Pendientes.Select(p => new PendienteCuentaDto(p.MiembroId, nombres.GetValueOrDefault(p.MiembroId, ""), p.Importe)).ToList(),
+            // Lo que la cuenta le debe de verdad: lo pendiente menos lo que ya ha ingresado. Solo los que deben algo.
+            e.Pendientes.Select(p => (p.MiembroId, Neto: CuentaComun.PendienteNeto(e.Pendientes, d.Historico.Ingresos, p.MiembroId, s.Mes)))
+                .Where(x => x.Neto > 0m)
+                .Select(x => new PendienteCuentaDto(x.MiembroId, nombres.GetValueOrDefault(x.MiembroId, ""), x.Neto)).ToList(),
             e.Efectivo, d.Aportaciones.Select(a => new AportacionCuentaDto(a.Id, a.MiembroId, a.Desde, a.Importe, a.Ahorro)).ToList(),
             d.ReembolsosDelMes.Select(r => new ReembolsoCuentaDto(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto)).ToList(),
             e.AhorroMes, e.AhorroAcumulado, e.AhorroRetirado, e.AhorroDisponible,

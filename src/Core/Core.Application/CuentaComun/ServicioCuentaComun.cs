@@ -36,7 +36,7 @@ public sealed class ServicioCuentaComun(IRepositorioCuentaComun repositorio, Tim
         var h = detalle.Historico;
         var saldoInicial = h.SaldoInicial;
         var estado = Domain.CuentaComun.Calcular(inicio, h.Vigentes, h.Gastos, h.Reembolsos, h.Retiradas, h.Depositos, saldoInicial, h.Ingresos);
-        var partes = Domain.CuentaComun.PartesPorPersona(inicio, h.Vigentes, estado, h.Depositos);
+        var partes = Domain.CuentaComun.PartesPorPersona(inicio, h.Vigentes, estado, h.Depositos, h.Ingresos);
         var reembolsos = detalle.ReembolsosDelMes.Select(r => new ReembolsoDeCuenta(r.MiembroId, r.Fecha, r.Importe)).ToList();
         var extracto = Domain.CuentaComun.Extracto(inicio, h.Vigentes, h.GastosDelMes ?? [], reembolsos, saldoInicial, estado, h.Ingresos);
         var resumen = Domain.CuentaComun.ResumenMensual(inicio, h);
@@ -134,7 +134,7 @@ public sealed class ServicioCuentaComun(IRepositorioCuentaComun repositorio, Tim
 
     /// <summary>
     /// Registra un pago de la cuenta a quien adelantó gastos. Inválido si el importe no vale o el miembro no es del hogar;
-    /// conflicto si supera lo pendiente de reembolsarle.
+    /// conflicto si supera lo que la cuenta le debe (lo adelantado, menos lo reembolsado y lo que él ya ha ingresado).
     /// </summary>
     public async Task<Resultado<ReembolsoCuenta>> CrearReembolsoAsync(RegistrarMovimiento m, CancellationToken ct)
     {
@@ -144,7 +144,8 @@ public sealed class ServicioCuentaComun(IRepositorioCuentaComun repositorio, Tim
         if (!await repositorio.ExisteMiembroAsync(m.MiembroId, ct))
             return Resultado<ReembolsoCuenta>.Invalido("El miembro del reembolso debe pertenecer al hogar.");
 
-        var pendiente = await repositorio.GastadoACargoAsync(m.MiembroId, ct) - await repositorio.ReembolsadoAsync(m.MiembroId, ct);
+        var pendiente = await repositorio.GastadoACargoAsync(m.MiembroId, ct) - await repositorio.ReembolsadoAsync(m.MiembroId, ct)
+            - await repositorio.IngresadoPorAsync(m.MiembroId, ct);
         if (m.Importe > pendiente)
         {
             var visible = Math.Max(0m, pendiente);

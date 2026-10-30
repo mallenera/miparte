@@ -60,7 +60,7 @@ public static class ResumenMes
                 m.Id, m.Nombre,
                 gastos.Where(g => g.PagadoPor == m.Id).Sum(g => g.Importe),
                 gastos.SelectMany(g => g.Repartos).Where(r => r.MiembroId == m.Id).Sum(r => r.ImporteAsumido),
-                Math.Max(0m, cuenta.Pendientes.FirstOrDefault(p => p.MiembroId == m.Id)?.Importe ?? 0m),
+                Math.Max(0m, CuentaComun.PendienteNeto(cuenta.Pendientes, historico.Ingresos, m.Id, inicio)),
                 personales.Where(g => g.PagadoPor == m.Id).Sum(g => g.Importe)))
             .ToList();
 
@@ -83,7 +83,9 @@ public static class ResumenMes
             var delAhorro = (historico.GastosDelMes ?? []).Where(g => g.DesdeAhorro).Sum(g => g.Importe);
             resumenCuenta = new ResumenCuenta(
                 estado.AportadoMes, historico.GastadoMes - delAhorro, estado.Saldo,
-                estado.Efectivo, estado.Pendientes.Where(p => p.Importe > 0m).Sum(p => p.Importe),
+                estado.Efectivo,
+                estado.Pendientes.Select(p => CuentaComun.PendienteNeto(estado.Pendientes, historico.Ingresos, p.MiembroId, inicio))
+                    .Where(n => n > 0m).Sum(),
                 estado.AhorroMes, estado.AhorroDisponible, delAhorro);
         }
 

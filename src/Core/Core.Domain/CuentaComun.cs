@@ -22,9 +22,10 @@ public sealed record RetiradaDeAhorro(DateOnly Fecha, decimal Importe);
 
 /// <summary>
 /// Dinero que entra a la cuenta para gastos fuera de las aportaciones (p. ej. lo que pagan las amigas de una cena): suma al saldo y al
-/// efectivo desde su fecha, como el saldo inicial.
+/// efectivo desde su fecha, como el saldo inicial. <paramref name="MiembroId"/> es quien lo ingresa; con él se descuenta de lo que la
+/// cuenta le debe (<see cref="PendienteNeto"/>).
 /// </summary>
-public sealed record IngresoDeCuenta(DateOnly Fecha, decimal Importe);
+public sealed record IngresoDeCuenta(DateOnly Fecha, decimal Importe, Guid? MiembroId = null);
 
 /// <summary>
 /// Dinero que entra al ahorro de la cuenta común fuera de la aportación mensual (ahorro inicial, lotería...).
@@ -244,6 +245,22 @@ public static class CuentaComun
     }
 
     /// <summary>
+    /// Lo que la cuenta le debe a un miembro hasta el fin de <paramref name="mes"/>: lo pendiente de reembolsarle menos lo que él
+    /// mismo ha ingresado en la cuenta. Puede ser negativo (ha puesto más de lo que le debe la cuenta); quien muestra la deuda
+    /// lo acota a cero.
+    /// </summary>
+    /// <param name="pendientes">Pendientes por miembro (solo gastos y reembolsos).</param>
+    /// <param name="ingresos">Ingresos sueltos; solo cuentan los de ese miembro hasta el fin del mes.</param>
+    public static decimal PendienteNeto(
+        IEnumerable<PendienteMiembro> pendientes, IEnumerable<IngresoDeCuenta>? ingresos, Guid miembroId, DateOnly mes)
+    {
+        var fin = mes.AddMonths(1);
+        var pendiente = pendientes.FirstOrDefault(p => p.MiembroId == miembroId)?.Importe ?? 0m;
+        var ingresado = (ingresos ?? []).Where(i => i.MiembroId == miembroId && i.Fecha < fin).Sum(i => i.Importe);
+        return pendiente - ingresado;
+    }
+
+    /// <summary>
     /// «Su parte» de cada miembro con aportaciones o depósitos hasta <paramref name="mes"/>: el saldo de gastos se reparte
     /// en proporción a lo aportado para gastos y el ahorro disponible, en proporción a lo ahorrado. El céntimo sobrante lo
     /// absorbe el último miembro (por id), de modo que las partes suman siempre el saldo y el ahorro disponible.
@@ -253,9 +270,10 @@ public static class CuentaComun
     /// <param name="aportaciones">Aportaciones vigentes de todos los miembros.</param>
     /// <param name="estado">Estado de la cuenta ya calculado para ese mes (saldo, ahorro disponible y pendientes).</param>
     /// <param name="depositos">Depósitos de ahorro; solo se atribuyen los que llevan miembro.</param>
+    /// <param name="ingresos">Ingresos sueltos; descuentan de la deuda neta de quien los ingresa (<see cref="PendienteNeto"/>).</param>
     public static IReadOnlyList<PartePersona> PartesPorPersona(
         DateOnly mes, IReadOnlyList<AportacionVigente> aportaciones, EstadoCuentaComun estado,
-        IEnumerable<DepositoDeAhorro>? depositos = null)
+        IEnumerable<DepositoDeAhorro>? depositos = null, IEnumerable<IngresoDeCuenta>? ingresos = null)
     {
         var fin = mes.AddMonths(1);
         var aportado = new Dictionary<Guid, decimal>();
@@ -292,7 +310,7 @@ public static class CuentaComun
             totalAportado > 0 ? Math.Round(100m * aportado[id] / totalAportado, 2, MidpointRounding.AwayFromZero) : 0m,
             totalAhorrado > 0 ? Math.Round(100m * ahorrado[id] / totalAhorrado, 2, MidpointRounding.AwayFromZero) : 0m,
             porSaldo[i], porAhorro[i],
-            estado.Pendientes.FirstOrDefault(p => p.MiembroId == id)?.Importe ?? 0m)).ToList();
+            PendienteNeto(estado.Pendientes, ingresos, id, mes))).ToList();
     }
 
     /// <summary>Reparte un importe (de cualquier signo) según pesos no negativos; el último con peso absorbe el céntimo sobrante. Si todos los pesos son cero, con <paramref name="igualSiSinPesos"/> se reparte a partes iguales (la suma sigue siendo el importe) y sin él todo queda a cero.</summary>

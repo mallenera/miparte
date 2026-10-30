@@ -35,7 +35,7 @@ internal static class RepositoriosEnMemoria
             gastosDelMes.Sum(g => g.Importe),
             gastosDelMes.Select(g => new GastoDeCuenta(g.PagadoPor, g.Fecha, g.Importe, g.PagadoDesdeAhorro)).ToList(),
             a.Hogar.SaldoInicialFecha is { } f && a.Hogar.SaldoInicialImporte is { } i ? new SaldoInicialCuenta(f, i) : null, a.Hogar.AportacionFrecuencia,
-            a.Ingresos.Where(x => x.Fecha < fin).Select(x => new IngresoDeCuenta(x.Fecha, x.Importe)).ToList());
+            a.Ingresos.Where(x => x.Fecha < fin).Select(x => new IngresoDeCuenta(x.Fecha, x.Importe, x.MiembroId)).ToList());
     }
 
     /// <summary>Datos del ahorro; <paramref name="excluirGasto"/> deja fuera un gasto que se estÃ¡ editando.</summary>
@@ -276,6 +276,9 @@ internal sealed class RepositorioCuentaComunEnMemoria(AlmacenDemo a) : IReposito
 
     public Task<decimal> ReembolsadoAsync(Guid miembroId, CancellationToken ct)
         => Task.FromResult(a.Reembolsos.Where(r => r.MiembroId == miembroId).Sum(r => r.Importe));
+
+    public Task<decimal> IngresadoPorAsync(Guid miembroId, CancellationToken ct)
+        => Task.FromResult(a.Ingresos.Where(i => i.MiembroId == miembroId).Sum(i => i.Importe));
 
     public Task<AportacionCuenta> FijarAportacionAsync(
         Guid hogarId, Guid miembroId, DateOnly desde, decimal importe, decimal ahorro, CancellationToken ct)

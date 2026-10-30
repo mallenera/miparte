@@ -108,6 +108,19 @@ public class ServicioCuentaComunTests
     }
 
     [Fact]
+    public async Task Reembolso_RestaLoQueElMiembroHaIngresado_AlTopeDeLoQueLaCuentaLeDebe()
+    {
+        _repo.GastadoPor[_ana] = 100m;
+        await Servicio.CrearIngresoAsync(Mov(_ana, 30m), default);
+
+        var demasiado = await Servicio.CrearReembolsoAsync(Mov(_ana, 70.01m), default);
+        var justo = await Servicio.CrearReembolsoAsync(Mov(_ana, 70m), default);
+
+        Assert.Equal(70m, demasiado.Error!.Extra!["pendiente"]);
+        Assert.Null(justo.Error);
+    }
+
+    [Fact]
     public async Task Reembolso_DeUnMiembroAjeno_EsInvalido()
     {
         var r = await Servicio.CrearReembolsoAsync(Mov(Guid.NewGuid(), 10m), default);
@@ -409,6 +422,9 @@ public class ServicioCuentaComunTests
             => new(Vigentes(), await DepositosAsync(null, ct), Retiradas.Sum(r => r.Importe), 0m);
 
         public Task<decimal> GastadoACargoAsync(Guid miembroId, CancellationToken ct) => Task.FromResult(GastadoPor.GetValueOrDefault(miembroId));
+
+        public Task<decimal> IngresadoPorAsync(Guid miembroId, CancellationToken ct)
+            => Task.FromResult(Ingresos.Where(i => i.MiembroId == miembroId).Sum(i => i.Importe));
 
         public Task<decimal> ReembolsadoAsync(Guid miembroId, CancellationToken ct)
             => Task.FromResult(ReembolsadoA.GetValueOrDefault(miembroId) + Reembolsos.Where(r => r.MiembroId == miembroId).Sum(r => r.Importe));

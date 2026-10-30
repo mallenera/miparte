@@ -112,12 +112,13 @@ public sealed class HistoricoCuentaComun
                 Importe = g.Sum(x => x.Importe), Ahorro = 0m, Marca = g.Key.EnMes, Marca2 = false, Texto = "",
             });
         // Los ingresos sueltos, igual que los depósitos: «del mes» y «anteriores», porque el extracto muestra los del mes.
+        // Por miembro, porque lo que ingresa cada uno descuenta de lo que la cuenta le debe.
         var ingresos = db.IngresosCuentaComun.Where(i => i.Fecha < fin)
-            .GroupBy(i => i.Fecha >= inicio)
+            .GroupBy(i => new { i.MiembroId, EnMes = i.Fecha >= inicio })
             .Select(g => new Fila
             {
-                Tipo = TipoIngresos, Id = vacio, MiembroId = vacio, Fecha = inicio,
-                Importe = g.Sum(x => x.Importe), Ahorro = 0m, Marca = g.Key, Marca2 = false, Texto = "",
+                Tipo = TipoIngresos, Id = vacio, MiembroId = g.Key.MiembroId, Fecha = inicio,
+                Importe = g.Sum(x => x.Importe), Ahorro = 0m, Marca = g.Key.EnMes, Marca2 = false, Texto = "",
             });
         var aportaciones = db.AportacionesCuenta.Select(a => new Fila
         {
@@ -204,7 +205,7 @@ public sealed class HistoricoCuentaComun
 
     /// <summary>Ingresos sueltos hasta el fin del mes; los del mes llevan la fecha del mes y los anteriores, el día previo.</summary>
     public List<IngresoDeCuenta> Ingresos => De(TipoIngresos)
-        .Select(f => new IngresoDeCuenta(f.Marca ? _inicio : _inicio.AddDays(-1), f.Importe)).ToList();
+        .Select(f => new IngresoDeCuenta(f.Marca ? _inicio : _inicio.AddDays(-1), f.Importe, f.MiembroId)).ToList();
 
     /// <summary>Nombre de cada miembro por id (solo con <c>detalleDelMes</c>).</summary>
     public Dictionary<Guid, string> Nombres => De(TipoNombre).ToDictionary(f => f.Id, f => f.Texto);

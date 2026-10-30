@@ -8,6 +8,7 @@ using MiParte.Core.Api.Cierres;
 using MiParte.Core.Api.Contacto;
 using MiParte.Core.Api.Gastos;
 using MiParte.Core.Api.Hogares;
+using MiParte.Core.Api.ListaCompra;
 using MiParte.Core.Api.Miembros;
 using MiParte.Core.Api.Notificaciones;
 using MiParte.Core.Api.Reparto;
@@ -20,6 +21,7 @@ using MiParte.Core.Application.Contacto;
 using MiParte.Core.Application.Gastos;
 using MiParte.Core.Application.Hogares;
 using MiParte.Core.Application.Liquidacion;
+using MiParte.Core.Application.ListaCompra;
 using MiParte.Core.Application.Miembros;
 using MiParte.Core.Application.Notificaciones;
 using MiParte.Core.Application.Periodos;
@@ -85,6 +87,8 @@ builder.Services.AddScoped(sp => new ServicioEnlacesGrupo(
     sp.GetRequiredService<IRepositorioEnlacesGrupo>(), sp.GetRequiredService<IRepositorioMiembros>(), sp.GetRequiredService<TimeProvider>()));
 builder.Services.AddScoped(sp => new ServicioCuentaComun(
     sp.GetRequiredService<IRepositorioCuentaComun>(), sp.GetRequiredService<TimeProvider>()));
+builder.Services.AddScoped(sp => new ServicioListaCompra(
+    sp.GetRequiredService<IRepositorioListaCompra>(), sp.GetRequiredService<TimeProvider>()));
 builder.Services.AddScoped(sp => new ServicioLiquidacion(
     sp.GetRequiredService<IRepositorioLiquidacion>(), sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<IPublicadorNotificaciones>()));
 
@@ -96,8 +100,10 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
 {
     if (origenes.Length > 0)
         p.WithOrigins(origenes)
-         .WithHeaders("Authorization", "Content-Type", HogarActualMiddleware.Cabecera)
-         .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
+         .WithHeaders("Authorization", "Content-Type", HogarActualMiddleware.Cabecera, ListaCompraEndpoints.CabeceraEnlace)
+         .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
+         // Cachea el preflight en el navegador: sin esto repite un OPTIONS (un viaje más a Render) por cada petición.
+         .SetPreflightMaxAge(TimeSpan.FromHours(2));
 }));
 
 var app = builder.Build();
@@ -140,6 +146,7 @@ app.MapGastos();
 app.MapGastosRecurrentes();
 app.MapLiquidacion();
 app.MapCuentaComun();
+app.MapListaCompra();
 app.MapCategorias();
 app.MapPerfiles();
 app.MapMiembros();

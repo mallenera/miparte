@@ -51,20 +51,20 @@ public interface IRepositorioCuentaComun
     /// <summary>Todos los depósitos de ahorro; <paramref name="excluir"/> deja fuera uno.</summary>
     Task<IReadOnlyList<DepositoDeAhorro>> DepositosAsync(Guid? excluir, CancellationToken ct);
 
-    /// <summary>Todo lo que ya salió del ahorro: retiradas y gastos pagados desde él.</summary>
+    /// <summary>
+    /// Todo lo que ya salió del ahorro: retiradas, gastos pagados desde él y las deudas con el ahorro, estas últimas con signo
+    /// (un adelanto sale; una devolución o una compensación entran, como un uso negativo).
+    /// </summary>
     Task<IReadOnlyList<UsoDeAhorro>> UsosDeAhorroAsync(CancellationToken ct);
 
     /// <summary>Datos para calcular el ahorro disponible.</summary>
     Task<DatosAhorro> DatosAhorroAsync(CancellationToken ct);
 
-    /// <summary>Total de gastos a cargo de la cuenta que adelantó el miembro.</summary>
-    Task<decimal> GastadoACargoAsync(Guid miembroId, CancellationToken ct);
+    /// <summary>Total de gastos a cargo de la cuenta que adelantó el miembro, del fondo de Hogar o del ahorro (<paramref name="desdeAhorro"/>).</summary>
+    Task<decimal> GastadoACargoAsync(Guid miembroId, bool desdeAhorro, CancellationToken ct);
 
-    /// <summary>Total que la cuenta ya ha reembolsado al miembro.</summary>
-    Task<decimal> ReembolsadoAsync(Guid miembroId, CancellationToken ct);
-
-    /// <summary>Total de ingresos sueltos que ha hecho el miembro en la cuenta común.</summary>
-    Task<decimal> IngresadoPorAsync(Guid miembroId, CancellationToken ct);
+    /// <summary>Total que la cuenta ya ha reembolsado al miembro desde ese fondo (<paramref name="desdeAhorro"/>).</summary>
+    Task<decimal> ReembolsadoAsync(Guid miembroId, bool desdeAhorro, CancellationToken ct);
 
     /// <summary>Fija la aportación del miembro desde el mes, sustituyendo la de ese mes si ya existía.</summary>
     Task<AportacionCuenta> FijarAportacionAsync(Guid hogarId, Guid miembroId, DateOnly desde, decimal importe, decimal ahorro, CancellationToken ct);
@@ -74,6 +74,18 @@ public interface IRepositorioCuentaComun
 
     /// <summary>Borra un reembolso; false si no existe en el hogar.</summary>
     Task<bool> EliminarReembolsoAsync(Guid id, CancellationToken ct);
+
+    /// <summary>Todos los movimientos de deuda de las personas con la cuenta común o su ahorro.</summary>
+    Task<IReadOnlyList<MovimientoDeuda>> DeudasAsync(CancellationToken ct);
+
+    /// <summary>Guarda un movimiento de deuda nuevo (adelanto, devolución o compensación).</summary>
+    Task GuardarDeudaAsync(MovimientoDeudaCuenta deuda, CancellationToken ct);
+
+    /// <summary>Un movimiento de deuda con su identificador y concepto, o null si no existe en el hogar.</summary>
+    Task<MovimientoDeuda?> DeudaAsync(Guid id, CancellationToken ct);
+
+    /// <summary>Borra un movimiento de deuda; false si no existe en el hogar.</summary>
+    Task<bool> EliminarDeudaAsync(Guid id, CancellationToken ct);
 
     /// <summary>Guarda un ingreso a la cuenta común nuevo.</summary>
     Task GuardarIngresoAsync(IngresoCuentaComun ingreso, CancellationToken ct);

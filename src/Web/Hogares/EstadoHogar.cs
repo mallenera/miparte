@@ -91,6 +91,17 @@ public sealed class EstadoHogar
         Cambiado?.Invoke();
     }
 
+    /// <summary>Actualiza si el hogar tiene la lista de la compra activada, sin volver a pedir <c>/api/yo</c>.</summary>
+    /// <param name="activa">Si la lista de la compra queda activada.</param>
+    public void ActualizarListaCompra(bool activa)
+    {
+        if (HogarActual is not { } actual) return;
+        var nuevo = actual with { ListaCompraActiva = activa };
+        Hogares = Hogares.Select(h => h.Id == nuevo.Id ? nuevo : h).ToList();
+        HogarActual = nuevo;
+        Cambiado?.Invoke();
+    }
+
     /// <summary>Actualiza el modo de liquidación del hogar actual tras cambiarlo (mensual o ciclos), sin volver a pedir <c>/api/yo</c>.</summary>
     /// <param name="liquidacionModo">Modo nuevo (ver <c>ModosLiquidacion</c>).</param>
     public void ActualizarLiquidacion(string liquidacionModo)

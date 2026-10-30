@@ -1,0 +1,37 @@
+@* Resumen mensual de la cuenta común (Hogar, Ahorro y Total). La usan la pestaña Cuenta común y el bloque de cuenta común de Resumen. *@
+<div class="tabla-scroll">
+    <table class="resumen-cuenta" id="resumen-cuenta">
+        <thead>
+            <tr>
+                <th scope="col"><span class="sr">Cuenta</span></th>
+                <th scope="col">Inicial</th>
+                <th scope="col">Ingresos</th>
+                <th scope="col">Ingresos sueltos</th>
+                <th scope="col">Gastos</th>
+                <th scope="col">Reembolsos</th>
+                <th scope="col">Disponible</th>
+                <th scope="col">Pendiente de reembolsar</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var (nombre, fila, clase) in new[] { ("Hogar", Resumen.Hogar, ""), ("Ahorro", Resumen.Ahorro, ""), ("Total", Resumen.Total, "total") })
+            {
+                <tr class="@clase">
+                    <th scope="row">@nombre</th>
+                    <td>@Formato.Euros(fila.Inicial)</td>
+                    <td>@Formato.Euros(fila.Ingresos)</td>
+                    <td>@Formato.Euros(fila.IngresosSueltos)</td>
+                    <td>@Formato.Euros(fila.Gastos)</td>
+                    <td>@Formato.Euros(fila.Reembolsos)</td>
+                    <td><b>@Formato.Euros(fila.Disponible)</b></td>
+                    <td>@Formato.Euros(fila.Pendiente)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    /// <summary>Filas del mes a mostrar.</summary>
+    [Parameter, EditorRequired] public ResumenCuentaMesDto Resumen { get; set; } = default!;
+}

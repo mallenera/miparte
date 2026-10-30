@@ -7,13 +7,17 @@ public sealed record HistoricoCuenta(
     IReadOnlyList<AportacionVigente> Vigentes, IReadOnlyList<GastoDeCuenta> Gastos, IReadOnlyList<ReembolsoDeCuenta> Reembolsos,
     IReadOnlyList<RetiradaDeAhorro> Retiradas, IReadOnlyList<DepositoDeAhorro> Depositos, bool CuentaActiva, decimal GastadoMes,
     IReadOnlyList<GastoDeCuenta>? GastosDelMes = null, SaldoInicialCuenta? SaldoInicial = null,
-    FrecuenciaAportacion Frecuencia = FrecuenciaAportacion.Mensual, IReadOnlyList<IngresoDeCuenta>? Ingresos = null);
+    FrecuenciaAportacion Frecuencia = FrecuenciaAportacion.Mensual, IReadOnlyList<IngresoDeCuenta>? Ingresos = null,
+    IReadOnlyList<MovimientoDeuda>? Deudas = null);
 
 /// <summary>Importe asociado a un miembro.</summary>
 public sealed record ImporteMiembro(Guid MiembroId, decimal Importe);
 
-/// <summary>Lo pagado, asumido, pendiente de reembolso y personal de un miembro en el mes.</summary>
-public sealed record ResumenMiembro(Guid MiembroId, string Nombre, decimal Pagado, decimal Asumido, decimal PendienteCuenta, decimal Personal);
+/// <summary>
+/// Lo pagado, asumido, saldo con la cuenta común y personal de un miembro en el mes. El saldo es neto: positivo si la cuenta
+/// le debe a la persona, negativo si ella le debe a la cuenta (p. ej. por un adelanto que aún no devolvió).
+/// </summary>
+public sealed record ResumenMiembro(Guid MiembroId, string Nombre, decimal Pagado, decimal Asumido, decimal SaldoCuenta, decimal Personal);
 
 /// <summary>Gasto de una categoría en el mes y lo que asume cada miembro.</summary>
 public sealed record ResumenCategoria(Guid CategoriaId, string Nombre, decimal Total, IReadOnlyList<ImporteMiembro> PorMiembro);
@@ -47,12 +51,12 @@ public static class ResumenMes
         var gastosTotales = gastos.Sum(g => g.Importe);
 
         // Lo que adelantó un miembro para la cuenta común cuenta como pagado, y la cuenta le debe lo aún no reembolsado.
-        var cuenta = CuentaComun.Calcular(inicio, [], historico.Gastos, historico.Reembolsos);
+        var cuenta = CuentaComun.Calcular(inicio, [], historico.Gastos, historico.Reembolsos, deudas: historico.Deudas);
         // Los acreedores con pendiente de meses anteriores aparecen aunque no participen en los gastos de este mes (p. ej. un miembro ya inactivo).
         var implicados = miembros.Where(m => m.Activo && m.Tipo == TipoMiembro.Adulto).Select(m => m.Id)
             .Concat(gastos.Where(g => g.PagadoPor is not null).Select(g => g.PagadoPor!.Value))
             .Concat(gastos.SelectMany(g => g.Repartos).Select(r => r.MiembroId))
-            .Concat(cuenta.Pendientes.Where(p => p.Importe > 0m).Select(p => p.MiembroId))
+            .Concat(cuenta.Pendientes.Where(p => p.Importe != 0m).Select(p => p.MiembroId))
             .Concat(personales.Select(g => g.PagadoPor!.Value))
             .ToHashSet();
         var porMiembro = miembros.Where(m => implicados.Contains(m.Id)).OrderBy(m => m.Nombre).ThenBy(m => m.Id)
@@ -60,7 +64,7 @@ public static class ResumenMes
                 m.Id, m.Nombre,
                 gastos.Where(g => g.PagadoPor == m.Id).Sum(g => g.Importe),
                 gastos.SelectMany(g => g.Repartos).Where(r => r.MiembroId == m.Id).Sum(r => r.ImporteAsumido),
-                Math.Max(0m, CuentaComun.PendienteNeto(cuenta.Pendientes, historico.Ingresos, m.Id, inicio)),
+                cuenta.Pendientes.Where(p => p.MiembroId == m.Id).Sum(p => p.Importe),
                 personales.Where(g => g.PagadoPor == m.Id).Sum(g => g.Importe)))
             .ToList();
 
@@ -78,14 +82,12 @@ public static class ResumenMes
         {
             var estado = CuentaComun.Calcular(
                 inicio, historico.Vigentes, historico.Gastos, historico.Reembolsos, historico.Retiradas, historico.Depositos,
-                historico.SaldoInicial, historico.Ingresos);
+                historico.SaldoInicial, historico.Ingresos, historico.Deudas);
             // Lo gastado de la cuenta y lo gastado del ahorro se informan por separado.
             var delAhorro = (historico.GastosDelMes ?? []).Where(g => g.DesdeAhorro).Sum(g => g.Importe);
             resumenCuenta = new ResumenCuenta(
                 estado.AportadoMes, historico.GastadoMes - delAhorro, estado.Saldo,
-                estado.Efectivo,
-                estado.Pendientes.Select(p => CuentaComun.PendienteNeto(estado.Pendientes, historico.Ingresos, p.MiembroId, inicio))
-                    .Where(n => n > 0m).Sum(),
+                estado.Efectivo, estado.Pendientes.Where(p => p.Importe > 0m).Sum(p => p.Importe),
                 estado.AhorroMes, estado.AhorroDisponible, delAhorro);
         }
 

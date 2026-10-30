@@ -36,6 +36,14 @@ internal sealed class AlmacenDemo
 
     /// <summary>Reembolsos de la cuenta común.</summary>
     public List<ReembolsoCuenta> Reembolsos { get; } = [];
+    /// <summary>Productos de la lista de la compra.</summary>
+    public List<ProductoListaCompra> Productos { get; } = [];
+
+    /// <summary>Enlaces QR de la lista de la compra.</summary>
+    public List<EnlaceListaCompra> EnlacesListaCompra { get; } = [];
+
+    /// <summary>Movimientos de deuda de las personas con la cuenta común o su ahorro.</summary>
+    public List<MovimientoDeudaCuenta> Deudas { get; } = [];
 
     /// <summary>Depósitos de ahorro.</summary>
     public List<DepositoAhorro> Depositos { get; } = [];

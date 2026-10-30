@@ -69,6 +69,26 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
     /// <summary>Miembro al que se reembolsa.</summary>
     public Guid Reembolsado { get; set; }
 
+    /// <summary>Fondo del reembolso elegido: el del ahorro (true) o el de Hogar. Un reembolso nunca mezcla fondos.</summary>
+    public bool ReembolsadoDesdeAhorro { get; set; }
+
+    /// <summary>Clave del pendiente elegido en el formulario, «miembro|fondo», que es lo que lee el selector.</summary>
+    public string ClavePendiente => ClaveDe(Reembolsado, ReembolsadoDesdeAhorro);
+
+    /// <summary>Clave de un pendiente para el selector del formulario de reembolso.</summary>
+    public static string ClaveDe(PendienteCuentaDto p) => ClaveDe(p.MiembroId, p.DesdeAhorro);
+
+    private static string ClaveDe(Guid miembroId, bool desdeAhorro) => $"{miembroId}|{(desdeAhorro ? 1 : 0)}";
+
+    /// <summary>Elige el pendiente del formulario a partir de su clave; una clave que no sea válida no cambia nada.</summary>
+    public void ElegirPendiente(string? clave)
+    {
+        var partes = (clave ?? "").Split('|');
+        if (partes.Length != 2 || !Guid.TryParse(partes[0], out var miembro)) return;
+        Reembolsado = miembro;
+        ReembolsadoDesdeAhorro = partes[1] == "1";
+    }
+
     /// <summary>Adulto que ingresa al ahorro.</summary>
     public Guid Depositante { get; set; }
 
@@ -93,7 +113,7 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
     /// <summary>Concepto del ingreso a la cuenta común (de dónde viene).</summary>
     public string ConceptoIngreso { get; set; } = "";
 
-    /// <summary>Qué hace la operación del formulario único: <c>aportacion</c>, <c>ingreso</c> o <c>reembolso</c>.</summary>
+    /// <summary>Qué hace la operación del formulario único: <c>aportacion</c>, <c>ingreso</c>, <c>reembolso</c> o <c>deuda</c>.</summary>
     public string Operacion { get; set; } = "aportacion";
 
     /// <summary>Fecha de la operación; la aportación cuenta desde el mes de esta fecha.</summary>
@@ -104,6 +124,7 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
     {
         "ingreso" => IngresoValido,
         "reembolso" => (Estado?.Pendientes.Count ?? 0) > 0 && ReembolsoValido,
+        "deuda" => DeudaValida,
         _ => AportacionValida,
     };
 
@@ -171,6 +192,7 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
             Adultos = Miembros.Where(m => m.Tipo == TiposMiembro.Adulto && m.Activo).ToList();
             Aportante = Depositante = (Adultos.FirstOrDefault(m => m.EsYo) ?? Adultos.FirstOrDefault())?.Id ?? Guid.Empty;
             Ingresante = (Miembros.FirstOrDefault(m => m.EsYo) ?? Miembros.FirstOrDefault())?.Id ?? Guid.Empty;
+            Deudor = Ingresante;
             await RecargarAsync();
         }
         catch (ApiException e)
@@ -197,8 +219,12 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
 
         if (version != _version) return;
         Estado = estado;
-        if (Estado.Pendientes.All(p => p.MiembroId != Reembolsado))
-            Reembolsado = Estado.Pendientes.FirstOrDefault()?.MiembroId ?? Guid.Empty;
+        if (Estado.Pendientes.All(p => ClaveDe(p) != ClavePendiente))
+        {
+            var primero = Estado.Pendientes.FirstOrDefault();
+            Reembolsado = primero?.MiembroId ?? Guid.Empty;
+            ReembolsadoDesdeAhorro = primero?.DesdeAhorro ?? false;
+        }
         AlCambiarAportante();
         AlCambiarSaldoInicial();
 
@@ -264,12 +290,62 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
             return "Aportación guardada";
         });
 
+    /// <summary>Persona a la que se refiere el movimiento de deuda.</summary>
+    public Guid Deudor { get; set; }
+
+    /// <summary>Tipo del movimiento: «adelanto», «devolucion» o «compensacion».</summary>
+    public string TipoDeuda { get; set; } = "adelanto";
+
+    /// <summary>Si el movimiento es del fondo del ahorro (true) o de Hogar (false).</summary>
+    public bool DeudaDesdeAhorro { get; set; }
+
+    /// <summary>Importe del movimiento de deuda, tal como lo escribe la persona.</summary>
+    public string ImporteDeuda { get; set; } = "";
+
+    /// <summary>Concepto del movimiento de deuda.</summary>
+    public string ConceptoDeuda { get; set; } = "";
+
+    /// <summary>Si el importe del movimiento de deuda se puede enviar.</summary>
+    public bool DeudaValida => EntradaImporte.TryParse(ImporteDeuda, out _);
+
+    /// <summary>Nombre visible de un tipo de movimiento de deuda.</summary>
+    public static string NombreTipoDeuda(string tipo) => tipo switch
+    {
+        "devolucion" => "Devolución",
+        "compensacion" => "Compensación",
+        _ => "Adelanto",
+    };
+
+    /// <summary>Frase que explica qué hace cada tipo de movimiento de deuda, para mostrarla junto al selector.</summary>
+    public static string AyudaTipoDeuda(string tipo) => tipo switch
+    {
+        "devolucion" => "La persona ingresa dinero para pagar lo que debe.",
+        "compensacion" => "Se resta de lo que la cuenta le debe por reembolsos; no mueve dinero.",
+        _ => "La cuenta pagó algo por la persona: ella le debe ese importe.",
+    };
+
+    /// <summary>Registra un adelanto, una devolución o una compensación de la deuda de una persona con la cuenta común.</summary>
+    public Task<string?> RegistrarDeudaAsync() =>
+        EjecutarAsync(async () =>
+        {
+            var importe = Importe(ImporteDeuda);
+            await api.CrearDeudaAsync(new CrearDeudaCuentaRequest(Deudor, TipoDeuda, importe, FechaOperacion, Texto(ConceptoDeuda), DeudaDesdeAhorro));
+            ImporteDeuda = "";
+            ConceptoDeuda = "";
+            return TipoDeuda switch
+            {
+                "devolucion" => "Devolución registrada",
+                "compensacion" => "Compensación registrada",
+                _ => "Adelanto registrado",
+            };
+        });
+
     /// <summary>Registra un reembolso de la cuenta a quien adelantó gastos.</summary>
     public Task<string?> ReembolsarAsync() =>
         EjecutarAsync(async () =>
         {
             var importe = Importe(ImporteReembolso);
-            await api.CrearReembolsoAsync(new CrearReembolsoRequest(Reembolsado, importe, FechaOperacion, Texto(ConceptoReembolso)));
+            await api.CrearReembolsoAsync(new CrearReembolsoRequest(Reembolsado, importe, FechaOperacion, Texto(ConceptoReembolso), ReembolsadoDesdeAhorro));
             ImporteReembolso = "";
             ConceptoReembolso = "";
             return "Reembolso registrado";
@@ -289,11 +365,12 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
             return "Ingreso registrado";
         });
 
-    /// <summary>Registra la operación elegida en el formulario único (aportación, ingreso o reembolso) con su fecha.</summary>
+    /// <summary>Registra la operación elegida en el formulario único (aportación, ingreso, reembolso o deuda) con su fecha.</summary>
     public Task<string?> RegistrarOperacionAsync() => Operacion switch
     {
         "ingreso" => IngresarAsync(),
         "reembolso" => ReembolsarAsync(),
+        "deuda" => RegistrarDeudaAsync(),
         _ => FijarAportacionAsync(),
     };
 
@@ -344,6 +421,15 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
             await api.EliminarDepositoAhorroAsync(d.Id);
             ConfirmandoEliminar = null;
             return "Ingreso eliminado";
+        });
+
+    /// <summary>Elimina un movimiento de deuda (adelanto, devolución o compensación). La API lo rechaza si dejaría la deuda negativa o el ahorro sin respaldo.</summary>
+    public Task<string?> EliminarDeudaAsync(MovimientoDeudaCuentaDto d) =>
+        EjecutarAsync(async () =>
+        {
+            await api.EliminarDeudaAsync(d.Id);
+            ConfirmandoEliminar = null;
+            return $"{NombreTipoDeuda(d.Tipo)} eliminado";
         });
 
     /// <summary>Elimina un reembolso.</summary>

@@ -32,18 +32,9 @@ else if (_m.Resumen is not null && _m.Liquidacion is not null)
         <div class="aviso err u-mt12" role="alert">@_m.Error</div>
     }
 
-    <TarjetaCierreMes Mes="_m.Mes" Cierre="_m.CierreDelMes" PuedeCerrar="Permisos.Tiene(Claves.MesCerrar)" PuedeReabrir="Permisos.Tiene(Claves.MesReabrir)" Cambiado="_m.RecargarTrasCierreAsync" />
-
-    <section class="card" aria-labelledby="t-liquidacion">
-        <div class="card-head"><h2 id="t-liquidacion">Liquidación</h2></div>
-        @if (_m.PorCiclos)
-        {
-            <p class="muted">Quién debe a quién desde el último cierre. Cuando el grupo haya saldado sus cuentas, cierra la liquidación: los gastos quedan liquidados y el cierre se guarda.</p>
-        }
-        else
-        {
-            <p class="muted">Quién debe a quién para quedar en paz este mes. Los pagos que registres, completos o parciales, se descuentan de los saldos.</p>
-        }
+    <section class="card" aria-labelledby="t-resumen">
+        <div class="card-head"><h2 id="t-resumen">Resumen del mes</h2></div>
+        <p class="muted">Por persona: lo que ha pagado, lo que le corresponde, su saldo con la cuenta común y su saldo de liquidación.</p>
 
         @if (_m.Liquidacion.Saldos.Count > 1)
         {
@@ -58,15 +49,110 @@ else if (_m.Resumen is not null && _m.Liquidacion is not null)
             </label>
         }
 
-        @foreach (var s in _m.Liquidacion.Saldos.Where(s => _m.FiltraMiembro(s.MiembroId)))
+        @if (_m.Resumen.GastosTotales == 0)
         {
-            <div class="catrow">
-                <div class="c-name"><Avatar Nombre="@s.Nombre" Color="@ColorMiembro.De(s.MiembroId, _m.Miembros)" Tamano="sm" /> @s.Nombre</div>
-                <div class="c-sel">
-                    <b class="g-importe saldo @(s.Saldo > 0 ? "pos" : s.Saldo < 0 ? "neg" : "")">@Saldo(s.Saldo)</b>
-                    <span>@(s.Saldo > 0 ? "le deben" : s.Saldo < 0 ? "debe" : "en paz")</span>
-                </div>
+            <div class="empty">
+                <span>@(_m.Resumen.GastosPersonales > 0 ? "No hay gastos del hogar" : "No hay gastos") en @_m.NombreMes.</span>
+                <a class="btn" href="gastos">Añadir un gasto</a>
             </div>
+            @foreach (var m in _m.Resumen.Miembros.Where(m => m.DebeCuentaComun > 0))
+            {
+                <div class="catrow">
+                    <div class="c-name"><Avatar Nombre="@m.Nombre" Color="@ColorMiembro.De(m.MiembroId, _m.Miembros)" Tamano="sm" /> @m.Nombre</div>
+                    <div class="c-sel"><span class="chip">La cuenta común le debe&nbsp;<b>@Formato.Euros(m.DebeCuentaComun)</b></span></div>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="u-fila-mt10">
+                <span class="chip">Gastos del mes&nbsp;<b id="total">@Formato.Euros(_m.Resumen.GastosTotales)</b></span>
+            </div>
+        }
+
+        @if (_m.Personas().Count > 0)
+        {
+            <h3 class="u-sec">Por persona</h3>
+            <div class="tabla-scroll">
+                <table class="resumen-cuenta" id="resumen-personas">
+                    <thead>
+                        <tr>
+                            <th scope="col"><span class="sr">Persona</span></th>
+                            <th scope="col">Ha pagado</th>
+                            <th scope="col">Le corresponden</th>
+                            <th scope="col">Cuenta común</th>
+                            <th scope="col">Liquidación</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var m in _m.Personas().Where(m => _m.FiltraMiembro(m.MiembroId)))
+                        {
+                            var liquidacion = _m.SaldoDe(m.MiembroId);
+                            <tr>
+                                <th scope="row"><div class="c-name"><Avatar Nombre="@m.Nombre" Color="@ColorMiembro.De(m.MiembroId, _m.Miembros)" Tamano="sm" /> @m.Nombre</div></th>
+                                <td>@Formato.Euros(m.Pagado)</td>
+                                <td>@Formato.Euros(m.Asumido)</td>
+                                <td>
+                                    @if (m.DebeCuentaComun != 0m)
+                                    {
+                                        <b class="g-importe saldo @(m.DebeCuentaComun > 0 ? "pos" : "neg")">@Saldo(m.DebeCuentaComun)</b>
+                                        <span>@(m.DebeCuentaComun > 0 ? "la cuenta le debe" : "debe a la cuenta")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="muted">—</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (liquidacion is { } l)
+                                    {
+                                        <b class="g-importe saldo @(l.Saldo > 0 ? "pos" : l.Saldo < 0 ? "neg" : "")">@Saldo(l.Saldo)</b>
+                                        <span>@(l.Saldo > 0 ? "le deben" : l.Saldo < 0 ? "debe" : "en paz")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="muted">—</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    @if (_m.Resumen.CuentaComun is not null)
+    {
+        <section class="card" aria-labelledby="t-cuenta-resumen">
+            <div class="card-head"><h2 id="t-cuenta-resumen">Cuenta común</h2></div>
+            <p class="muted">Saldos al final de @_m.NombreMes. Los gastos a su cargo no entran en la liquidación entre personas.</p>
+            @if (_m.CuentaComun?.Resumen is { } filas)
+            {
+                <div class="u-mt12"><TablaResumenCuenta Resumen="filas" /></div>
+            }
+            @if (_m.CuentaComun is { } estadoCuenta)
+            {
+                <AvisosCuenta Estado="estadoCuenta" />
+            }
+            <a class="linkbtn u-mt8-inline" href="cuenta-comun">Ver la cuenta común</a>
+        </section>
+    }
+
+    @if (_m.HayGastos)
+    {
+        <TarjetaCierreMes Mes="_m.Mes" Cierre="_m.CierreDelMes" PuedeCerrar="Permisos.Tiene(Claves.MesCerrar)" PuedeReabrir="Permisos.Tiene(Claves.MesReabrir)" Cambiado="_m.RecargarTrasCierreAsync" />
+    }
+
+    <section class="card" aria-labelledby="t-liquidacion">
+        <div class="card-head"><h2 id="t-liquidacion">Liquidación</h2></div>
+        @if (_m.PorCiclos)
+        {
+            <p class="muted">Quién debe a quién desde el último cierre. Cuando el grupo haya saldado sus cuentas, cierra la liquidación: los gastos quedan liquidados y el cierre se guarda.</p>
+        }
+        else
+        {
+            <p class="muted">Quién debe a quién para quedar en paz este mes. Los pagos que registres, completos o parciales, se descuentan de los saldos.</p>
         }
 
         @if (_m.Liquidacion.Transferencias.Count == 0)
@@ -193,120 +279,62 @@ else if (_m.Resumen is not null && _m.Liquidacion is not null)
 
     <TarjetaCompartir NombreHogar="@(Hogar.HogarActual?.Nombre ?? "")" Mes="@_m.Mes" Liquidacion="@_m.Liquidacion" Miembros="@_m.Miembros" PorCiclos="@_m.PorCiclos" />
 
-    @if (_m.Resumen.CuentaComun is { } cuenta)
+    @if (_m.Resumen.GastosTotales > 0 || _m.Resumen.GastosPersonales > 0)
     {
-        <section class="card" aria-labelledby="t-cuenta-resumen">
-            <div class="card-head"><h2 id="t-cuenta-resumen">Cuenta común</h2></div>
-            <p class="muted">Saldos al final de @_m.NombreMes. Los gastos a su cargo no entran en la liquidación entre personas.</p>
-            <div class="u-fila-mt10">
-                <span class="chip">Saldo&nbsp;<b id="cuenta-saldo">@Formato.Euros(cuenta.Saldo)</b></span>
-                <span class="chip">Efectivo&nbsp;<b>@Formato.Euros(cuenta.Efectivo)</b></span>
-                <span class="chip">Aportado este mes&nbsp;<b>@Formato.Euros(cuenta.AportadoMes)</b></span>
-                <span class="chip">Gastado este mes&nbsp;<b>@Formato.Euros(cuenta.GastadoMes)</b></span>
-                @if (cuenta.GastadoAhorroMes > 0)
-                {
-                    <span class="chip">Gastado del ahorro este mes&nbsp;<b>@Formato.Euros(cuenta.GastadoAhorroMes)</b></span>
-                }
-                <span class="chip">Ahorro disponible&nbsp;<b>@Formato.Euros(cuenta.AhorroDisponible)</b></span>
-                @if (cuenta.Pendiente > 0)
-                {
-                    <span class="chip">Pendiente de reembolsar&nbsp;<b>@Formato.Euros(cuenta.Pendiente)</b></span>
-                }
-            </div>
-            @if (cuenta.Saldo < 0)
+        <section class="card" aria-labelledby="t-detalle">
+            <div class="card-head"><h2 id="t-detalle">Detalle del mes</h2></div>
+
+            @if (_m.Resumen.GastosTotales > 0)
             {
-                <div class="aviso warn u-mt12" role="status">La cuenta no cubre los gastos: faltan @Formato.Euros(-cuenta.Saldo).</div>
+                <h3 class="u-sec">Por categoría</h3>
+                @foreach (var f in _m.FilasCategorias())
+                {
+                    var n = f.Nodo;
+                    var importe = f.Directo ? n.Propio : n.Total;
+                    <div class="catrow resrow nivel-@Math.Min(f.Nivel, 4)">
+                        <div class="c-name @(f.Nivel > 0 ? "sub" : "")">
+                            @if (!f.Directo && n.Hijos.Count > 0)
+                            {
+                                var abierto = _m.EstaAbierta(n.CategoriaId);
+                                <button class="linkbtn" type="button" aria-expanded="@(abierto ? "true" : "false")"
+                                        aria-label="@(abierto ? "Contraer" : "Desplegar") @n.Nombre" @onclick="() => _m.Alternar(n.CategoriaId)">@(abierto ? "▾" : "▸")</button>
+                            }
+                            @(f.Directo ? "Sin subcategoría" : n.Nombre)
+                        </div>
+                        <div class="c-sel">
+                            <b class="g-importe">@Formato.Euros(importe)</b> <span class="muted">@_m.Porcentaje(importe) %</span>
+                            <progress class="barra" max="100" value="@_m.Porcentaje(importe)" aria-label="@_m.Porcentaje(importe) % del total del mes"></progress>
+                            @if (!f.Directo && n.PorMiembro.Count > 0)
+                            {
+                                <span class="g-reparto">
+                                    @foreach (var p in n.PorMiembro)
+                                    {
+                                        <span class="chip">
+                                            <Avatar Nombre="@Formato.NombreMiembro(p.MiembroId, _m.Miembros)" Color="@ColorMiembro.De(p.MiembroId, _m.Miembros)" Tamano="sm" />
+                                            @Formato.Euros(p.Importe)
+                                        </span>
+                                    }
+                                </span>
+                            }
+                        </div>
+                    </div>
+                }
             }
-            <a class="linkbtn u-mt8-inline" href="cuenta-comun">Ver la cuenta común</a>
+
+            @if (_m.Resumen.GastosPersonales > 0)
+            {
+                <h3 class="u-sec">Gastos personales</h3>
+                <p class="muted">Cada uno es solo de quien lo paga: no entran en la liquidación ni en los totales de arriba.</p>
+                @foreach (var m in _m.Resumen.Miembros.Where(m => m.Personal > 0))
+                {
+                    <div class="catrow">
+                        <div class="c-name"><Avatar Nombre="@m.Nombre" Color="@ColorMiembro.De(m.MiembroId, _m.Miembros)" Tamano="sm" /> @m.Nombre</div>
+                        <div class="c-sel"><span class="tag admin">Personal</span> <b class="g-importe">@Formato.Euros(m.Personal)</b></div>
+                    </div>
+                }
+            }
         </section>
     }
-
-    <section class="card" aria-labelledby="t-resumen">
-        <div class="card-head"><h2 id="t-resumen">Resumen del mes</h2></div>
-
-        @if (_m.Resumen.GastosTotales == 0)
-        {
-            <div class="empty">
-                <span>@(_m.Resumen.GastosPersonales > 0 ? "No hay gastos del hogar" : "No hay gastos") en @_m.NombreMes.</span>
-                <a class="btn" href="gastos">Añadir un gasto</a>
-            </div>
-            @foreach (var m in _m.Resumen.Miembros.Where(m => m.DebeCuentaComun > 0))
-            {
-                <div class="catrow">
-                    <div class="c-name"><Avatar Nombre="@m.Nombre" Color="@ColorMiembro.De(m.MiembroId, _m.Miembros)" Tamano="sm" /> @m.Nombre</div>
-                    <div class="c-sel"><span class="chip">La cuenta común le debe&nbsp;<b>@Formato.Euros(m.DebeCuentaComun)</b></span></div>
-                </div>
-            }
-        }
-        else
-        {
-            <div class="u-fila-mt10">
-                <span class="chip">Gastos del mes&nbsp;<b id="total">@Formato.Euros(_m.Resumen.GastosTotales)</b></span>
-            </div>
-
-            <h3 class="u-sec">Por persona</h3>
-            @foreach (var m in _m.Resumen.Miembros)
-            {
-                <div class="catrow">
-                    <div class="c-name"><Avatar Nombre="@m.Nombre" Color="@ColorMiembro.De(m.MiembroId, _m.Miembros)" Tamano="sm" /> @m.Nombre</div>
-                    <div class="c-sel">
-                        Ha pagado @Formato.Euros(m.Pagado) · le corresponden @Formato.Euros(m.Asumido)
-                        @if (m.DebeCuentaComun > 0)
-                        {
-                            <span class="chip">La cuenta común le debe&nbsp;<b>@Formato.Euros(m.DebeCuentaComun)</b></span>
-                        }
-                    </div>
-                </div>
-            }
-
-            <h3 class="u-sec">Por categoría</h3>
-            @foreach (var f in _m.FilasCategorias())
-            {
-                var n = f.Nodo;
-                var importe = f.Directo ? n.Propio : n.Total;
-                <div class="catrow resrow nivel-@Math.Min(f.Nivel, 4)">
-                    <div class="c-name @(f.Nivel > 0 ? "sub" : "")">
-                        @if (!f.Directo && n.Hijos.Count > 0)
-                        {
-                            var abierto = _m.EstaAbierta(n.CategoriaId);
-                            <button class="linkbtn" type="button" aria-expanded="@(abierto ? "true" : "false")"
-                                    aria-label="@(abierto ? "Contraer" : "Desplegar") @n.Nombre" @onclick="() => _m.Alternar(n.CategoriaId)">@(abierto ? "▾" : "▸")</button>
-                        }
-                        @(f.Directo ? "Sin subcategoría" : n.Nombre)
-                    </div>
-                    <div class="c-sel">
-                        <b class="g-importe">@Formato.Euros(importe)</b> <span class="muted">@_m.Porcentaje(importe) %</span>
-                        <progress class="barra" max="100" value="@_m.Porcentaje(importe)" aria-label="@_m.Porcentaje(importe) % del total del mes"></progress>
-                        @if (!f.Directo && n.PorMiembro.Count > 0)
-                        {
-                            <span class="g-reparto">
-                                @foreach (var p in n.PorMiembro)
-                                {
-                                    <span class="chip">
-                                        <Avatar Nombre="@Formato.NombreMiembro(p.MiembroId, _m.Miembros)" Color="@ColorMiembro.De(p.MiembroId, _m.Miembros)" Tamano="sm" />
-                                        @Formato.Euros(p.Importe)
-                                    </span>
-                                }
-                            </span>
-                        }
-                    </div>
-                </div>
-            }
-        }
-
-        @if (_m.Resumen.GastosPersonales > 0)
-        {
-            <h3 class="u-sec">Gastos personales</h3>
-            <p class="muted">Cada uno es solo de quien lo paga: no entran en la liquidación ni en los totales de arriba.</p>
-            @foreach (var m in _m.Resumen.Miembros.Where(m => m.Personal > 0))
-            {
-                <div class="catrow">
-                    <div class="c-name"><Avatar Nombre="@m.Nombre" Color="@ColorMiembro.De(m.MiembroId, _m.Miembros)" Tamano="sm" /> @m.Nombre</div>
-                    <div class="c-sel"><span class="tag admin">Personal</span> <b class="g-importe">@Formato.Euros(m.Personal)</b></div>
-                </div>
-            }
-        }
-    </section>
 }
 
 @code {

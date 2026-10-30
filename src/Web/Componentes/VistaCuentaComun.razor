@@ -47,73 +47,20 @@ else if (_m.Estado is not null)
                 <button class="linkbtn" type="button" aria-label="Mes siguiente" @onclick="() => _m.CambiarMesAsync(1)"><Icono Nombre="chevron-right" /></button>
             </div>
         </div>
-        <p class="muted">Saldo acumulado hasta final de mes: aportaciones para gastos (sin el ahorro) menos los gastos cargados a la cuenta.</p>
+        <p class="muted">Inicial es lo que quedó el mes anterior; el resto, solo de este mes. Lo que queda pasa al mes siguiente.</p>
 
         @if (_m.Error is not null)
         {
             <div class="aviso err u-mt12" role="alert">@_m.Error</div>
         }
 
-        <div class="u-fila-mt10">
-            <span class="chip">Saldo&nbsp;<b id="saldo">@Formato.Euros(_m.Estado.Saldo)</b></span>
-            <span class="chip">Efectivo&nbsp;<b>@Formato.Euros(_m.Estado.Efectivo)</b></span>
-            <span class="chip">Aportado este mes&nbsp;<b>@Formato.Euros(_m.Estado.AportadoMes)</b></span>
-            <span class="chip">Aportado en total&nbsp;<b>@Formato.Euros(_m.Estado.Aportado)</b></span>
-            <span class="chip">Gastado en total&nbsp;<b>@Formato.Euros(_m.Estado.Gastado)</b></span>
-            @if (_m.Estado.AhorroActivo || _m.Estado.AhorroGastado != 0)
-            {
-                <span class="chip">Gastado del ahorro&nbsp;<b>@Formato.Euros(_m.Estado.AhorroGastado)</b></span>
-            }
-            @if (_m.Estado.AhorroActivo)
-            {
-                <span class="chip">Ahorro disponible&nbsp;<b id="ahorro">@Formato.Euros(_m.Estado.AhorroDisponible)</b></span>
-            }
-        </div>
-
-        @if (_m.Estado.Saldo < 0)
+        @if (_m.Estado.Resumen is { } res)
         {
-            <div class="aviso warn u-mt12" role="status">
-                La cuenta no cubre los gastos: faltan @Formato.Euros(-_m.Estado.Saldo) para cubrirlos.
-            </div>
+            <div class="u-mt12"><TablaResumenCuenta Resumen="res" /></div>
         }
-    </section>
 
-    @if (_m.Estado.Resumen is { } res)
-    {
-        <section class="card" aria-labelledby="t-resumen">
-            <div class="card-head"><h2 id="t-resumen">Resumen de @_m.NombreMes</h2></div>
-            <p class="muted">Inicial es lo que quedó el mes anterior; el resto, solo de este mes. Lo que queda pasa al mes siguiente.</p>
-            <div class="tabla-scroll">
-                <table class="resumen-cuenta" id="resumen-cuenta">
-                    <thead>
-                        <tr>
-                            <th scope="col"><span class="sr">Cuenta</span></th>
-                            <th scope="col">Inicial</th>
-                            <th scope="col">Ingresos</th>
-                            <th scope="col">Ingresos sueltos</th>
-                            <th scope="col">Gastos</th>
-                            <th scope="col">Reembolsos</th>
-                            <th scope="col">Disponible</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var (nombre, fila, clase) in new[] { ("Hogar", res.Hogar, ""), ("Ahorro", res.Ahorro, ""), ("Total", res.Total, "total") })
-                        {
-                            <tr class="@clase">
-                                <th scope="row">@nombre</th>
-                                <td>@Formato.Euros(fila.Inicial)</td>
-                                <td>@Formato.Euros(fila.Ingresos)</td>
-                                <td>@Formato.Euros(fila.IngresosSueltos)</td>
-                                <td>@Formato.Euros(fila.Gastos)</td>
-                                <td>@Formato.Euros(fila.Reembolsos)</td>
-                                <td><b>@Formato.Euros(fila.Disponible)</b></td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        </section>
-    }
+        <AvisosCuenta Estado="_m.Estado" />
+    </section>
 
     @if (_m.Estado.Extracto is { } x)
     {
@@ -146,7 +93,7 @@ else if (_m.Estado is not null)
         </section>
     }
 
-    <PanelMovimientosCuenta />
+    <PanelMovimientosCuenta @ref="_movimientos" />
 
     <section class="card" aria-labelledby="t-saldo-inicial">
         <div class="card-head"><h2 id="t-saldo-inicial">Saldo inicial</h2></div>
@@ -218,102 +165,18 @@ else if (_m.Estado is not null)
         <div class="card-head"><h2 id="t-operaciones">Aportaciones, deudas e ingresos</h2></div>
         <p class="muted">
             Todo lo que mueve dinero entre las personas y la cuenta, en un solo sitio. Elige qué quieres hacer y la fecha de la operación:
-            una aportación cuenta desde el mes de esa fecha.
+            una aportación cuenta desde el mes de esa fecha. Las listas de cada tipo siguen más abajo.
         </p>
-
-        <h3 class="u-titulo-form">Aportaciones vigentes</h3>
-        @foreach (var a in _m.Adultos)
-        {
-            <div class="catrow">
-                <div class="c-name"><Avatar Nombre="@a.Nombre" Color="@ColorMiembro.De(a.Id, _m.Miembros)" Tamano="sm" /> @a.Nombre</div>
-                <div class="c-sel">@Formato.Euros(_m.VigenteDe(a.Id)) al mes@(_m.AhorroVigenteDe(a.Id) > 0 ? $" ({Formato.Euros(_m.AhorroVigenteDe(a.Id))} de ahorro)" : "")</div>
-            </div>
-        }
-        @if (_m.Adultos.Count == 0)
-        {
-            <div class="empty">El hogar no tiene adultos activos.</div>
-        }
-
-        <h3 class="u-titulo-form">Deudas pendientes</h3>
-        <p class="muted">Gastos que una persona ha adelantado y la cuenta aún no le ha devuelto, descontado lo que ya ha ingresado en la cuenta.</p>
-        @if (_m.Estado.Pendientes.Count == 0)
-        {
-            <div class="empty">No hay deudas pendientes.</div>
-        }
-        @foreach (var p in _m.Estado.Pendientes)
-        {
-            <div class="catrow">
-                <div class="c-name">@p.Nombre</div>
-                <div class="c-sel">La cuenta le debe @Formato.Euros(p.Importe)</div>
-            </div>
-        }
-
-        <h3 class="u-titulo-form">Movimientos de @_m.NombreMes</h3>
-        @if (_m.IngresosDelMes.Count == 0 && _m.Estado.Reembolsos.Count == 0)
-        {
-            <div class="empty">No hay ingresos ni reembolsos este mes.</div>
-        }
-        @foreach (var i in _m.IngresosDelMes)
-        {
-            <div class="gastorow">
-                <div class="g-main">
-                    <div class="g-concepto">Ingreso: @(string.IsNullOrWhiteSpace(i.Concepto) ? "sin concepto" : i.Concepto)</div>
-                    <div class="muted g-meta">@i.Fecha.ToString("dd/MM/yyyy", Es) · ingresó @Formato.NombreMiembro(i.MiembroId, _m.Miembros)</div>
-                </div>
-                <div class="g-importe">@Formato.Euros(i.Importe)</div>
-                @if (PuedeCuenta)
-                {
-                    <div class="c-acc">
-                        @if (_m.ConfirmandoEliminar == i.Id)
-                        {
-                            <span class="muted">¿Eliminar?</span>
-                            <button class="linkbtn danger" type="button" @onclick="() => EliminarIngresoAsync(i)">Sí</button>
-                            <button class="linkbtn" type="button" @onclick="() => _m.ConfirmandoEliminar = null">No</button>
-                        }
-                        else
-                        {
-                            <button class="linkbtn danger" type="button" aria-label="Eliminar ingreso de @Formato.NombreMiembro(i.MiembroId, _m.Miembros)" @onclick="() => _m.ConfirmandoEliminar = i.Id">Eliminar</button>
-                        }
-                    </div>
-                }
-            </div>
-        }
-        @foreach (var r in _m.Estado.Reembolsos.OrderByDescending(r => r.Fecha))
-        {
-            <div class="gastorow">
-                <div class="g-main">
-                    <div class="g-concepto">Reembolso a @Formato.NombreMiembro(r.MiembroId, _m.Miembros)</div>
-                    <div class="muted g-meta">@r.Fecha.ToString("dd/MM/yyyy", Es)@(string.IsNullOrWhiteSpace(r.Concepto) ? "" : " · " + r.Concepto)</div>
-                </div>
-                <div class="g-importe">@Formato.Euros(r.Importe)</div>
-                <div class="c-acc">
-                    @if (_m.ConfirmandoEliminar == r.Id)
-                    {
-                        <span class="muted">¿Eliminar?</span>
-                        <button class="linkbtn danger" type="button" @onclick="() => EliminarAsync(r)">Sí</button>
-                        <button class="linkbtn" type="button" @onclick="() => _m.ConfirmandoEliminar = null">No</button>
-                    }
-                    else
-                    {
-                        <button class="linkbtn danger" type="button" aria-label="Eliminar reembolso a @Formato.NombreMiembro(r.MiembroId, _m.Miembros)" @onclick="() => _m.ConfirmandoEliminar = r.Id">Eliminar</button>
-                    }
-                </div>
-            </div>
-        }
-        @if (_m.IngresosDelMes.Count > 0)
-        {
-            <div class="muted g-meta">Total ingresado este mes: @Formato.Euros(_m.TotalIngresosDelMes)</div>
-        }
 
         @if (_m.Adultos.Count > 0 && PuedeCuenta)
         {
             <form class="addcat" id="form-operacion" @onsubmit="OperarAsync">
-                <h3 class="u-titulo-form">¿Qué quieres hacer?</h3>
-                <label>Operación
+                <label>¿Qué quieres hacer?
                     <select @bind="_m.Operacion">
                         <option value="aportacion">Fijar la aportación mensual de un adulto</option>
                         <option value="ingreso">Ingresar dinero en la cuenta</option>
-                        <option value="reembolso" disabled="@(_m.Estado.Pendientes.Count == 0)">Reembolsar una deuda</option>
+                        <option value="reembolso" disabled="@(_m.Estado.Pendientes.Count == 0)">Reembolsar a quien adelantó un gasto</option>
+                        <option value="deuda">Registrar una deuda con la cuenta</option>
                     </select>
                 </label>
                 <label>Fecha
@@ -357,13 +220,13 @@ else if (_m.Estado is not null)
                         <input maxlength="200" placeholder="Por ejemplo, Cena amigas" @bind="_m.ConceptoIngreso" @bind:event="oninput" />
                     </label>
                 }
-                else if (_m.Estado.Pendientes.Count > 0)
+                else if (_m.Operacion == "reembolso")
                 {
                     <label>A
-                        <select @bind="_m.Reembolsado">
+                        <select value="@_m.ClavePendiente" @onchange="e => _m.ElegirPendiente(e.Value?.ToString())">
                             @foreach (var p in _m.Estado.Pendientes)
                             {
-                                <option value="@p.MiembroId">@p.Nombre</option>
+                                <option value="@ModeloCuentaComun.ClaveDe(p)">@p.Nombre @(p.DesdeAhorro ? "(del ahorro)" : "(de Hogar)")</option>
                             }
                         </select>
                     </label>
@@ -374,10 +237,192 @@ else if (_m.Estado is not null)
                         <input maxlength="200" placeholder="Opcional" @bind="_m.ConceptoReembolso" @bind:event="oninput" />
                     </label>
                 }
+                else
+                {
+                    <p class="u-titulo-form muted">@ModeloCuentaComun.AyudaTipoDeuda(_m.TipoDeuda)</p>
+                    <label>Persona
+                        <select value="@_m.Deudor" @onchange="e => _m.Deudor = Guid.Parse(e.Value!.ToString()!)">
+                            @foreach (var m in _m.Adultos)
+                            {
+                                <option value="@m.Id">@m.Nombre</option>
+                            }
+                        </select>
+                    </label>
+                    <label>Tipo
+                        <select @bind="_m.TipoDeuda">
+                            <option value="adelanto">Adelanto</option>
+                            <option value="devolucion">Devolución</option>
+                            <option value="compensacion">Compensación</option>
+                        </select>
+                    </label>
+                    <label class="chk"><input type="checkbox" @bind="_m.DeudaDesdeAhorro" /> Del ahorro (no de Hogar)</label>
+                    <label>Importe (€)
+                        <input inputmode="decimal" required placeholder="0,00" @bind="_m.ImporteDeuda" @bind:event="oninput" />
+                    </label>
+                    <label>Concepto
+                        <input maxlength="200" placeholder="Opcional" @bind="_m.ConceptoDeuda" @bind:event="oninput" />
+                    </label>
+                }
 
                 <button class="btn" type="submit" disabled="@(!_m.OperacionValida || _m.Enviando)">@EtiquetaOperacion</button>
             </form>
         }
+    </section>
+
+    <section class="card" aria-labelledby="t-aportaciones">
+        <div class="card-head"><h2 id="t-aportaciones">Aportación mensual</h2></div>
+        <p class="muted">Importe fijo que aporta cada adulto al mes@(_m.Estado.AhorroActivo ? "; una parte puede ir a ahorro y el resto queda para gastos" : ""). Un cambio vale desde el mes elegido en adelante.</p>
+        <div class="u-mt10">
+            @foreach (var a in _m.Adultos)
+            {
+                <div class="catrow">
+                    <div class="c-name"><Avatar Nombre="@a.Nombre" Color="@ColorMiembro.De(a.Id, _m.Miembros)" Tamano="sm" /> @a.Nombre</div>
+                    <div class="c-sel">@Formato.Euros(_m.VigenteDe(a.Id)) al mes@(_m.AhorroVigenteDe(a.Id) > 0 ? $" ({Formato.Euros(_m.AhorroVigenteDe(a.Id))} de ahorro)" : "")</div>
+                </div>
+            }
+            @if (_m.Adultos.Count == 0)
+            {
+                <div class="empty">El hogar no tiene adultos activos.</div>
+            }
+        </div>
+
+    </section>
+
+    <section class="card" aria-labelledby="t-reembolsos">
+        <div class="card-head"><h2 id="t-reembolsos">Reembolsos</h2></div>
+        <p class="muted">Cuando una persona adelanta un gasto de la cuenta, esta le debe ese importe hasta reembolsárselo.</p>
+
+        @if (_m.Estado.Pendientes.Count == 0)
+        {
+            <div class="empty">No hay reembolsos pendientes.</div>
+        }
+        @foreach (var p in _m.Estado.Pendientes)
+        {
+            <div class="catrow">
+                <div class="c-name">@p.Nombre</div>
+                <div class="c-sel">@(p.Importe > 0 ? "La cuenta le debe" : "Debe a la cuenta") @Formato.Euros(Math.Abs(p.Importe)) · @(p.DesdeAhorro ? "del ahorro" : "de Hogar")</div>
+            </div>
+        }
+
+        @foreach (var r in _m.Estado.Reembolsos.OrderByDescending(r => r.Fecha))
+        {
+            <div class="gastorow">
+                <div class="g-main">
+                    <div class="g-concepto">Reembolso a @Formato.NombreMiembro(r.MiembroId, _m.Miembros) @(r.DesdeAhorro ? "(del ahorro)" : "(de Hogar)")</div>
+                    <div class="muted g-meta">@r.Fecha.ToString("dd/MM/yyyy", Es)@(string.IsNullOrWhiteSpace(r.Concepto) ? "" : " · " + r.Concepto)</div>
+                </div>
+                <div class="g-importe">@Formato.Euros(r.Importe)</div>
+                <div class="c-acc">
+                    @if (_m.ConfirmandoEliminar == r.Id)
+                    {
+                        <span class="muted">¿Eliminar?</span>
+                        <button class="linkbtn danger" type="button" @onclick="() => EliminarAsync(r)">Sí</button>
+                        <button class="linkbtn" type="button" @onclick="() => _m.ConfirmandoEliminar = null">No</button>
+                    }
+                    else
+                    {
+                        <button class="linkbtn danger" type="button" aria-label="Eliminar reembolso a @Formato.NombreMiembro(r.MiembroId, _m.Miembros)" @onclick="() => _m.ConfirmandoEliminar = r.Id">Eliminar</button>
+                    }
+                </div>
+            </div>
+        }
+
+    </section>
+
+    <section class="card" aria-labelledby="t-deudas">
+        <div class="card-head"><h2 id="t-deudas">Deudas con la cuenta</h2></div>
+        <p class="muted">Lo que una persona debe a la cuenta común o a su ahorro porque la cuenta pagó algo por ella. Se salda con una devolución suya, o con una compensación que resta de lo que la cuenta le debe por reembolsos.</p>
+
+        @if (_m.Estado.Deudas is not { Count: > 0 } deudas)
+        {
+            <div class="empty">Nadie debe nada a la cuenta.</div>
+        }
+        else
+        {
+            @foreach (var d in deudas)
+            {
+                <div class="gastorow">
+                    <div class="g-main">
+                        <div class="g-concepto">@Formato.NombreMiembro(d.MiembroId, _m.Miembros)</div>
+                        <div class="muted g-meta">@(d.DesdeAhorro ? "Debe al ahorro" : "Debe a Hogar")</div>
+                    </div>
+                    <div class="g-importe">@Formato.Euros(d.Importe)</div>
+                </div>
+            }
+        }
+
+        @if (_m.Estado.MovimientosDeuda is { Count: > 0 } movimientosDeuda)
+        {
+            <h3 class="u-titulo-form u-mt12">Movimientos de @_m.NombreMes</h3>
+            @foreach (var d in movimientosDeuda)
+            {
+                <div class="gastorow" @key="d.Id">
+                    <div class="g-main">
+                        <div class="g-concepto">@ModeloCuentaComun.NombreTipoDeuda(d.Tipo) · @Formato.NombreMiembro(d.MiembroId, _m.Miembros) @(d.DesdeAhorro ? "(del ahorro)" : "(de Hogar)")</div>
+                        <div class="muted g-meta">@d.Fecha.ToString("dd/MM/yyyy", Es)@(string.IsNullOrWhiteSpace(d.Concepto) ? "" : " · " + d.Concepto)</div>
+                    </div>
+                    <div class="g-importe">@Formato.Euros(d.Importe)</div>
+                    @if (PuedeCuenta)
+                    {
+                        <div class="c-acc">
+                            @if (_m.ConfirmandoEliminar == d.Id)
+                            {
+                                <span class="muted">¿Eliminar?</span>
+                                <button class="linkbtn danger" type="button" @onclick="() => EliminarDeudaAsync(d)">Sí</button>
+                                <button class="linkbtn" type="button" @onclick="() => _m.ConfirmandoEliminar = null">No</button>
+                            }
+                            else
+                            {
+                                <button class="linkbtn danger" type="button" aria-label="Eliminar @ModeloCuentaComun.NombreTipoDeuda(d.Tipo).ToLowerInvariant() de @Formato.NombreMiembro(d.MiembroId, _m.Miembros)" @onclick="() => _m.ConfirmandoEliminar = d.Id">Eliminar</button>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        }
+
+    </section>
+
+    <section class="card" aria-labelledby="t-ingresos">
+        <div class="card-head"><h2 id="t-ingresos">Ingresos</h2></div>
+        <p class="muted">Dinero que entra a la cuenta común fuera de las aportaciones y del ahorro, por ejemplo lo que pagan las amigas de una cena. Suma al saldo y al efectivo de la cuenta; no cambia los reembolsos.</p>
+
+        @if (_m.IngresosDelMes.Count == 0)
+        {
+            <div class="empty">No hay ingresos este mes.</div>
+        }
+
+        @foreach (var i in _m.IngresosDelMes)
+        {
+            <div class="gastorow">
+                <div class="g-main">
+                    <div class="g-concepto">@(string.IsNullOrWhiteSpace(i.Concepto) ? "Ingreso" : i.Concepto)</div>
+                    <div class="muted g-meta">@i.Fecha.ToString("dd/MM/yyyy", Es) · ingresó @Formato.NombreMiembro(i.MiembroId, _m.Miembros)</div>
+                </div>
+                <div class="g-importe">@Formato.Euros(i.Importe)</div>
+                @if (PuedeCuenta)
+                {
+                    <div class="c-acc">
+                        @if (_m.ConfirmandoEliminar == i.Id)
+                        {
+                            <span class="muted">¿Eliminar?</span>
+                            <button class="linkbtn danger" type="button" @onclick="() => EliminarIngresoAsync(i)">Sí</button>
+                            <button class="linkbtn" type="button" @onclick="() => _m.ConfirmandoEliminar = null">No</button>
+                        }
+                        else
+                        {
+                            <button class="linkbtn danger" type="button" aria-label="Eliminar ingreso de @Formato.NombreMiembro(i.MiembroId, _m.Miembros)" @onclick="() => _m.ConfirmandoEliminar = i.Id">Eliminar</button>
+                        }
+                    </div>
+                }
+            </div>
+        }
+
+        @if (_m.IngresosDelMes.Count > 0)
+        {
+            <div class="muted g-meta">Total ingresado este mes: @Formato.Euros(_m.TotalIngresosDelMes)</div>
+        }
+
     </section>
 
     @if (_m.Estado.AhorroActivo)
@@ -479,10 +524,13 @@ else if (_m.Estado is not null)
     {
         "ingreso" => "Ingresar",
         "reembolso" => "Reembolsar",
+        "deuda" => "Registrar",
         _ => $"Fijar desde {_m.FechaOperacion.ToString("MMMM yyyy", Es)}",
     };
 
     private Task OperarAsync() => Mostrar(_m.RegistrarOperacionAsync());
+
+    private Task EliminarDeudaAsync(MovimientoDeudaCuentaDto d) => Mostrar(_m.EliminarDeudaAsync(d));
 
     private Task IngresarAhorroAsync() => Mostrar(_m.IngresarAhorroAsync());
 
@@ -497,8 +545,19 @@ else if (_m.Estado is not null)
     private Task EliminarIngresoAsync(IngresoCuentaComunDto i) => Mostrar(_m.EliminarIngresoAsync(i));
 
     /// <summary>Espera la operación del modelo y, si salió bien, muestra su aviso.</summary>
+    private PanelMovimientosCuenta? _movimientos;
+
     private async Task Mostrar(Task<string?> operacion)
     {
-        if (await operacion is { } aviso) Avisos.Mostrar(aviso);
+        if (await operacion is not { } aviso)
+        {
+            // El error también sale arriba, en la primera tarjeta, que puede quedar lejos de donde se actuó: se repite como aviso visible.
+            if (_m.Error is { } error) Avisos.Mostrar(error, TimeSpan.FromSeconds(6));
+            return;
+        }
+
+        Avisos.Mostrar(aviso);
+        // Lo que se acaba de registrar tiene que verse también en el extracto de Movimientos.
+        if (_movimientos is not null) await _movimientos.RecargarAsync();
     }
 }

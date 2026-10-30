@@ -80,8 +80,33 @@ public class CuentaComunAhorroTests
         Assert.Equal(430m, e.Efectivo); // 370 de saldo más los 60 que la cuenta debe a Ana
 
         // Al reembolsárselo baja el efectivo y el pendiente; el ahorro y lo gastado no cambian.
-        var tras = CuentaComun.Calcular(Septiembre, aportaciones, gastos, [new ReembolsoDeCuenta(Ana, Septiembre.AddDays(20), 60m)]);
+        var tras = CuentaComun.Calcular(Septiembre, aportaciones, gastos, [new ReembolsoDeCuenta(Ana, Septiembre.AddDays(20), 60m, DesdeAhorro: true)]);
         Assert.Empty(tras.Pendientes);
         Assert.Equal((370m, 40m, 370m), (tras.Saldo, tras.AhorroDisponible, tras.Efectivo));
+    }
+
+    [Fact]
+    public void Pendiente_de_ahorro_y_de_hogar_se_reembolsan_cada_uno_desde_su_fondo()
+    {
+        var aportaciones = new[] { new AportacionVigente(Ana, Septiembre, 500m, 100m) };
+        var gastos = new[]
+        {
+            new GastoDeCuenta(Ana, Septiembre.AddDays(9), 60m, DesdeAhorro: true),
+            new GastoDeCuenta(Ana, Septiembre.AddDays(10), 40m),
+        };
+
+        var e = CuentaComun.Calcular(Septiembre, aportaciones, gastos, []);
+        Assert.Equal(2, e.Pendientes.Count);
+        Assert.Contains(e.Pendientes, p => p.DesdeAhorro && p.Importe == 60m);
+        Assert.Contains(e.Pendientes, p => !p.DesdeAhorro && p.Importe == 40m);
+
+        // Reembolsar lo de Hogar no toca lo del ahorro, y viceversa.
+        var soloHogar = CuentaComun.Calcular(Septiembre, aportaciones, gastos, [new ReembolsoDeCuenta(Ana, Septiembre.AddDays(20), 40m)]);
+        var quedan = Assert.Single(soloHogar.Pendientes);
+        Assert.Equal((60m, true), (quedan.Importe, quedan.DesdeAhorro));
+
+        var todo = CuentaComun.Calcular(Septiembre, aportaciones, gastos,
+            [new ReembolsoDeCuenta(Ana, Septiembre.AddDays(20), 40m), new ReembolsoDeCuenta(Ana, Septiembre.AddDays(21), 60m, DesdeAhorro: true)]);
+        Assert.Empty(todo.Pendientes);
     }
 }

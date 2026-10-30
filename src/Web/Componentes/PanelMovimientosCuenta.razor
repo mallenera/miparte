@@ -148,6 +148,13 @@
     private async Task ExportarAsync()
         => await JS.InvokeVoidAsync("descargarFichero", _m.NombreCsv, _m.GenerarCsv(), "text/csv;charset=utf-8");
 
+    /// <summary>Vuelve a pedir las líneas del periodo (con los filtros actuales) tras un cambio hecho en otra tarjeta de la pestaña.</summary>
+    public async Task RecargarAsync()
+    {
+        await _m.CargarAsync();
+        StateHasChanged();
+    }
+
     protected override Task OnInitializedAsync()
     {
         _m = new ModeloMovimientosCuenta(Api, Hoy ?? DateOnly.FromDateTime(DateTime.Today));

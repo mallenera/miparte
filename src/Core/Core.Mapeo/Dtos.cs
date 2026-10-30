@@ -46,7 +46,7 @@ public static class Dtos
     public static HogarResumen ADto(this Hogar h)
         => new(h.Id, h.Nombre, h.CuentaComunActiva, h.AhorroActivo, TextoTipoGrupo.ATexto(h.Tipo), h.RecurrentesActivas,
             TextoModoLiquidacion.ATexto(h.LiquidacionModo), h.PeriodoPropio?.ATexto(), h.PeriodoCerradoEn is not null,
-            TextoFrecuenciaAportacion.ATexto(h.AportacionFrecuencia));
+            TextoFrecuenciaAportacion.ATexto(h.AportacionFrecuencia), h.ListaCompraActiva);
 
     /// <summary>Ciclo de liquidación cerrado, con el nombre de quien lo cerró.</summary>
     public static CicloLiquidacionDto ADto(this CicloConAutor c)
@@ -60,7 +60,7 @@ public static class Dtos
     public static AportacionCuentaDto ADto(this AportacionCuenta a) => new(a.Id, a.MiembroId, a.Desde, a.Importe, a.Ahorro);
 
     /// <summary>Reembolso de la cuenta común.</summary>
-    public static ReembolsoCuentaDto ADto(this ReembolsoCuenta r) => new(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto);
+    public static ReembolsoCuentaDto ADto(this ReembolsoCuenta r) => new(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto, r.DesdeAhorro);
 
     /// <summary>Ingreso a la cuenta común fuera de aportaciones y ahorro.</summary>
     public static IngresoCuentaComunDto ADto(this IngresoCuentaComun i) => new(i.Id, i.MiembroId, i.Fecha, i.Importe, i.Concepto);
@@ -77,7 +77,7 @@ public static class Dtos
     /// <summary>Resumen mensual del hogar.</summary>
     public static ResumenMensualResponse ADto(this ResumenDelMes r) => new(
         FormatosApi.FormatoMes(r.Mes), r.GastosTotales,
-        r.PorMiembro.Select(m => new ResumenMiembroDto(m.MiembroId, m.Nombre, m.Pagado, m.Asumido, m.PendienteCuenta, m.Personal)).ToList(),
+        r.PorMiembro.Select(m => new ResumenMiembroDto(m.MiembroId, m.Nombre, m.Pagado, m.Asumido, m.SaldoCuenta, m.Personal)).ToList(),
         r.PorCategoria.Select(c => new ResumenCategoriaDto(
             c.CategoriaId, c.Nombre, c.Total, c.PorMiembro.Select(x => new ImporteMiembroDto(x.MiembroId, x.Importe)).ToList())).ToList(),
         r.Cuenta is { } c2
@@ -100,12 +100,9 @@ public static class Dtos
         var nombres = d.Nombres;
         return new CuentaComunResponse(
             FormatosApi.FormatoMes(s.Mes), e.AportadoMes, e.Aportado, e.Gastado, e.Saldo,
-            // Lo que la cuenta le debe de verdad: lo pendiente menos lo que ya ha ingresado. Solo los que deben algo.
-            e.Pendientes.Select(p => (p.MiembroId, Neto: CuentaComun.PendienteNeto(e.Pendientes, d.Historico.Ingresos, p.MiembroId, s.Mes)))
-                .Where(x => x.Neto > 0m)
-                .Select(x => new PendienteCuentaDto(x.MiembroId, nombres.GetValueOrDefault(x.MiembroId, ""), x.Neto)).ToList(),
+            e.Pendientes.Select(p => new PendienteCuentaDto(p.MiembroId, nombres.GetValueOrDefault(p.MiembroId, ""), p.Importe, p.DesdeAhorro)).ToList(),
             e.Efectivo, d.Aportaciones.Select(a => new AportacionCuentaDto(a.Id, a.MiembroId, a.Desde, a.Importe, a.Ahorro)).ToList(),
-            d.ReembolsosDelMes.Select(r => new ReembolsoCuentaDto(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto)).ToList(),
+            d.ReembolsosDelMes.Select(r => new ReembolsoCuentaDto(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto, r.DesdeAhorro)).ToList(),
             e.AhorroMes, e.AhorroAcumulado, e.AhorroRetirado, e.AhorroDisponible,
             d.RetiradasDelMes.Select(r => new RetiradaAhorroDto(r.Id, r.MiembroId, r.Fecha, r.Importe, r.Concepto)).ToList(),
             e.AhorroDepositado,
@@ -115,15 +112,33 @@ public static class Dtos
                 p.MiembroId, nombres.GetValueOrDefault(p.MiembroId, ""), p.Aportado, p.Ahorrado, p.PorcentajeGastos, p.PorcentajeAhorro,
                 p.ParteSaldo, p.ParteAhorro, p.Pendiente)).ToList(),
             d.AhorroActivo, ADto(s.Extracto), s.SaldoInicial is { } si ? new SaldoInicialDto(si.Fecha, si.Importe) : null,
-            TextoFrecuenciaAportacion.ATexto(d.Historico.Frecuencia), ADto(s.Resumen));
+            TextoFrecuenciaAportacion.ATexto(d.Historico.Frecuencia), ADto(s.Resumen),
+            e.Deudas?.Select(x => new DeudaCuentaDto(x.MiembroId, nombres.GetValueOrDefault(x.MiembroId, ""), x.Importe, x.DesdeAhorro)).ToList(),
+            d.DeudasDelMes?.Select(x => new MovimientoDeudaCuentaDto(
+                x.Id ?? Guid.Empty, x.MiembroId, x.Fecha, x.Importe, TextoTipoDeuda(x.Tipo), x.DesdeAhorro, x.Concepto)).ToList());
     }
+
+    /// <summary>Movimiento de deuda de la cuenta común tal como se devuelve al crearlo.</summary>
+    public static MovimientoDeudaCuentaDto ADto(this MovimientoDeudaCuenta d) => new(
+        d.Id, d.MiembroId, d.Fecha, d.Importe, TextoTipoDeuda(d.Tipo), d.DesdeAhorro, d.Concepto);
+
+    /// <summary>Producto de la lista de la compra tal como se devuelve.</summary>
+    public static ProductoCompraDto ADto(this ProductoListaCompra p) => new(p.Id, p.Nombre, p.Cantidad, p.Comprado);
+
+    /// <summary>Texto con que viaja cada tipo de movimiento de deuda en la API.</summary>
+    public static string TextoTipoDeuda(TipoMovimientoDeuda tipo) => tipo switch
+    {
+        TipoMovimientoDeuda.Adelanto => "adelanto",
+        TipoMovimientoDeuda.Devolucion => "devolucion",
+        _ => "compensacion",
+    };
 
     /// <summary>Resumen mensual de la cuenta común (Hogar, Ahorro y Total).</summary>
     private static ResumenCuentaMesDto ADto(ResumenMensualCuenta r) => new(ADto(r.Hogar), ADto(r.Ahorro), ADto(r.Total));
 
     /// <summary>Una fila del resumen mensual de la cuenta común.</summary>
     private static FilaResumenCuentaDto ADto(FilaResumenMensualCuenta f) => new(
-        f.Inicial, f.Ingresos, f.IngresosSueltos, f.Gastos, f.Reembolsos, f.Disponible);
+        f.Inicial, f.Ingresos, f.IngresosSueltos, f.Gastos, f.Reembolsos, f.Disponible, f.Pendiente);
 
     /// <summary>Extracto bancario de la cuenta común entre dos fechas.</summary>
     public static MovimientosCuentaComunResponse ADto(this ExtractoBanco x) => new(

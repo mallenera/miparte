@@ -1,0 +1,11 @@
+@page "/compra/{Token}"
+
+<PageTitle>Lista de la compra · Mi parte, tu parte</PageTitle>
+
+@* Lista abierta desde un enlace QR: no pide sesión; el token da acceso solo a esta lista. *@
+<VistaListaCompra Token="@Token" />
+
+@code {
+    /// <summary>Token del enlace QR, de la ruta.</summary>
+    [Parameter] public string? Token { get; set; }
+}

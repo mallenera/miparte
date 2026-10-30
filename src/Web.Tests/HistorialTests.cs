@@ -45,6 +45,35 @@ public class HistorialTests : BunitContext
 
 
     [Fact]
+    public void Frase_y_cambios_de_la_lista_de_la_compra_y_sus_enlaces_son_legibles()
+    {
+        Assert.Equal("creó un producto de la lista de la compra «Leche»",
+            TextoAuditoria.Frase(Evento("crear", "producto_compra", null, """{"nombre":"Leche","cantidad":2,"comprado":false}""")));
+        Assert.Equal("borró un producto de la lista de la compra «Leche»",
+            TextoAuditoria.Frase(Evento("borrar", "producto_compra", """{"nombre":"Leche"}""", null)));
+        Assert.Equal("creó un enlace QR de la lista de la compra", TextoAuditoria.Frase(Evento("crear", "enlace_lista_compra", null, """{"activo":true}""")));
+
+        var alta = TextoAuditoria.Cambios(Evento("crear", "producto_compra", null, """{"nombre":"Leche","cantidad":2,"comprado":false}"""), _ => null);
+        Assert.Contains(alta, c => c.Campo == "Cantidad" && c.Despues == "2");
+        Assert.Contains(alta, c => c.Campo == "Comprado" && c.Despues == "No");
+
+        var revocar = TextoAuditoria.Cambios(Evento("editar", "enlace_lista_compra", """{"activo":true}""", """{"activo":false}"""), _ => null);
+        var cambio = Assert.Single(revocar);
+        Assert.Equal(("Activo", "Sí", "No"), (cambio.Campo, cambio.Antes, cambio.Despues));
+
+        var activar = TextoAuditoria.Cambios(Evento("editar", "hogar", """{"listaCompraActiva":false}""", """{"listaCompraActiva":true}"""), _ => null);
+        Assert.Equal("Lista de la compra activada", Assert.Single(activar).Campo);
+    }
+
+    [Fact]
+    public void Los_filtros_del_historial_incluyen_los_productos_y_los_enlaces_de_la_lista()
+    {
+        Assert.Contains(TextoAuditoria.Entidades, e => e.Id == "producto_compra");
+        Assert.Contains(TextoAuditoria.Entidades, e => e.Id == "enlace_lista_compra");
+        Assert.Contains(TextoAuditoria.Entidades, e => e.Id == "deuda_cuenta");
+    }
+
+    [Fact]
     public void Cambios_de_permisos_se_muestran_con_el_texto_del_catalogo()
     {
         var e = Evento("editar", "miembro", """{"permisos":["gastos.crear"]}""", """{"permisos":["gastos.crear","historial.ver"]}""");

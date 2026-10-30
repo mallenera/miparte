@@ -5,6 +5,18 @@ using MiParte.Web.Reparto;
 
 namespace MiParte.Web.Modelos;
 
+/// <summary>Una línea de la lista única de la cuenta común: aportación, saldo de deuda, reembolso pendiente, movimiento, reembolso o ingreso.</summary>
+/// <param name="Clave">Clave estable de la fila, para que Blazor no la recree al cambiar la lista.</param>
+/// <param name="Etiqueta">Tipo de la línea, para mostrarlo.</param>
+/// <param name="Tipo">Clave del tipo: <c>aportacion</c>, <c>deuda</c>, <c>pendiente</c>, <c>movimiento-deuda</c>, <c>reembolso</c> o <c>ingreso</c>.</param>
+/// <param name="Id">Id del movimiento guardado, si se puede borrar; null en aportaciones y saldos.</param>
+/// <param name="Fecha">Fecha del movimiento; null en aportaciones y saldos.</param>
+/// <param name="Titulo">Persona o concepto de la línea.</param>
+/// <param name="Detalle">Dato extra: fondo, sentido de la deuda o quién ingresó.</param>
+/// <param name="Importe">Importe, siempre positivo; el sentido va en <paramref name="Detalle"/>.</param>
+public sealed record LineaCuenta(
+    string Clave, string Etiqueta, string Tipo, Guid? Id, DateOnly? Fecha, string Titulo, string Detalle, decimal Importe);
+
 /// <summary>
 /// Estado y orquestación de la pestaña Cuenta común: saldo del mes, su parte por persona, aportaciones, reembolsos y movimientos del
 /// ahorro. No depende de Blazor; <c>VistaCuentaComun</c> solo enlaza sus campos y pinta.
@@ -112,6 +124,21 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
 
     /// <summary>Concepto del ingreso a la cuenta común (de dónde viene).</summary>
     public string ConceptoIngreso { get; set; } = "";
+
+    /// <summary>Qué hace la operación del formulario único: <c>aportacion</c>, <c>ingreso</c>, <c>reembolso</c> o <c>deuda</c>.</summary>
+    public string Operacion { get; set; } = "aportacion";
+
+    /// <summary>Fecha de la operación; la aportación cuenta desde el mes de esta fecha.</summary>
+    public DateOnly FechaOperacion { get; set; } = hoy;
+
+    /// <summary>La operación elegida tiene sus datos válidos (y hay deuda, si es un reembolso).</summary>
+    public bool OperacionValida => Operacion switch
+    {
+        "ingreso" => IngresoValido,
+        "reembolso" => (Estado?.Pendientes.Count ?? 0) > 0 && ReembolsoValido,
+        "adelanto" or "devolucion" or "compensacion" => DeudaValida,
+        _ => AportacionValida,
+    };
 
     /// <summary>Importe del ingreso al ahorro.</summary>
     public string ImporteDeposito { get; set; } = "";
@@ -270,7 +297,8 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
             if (Estado!.AhorroActivo && !string.IsNullOrWhiteSpace(AhorroAportacion)
                 && (!EntradaImporte.TryParse(AhorroAportacion, permitirCero: true, out ahorro) || ahorro > importe))
                 throw new ApiException(System.Net.HttpStatusCode.BadRequest, "El ahorro debe estar entre 0 y la aportación, con máximo 2 decimales.");
-            await api.FijarAportacionAsync(new FijarAportacionRequest(Aportante, _mes, importe, ahorro));
+            var mes = new DateOnly(FechaOperacion.Year, FechaOperacion.Month, 1);
+            await api.FijarAportacionAsync(new FijarAportacionRequest(Aportante, mes, importe, ahorro));
             return "Aportación guardada";
         });
 
@@ -313,7 +341,7 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
         EjecutarAsync(async () =>
         {
             var importe = Importe(ImporteDeuda);
-            await api.CrearDeudaAsync(new CrearDeudaCuentaRequest(Deudor, TipoDeuda, importe, null, Texto(ConceptoDeuda), DeudaDesdeAhorro));
+            await api.CrearDeudaAsync(new CrearDeudaCuentaRequest(Deudor, TipoDeuda, importe, FechaOperacion, Texto(ConceptoDeuda), DeudaDesdeAhorro));
             ImporteDeuda = "";
             ConceptoDeuda = "";
             return TipoDeuda switch
@@ -329,7 +357,7 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
         EjecutarAsync(async () =>
         {
             var importe = Importe(ImporteReembolso);
-            await api.CrearReembolsoAsync(new CrearReembolsoRequest(Reembolsado, importe, null, Texto(ConceptoReembolso), ReembolsadoDesdeAhorro));
+            await api.CrearReembolsoAsync(new CrearReembolsoRequest(Reembolsado, importe, FechaOperacion, Texto(ConceptoReembolso), ReembolsadoDesdeAhorro));
             ImporteReembolso = "";
             ConceptoReembolso = "";
             return "Reembolso registrado";
@@ -343,12 +371,81 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
         EjecutarAsync(async () =>
         {
             var importe = Importe(ImporteIngreso);
-            var fecha = _mes == new DateOnly(hoy.Year, hoy.Month, 1) ? (DateOnly?)null : _mes;
-            await api.CrearIngresoCuentaComunAsync(new CrearIngresoCuentaComunRequest(Ingresante, importe, fecha, Texto(ConceptoIngreso)));
+            await api.CrearIngresoCuentaComunAsync(new CrearIngresoCuentaComunRequest(Ingresante, importe, FechaOperacion, Texto(ConceptoIngreso)));
             ImporteIngreso = "";
             ConceptoIngreso = "";
             return "Ingreso registrado";
         });
+
+    /// <summary>
+    /// Todas las líneas de la cuenta, en una sola lista: aportaciones vigentes, saldos de deuda y reembolsos pendientes, y los movimientos
+    /// del mes (deudas, reembolsos e ingresos). Los saldos de deuda salen de <c>Deudas</c> de la respuesta; los reembolsos pendientes solo
+    /// cuentan si la cuenta le debe algo (lo que una persona debe ya sale como deuda).
+    /// </summary>
+    public IReadOnlyList<LineaCuenta> Lineas
+    {
+        get
+        {
+            var lineas = Adultos.Select(a => new LineaCuenta(
+                $"ap-{a.Id}", "Aportación mensual", "aportacion", null, null, a.Nombre, "Cada mes", VigenteDe(a.Id))).ToList();
+            if (Estado is null) return lineas;
+
+            lineas.AddRange((Estado.Deudas ?? []).Select(d => new LineaCuenta(
+                $"deuda-{d.MiembroId}-{d.DesdeAhorro}", "Deuda con la cuenta", "deuda", null, null, NombreDe(d.MiembroId),
+                d.DesdeAhorro ? "Debe al ahorro" : "Debe a Hogar", d.Importe)));
+            lineas.AddRange(Estado.Pendientes.Where(p => p.Importe > 0).Select(p => new LineaCuenta(
+                $"pendiente-{p.MiembroId}-{p.DesdeAhorro}", "Reembolso pendiente", "pendiente", null, null, NombreDe(p.MiembroId),
+                "La cuenta le debe · " + (p.DesdeAhorro ? "del ahorro" : "de Hogar"), p.Importe)));
+            lineas.AddRange((Estado.MovimientosDeuda ?? []).Select(d => new LineaCuenta(
+                $"md-{d.Id}", NombreTipoDeuda(d.Tipo), "movimiento-deuda", d.Id, d.Fecha, NombreDe(d.MiembroId),
+                (d.DesdeAhorro ? "Del ahorro" : "De Hogar") + (string.IsNullOrWhiteSpace(d.Concepto) ? "" : " · " + d.Concepto), d.Importe)));
+            lineas.AddRange(Estado.Reembolsos.Select(r => new LineaCuenta(
+                $"re-{r.Id}", "Reembolso", "reembolso", r.Id, r.Fecha, NombreDe(r.MiembroId), r.Concepto ?? "", r.Importe)));
+            lineas.AddRange(IngresosDelMes.Select(i => new LineaCuenta(
+                $"in-{i.Id}", "Ingreso en la cuenta", "ingreso", i.Id, i.Fecha,
+                string.IsNullOrWhiteSpace(i.Concepto) ? "Ingreso" : i.Concepto, "Ingresó " + NombreDe(i.MiembroId), i.Importe)));
+            return lineas;
+        }
+    }
+
+    /// <summary>Nombre de un miembro, o vacío si no está en el hogar.</summary>
+    private string NombreDe(Guid id) => Miembros.FirstOrDefault(m => m.Id == id)?.Nombre ?? "";
+
+    /// <summary>Borra una línea que es un movimiento guardado (ingreso, reembolso o movimiento de deuda); las demás no se borran.</summary>
+    public Task<string?> EliminarLineaAsync(LineaCuenta l)
+    {
+        // Si la fila ya no está (otra acción la borró y la lista se ha recargado), no hay nada que borrar: no se lanza error.
+        switch (l.Tipo)
+        {
+            case "ingreso" when Ingresos.FirstOrDefault(i => i.Id == l.Id) is { } ingreso:
+                return EliminarIngresoAsync(ingreso);
+            case "reembolso" when Estado?.Reembolsos.FirstOrDefault(r => r.Id == l.Id) is { } reembolso:
+                return EliminarAsync(reembolso);
+            case "movimiento-deuda" when Estado?.MovimientosDeuda?.FirstOrDefault(d => d.Id == l.Id) is { } deuda:
+                return EliminarDeudaAsync(deuda);
+            default:
+                return Task.FromResult<string?>(null);
+        }
+    }
+
+    /// <summary>Si la operación elegida es un movimiento de deuda (adelanto, devolución o compensación).</summary>
+    public bool EsOperacionDeuda => Operacion is "adelanto" or "devolucion" or "compensacion";
+
+    /// <summary>Registra el movimiento de deuda de la operación elegida: el tipo sale de la propia operación.</summary>
+    private Task<string?> RegistrarDeudaOperacionAsync()
+    {
+        TipoDeuda = Operacion;
+        return RegistrarDeudaAsync();
+    }
+
+    /// <summary>Registra la operación elegida en el formulario único (aportación, ingreso, reembolso o deuda) con su fecha.</summary>
+    public Task<string?> RegistrarOperacionAsync() => Operacion switch
+    {
+        "ingreso" => IngresarAsync(),
+        "reembolso" => ReembolsarAsync(),
+        "adelanto" or "devolucion" or "compensacion" => RegistrarDeudaOperacionAsync(),
+        _ => FijarAportacionAsync(),
+    };
 
     /// <summary>Elimina un ingreso a la cuenta común.</summary>
     public Task<string?> EliminarIngresoAsync(IngresoCuentaComunDto i) =>

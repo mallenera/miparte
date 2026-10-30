@@ -327,6 +327,10 @@ public class ComponentesTests : BunitContext
         Assert.Contains(perfil.Id.ToString(), cuerpo);
     }
 
+    /// <summary>Filas de la lista de la cuenta sin las aportaciones (que salen siempre, una por adulto).</summary>
+    private static List<AngleSharp.Dom.IElement> FilasSinAportacion(IRenderedComponent<VistaCuentaComun> c) =>
+        c.FindAll("section[aria-labelledby=t-operaciones] .gastorow").Where(f => !f.TextContent.Contains("Aportación mensual")).ToList();
+
     private static CuentaComunResponse Cuenta(decimal saldo, params PendienteCuentaDto[] pendientes) =>
         new("2026-10", 1000m, 1000m, 1000m - saldo, saldo, pendientes, saldo + pendientes.Sum(p => p.Importe), [], []);
 
@@ -344,9 +348,8 @@ public class ComponentesTests : BunitContext
 
         var c = Render<VistaCuentaComun>();
 
-        Assert.Contains("Deudas con la cuenta", c.Markup);
-        Assert.Contains("Nadie debe nada a la cuenta.", c.Markup);
-        Assert.NotEmpty(c.FindAll("#form-deuda"));
+        Assert.Empty(FilasSinAportacion(c));
+        Assert.NotEmpty(c.FindAll("#form-operacion"));
     }
 
     [Fact]
@@ -362,7 +365,7 @@ public class ComponentesTests : BunitContext
 
         var c = Render<VistaCuentaComun>();
 
-        var filas = c.FindAll("#t-deudas ~ .gastorow, section[aria-labelledby=t-deudas] .gastorow");
+        var filas = FilasSinAportacion(c);
         Assert.Equal(2, filas.Count);
         Assert.Contains("Ana", filas[0].TextContent);
         Assert.Contains("Debe a Hogar", filas[0].TextContent);
@@ -385,8 +388,9 @@ public class ComponentesTests : BunitContext
         Registrar(api);
         var c = Render<VistaCuentaComun>();
 
-        c.Find("#form-deuda input[placeholder='0,00']").Input("40");
-        c.Find("#form-deuda").Submit();
+        c.Find("#form-operacion select").Change("adelanto");
+        c.Find("#form-operacion input[placeholder='0,00']").Input("40");
+        c.Find("#form-operacion").Submit();
 
         var cuerpo = api.Cuerpos["POST /api/cuenta-comun/deudas"];
         Assert.Contains(AnaId.ToString(), cuerpo); // la persona que usa la app, aunque no sea la primera de la lista
@@ -408,11 +412,12 @@ public class ComponentesTests : BunitContext
         Registrar(api);
         var c = Render<VistaCuentaComun>();
 
-        c.Find("#form-deuda select").Change(LuisId.ToString());
-        c.FindAll("#form-deuda select")[1].Change("compensacion");
-        c.Find("#form-deuda input[type=checkbox]").Change(true);
-        c.Find("#form-deuda input[placeholder='0,00']").Input("10");
-        c.Find("#form-deuda").Submit();
+        c.Find("#form-operacion select").Change("adelanto");
+        c.FindAll("#form-operacion select")[1].Change(LuisId.ToString());
+        c.Find("#form-operacion select").Change("compensacion");
+        c.Find("#form-operacion input[type=checkbox]").Change(true);
+        c.Find("#form-operacion input[placeholder='0,00']").Input("10");
+        c.Find("#form-operacion").Submit();
 
         var cuerpo = api.Cuerpos["POST /api/cuenta-comun/deudas"];
         Assert.Contains(LuisId.ToString(), cuerpo);
@@ -434,10 +439,11 @@ public class ComponentesTests : BunitContext
                 new MovimientoDeudaCuentaDto(Guid.NewGuid(), AnaId, new DateOnly(2026, 10, 7), 40m, "adelanto", false, null));
         Registrar(api);
         var c = Render<VistaCuentaComun>();
+        c.Find("#form-operacion select").Change("adelanto");
         Assert.Equal(1, api.Recibidas.Count(r => r == "GET /api/cuenta-comun/movimientos"));
 
-        c.Find("#form-deuda input[placeholder='0,00']").Input("40");
-        c.Find("#form-deuda").Submit();
+        c.Find("#form-operacion input[placeholder='0,00']").Input("40");
+        c.Find("#form-operacion").Submit();
 
         // El extracto de Movimientos se vuelve a pedir para que la línea nueva aparezca sin recargar la página.
         Assert.Equal(2, api.Recibidas.Count(r => r == "GET /api/cuenta-comun/movimientos"));
@@ -461,13 +467,15 @@ public class ComponentesTests : BunitContext
 
         var c = Render<VistaCuentaComun>();
 
-        var filas = c.FindAll("section[aria-labelledby=t-deudas] .gastorow");
+        var filas = FilasSinAportacion(c);
         Assert.Equal(2, filas.Count);
-        Assert.Contains("Adelanto · Ana (de Hogar)", filas[0].TextContent);
-        Assert.Contains("05/10/2026 · Fontanero", filas[0].TextContent);
+        Assert.Contains("Adelanto · Ana", filas[0].TextContent);
+        Assert.Contains("De Hogar · Fontanero", filas[0].TextContent);
+        Assert.Contains("05/10/2026", filas[0].TextContent);
         Assert.Contains("40,00", filas[0].TextContent);
-        Assert.Contains("Devolución · Ana (del ahorro)", filas[1].TextContent);
-        Assert.Contains("Movimientos de", c.Find("section[aria-labelledby=t-deudas]").TextContent);
+        Assert.Contains("Devolución · Ana", filas[1].TextContent);
+        Assert.Contains("Del ahorro", filas[1].TextContent);
+        Assert.Contains("Lista de la cuenta de", c.Find("section[aria-labelledby=t-operaciones]").TextContent);
     }
 
     [Fact]
@@ -481,8 +489,7 @@ public class ComponentesTests : BunitContext
 
         var c = Render<VistaCuentaComun>();
 
-        Assert.Empty(c.FindAll("section[aria-labelledby=t-deudas] .gastorow"));
-        Assert.DoesNotContain("Movimientos de", c.Find("section[aria-labelledby=t-deudas]").TextContent);
+        Assert.Empty(FilasSinAportacion(c));
     }
 
     [Fact]
@@ -497,11 +504,11 @@ public class ComponentesTests : BunitContext
         Registrar(api);
         var c = Render<VistaCuentaComun>();
 
-        c.Find("section[aria-labelledby=t-deudas] button.linkbtn.danger").Click();
+        c.Find("section[aria-labelledby=t-operaciones] button.linkbtn.danger").Click();
         Assert.DoesNotContain($"DELETE /api/cuenta-comun/deudas/{DeudaId}", api.Recibidas); // pide confirmación antes
-        Assert.Contains("¿Eliminar?", c.Find("section[aria-labelledby=t-deudas]").TextContent);
+        Assert.Contains("¿Eliminar?", c.Find("section[aria-labelledby=t-operaciones]").TextContent);
 
-        c.FindAll("section[aria-labelledby=t-deudas] button.linkbtn.danger").First(b => b.TextContent == "Sí").Click();
+        c.FindAll("section[aria-labelledby=t-operaciones] button.linkbtn.danger").First(b => b.TextContent == "Sí").Click();
 
         Assert.Contains($"DELETE /api/cuenta-comun/deudas/{DeudaId}", api.Recibidas);
     }
@@ -517,10 +524,10 @@ public class ComponentesTests : BunitContext
         Registrar(api);
         var c = Render<VistaCuentaComun>();
 
-        c.Find("section[aria-labelledby=t-deudas] button.linkbtn.danger").Click();
-        c.FindAll("section[aria-labelledby=t-deudas] button.linkbtn").First(b => b.TextContent == "No").Click();
+        c.Find("section[aria-labelledby=t-operaciones] button.linkbtn.danger").Click();
+        c.FindAll("section[aria-labelledby=t-operaciones] button.linkbtn").First(b => b.TextContent == "No").Click();
 
-        Assert.DoesNotContain("¿Eliminar?", c.Find("section[aria-labelledby=t-deudas]").TextContent);
+        Assert.DoesNotContain("¿Eliminar?", c.Find("section[aria-labelledby=t-operaciones]").TextContent);
         Assert.DoesNotContain(api.Recibidas, r => r.StartsWith("DELETE"));
     }
 
@@ -537,8 +544,8 @@ public class ComponentesTests : BunitContext
 
         var c = Render<VistaCuentaComun>();
 
-        Assert.Single(c.FindAll("section[aria-labelledby=t-deudas] .gastorow"));
-        Assert.Empty(c.FindAll("section[aria-labelledby=t-deudas] button.linkbtn.danger"));
+        Assert.Single(FilasSinAportacion(c));
+        Assert.Empty(c.FindAll("section[aria-labelledby=t-operaciones] button.linkbtn.danger"));
     }
 
     [Fact]
@@ -554,8 +561,8 @@ public class ComponentesTests : BunitContext
         Registrar(api);
         var c = Render<VistaCuentaComun>();
 
-        c.Find("section[aria-labelledby=t-deudas] button.linkbtn.danger").Click();
-        c.FindAll("section[aria-labelledby=t-deudas] button.linkbtn.danger").First(b => b.TextContent == "Sí").Click();
+        c.Find("section[aria-labelledby=t-operaciones] button.linkbtn.danger").Click();
+        c.FindAll("section[aria-labelledby=t-operaciones] button.linkbtn.danger").First(b => b.TextContent == "Sí").Click();
 
         Assert.Contains("dejaría devoluciones o compensaciones sin deuda", c.Markup);
         // Además del aviso de la primera tarjeta, el motivo sale como aviso visible donde se actuó.
@@ -572,9 +579,10 @@ public class ComponentesTests : BunitContext
         Registrar(api);
         var c = Render<VistaCuentaComun>();
 
-        c.Find("#form-deuda input[placeholder='0,00']").Input("abc");
+        c.Find("#form-operacion select").Change("adelanto");
+        c.Find("#form-operacion input[placeholder='0,00']").Input("abc");
 
-        Assert.True(c.Find("#form-deuda button[type=submit]").HasAttribute("disabled"));
+        Assert.True(c.Find("#form-operacion button[type=submit]").HasAttribute("disabled"));
     }
 
     [Fact]
@@ -589,8 +597,8 @@ public class ComponentesTests : BunitContext
 
         var c = Render<VistaCuentaComun>();
 
-        Assert.Contains("Ana", c.Find("section[aria-labelledby=t-deudas]").TextContent);
-        Assert.Empty(c.FindAll("#form-deuda"));
+        Assert.Contains("Ana", c.Find("section[aria-labelledby=t-operaciones]").TextContent);
+        Assert.Empty(c.FindAll("#form-operacion"));
     }
 
     [Fact]
@@ -604,12 +612,13 @@ public class ComponentesTests : BunitContext
         Registrar(api);
         var c = Render<VistaCuentaComun>();
 
-        c.FindAll("#form-deuda select")[1].Change("devolucion");
-        c.Find("#form-deuda input[placeholder='0,00']").Input("100");
-        c.Find("#form-deuda").Submit();
+        c.Find("#form-operacion select").Change("adelanto");
+        c.Find("#form-operacion select").Change("devolucion");
+        c.Find("#form-operacion input[placeholder='0,00']").Input("100");
+        c.Find("#form-operacion").Submit();
 
         Assert.Contains("supera lo que debe", c.Markup);
-        Assert.Equal("100", c.Find("#form-deuda input[placeholder='0,00']").GetAttribute("value"));
+        Assert.Equal("100", c.Find("#form-operacion input[placeholder='0,00']").GetAttribute("value"));
     }
 
     [Fact]
@@ -642,8 +651,8 @@ public class ComponentesTests : BunitContext
         Registrar(api);
         var c = Render<VistaCuentaComun>();
 
-        c.Find("#form-aportacion input").Input("600,50");
-        c.Find("#form-aportacion").Submit();
+        c.Find("#form-operacion input[inputmode=decimal]").Input("600,50");
+        c.Find("#form-operacion").Submit();
 
         var cuerpo = api.Cuerpos["PUT /api/cuenta-comun/aportaciones"];
         Assert.Contains(AnaId.ToString(), cuerpo);
@@ -664,8 +673,9 @@ public class ComponentesTests : BunitContext
         var c = Render<VistaCuentaComun>();
 
         Assert.Contains("La cuenta le debe", c.Markup);
-        c.Find("#form-reembolso input").Input("400");
-        c.Find("#form-reembolso").Submit();
+        c.Find("#form-operacion select").Change("reembolso");
+        c.Find("#form-operacion input[inputmode=decimal]").Input("400");
+        c.Find("#form-operacion").Submit();
 
         var cuerpo = api.Cuerpos["POST /api/cuenta-comun/reembolsos"];
         Assert.Contains(AnaId.ToString(), cuerpo);
@@ -684,12 +694,12 @@ public class ComponentesTests : BunitContext
         Registrar(api);
         var c = Render<VistaCuentaComun>();
 
-        c.Find("#form-aportacion input").Input("600");
+        c.Find("#form-operacion input[inputmode=decimal]").Input("600");
         c.Find("#ahorro-aportacion").Input("700");
-        Assert.True(c.Find("#form-aportacion button").HasAttribute("disabled")); // ahorro > importe
+        Assert.True(c.Find("#form-operacion button").HasAttribute("disabled")); // ahorro > importe
 
         c.Find("#ahorro-aportacion").Input("100,50");
-        c.Find("#form-aportacion").Submit();
+        c.Find("#form-operacion").Submit();
 
         var cuerpo = api.Cuerpos["PUT /api/cuenta-comun/aportaciones"];
         Assert.Contains("\"importe\":600", cuerpo);
@@ -729,8 +739,8 @@ public class ComponentesTests : BunitContext
 
         var c = Render<VistaCuentaComun>();
 
-        Assert.Empty(c.FindAll("#form-reembolso"));
-        Assert.Contains("No hay reembolsos pendientes", c.Markup);
+        Assert.True(c.Find("#form-operacion option[value=reembolso]").HasAttribute("disabled"));
+        Assert.DoesNotContain("Reembolso pendiente", c.Markup);
     }
 
     [Fact]
@@ -1319,7 +1329,7 @@ public class ComponentesTests : BunitContext
         var c = Render<VistaCuentaComun>();
 
         Assert.Contains("Sin activar", c.Markup);
-        Assert.Empty(c.FindAll("#form-aportacion"));
+        Assert.Empty(c.FindAll("#form-operacion"));
         Assert.Equal("hogar/configuracion", c.Find("a.btn").GetAttribute("href"));
     }
 
@@ -1337,8 +1347,8 @@ public class ComponentesTests : BunitContext
         Assert.Empty(c.FindAll("#ahorro"));
         Assert.Empty(c.FindAll("#t-ahorro"));
         Assert.Empty(c.FindAll("#ahorro-aportacion"));
-        c.Find("#form-aportacion input[inputmode=decimal]").Input("100");
-        c.Find("#form-aportacion").Submit();
+        c.Find("#form-operacion input[inputmode=decimal]").Input("100");
+        c.Find("#form-operacion").Submit();
 
         Assert.Contains("\"ahorro\":0", api.Cuerpos["PUT /api/cuenta-comun/aportaciones"]);
     }

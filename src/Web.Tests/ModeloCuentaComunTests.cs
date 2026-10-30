@@ -273,32 +273,34 @@ public class ModeloCuentaComunTests
         api.Responde("POST /api/cuenta-comun/ingresos", HttpStatusCode.Created,
             new IngresoCuentaComunDto(Guid.NewGuid(), _marcos.Id, Hoy, 40m, "Cena amigas"));
         await m.CargarAsync();
+        m.Operacion = "ingreso";
         m.Ingresante = _marcos.Id;
         m.ImporteIngreso = "40";
         m.ConceptoIngreso = "  Cena amigas ";
 
-        var aviso = await m.IngresarAsync();
+        var aviso = await m.RegistrarOperacionAsync();
 
         Assert.Equal("Ingreso registrado", aviso);
         var cuerpo = api.Cuerpos["POST /api/cuenta-comun/ingresos"];
         Assert.Contains($"\"miembroId\":\"{_marcos.Id}\"", cuerpo);
         Assert.Contains("\"concepto\":\"Cena amigas\"", cuerpo);
-        Assert.DoesNotContain("\"fecha\":\"", cuerpo); // el mes actual: lo fecha la API (hoy)
+        Assert.Contains($"\"fecha\":\"{Hoy:yyyy-MM-dd}\"", cuerpo); // por defecto, la fecha de hoy
         Assert.Equal("", m.ImporteIngreso);
         Assert.Equal("", m.ConceptoIngreso);
     }
 
     [Fact]
-    public async Task Ingresar_en_otro_mes_lo_fecha_el_primer_dia_de_ese_mes()
+    public async Task Ingresar_con_otra_fecha_la_envia_tal_cual()
     {
         var (m, api) = Crear(Estado());
         api.Responde("POST /api/cuenta-comun/ingresos", HttpStatusCode.Created,
             new IngresoCuentaComunDto(Guid.NewGuid(), _ana.Id, new DateOnly(2026, 9, 1), 40m, null));
         await m.CargarAsync();
-        await m.CambiarMesAsync(-1);
+        m.Operacion = "ingreso";
+        m.FechaOperacion = new DateOnly(2026, 9, 1);
         m.ImporteIngreso = "40";
 
-        await m.IngresarAsync();
+        await m.RegistrarOperacionAsync();
 
         Assert.Contains("\"fecha\":\"2026-09-01\"", api.Cuerpos["POST /api/cuenta-comun/ingresos"]);
     }

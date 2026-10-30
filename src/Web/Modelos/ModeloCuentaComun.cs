@@ -412,13 +412,21 @@ public sealed class ModeloCuentaComun(CoreApiClient api, DateOnly hoy)
     private string NombreDe(Guid id) => Miembros.FirstOrDefault(m => m.Id == id)?.Nombre ?? "";
 
     /// <summary>Borra una línea que es un movimiento guardado (ingreso, reembolso o movimiento de deuda); las demás no se borran.</summary>
-    public Task<string?> EliminarLineaAsync(LineaCuenta l) => l.Tipo switch
+    public Task<string?> EliminarLineaAsync(LineaCuenta l)
     {
-        "ingreso" => EliminarIngresoAsync(Ingresos.First(i => i.Id == l.Id)),
-        "reembolso" => EliminarAsync(Estado!.Reembolsos.First(r => r.Id == l.Id)),
-        "movimiento-deuda" => EliminarDeudaAsync(Estado!.MovimientosDeuda!.First(d => d.Id == l.Id)),
-        _ => Task.FromResult<string?>(null),
-    };
+        // Si la fila ya no está (otra acción la borró y la lista se ha recargado), no hay nada que borrar: no se lanza error.
+        switch (l.Tipo)
+        {
+            case "ingreso" when Ingresos.FirstOrDefault(i => i.Id == l.Id) is { } ingreso:
+                return EliminarIngresoAsync(ingreso);
+            case "reembolso" when Estado?.Reembolsos.FirstOrDefault(r => r.Id == l.Id) is { } reembolso:
+                return EliminarAsync(reembolso);
+            case "movimiento-deuda" when Estado?.MovimientosDeuda?.FirstOrDefault(d => d.Id == l.Id) is { } deuda:
+                return EliminarDeudaAsync(deuda);
+            default:
+                return Task.FromResult<string?>(null);
+        }
+    }
 
     /// <summary>Si la operación elegida es un movimiento de deuda (adelanto, devolución o compensación).</summary>
     public bool EsOperacionDeuda => Operacion is "adelanto" or "devolucion" or "compensacion";

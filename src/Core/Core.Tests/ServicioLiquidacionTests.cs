@@ -64,6 +64,25 @@ public class ServicioLiquidacionTests
     }
 
     [Fact]
+    public async Task Resumen_SeparaLaDeudaConLaCuentaDeHogarYLaDelAhorro()
+    {
+        DosAdultos();
+        // Marcos debe 40 a Hogar; Ana debe 25 del ahorro. Cada persona ve su saldo por fondo, no uno mezclado.
+        _repo.Historico = new HistoricoCuenta([], [], [], [], [], true, 0m, Deudas:
+        [
+            new MovimientoDeuda(_marcos, Mes.AddDays(2), 40m, TipoMovimientoDeuda.Adelanto),
+            new MovimientoDeuda(_ana, Mes.AddDays(3), 25m, TipoMovimientoDeuda.Adelanto, DesdeAhorro: true),
+        ]);
+
+        var resumen = await Servicio.ResumenAsync(Mes, default);
+
+        var ana = resumen.PorMiembro.Single(m => m.MiembroId == _ana);
+        var marcos = resumen.PorMiembro.Single(m => m.MiembroId == _marcos);
+        Assert.Equal((0m, -25m), (ana.SaldoCuenta, ana.SaldoCuentaAhorro));
+        Assert.Equal((-40m, 0m), (marcos.SaldoCuenta, marcos.SaldoCuentaAhorro));
+    }
+
+    [Fact]
     public async Task RegistrarPago_ConImporteQueSuperaLaDeuda_EsConflictoConLoPendiente()
     {
         DosAdultos();
@@ -193,8 +212,10 @@ public class ServicioLiquidacionTests
         public Task<IReadOnlyDictionary<Guid, string>> NombresCategoriasAsync(CancellationToken ct)
             => Task.FromResult<IReadOnlyDictionary<Guid, string>>(new Dictionary<Guid, string>());
 
-        public Task<HistoricoCuenta> HistoricoCuentaAsync(DateOnly inicio, CancellationToken ct)
-            => Task.FromResult(new HistoricoCuenta([], [], [], [], [], false, 0m));
+        /// <summary>Histórico de la cuenta que devuelve; vacío salvo que el test lo rellene.</summary>
+        public HistoricoCuenta Historico { get; set; } = new([], [], [], [], [], false, 0m);
+
+        public Task<HistoricoCuenta> HistoricoCuentaAsync(DateOnly inicio, CancellationToken ct) => Task.FromResult(Historico);
 
         public Task<IReadOnlyList<PagoLiquidacionRegistro>> PagosDelMesAsync(DateOnly inicio, CancellationToken ct)
             => Task.FromResult<IReadOnlyList<PagoLiquidacionRegistro>>(Pagos.Where(p => p.Mes == inicio).ToList());

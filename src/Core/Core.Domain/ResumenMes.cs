@@ -14,10 +14,12 @@ public sealed record HistoricoCuenta(
 public sealed record ImporteMiembro(Guid MiembroId, decimal Importe);
 
 /// <summary>
-/// Lo pagado, asumido, saldo con la cuenta común y personal de un miembro en el mes. El saldo es neto: positivo si la cuenta
-/// le debe a la persona, negativo si ella le debe a la cuenta (p. ej. por un adelanto que aún no devolvió).
+/// Lo pagado, asumido, saldo con la cuenta común y personal de un miembro en el mes. Los saldos son netos por fondo: positivo si la
+/// cuenta le debe a la persona, negativo si ella le debe a la cuenta (p. ej. por un adelanto que aún no devolvió).
+/// <paramref name="SaldoCuenta"/> es el de Hogar y <paramref name="SaldoCuentaAhorro"/> el del ahorro.
 /// </summary>
-public sealed record ResumenMiembro(Guid MiembroId, string Nombre, decimal Pagado, decimal Asumido, decimal SaldoCuenta, decimal Personal);
+public sealed record ResumenMiembro(
+    Guid MiembroId, string Nombre, decimal Pagado, decimal Asumido, decimal SaldoCuenta, decimal Personal, decimal SaldoCuentaAhorro = 0m);
 
 /// <summary>Gasto de una categoría en el mes y lo que asume cada miembro.</summary>
 public sealed record ResumenCategoria(Guid CategoriaId, string Nombre, decimal Total, IReadOnlyList<ImporteMiembro> PorMiembro);
@@ -64,8 +66,9 @@ public static class ResumenMes
                 m.Id, m.Nombre,
                 gastos.Where(g => g.PagadoPor == m.Id).Sum(g => g.Importe),
                 gastos.SelectMany(g => g.Repartos).Where(r => r.MiembroId == m.Id).Sum(r => r.ImporteAsumido),
-                cuenta.Pendientes.Where(p => p.MiembroId == m.Id).Sum(p => p.Importe),
-                personales.Where(g => g.PagadoPor == m.Id).Sum(g => g.Importe)))
+                cuenta.Pendientes.Where(p => p.MiembroId == m.Id && !p.DesdeAhorro).Sum(p => p.Importe),
+                personales.Where(g => g.PagadoPor == m.Id).Sum(g => g.Importe),
+                cuenta.Pendientes.Where(p => p.MiembroId == m.Id && p.DesdeAhorro).Sum(p => p.Importe)))
             .ToList();
 
         var porCategoria = gastos.GroupBy(g => g.CategoriaId)

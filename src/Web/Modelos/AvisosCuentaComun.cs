@@ -28,7 +28,8 @@ public static class AvisosCuentaComun
         }
 
         // Los reembolsos salen del efectivo de Hogar aunque el gasto se pagara desde el ahorro: el efectivo ya los contiene.
-        var debeAPersonas = estado.Pendientes.Where(p => p.Importe > 0).Sum(p => p.Importe);
+        // Neto de deudas: lo que una persona debe a la cuenta reduce lo que hay que reembolsarle.
+        var debeAPersonas = estado.Pendientes.Sum(p => p.Importe);
         var faltaEfectivo = debeAPersonas - estado.Efectivo;
         if (faltaEfectivo > 0)
         {

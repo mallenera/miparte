@@ -40,10 +40,21 @@ public class AvisosCuentaComunTests
     }
 
     [Fact]
-    public void UnaPersonaQueDebeALaCuenta_NoCuentaComoReembolsoPendiente()
+    public void UnaPersonaQueDebeALaCuenta_RebajaLoQueHayQueReembolsar()
     {
-        // Luis debe 30 a Hogar y la cuenta debe 50 a Ana: solo lo que la cuenta debe cuenta para el efectivo.
-        var estado = Estado(50m, 0m, new PendienteCuentaDto(Ana, "Ana", 50m), new PendienteCuentaDto(Luis, "Luis", -30m));
+        // La cuenta debe 50 a Ana y Luis debe 30 a Hogar: hay que reembolsar 20 netos. Con 10 en efectivo faltan 10.
+        var estado = Estado(10m, 0m, new PendienteCuentaDto(Ana, "Ana", 50m), new PendienteCuentaDto(Luis, "Luis", -30m));
+
+        var aviso = Assert.Single(AvisosCuentaComun.Avisos(estado));
+        Assert.Contains("faltan 10,00", aviso);
+        Assert.Contains("hay que reembolsar 20,00", aviso);
+    }
+
+    [Fact]
+    public void UnaPersonaQueDebeALaCuenta_NoAvisaSiElEfectivoCubreElNeto()
+    {
+        // La cuenta debe 50 a Ana y Luis debe 30: 20 netos, y hay 20 en efectivo.
+        var estado = Estado(20m, 0m, new PendienteCuentaDto(Ana, "Ana", 50m), new PendienteCuentaDto(Luis, "Luis", -30m));
 
         Assert.Empty(AvisosCuentaComun.Avisos(estado));
     }

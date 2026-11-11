@@ -2,13 +2,18 @@ using MiParte.Core.Domain.Entidades;
 
 namespace MiParte.Core.Domain;
 
-/// <summary>Histórico de la cuenta común hasta el fin de un mes, ya agrupado, en la forma que usa <see cref="CuentaComun.Calcular"/>.</summary>
+/// <summary>
+/// Histórico de la cuenta común hasta el fin de un mes, ya agrupado, en la forma que usa <see cref="CuentaComun.Calcular"/>.
+/// <paramref name="ReembolsosDelMes"/> y <paramref name="RetiradasDelMes"/> son solo los movimientos con fecha en el mes: las listas
+/// acumuladas llegan fechadas en el mes pedido y no sirven para saber qué se movió en él. Si son null se filtran las acumuladas por fecha.
+/// </summary>
 public sealed record HistoricoCuenta(
     IReadOnlyList<AportacionVigente> Vigentes, IReadOnlyList<GastoDeCuenta> Gastos, IReadOnlyList<ReembolsoDeCuenta> Reembolsos,
     IReadOnlyList<RetiradaDeAhorro> Retiradas, IReadOnlyList<DepositoDeAhorro> Depositos, bool CuentaActiva, decimal GastadoMes,
     IReadOnlyList<GastoDeCuenta>? GastosDelMes = null, SaldoInicialCuenta? SaldoInicial = null,
     FrecuenciaAportacion Frecuencia = FrecuenciaAportacion.Mensual, IReadOnlyList<IngresoDeCuenta>? Ingresos = null,
-    IReadOnlyList<MovimientoDeuda>? Deudas = null);
+    IReadOnlyList<MovimientoDeuda>? Deudas = null, IReadOnlyList<ReembolsoDeCuenta>? ReembolsosDelMes = null,
+    IReadOnlyList<RetiradaDeAhorro>? RetiradasDelMes = null);
 
 /// <summary>Importe asociado a un miembro.</summary>
 public sealed record ImporteMiembro(Guid MiembroId, decimal Importe);

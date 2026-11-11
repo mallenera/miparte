@@ -58,6 +58,48 @@ public class CuentaComunResumenTests
         Assert.Equal(130m, r2.Ahorro.Disponible);
     }
 
+    /// <summary>
+    /// Igual que <see cref="Historico"/> pero con la forma que da <c>HistoricoCuentaComun</c>: gastos, reembolsos y retiradas
+    /// agrupados hasta el fin del mes y fechados en el primer día de ese mes; depósitos e ingresos, los del mes en el mes y los
+    /// anteriores el día previo.
+    /// </summary>
+    private static HistoricoCuenta HistoricoComoElRepositorio(DateOnly mes)
+    {
+        var real = Historico(mes);
+        var fin = mes.AddMonths(1);
+        var gastos = real.Gastos.GroupBy(g => (g.PagadoPor, g.DesdeAhorro))
+            .Select(g => new GastoDeCuenta(g.Key.PagadoPor, mes, g.Sum(x => x.Importe), g.Key.DesdeAhorro)).ToList();
+        var delMes = real.GastosDelMes!.Where(g => g.Fecha >= mes && g.Fecha < fin)
+            .Select(g => g with { Fecha = mes }).ToList();
+        var reembolsos = real.Reembolsos.Select(r => r with { Fecha = mes }).ToList();
+        var retiradas = real.Retiradas.Select(r => r with { Fecha = mes }).ToList();
+        // Los del mes llegan aparte, como en el repositorio; los acumulados no distinguen en qué mes se movieron.
+        var reembolsosMes = real.Reembolsos.Where(r => r.Fecha >= mes).Select(r => r with { Fecha = mes }).ToList();
+        var retiradasMes = real.Retiradas.Where(r => r.Fecha >= mes).Select(r => r with { Fecha = mes }).ToList();
+        var depositos = real.Depositos.Select(d => d with { Fecha = d.Fecha >= mes ? mes : mes.AddDays(-1) }).ToList();
+        var ingresos = real.Ingresos!.Select(i => i with { Fecha = i.Fecha >= mes ? mes : mes.AddDays(-1) }).ToList();
+        return real with
+        {
+            Gastos = gastos, GastosDelMes = delMes, Reembolsos = reembolsos, Retiradas = retiradas, Depositos = depositos, Ingresos = ingresos,
+            ReembolsosDelMes = reembolsosMes, RetiradasDelMes = retiradasMes,
+        };
+    }
+
+    [Fact]
+    public void Resumen_ConElHistoricoDelRepositorioElInicialDeFebreroEsElDisponibleDeEnero()
+    {
+        var enero = D("2026-01-01");
+        var febrero = D("2026-02-01");
+
+        var r1 = CuentaComun.ResumenMensual(enero, HistoricoComoElRepositorio(enero));
+        var r2 = CuentaComun.ResumenMensual(febrero, HistoricoComoElRepositorio(febrero));
+        var referencia = CuentaComun.ResumenMensual(febrero, Historico(febrero));
+
+        Assert.Equal(r1.Hogar.Disponible, r2.Hogar.Inicial);
+        Assert.Equal(r1.Ahorro.Disponible, r2.Ahorro.Inicial);
+        Assert.Equal(referencia, r2);
+    }
+
     [Fact]
     public void Resumen_InicialDeCadaMesEsElDisponibleDelAnterior()
     {
@@ -99,6 +141,21 @@ public class CuentaComunResumenTests
         Assert.Equal(0m, ahorro.IngresosSueltos);
         Assert.Equal(20m, ahorro.Gastos);
         Assert.Equal(0m, ahorro.Reembolsos);
+    }
+
+    [Fact]
+    public void Resumen_TotalNoCuentaElGastoAdelantadoDelAhorroComoIngresoNiComoGasto()
+    {
+        var enero = D("2026-01-01");
+
+        var total = CuentaComun.ResumenMensual(enero, Historico(enero)).Total;
+
+        // Entran 1.000 de aportaciones; los 150 que Ana adelantó del ahorro pasan de un fondo a otro y no mueven el total.
+        Assert.Equal(1000m, total.Ingresos);
+        Assert.Equal(130m, total.IngresosSueltos); // ingreso suelto de 30 y depósito de 100
+        Assert.Equal(200m, total.Gastos);
+        Assert.Equal(50m, total.Reembolsos);
+        Assert.Equal(total.Inicial + total.Ingresos + total.IngresosSueltos - total.Gastos - total.Reembolsos, total.Disponible);
     }
 
     [Fact]

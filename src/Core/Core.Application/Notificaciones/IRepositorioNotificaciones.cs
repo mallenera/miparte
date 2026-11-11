@@ -15,6 +15,9 @@ public interface IRepositorioNotificaciones
     /// </summary>
     Task ReemplazarAsync(string endpoint, SuscripcionPush nueva, CancellationToken ct);
 
+    /// <summary>Número de suscripciones del miembro en el hogar actual, sin contar la de <paramref name="endpoint"/>.</summary>
+    Task<int> ContarOtrasDeMiembroAsync(Guid miembroId, string endpoint, CancellationToken ct);
+
     /// <summary>Quita la suscripción de ese miembro y endpoint en el hogar actual. Devuelve false si no existía.</summary>
     Task<bool> EliminarAsync(Guid miembroId, string endpoint, CancellationToken ct);
 

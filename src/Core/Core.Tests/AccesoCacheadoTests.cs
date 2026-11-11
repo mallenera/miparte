@@ -45,9 +45,12 @@ public class AccesoCacheadoTests
         return new Escenario(f, hogar, ana, beto, betoId);
     }
 
-    /// <summary>POST de un gasto vacío: el filtro de permisos responde antes que la validación, así que 403 = sin permiso y 400 = con permiso.</summary>
+    /// <summary>
+    /// POST de un gasto con importe 0: el filtro de permisos responde antes que la validación, así que 403 = sin permiso y 400 = con
+    /// permiso. La fecha ha de ser válida: una fuera de rango ya no llega al filtro (el cuerpo no se puede leer y es 400 para todos).
+    /// </summary>
     private static async Task<HttpStatusCode> IntentarCrearGasto(HttpClient c)
-        => (await c.PostAsJsonAsync("/api/gastos", new GastoRequest(default, 0m, Guid.Empty, null, Guid.Empty, null))).StatusCode;
+        => (await c.PostAsJsonAsync("/api/gastos", new GastoRequest(new DateOnly(2026, 11, 1), 0m, Guid.Empty, null, Guid.Empty, null))).StatusCode;
 
     [Fact]
     public async Task Quitar_un_permiso_surte_efecto_en_la_siguiente_peticion_aunque_estuviera_cacheado()

@@ -22,6 +22,12 @@ public enum TipoPeriodo
 /// </summary>
 public sealed record Periodo
 {
+    /// <summary>Primer año admitido (el mismo que la API, <c>FormatosApi.AnioMinimo</c>): fuera del rango, «el mes siguiente» puede desbordar.</summary>
+    public const int AnioMinimo = 1900;
+
+    /// <summary>Último año admitido (el mismo que la API, <c>FormatosApi.AnioMaximo</c>).</summary>
+    public const int AnioMaximo = 2999;
+
     /// <summary>Mensaje de error común para un texto de periodo con formato desconocido.</summary>
     private const string MensajeFormato = "El periodo debe tener el formato YYYY-MM, YYYY-MM-DD/YYYY-MM-DD o YYYY-MM-DD/.";
 
@@ -48,7 +54,7 @@ public sealed record Periodo
     public DateOnly? Hasta { get; }
 
     /// <summary>Crea el periodo de un mes a partir de «YYYY-MM» estricto; lanza <see cref="ArgumentException"/> si el formato no es válido.</summary>
-    /// <param name="mes">Mes en formato «YYYY-MM» (año desde 1, mes 01-12).</param>
+    /// <param name="mes">Mes en formato «YYYY-MM» (año entre AnioMinimo y AnioMaximo, mes 01-12).</param>
     public static Periodo DeMes(string mes)
     {
         if (!TryMes(mes, out var inicio)) throw new ArgumentException(MensajeMes, nameof(mes));
@@ -152,12 +158,12 @@ public sealed record Periodo
     public static Periodo Parse(string? texto)
         => TryParse(texto, out var periodo, out var error) ? periodo! : throw new ArgumentException(error, nameof(texto));
 
-    /// <summary>Parsea «YYYY-MM» estricto (año desde 1, mes 01-12) y devuelve su primer día. Misma regla que la API.</summary>
+    /// <summary>Parsea «YYYY-MM» estricto (año entre AnioMinimo y AnioMaximo, mes 01-12) y devuelve su primer día. Misma regla que la API.</summary>
     private static bool TryMes(string? mes, out DateOnly inicio)
     {
         inicio = default;
         if (mes is not { Length: 7 } || mes[4] != '-') return false;
-        if (!int.TryParse(mes.AsSpan(0, 4), NumberStyles.None, CultureInfo.InvariantCulture, out var anio) || anio < 1) return false;
+        if (!int.TryParse(mes.AsSpan(0, 4), NumberStyles.None, CultureInfo.InvariantCulture, out var anio) || anio is < AnioMinimo or > AnioMaximo) return false;
         if (!int.TryParse(mes.AsSpan(5, 2), NumberStyles.None, CultureInfo.InvariantCulture, out var numero) || numero is < 1 or > 12) return false;
         inicio = new DateOnly(anio, numero, 1);
         return true;
@@ -168,7 +174,7 @@ public sealed record Periodo
     {
         fecha = default;
         if (texto is not { Length: 10 } || texto[4] != '-' || texto[7] != '-') return false;
-        if (!int.TryParse(texto.AsSpan(0, 4), NumberStyles.None, CultureInfo.InvariantCulture, out var anio) || anio < 1) return false;
+        if (!int.TryParse(texto.AsSpan(0, 4), NumberStyles.None, CultureInfo.InvariantCulture, out var anio) || anio is < AnioMinimo or > AnioMaximo) return false;
         if (!int.TryParse(texto.AsSpan(5, 2), NumberStyles.None, CultureInfo.InvariantCulture, out var mes) || mes is < 1 or > 12) return false;
         if (!int.TryParse(texto.AsSpan(8, 2), NumberStyles.None, CultureInfo.InvariantCulture, out var dia)
             || dia < 1 || dia > DateTime.DaysInMonth(anio, mes)) return false;

@@ -32,7 +32,7 @@ public static class EndpointChat
     }
 
     private static async Task<IResult> ResponderAsync(
-        HttpContext http, ChatRequest peticion, ServicioChat chat, IFabricaDatosHogar fabrica,
+        HttpContext http, ChatRequest peticion, ServicioChat chat, IFabricaDatosHogar fabrica, CuotaDiaria cuota,
         ILogger<ServicioChat> log, CancellationToken ct)
     {
         if (!LeerHogar(http, out var hogarId, out var error)) return error!;
@@ -41,6 +41,7 @@ public static class EndpointChat
         try
         {
             await datos.MiembrosAsync(ct); // 403 si no es miembro activo de ese hogar
+            ConsumirCuota(http, cuota);
             return Results.Ok(await chat.ResponderAsync(peticion?.Mensajes, datos, ct));
         }
         catch (Exception ex) when (Traducir(ex, log) is { } e)
@@ -55,7 +56,7 @@ public static class EndpointChat
     /// empezado el flujo, <c>error</c> (<c>{ error }</c>). Antes de empezar, los errores son respuestas JSON normales.
     /// </summary>
     private static async Task<IResult> ResponderStreamingAsync(
-        HttpContext http, ChatRequest peticion, ServicioChat chat, IFabricaDatosHogar fabrica,
+        HttpContext http, ChatRequest peticion, ServicioChat chat, IFabricaDatosHogar fabrica, CuotaDiaria cuota,
         ILogger<ServicioChat> log, CancellationToken ct)
     {
         if (!LeerHogar(http, out var hogarId, out var error)) return error!;
@@ -76,6 +77,7 @@ public static class EndpointChat
         try
         {
             await datos.MiembrosAsync(ct);
+            ConsumirCuota(http, cuota);
             var respuesta = await chat.ResponderAsync(peticion?.Mensajes, datos, async texto =>
             {
                 await IniciarAsync();
@@ -116,6 +118,17 @@ public static class EndpointChat
         }
     }
 
+    /// <summary>
+    /// Anota la pregunta en la cuota diaria, tras comprobar el acceso al hogar y antes de llamar al modelo (lo único que cuesta).
+    /// Confirmar un gasto no pasa por aquí: no usa el modelo.
+    /// </summary>
+    /// <exception cref="CuotaAgotadaException">No quedan preguntas hoy para la persona o para el asistente.</exception>
+    private static void ConsumirCuota(HttpContext http, CuotaDiaria cuota)
+    {
+        var usuario = http.User.FindFirst("sub")?.Value ?? "";
+        if (!cuota.Consumir(usuario)) throw new CuotaAgotadaException();
+    }
+
     /// <summary>Lee la cabecera de hogar; si falta o no es un identificador, devuelve el 400 correspondiente.</summary>
     private static bool LeerHogar(HttpContext http, out Guid hogarId, out IResult? error)
     {
@@ -137,6 +150,7 @@ public static class EndpointChat
     private static (int Codigo, string Mensaje)? Traducir(Exception ex, ILogger log) => ex switch
     {
         SolicitudInvalidaException e => (StatusCodes.Status400BadRequest, e.Message),
+        CuotaAgotadaException e => (StatusCodes.Status429TooManyRequests, e.Message),
         GastoRechazadoException e => ((int)e.Codigo, e.Message),
         HogarNoAccesibleException e when e.Codigo == System.Net.HttpStatusCode.Unauthorized
             => (StatusCodes.Status401Unauthorized, "La sesión ha caducado."),

@@ -21,6 +21,14 @@ public static class ErroresInesperados
             {
                 await next();
             }
+            catch (BadHttpRequestException ex) when (!ctx.Response.HasStarted)
+            {
+                // Cuerpo ilegible (JSON roto, un texto con NUL, una fecha fuera de rango...). En producción ASP.NET ya responde 400 por su
+                // cuenta; en desarrollo lanza la excepción, que sin esto acababa como un 500. Es un error del cliente, no se registra.
+                ctx.Response.Headers.ContentLength = null;
+                ctx.Response.StatusCode = ex.StatusCode;
+                await ctx.Response.WriteAsJsonAsync(new { error = "La petición no es válida: revisa el formato de los datos enviados." });
+            }
             catch (Exception ex) when (!ctx.RequestAborted.IsCancellationRequested && !ctx.Response.HasStarted)
             {
                 ctx.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("MiParte.Core.Api.Errores")

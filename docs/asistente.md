@@ -35,7 +35,7 @@ Reglas del diseño que se cumplen en código: si falta el año se asume el en cu
 - **Superficie mínima.** El modelo dispone de cinco funciones de lectura y de `proponer_gasto`, que solo devuelve un borrador; ninguna escribe. Una inyección que tuviera éxito podría como mucho proponer un gasto, que la persona ve, confirma o descarta. El alta nunca depende del texto del modelo: solo `POST /api/chat/confirmar-gasto` escribe, y lo llama la persona. Ni el importe ni la fecha ni el reparto los fija el modelo: los revisa la persona en la tarjeta del borrador.
 - **El historial del cliente es de la persona.** Solo se aceptan roles `user` y `assistant` (otro rol da 400), con máximo `Asistente__MaxMensajes` (20) mensajes de `Asistente__MaxCaracteresMensaje` (1500) caracteres; el último debe ser de `user`.
 - **Bucle acotado.** Máximo 5 vueltas y 8 llamadas a funciones por pregunta (`Asistente__MaxIteraciones`, `Asistente__MaxLlamadasHerramienta`); `max_tokens` 1024 por turno.
-- **Coste.** Límite de `Asistente__MensajesPorMinuto` (10) preguntas por usuario y de 60 peticiones por minuto en total (429 con `Retry-After`); cuerpo máximo 64 KB. Las peticiones sin sesión se cuentan por IP, que tras el proxy de Render es la del cliente solo con `ProxyInverso__*` configurado (ver Configuración).
+- **Coste.** Límite de `Asistente__MensajesPorMinuto` (10) preguntas por usuario y de 60 peticiones por minuto en total (429 con `Retry-After`); cuerpo máximo 64 KB. Además hay un tope diario (día UTC) de `Asistente__PreguntasPorDia` (100) preguntas por usuario y `Asistente__PreguntasPorDiaGlobal` (2000) entre todos, que también responde 429: el registro es gratuito y la cuenta demo es pública, así que el límite por minuto no acota el gasto sostenido. La cuenta se lleva en memoria (`CuotaDiaria`): se reinicia con el proceso y es por instancia; confirmar un gasto no consume. Conviene fijar también un límite de gasto en la consola del proveedor. Las peticiones sin sesión se cuentan por IP, que tras el proxy de Render es la del cliente solo con `ProxyInverso__*` configurado (ver Configuración).
 - **Secretos.** `ANTHROPIC_API_KEY` solo se lee del entorno (nunca de `appsettings` ni del repo); no se registra en logs ni en errores. Los fallos del proveedor llegan a la persona como un 503 genérico.
 - **Front.** Las respuestas se pintan como texto (Blazor escapa; no hay `MarkupString`), la CSP sigue sin scripts en línea y solo añade el origen del asistente a `connect-src` (`ASSISTANT_URL`).
 
@@ -112,6 +112,8 @@ DTOs en `src/Contracts/Asistente.cs` (`ChatRequest`, `MensajeChatDto`, `ChatResp
 | `Asistente__MaxIteraciones` / `Asistente__MaxLlamadasHerramienta` | 5 / 8 | Bucle de herramientas |
 | `Asistente__MaxMensajes` / `Asistente__MaxCaracteresMensaje` | 20 / 1500 | Historial aceptado |
 | `Asistente__MensajesPorMinuto` | 10 | Por usuario |
+| `Asistente__PreguntasPorDia` | 100 | Por usuario y día UTC |
+| `Asistente__PreguntasPorDiaGlobal` | 2000 | Entre todos los usuarios, por día UTC |
 | `Supabase__Url`, `Supabase__JwtSecret` | | Igual que Core.Api |
 | `Cors__OrigenesPermitidos__0` | | Origen del front |
 | `ProxyInverso__Proxies__N` / `ProxyInverso__Redes__N` | (vacío) | IPs o redes CIDR de los proxies de confianza. Una IP inválida impide arrancar. Mismo criterio que Core.Api (`MiParte.Seguridad.ReenvioCabeceras`) |
@@ -165,4 +167,4 @@ Sin clave se puede ver el asistente flotante y comprobar el 503; el modo demo de
 - Streaming: `ClienteWorkersAi` (el proveedor gratuito de producción) no implementa streaming real; la respuesta llega completa de una vez por el respaldo de `ClienteModelo`. El streaming real solo existe con Anthropic (`CreateStreaming`), que compila pero no se ha probado contra la API real.
 - Memoria de la conversación entre sesiones (hoy vive en la página).
 - Pruebas manuales con el modelo real, evaluación de calidad de las respuestas y ajuste del prompt.
-- Límite diario de coste por hogar.
+- Límite diario de coste por hogar (hoy el tope diario es por usuario y global, en memoria).

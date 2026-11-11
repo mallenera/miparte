@@ -79,11 +79,13 @@ public class AutenticacionTests
     }
 
     internal static string Token(SigningCredentials cred, Guid user, string issuer = Emisor,
-        string audience = "authenticated", DateTime? expira = null)
+        string audience = "authenticated", DateTime? expira = null, string? email = null)
     {
+        var claims = new List<Claim> { new("sub", user.ToString()) };
+        if (email is not null) claims.Add(new Claim("email", email));
         var d = new SecurityTokenDescriptor
         {
-            Subject = new ClaimsIdentity([new Claim("sub", user.ToString())]),
+            Subject = new ClaimsIdentity(claims),
             Issuer = issuer,
             Audience = audience,
             Expires = expira ?? DateTime.UtcNow.AddMinutes(10),

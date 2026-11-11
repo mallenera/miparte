@@ -77,6 +77,51 @@ public class ServicioNotificacionesTests
         Assert.Empty(_notificaciones.Suscripciones);
     }
 
+    // SSRF: el servidor hace una petición al endpoint en cada aviso, así que solo valen los servicios push de los navegadores.
+    [Theory]
+    [InlineData("https://169.254.169.254/latest/meta-data/")]
+    [InlineData("https://localhost/interno")]
+    [InlineData("https://victima.example/push")]
+    [InlineData("https://fcm.googleapis.com.atacante.example/fcm/send/abc")]
+    [InlineData("https://atacantefcm.googleapis.com/fcm/send/abc")]
+    [InlineData("https://fcm.googleapis.com:8443/fcm/send/abc")]
+    [InlineData("https://fcm.googleapis.com@atacante.example/fcm/send/abc")]
+    public async Task Suscribir_EndpointFueraDeLosServiciosPush_EsInvalido(string endpoint)
+    {
+        var r = await Servicio.SuscribirAsync(_userAna, Hogar, Datos(endpoint: endpoint), default);
+
+        Assert.Equal(TipoError.Invalido, r.Error!.Tipo);
+        Assert.Empty(_notificaciones.Suscripciones);
+    }
+
+    [Theory]
+    [InlineData("https://fcm.googleapis.com/fcm/send/abc")]
+    [InlineData("https://updates.push.services.mozilla.com/wpush/v2/abc")]
+    [InlineData("https://wns2-par02p.notify.windows.com/w/?token=abc")]
+    [InlineData("https://web.push.apple.com/abc")]
+    public async Task Suscribir_EndpointDeUnServicioPushConocido_SeAcepta(string endpoint)
+    {
+        var r = await Servicio.SuscribirAsync(_userAna, Hogar, Datos(endpoint: endpoint), default);
+
+        Assert.Null(r.Error);
+    }
+
+    [Fact]
+    public async Task Suscribir_ConElMaximoDeDispositivos_EsConflictoSalvoQueSustituyaUnoSuyo()
+    {
+        for (var i = 0; i < ServicioNotificaciones.MaxSuscripcionesPorMiembro; i++)
+            Assert.Null((await Servicio.SuscribirAsync(_userAna, Hogar, Datos(endpoint: $"{Endpoint}-{i}"), default)).Error);
+
+        var otro = await Servicio.SuscribirAsync(_userAna, Hogar, Datos(endpoint: Endpoint + "-nuevo"), default);
+        var repetido = await Servicio.SuscribirAsync(_userAna, Hogar, Datos(endpoint: Endpoint + "-0"), default);
+        var deMarcos = await Servicio.SuscribirAsync(_userMarcos, Hogar, Datos(endpoint: Endpoint + "-marcos"), default);
+
+        Assert.Equal(TipoError.Conflicto, otro.Error!.Tipo);
+        Assert.Null(repetido.Error);
+        Assert.Null(deMarcos.Error); // el tope es por miembro, no por hogar
+        Assert.Equal(ServicioNotificaciones.MaxSuscripcionesPorMiembro + 1, _notificaciones.Suscripciones.Count);
+    }
+
     [Theory]
     [InlineData("", Auth)]
     [InlineData(P256dh, "")]
@@ -181,6 +226,9 @@ public class ServicioNotificacionesTests
             Suscripciones.Add(nueva);
             return Task.CompletedTask;
         }
+
+        public Task<int> ContarOtrasDeMiembroAsync(Guid miembroId, string endpoint, CancellationToken ct)
+            => Task.FromResult(Suscripciones.Count(s => s.MiembroId == miembroId && s.Endpoint != endpoint));
 
         public Task<bool> EliminarAsync(Guid miembroId, string endpoint, CancellationToken ct)
             => Task.FromResult(Suscripciones.RemoveAll(s => s.MiembroId == miembroId && s.Endpoint == endpoint) > 0);

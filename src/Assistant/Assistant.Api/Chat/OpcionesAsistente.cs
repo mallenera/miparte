@@ -42,6 +42,12 @@ public sealed class OpcionesAsistente
     /// <summary>Preguntas por minuto y usuario (cada una cuesta tokens de pago).</summary>
     public int MensajesPorMinuto { get; set; } = 10;
 
+    /// <summary>Preguntas por día (UTC) y usuario: acota el gasto sostenido que el límite por minuto no frena.</summary>
+    public int PreguntasPorDia { get; set; } = 100;
+
+    /// <summary>Preguntas por día (UTC) entre todos los usuarios: tope del coste diario aunque se registren muchas cuentas.</summary>
+    public int PreguntasPorDiaGlobal { get; set; } = 2000;
+
     /// <summary>Tamaño máximo del cuerpo de la petición, en bytes.</summary>
     public long MaxCuerpoBytes { get; set; } = 64 * 1024;
 }

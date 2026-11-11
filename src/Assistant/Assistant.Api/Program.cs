@@ -37,6 +37,7 @@ else
 {
     builder.Services.AddSingleton<IClienteModelo, ClienteAnthropic>();
 }
+builder.Services.AddSingleton<CuotaDiaria>(); // tope diario de preguntas: en memoria y compartido por todas las peticiones
 builder.Services.AddScoped<ServicioChat>();
 builder.Services.AddScoped<ServicioAltaGasto>();
 

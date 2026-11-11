@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using MiParte.Contracts;
 using MiParte.Core.Api.Gastos;
 using MiParte.Core.Api.Miembros;
+using MiParte.Core.Api.Seguridad;
 using MiParte.Core.Application.Notificaciones;
 using MiParte.Core.Infrastructure.Persistencia;
 
@@ -18,7 +19,8 @@ public static class NotificacionesEndpoints
     public static IEndpointRouteBuilder MapNotificaciones(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/notificaciones/clave-publica", ClavePublica).RequireAuthorization();
-        app.MapPost("/api/notificaciones/suscripcion", SuscribirAsync).RequireAuthorization();
+        // La demo es una cuenta compartida: sus avisos llegarían a desconocidos (el front ya no se lo ofrece).
+        app.MapPost("/api/notificaciones/suscripcion", SuscribirAsync).RequireAuthorization().NoDisponibleEnDemo();
         app.MapDelete("/api/notificaciones/suscripcion", DesuscribirAsync).RequireAuthorization();
         return app;
     }

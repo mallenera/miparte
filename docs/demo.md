@@ -29,6 +29,8 @@ Prerrequisito: el esquema ya migrado con `migrar` del proyecto `MiParte.Database
 
 ## Notas
 
+- **Límites de la cuenta demo en la API.** Como la contraseña es pública, Core.Api le niega (403, `CuentaDemo.NoDisponibleEnDemo`) crear hogares, que el restablecimiento no borraría, y registrar suscripciones push. El asistente sí le funciona, acotado por la cuota diaria por usuario (`Asistente__PreguntasPorDia`), que toda la demo comparte. Cualquiera puede cambiarle la contraseña o el correo desde Supabase Auth: lo deshace el restablecimiento diario (o el botón manual).
+
 - Restablecer recrea el usuario de Auth con el mismo id: se pierden sus tokens de renovación, así que quien esté dentro tendrá que volver a iniciar sesión cuando caduque su token de acceso, y verá los datos reiniciados. A las 04:00 UTC es lo menos molesto.
 - `pg_cron` ejecuta la función como propietario de la base; el plan gratuito de Supabase lo incluye, pero un proyecto pausado por inactividad no corre tareas hasta que se reactive.
 - Verificado en local contra PostgreSQL 18 (esquema de CI más un stub ampliado de `auth.users`/`auth.identities` y `pgcrypto`): doble ejecución estable, recuperación tras modificar o borrar datos del hogar demo, desvinculación de la cuenta de hogares ajenos (sin borrarlos; este último caso aún no repetido tras el último cambio), reparto cuadrando con cada importe y la contraseña de la semilla válida contra el hash. `pg_cron` y el workflow **no** se han podido probar sin el proyecto real.

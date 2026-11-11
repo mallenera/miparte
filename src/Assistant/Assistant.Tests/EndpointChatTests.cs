@@ -22,12 +22,13 @@ public class EndpointChatTests
     private static readonly Guid Hogar = Guid.Parse("a0000000-0000-4000-8000-000000000001");
 
     private static WebApplicationFactory<Program> Crear(
-        IClienteModelo modelo, IDatosHogar datos, FabricaFalsa? fabrica = null, int? mensajesPorMinuto = null)
+        IClienteModelo modelo, IDatosHogar datos, FabricaFalsa? fabrica = null, int? mensajesPorMinuto = null, int? preguntasPorDia = null)
         => new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
         {
             b.UseSetting("Supabase:Url", Url);
             b.UseSetting("Supabase:JwtSecret", Secreto);
             if (mensajesPorMinuto is not null) b.UseSetting("Asistente:MensajesPorMinuto", mensajesPorMinuto.ToString());
+            if (preguntasPorDia is not null) b.UseSetting("Asistente:PreguntasPorDia", preguntasPorDia.ToString());
             b.ConfigureServices(s =>
             {
                 s.Replace(ServiceDescriptor.Singleton(modelo));
@@ -67,6 +68,23 @@ public class EndpointChatTests
         var r = await f.CreateClient().GetAsync("/health");
 
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+    }
+
+    [Fact]
+    public async Task CuotaDiariaAgotada_429SoloParaEseUsuario()
+    {
+        await using var f = Crear(new ModeloFalso(ModeloFalso.Texto("uno"), ModeloFalso.Texto("dos")), new DatosFalsos(), preguntasPorDia: 1);
+        var cliente = Cliente(f, Token(Guid.NewGuid()), Hogar);
+
+        var primera = await cliente.PostAsJsonAsync("/api/chat", Pregunta());
+        var segunda = await cliente.PostAsJsonAsync("/api/chat", Pregunta());
+        var enVivo = await cliente.PostAsJsonAsync("/api/chat/stream", Pregunta());
+        var deOtraPersona = await Cliente(f, Token(Guid.NewGuid()), Hogar).PostAsJsonAsync("/api/chat", Pregunta());
+
+        Assert.Equal(HttpStatusCode.OK, primera.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, segunda.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, enVivo.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, deOtraPersona.StatusCode);
     }
 
     [Fact]

@@ -42,6 +42,7 @@ builder.Services.TryAddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<CacheAcceso>(); // miembros activos por usuario: evita una consulta por petición
 builder.AddLimitacionPeticiones();
 builder.AddCabecerasSeguridad();
+builder.AddEntradasSeguras(); // NUL y fechas fuera de rango: 400 en vez de un 500 al llegar a PostgreSQL
 
 // Cadena de conexión: variable de entorno ConnectionStrings__Default (nunca en el repo).
 var connectionString = builder.Configuration.GetConnectionString("Default");
@@ -132,6 +133,7 @@ if (!string.IsNullOrWhiteSpace(supabase.Url)
 app.UseCabecerasSeguridad(); // el primero: también cubre los rechazos del CORS, la autenticación y el limitador
 app.UseCors();
 app.UseErroresInesperados(); // tras el CORS: un 500 conserva Access-Control-Allow-Origin
+app.UseEntradasSeguras(); // antes de autenticar: una query con NUL no llega a ningún endpoint
 app.UseAuthentication();
 // Entre autenticar y autorizar: la partición es el usuario ya validado (un sub falsificado no cuenta) y
 // los 401 de quien no se autentica también se limitan por IP, porque UseAuthorization corta antes.

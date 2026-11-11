@@ -5,8 +5,8 @@ using MiParte.Core.Domain.Entidades;
 namespace MiParte.Core.Infrastructure.Persistencia;
 
 /// <summary>
-/// Implementación EF Core de <see cref="IRepositorioNotificaciones"/>. Solo <see cref="EliminarAsync"/> aplica el filtro del hogar
-/// actual. Los demás usan <c>IgnoreQueryFilters</c> a propósito: el envío en segundo plano no tiene hogar actual, pero siempre
+/// Implementación EF Core de <see cref="IRepositorioNotificaciones"/>. Solo <see cref="EliminarAsync"/> y <see cref="ContarOtrasDeMiembroAsync"/> aplican
+/// el filtro del hogar actual. Los demás usan <c>IgnoreQueryFilters</c> a propósito: el envío en segundo plano no tiene hogar actual, pero siempre
 /// filtra por el hogar del aviso, y los endpoints son únicos en todo el sistema.
 /// </summary>
 public sealed class RepositorioNotificaciones(MiParteDbContext db) : IRepositorioNotificaciones
@@ -19,6 +19,10 @@ public sealed class RepositorioNotificaciones(MiParteDbContext db) : IRepositori
         db.SuscripcionesPush.Add(nueva);
         await db.SaveChangesAsync(ct);
     }
+
+    /// <inheritdoc />
+    public Task<int> ContarOtrasDeMiembroAsync(Guid miembroId, string endpoint, CancellationToken ct)
+        => db.SuscripcionesPush.CountAsync(s => s.MiembroId == miembroId && s.Endpoint != endpoint, ct);
 
     /// <inheritdoc />
     public async Task<bool> EliminarAsync(Guid miembroId, string endpoint, CancellationToken ct)

@@ -40,8 +40,8 @@ public class PeriodoTests
     [InlineData("2026-02")]
     [InlineData("2026-12")]
     [InlineData("2000-07")]
-    [InlineData("0001-01")]
-    [InlineData("9999-12")]
+    [InlineData("1900-01")]
+    [InlineData("2999-12")]
     public void Mes_EsCompatibleConLosMesesDeLaApi(string mes)
     {
         // Lo que la API ya acepta como mes lo acepta el dominio, y al revés; el texto no cambia.
@@ -58,6 +58,8 @@ public class PeriodoTests
     [InlineData("2026-2")]
     [InlineData("2026-02 ")]
     [InlineData("abcd-ef")]
+    [InlineData("0001-01")]
+    [InlineData("9999-12")]
     public void MesInvalido_TambienLoRechazaLaApi(string mes)
     {
         Assert.False(FormatosApi.TryMes(mes, out _));

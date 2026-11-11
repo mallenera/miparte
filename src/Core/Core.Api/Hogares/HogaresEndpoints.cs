@@ -33,6 +33,8 @@ public static class HogaresEndpoints
 
         app.MapPost("/api/hogares", CrearAsync)
             .RequireAuthorization()
+            .NoDisponibleEnDemo() // el restablecimiento de la demo no borra los hogares que cree
+
             .RequireRateLimiting(LimitacionPeticiones.Costosa)
             .WithMetadata(new SinHogarActual());
 

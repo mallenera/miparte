@@ -29,6 +29,9 @@ public interface IRepositorioListaCompra
     /// <summary>Borra un producto del hogar; false si no existe en ese hogar.</summary>
     Task<bool> EliminarProductoAsync(Guid hogarId, Guid id, CancellationToken ct);
 
+    /// <summary>Borra los productos del hogar (solo los comprados si <paramref name="soloComprados"/>); devuelve cuántos borró.</summary>
+    Task<int> EliminarProductosAsync(Guid hogarId, bool soloComprados, CancellationToken ct);
+
     /// <summary>Guarda un enlace nuevo.</summary>
     Task GuardarEnlaceAsync(EnlaceListaCompra enlace, CancellationToken ct);
 

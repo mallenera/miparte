@@ -53,6 +53,18 @@ public sealed class RepositorioListaCompra(MiParteDbContext db) : IRepositorioLi
     }
 
     /// <inheritdoc />
+    public async Task<int> EliminarProductosAsync(Guid hogarId, bool soloComprados, CancellationToken ct)
+    {
+        // Se cargan y se quitan como entidades (no ExecuteDelete) para que el historial registre cada borrado.
+        var productos = await db.ProductosListaCompra.IgnoreQueryFilters()
+            .Where(p => p.HogarId == hogarId && (!soloComprados || p.Comprado)).ToListAsync(ct);
+        if (productos.Count == 0) return 0;
+        db.ProductosListaCompra.RemoveRange(productos);
+        await db.SaveChangesAsync(ct);
+        return productos.Count;
+    }
+
+    /// <inheritdoc />
     public async Task GuardarEnlaceAsync(EnlaceListaCompra enlace, CancellationToken ct)
     {
         db.EnlacesListaCompra.Add(enlace);

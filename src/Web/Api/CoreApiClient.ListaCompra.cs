@@ -39,6 +39,16 @@ public sealed partial class CoreApiClient
     public Task EliminarProductoCompraAsync(Guid id, CancellationToken ct = default) =>
         _nucleo.EnviarSinRespuestaAsync(HttpMethod.Delete, $"api/lista-compra/productos/{id}", ct);
 
+    /// <summary>Borra los productos ya comprados (<c>DELETE /api/lista-compra/productos/comprados</c>).</summary>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<JsonElement> LimpiarCompradosListaCompraAsync(CancellationToken ct = default) =>
+        _nucleo.EnviarAsync<JsonElement>(HttpMethod.Delete, "api/lista-compra/productos/comprados", null, ct);
+
+    /// <summary>Vacía la lista de la compra entera (<c>DELETE /api/lista-compra/productos</c>).</summary>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<JsonElement> VaciarListaCompraAsync(CancellationToken ct = default) =>
+        _nucleo.EnviarAsync<JsonElement>(HttpMethod.Delete, "api/lista-compra/productos", null, ct);
+
     /// <summary>Crea un enlace QR para añadir productos sin cuenta (<c>POST /api/lista-compra/enlaces</c>). El token solo viene aquí.</summary>
     /// <param name="ct">Token de cancelación.</param>
     public Task<EnlaceListaCreado> CrearEnlaceListaCompraAsync(CancellationToken ct = default) =>

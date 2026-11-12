@@ -137,6 +137,22 @@ public sealed class ModeloListaCompra(CoreApiClient api, string? token = null)
         return "Producto borrado";
     });
 
+    /// <summary>Borra de la lista los productos ya comprados (no disponible desde un enlace QR).</summary>
+    public Task<string?> LimpiarCompradosAsync() => EjecutarAsync(async () =>
+    {
+        await api.LimpiarCompradosListaCompraAsync();
+        await RecargarAsync();
+        return "Productos comprados borrados";
+    });
+
+    /// <summary>Vacía la lista por completo (no disponible desde un enlace QR).</summary>
+    public Task<string?> VaciarAsync() => EjecutarAsync(async () =>
+    {
+        await api.VaciarListaCompraAsync();
+        await RecargarAsync();
+        return "Lista vaciada";
+    });
+
     /// <summary>Activa o desactiva la lista de la compra del hogar.</summary>
     public Task<string?> ActivarAsync(bool activa) => EjecutarAsync(async () =>
     {

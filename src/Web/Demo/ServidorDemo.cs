@@ -137,6 +137,8 @@ public sealed partial class ServidorDemo
             ("lista-compra", 3, "PUT") when subruta == "activacion" => Ok(new { activa = await _lista.ActivarAsync(IdHogar, (await Cuerpo<ActivarListaCompraRequest>())!.Activa, ct) }),
             ("lista-compra", 3, "POST") when subruta == "productos" => await CrearProductoLista((await Cuerpo<CrearProductoCompraRequest>())!, ct),
             ("lista-compra", 4, "PUT") when subruta == "productos" && id is { } i => await MarcarProductoLista(i, (await Cuerpo<MarcarProductoCompraRequest>())!, ct),
+            ("lista-compra", 3, "DELETE") when subruta == "productos" => Ok(new { borrados = await _lista.VaciarAsync(IdHogar, ct) }),
+            ("lista-compra", 4, "DELETE") when subruta == "productos" && ruta[3] == "comprados" => Ok(new { borrados = await _lista.LimpiarCompradosAsync(IdHogar, ct) }),
             ("lista-compra", 4, "DELETE") when subruta == "productos" && id is { } i => Sin(await _lista.EliminarAsync(IdHogar, i, ct)),
             ("lista-compra", 3, "GET") when subruta == "enlaces" => await ListarEnlacesLista(ct),
             ("lista-compra", 3, "POST") when subruta == "enlaces" => await CrearEnlaceLista(ct),

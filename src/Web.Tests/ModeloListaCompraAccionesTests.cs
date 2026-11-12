@@ -54,6 +54,20 @@ public class ModeloListaCompraAccionesTests
         Assert.Contains($"DELETE /api/lista-compra/productos/{LecheId}", api.Recibidas);
     }
 
+    [Fact]
+    public async Task LimpiarComprados_y_Vaciar_llaman_a_sus_rutas_y_recargan()
+    {
+        var api = Api()
+            .Responde("DELETE /api/lista-compra/productos/comprados", HttpStatusCode.OK, new { borrados = 1 })
+            .Responde("DELETE /api/lista-compra/productos", HttpStatusCode.OK, new { borrados = 2 });
+        var m = new ModeloListaCompra(Cliente(api));
+        await m.CargarAsync();
+
+        Assert.Equal("Productos comprados borrados", await m.LimpiarCompradosAsync());
+        Assert.Equal("Lista vaciada", await m.VaciarAsync());
+        Assert.Equal(3, api.Recibidas.Count(r => r == "GET /api/lista-compra"));
+    }
+
     [Theory]
     [InlineData(true, "Lista de la compra activada")]
     [InlineData(false, "Lista de la compra desactivada")]

@@ -252,6 +252,8 @@ Los enlaces QR son para quien no tiene cuenta: `POST /api/lista-compra/enlaces` 
 | `POST /api/lista-compra/productos` | Añade un producto | `CrearProductoCompraRequest` (`nombre`, `cantidad` opcional) | `ProductoCompraDto` 201 | 400 nombre o cantidad inválidos; 409 lista desactivada o sin hogar | `lista.compra` |
 | `PUT /api/lista-compra/productos/{id}` | Marca o desmarca como comprado | `MarcarProductoCompraRequest` | `ProductoCompraDto` 200 | 404 no es del hogar; 409 sin hogar | `lista.compra` |
 | `DELETE /api/lista-compra/productos/{id}` | Borra un producto | - | 204 | 404; 409 sin hogar | `lista.compra` |
+| `DELETE /api/lista-compra/productos/comprados` | Borra los productos ya comprados | - | 200 `{ borrados }` | 409 sin hogar | `lista.compra` |
+| `DELETE /api/lista-compra/productos` | Vacía la lista entera | - | 200 `{ borrados }` | 409 sin hogar | `lista.compra` |
 | `GET /api/lista-compra/enlaces` | Enlaces QR del hogar, del más reciente al más antiguo, con su estado (`vigente`, `revocado` o `caducado`) y quién los creó. **No lleva el token**: solo se devuelve al crear el enlace; para uno perdido hay que revocarlo y crear otro. Funciona con la lista desactivada | - | `EnlaceListaDto[]` 200 | 409 sin hogar | miembro |
 | `POST /api/lista-compra/enlaces` | Crea un enlace QR (caduca a los 7 días). El token va solo aquí | - | `EnlaceListaCreado` 201 | 409 lista desactivada o sin hogar | `lista.compra` |
 | `DELETE /api/lista-compra/enlaces/{id}` | Revoca un enlace | - | 204 | 404; 409 sin hogar | `lista.compra` |

@@ -28,6 +28,8 @@ public static class ListaCompraEndpoints
         app.MapPost("/api/lista-compra/productos", CrearProductoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.ListaCompra);
         app.MapPut("/api/lista-compra/productos/{id:guid}", MarcarProductoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.ListaCompra);
         app.MapDelete("/api/lista-compra/productos/{id:guid}", BorrarProductoAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.ListaCompra);
+        app.MapDelete("/api/lista-compra/productos/comprados", LimpiarCompradosAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.ListaCompra);
+        app.MapDelete("/api/lista-compra/productos", VaciarAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.ListaCompra);
         app.MapGet("/api/lista-compra/enlaces", ListarEnlacesAsync).RequireAuthorization();
         app.MapPost("/api/lista-compra/enlaces", CrearEnlaceAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.ListaCompra);
         app.MapDelete("/api/lista-compra/enlaces/{id:guid}", RevocarEnlaceAsync).RequireAuthorization().RequierePermiso(CatalogoPermisos.ListaCompra);
@@ -83,6 +85,20 @@ public static class ListaCompraEndpoints
         if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
         var r = await servicio.EliminarAsync(hogarId, id, ct);
         return r.Error is { } error ? ApiComun.Respuesta(error) : Results.NoContent();
+    }
+
+    /// <summary>DELETE /api/lista-compra/productos/comprados: borra los productos ya comprados. 200 con cuántos se borraron.</summary>
+    private static async Task<IResult> LimpiarCompradosAsync([FromServices] ServicioListaCompra servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
+    {
+        if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
+        return Results.Ok(new { borrados = await servicio.LimpiarCompradosAsync(hogarId, ct) });
+    }
+
+    /// <summary>DELETE /api/lista-compra/productos: vacía la lista entera. 200 con cuántos se borraron.</summary>
+    private static async Task<IResult> VaciarAsync([FromServices] ServicioListaCompra servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
+    {
+        if (hogar.HogarId is not { } hogarId) return ApiComun.SinHogar();
+        return Results.Ok(new { borrados = await servicio.VaciarAsync(hogarId, ct) });
     }
 
     /// <summary>

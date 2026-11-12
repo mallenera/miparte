@@ -233,6 +233,23 @@ public class ServicioListaCompraTests
     }
 
     [Fact]
+    public async Task LimpiarComprados_SoloBorraLosComprados_YVaciar_BorraTodo_SinTocarOtroHogar()
+    {
+        var pan = (await Servicio.AnadirAsync(Hogar, "Pan", 1, default)).Valor!;
+        await Servicio.AnadirAsync(Hogar, "Leche", 1, default);
+        await Servicio.MarcarAsync(Hogar, pan.Id, true, default);
+        var ajeno = new ProductoListaCompra { Id = Guid.NewGuid(), HogarId = Guid.NewGuid(), Nombre = "Ajeno", Cantidad = 1, Comprado = true };
+        _repo.Productos.Add(ajeno);
+
+        Assert.Equal(1, await Servicio.LimpiarCompradosAsync(Hogar, default));
+        Assert.Equal(["Leche"], (await Servicio.ListarAsync(Hogar, default)).Select(p => p.Nombre));
+
+        Assert.Equal(1, await Servicio.VaciarAsync(Hogar, default));
+        Assert.Empty(await Servicio.ListarAsync(Hogar, default));
+        Assert.Contains(ajeno, _repo.Productos);
+    }
+
+    [Fact]
     public async Task CrearEnlace_ConUnaCaducidadPasada_EsInvalido_YConUnaFutura_LaRespeta()
     {
         var pasada = await Servicio.CrearEnlaceAsync(Hogar, Ana, _reloj.GetUtcNow().AddMinutes(-1), default);
@@ -408,6 +425,9 @@ public class ServicioListaCompraTests
 
         public Task<bool> EliminarProductoAsync(Guid hogarId, Guid id, CancellationToken ct)
             => Task.FromResult(Productos.RemoveAll(p => p.HogarId == hogarId && p.Id == id) > 0);
+
+        public Task<int> EliminarProductosAsync(Guid hogarId, bool soloComprados, CancellationToken ct)
+            => Task.FromResult(Productos.RemoveAll(p => p.HogarId == hogarId && (!soloComprados || p.Comprado)));
 
         public Task GuardarEnlaceAsync(EnlaceListaCompra enlace, CancellationToken ct)
         {

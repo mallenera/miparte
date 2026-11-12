@@ -302,8 +302,6 @@ public static class CuentaComun
     public static ResumenMensualCuenta ResumenMensual(DateOnly mes, HistoricoCuenta h)
     {
         var fin = mes.AddMonths(1);
-        var anterior = Calcular(
-            mes.AddMonths(-1), h.Vigentes, h.Gastos, h.Reembolsos, h.Retiradas, h.Depositos, h.SaldoInicial, h.Ingresos, h.Deudas);
         bool EnMes(DateOnly f) => f >= mes && f < fin;
 
         var aportesGastos = h.Vigentes.Select(a => a.MiembroId).Distinct()
@@ -313,8 +311,8 @@ public static class CuentaComun
         var directos = gastos.Where(g => g.PagadoPor is null && !g.DesdeAhorro).Sum(g => g.Importe);
         var delAhorro = gastos.Where(g => g.DesdeAhorro).Sum(g => g.Importe);
         var adelantadosDelAhorro = gastos.Where(g => g.PagadoPor is not null && g.DesdeAhorro).Sum(g => g.Importe);
-        var reembolsado = h.Reembolsos.Where(r => EnMes(r.Fecha)).Sum(r => r.Importe);
-        var retirado = h.Retiradas.Where(r => EnMes(r.Fecha)).Sum(r => r.Importe);
+        var reembolsado = (h.ReembolsosDelMes ?? h.Reembolsos.Where(r => EnMes(r.Fecha)).ToList()).Sum(r => r.Importe);
+        var retirado = (h.RetiradasDelMes ?? h.Retiradas.Where(r => EnMes(r.Fecha)).ToList()).Sum(r => r.Importe);
         var depositado = h.Depositos.Where(d => EnMes(d.Fecha)).Sum(d => d.Importe);
         var ingresado = (h.Ingresos ?? []).Where(i => EnMes(i.Fecha)).Sum(i => i.Importe);
         var fijado = h.SaldoInicial is { } si && EnMes(si.Fecha) ? si.Importe : 0m;
@@ -336,19 +334,25 @@ public static class CuentaComun
         // Los reembolsos salen del efectivo de Hogar aunque el adelanto fuera del ahorro: el efectivo ya incluye lo pendiente de los dos
         // fondos. El fondo solo decide de qué pendiente se descuenta, así que la columna de Ahorro no cambia el dinero.
         // La compensación del ahorro se anota como salida de Hogar (su pendiente deja el efectivo) y entrada de Ahorro.
+        // El inicial no se calcula con el estado del mes anterior: el histórico llega agrupado y fechado en este mes (gastos,
+        // reembolsos y retiradas), así que un corte al mes anterior los descartaría todos. Se parte del estado al cierre de este mes
+        // y se resta lo que se mueve en él, como hace el extracto; así el inicial es el disponible del mes anterior.
+        var movimientoHogar = aportesGastos + fijado + adelantadosDelAhorro + ingresado + devueltoHogar
+            - directos - adelantoHogar - reembolsado - compensadoAhorro;
+        var movimientoAhorro = aportesAhorro + compensadoAhorro + depositado + devueltoAhorro - delAhorro - retirado - adelantoAhorro;
         var hogar = new FilaResumenMensualCuenta(
-            anterior.Efectivo, aportesGastos + fijado + adelantadosDelAhorro, ingresado + devueltoHogar, directos + adelantoHogar,
-            reembolsado + compensadoAhorro,
-            anterior.Efectivo + aportesGastos + fijado + adelantadosDelAhorro + ingresado + devueltoHogar
-                - directos - adelantoHogar - reembolsado - compensadoAhorro,
-            pendienteHogar);
+            estadoMes.Efectivo - movimientoHogar, aportesGastos + fijado + adelantadosDelAhorro, ingresado + devueltoHogar,
+            directos + adelantoHogar, reembolsado + compensadoAhorro, estadoMes.Efectivo, pendienteHogar);
         var ahorro = new FilaResumenMensualCuenta(
-            anterior.AhorroDisponible, aportesAhorro + compensadoAhorro, depositado + devueltoAhorro, delAhorro + retirado + adelantoAhorro, 0m,
-            anterior.AhorroDisponible + aportesAhorro + compensadoAhorro + depositado + devueltoAhorro - delAhorro - retirado - adelantoAhorro,
-            pendienteAhorro);
+            estadoMes.AhorroDisponible - movimientoAhorro, aportesAhorro + compensadoAhorro, depositado + devueltoAhorro,
+            delAhorro + retirado + adelantoAhorro, 0m, estadoMes.AhorroDisponible, pendienteAhorro);
+        // Dos traspasos entre fondos aparecen en las dos filas, como salida de un lado y entrada del otro: el gasto del ahorro que
+        // adelanta una persona (entra en Hogar y sale del Ahorro) y la compensación del ahorro (sale de Hogar y entra en el Ahorro).
+        // El dinero total no se mueve, así que el Total los quita de las dos columnas y el Disponible sigue cuadrando.
         var total = new FilaResumenMensualCuenta(
-            hogar.Inicial + ahorro.Inicial, hogar.Ingresos + ahorro.Ingresos, hogar.IngresosSueltos + ahorro.IngresosSueltos,
-            hogar.Gastos + ahorro.Gastos, hogar.Reembolsos + ahorro.Reembolsos, hogar.Disponible + ahorro.Disponible,
+            hogar.Inicial + ahorro.Inicial, hogar.Ingresos + ahorro.Ingresos - adelantadosDelAhorro - compensadoAhorro,
+            hogar.IngresosSueltos + ahorro.IngresosSueltos, hogar.Gastos + ahorro.Gastos - adelantadosDelAhorro,
+            hogar.Reembolsos + ahorro.Reembolsos - compensadoAhorro, hogar.Disponible + ahorro.Disponible,
             hogar.Pendiente + ahorro.Pendiente);
         return new ResumenMensualCuenta(hogar, ahorro, total);
     }

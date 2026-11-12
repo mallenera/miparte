@@ -15,7 +15,8 @@ public sealed class HistoricoCuentaComun
     private const int TipoAportacion = 0, TipoReembolsoMes = 1, TipoRetiradaMes = 2, TipoDepositoMes = 3, TipoReembolsos = 4,
         TipoGastos = 5, TipoGastosMes = 6, TipoRetiradas = 7, TipoDepositos = 8, TipoNombre = 9, TipoFunciones = 10, TipoIngresos = 11,
         TipoDeudaAdelanto = 12, TipoDeudaDevolucion = 13, TipoDeudaCompensacion = 14,
-        TipoDeudaMesAdelanto = 15, TipoDeudaMesDevolucion = 16, TipoDeudaMesCompensacion = 17;
+        TipoDeudaMesAdelanto = 15, TipoDeudaMesDevolucion = 16, TipoDeudaMesCompensacion = 17,
+        TipoReembolsosAgrupadosMes = 18, TipoRetiradasAgrupadasMes = 19;
 
     /// <summary>
     /// Fila común a todas las partes de la consulta: EF las une con <c>UNION ALL</c> y para eso necesitan la misma forma. Los
@@ -68,7 +69,7 @@ public sealed class HistoricoCuentaComun
     /// </summary>
     public HistoricoCuenta AHistoricoCuenta() => new(
         Vigentes, Gastos, Reembolsos, Retiradas, Depositos, CuentaActiva, GastadoMes, GastosDelMes, SaldoInicial,
-        Frecuencia, Ingresos, Deudas);
+        Frecuencia, Ingresos, Deudas, ReembolsosAgrupadosMes, RetiradasAgrupadasMes);
 
     /// <summary>
     /// Lee en una consulta lo necesario para calcular la cuenta al final del mes que empieza en <paramref name="inicio"/>.
@@ -105,6 +106,21 @@ public sealed class HistoricoCuentaComun
             {
                 Tipo = TipoReembolsos, Id = vacio, MiembroId = g.Key.MiembroId, Fecha = inicio,
                 Importe = g.Sum(x => x.Importe), Ahorro = 0m, Marca = g.Key.DesdeAhorro, Marca2 = false, Texto = "",
+            });
+        // Solo los del mes, para el resumen mensual: las sumas hasta el fin del mes no dicen cuánto se movió dentro de él.
+        var reembolsosMes = db.ReembolsosCuenta.Where(r => r.Fecha >= inicio && r.Fecha < fin)
+            .GroupBy(r => new { r.MiembroId, r.DesdeAhorro })
+            .Select(g => new Fila
+            {
+                Tipo = TipoReembolsosAgrupadosMes, Id = vacio, MiembroId = g.Key.MiembroId, Fecha = inicio,
+                Importe = g.Sum(x => x.Importe), Ahorro = 0m, Marca = g.Key.DesdeAhorro, Marca2 = false, Texto = "",
+            });
+        var retiradasMes = db.RetiradasAhorro.Where(r => r.Fecha >= inicio && r.Fecha < fin)
+            .GroupBy(r => true)
+            .Select(g => new Fila
+            {
+                Tipo = TipoRetiradasAgrupadasMes, Id = vacio, MiembroId = vacio, Fecha = inicio,
+                Importe = g.Sum(x => x.Importe), Ahorro = 0m, Marca = false, Marca2 = false, Texto = "",
             });
         var retiradas = db.RetiradasAhorro.Where(r => r.Fecha < fin)
             .GroupBy(r => true)
@@ -145,7 +161,7 @@ public sealed class HistoricoCuentaComun
         });
 
         var consulta = gastos.Concat(gastosMes).Concat(reembolsos).Concat(retiradas).Concat(depositos).Concat(ingresos).Concat(aportaciones).Concat(funciones)
-            .Concat(deudas);
+            .Concat(deudas).Concat(reembolsosMes).Concat(retiradasMes);
 
         if (detalleDelMes)
         {
@@ -234,6 +250,14 @@ public sealed class HistoricoCuentaComun
 
     /// <summary>Reembolsos hasta el fin del mes, agrupados por miembro.</summary>
     public List<ReembolsoDeCuenta> Reembolsos => De(TipoReembolsos).Select(f => new ReembolsoDeCuenta(f.MiembroId, _inicio, f.Importe, f.Marca)).ToList();
+
+    /// <summary>Reembolsos con fecha dentro del mes, agrupados por miembro y origen.</summary>
+    public List<ReembolsoDeCuenta> ReembolsosAgrupadosMes => De(TipoReembolsosAgrupadosMes)
+        .Select(f => new ReembolsoDeCuenta(f.MiembroId, _inicio, f.Importe, f.Marca)).ToList();
+
+    /// <summary>Retiradas de ahorro con fecha dentro del mes (una sola fila, o ninguna si no hay).</summary>
+    public List<RetiradaDeAhorro> RetiradasAgrupadasMes => De(TipoRetiradasAgrupadasMes)
+        .Select(f => new RetiradaDeAhorro(_inicio, f.Importe)).ToList();
 
     /// <summary>Total retirado del ahorro hasta el fin del mes (una sola fila, o ninguna si no hay).</summary>
     public List<RetiradaDeAhorro> Retiradas => De(TipoRetiradas).Select(f => new RetiradaDeAhorro(_inicio, f.Importe)).ToList();

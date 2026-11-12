@@ -32,6 +32,9 @@ internal sealed class RepositorioListaCompraEnMemoria(AlmacenDemo a) : IReposito
     public Task<bool> EliminarProductoAsync(Guid hogarId, Guid id, CancellationToken ct)
         => Task.FromResult(a.Productos.RemoveAll(p => p.HogarId == hogarId && p.Id == id) > 0);
 
+    public Task<int> EliminarProductosAsync(Guid hogarId, bool soloComprados, CancellationToken ct)
+        => Task.FromResult(a.Productos.RemoveAll(p => p.HogarId == hogarId && (!soloComprados || p.Comprado)));
+
     public Task GuardarEnlaceAsync(EnlaceListaCompra enlace, CancellationToken ct)
     {
         a.EnlacesListaCompra.Add(enlace);

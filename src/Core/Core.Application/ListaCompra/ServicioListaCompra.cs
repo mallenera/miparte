@@ -69,6 +69,12 @@ public sealed class ServicioListaCompra(IRepositorioListaCompra repositorio, Tim
     public async Task<Resultado<bool>> EliminarAsync(Guid hogarId, Guid id, CancellationToken ct)
         => await repositorio.EliminarProductoAsync(hogarId, id, ct) ? Resultado<bool>.Ok(true) : Resultado<bool>.NoEncontrado();
 
+    /// <summary>Borra los productos ya comprados y devuelve cuántos eran.</summary>
+    public Task<int> LimpiarCompradosAsync(Guid hogarId, CancellationToken ct) => repositorio.EliminarProductosAsync(hogarId, true, ct);
+
+    /// <summary>Vacía la lista (pendientes y comprados) y devuelve cuántos productos borró.</summary>
+    public Task<int> VaciarAsync(Guid hogarId, CancellationToken ct) => repositorio.EliminarProductosAsync(hogarId, false, ct);
+
     /// <summary>
     /// Crea un enlace para añadir y marcar productos por QR. Sin <paramref name="caducaEn"/> caduca a los 7 días. Conflicto si la lista
     /// no está activada en el hogar; inválido si la caducidad ya pasó.

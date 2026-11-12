@@ -83,6 +83,26 @@
                 }
             }
 
+            @if (PuedeEditar && _m.Productos.Count > 0)
+            {
+                <div class="u-mt12">
+                    @if (_m.Comprados.Any())
+                    {
+                        <button class="btn" type="button" disabled="@_m.Enviando" @onclick="LimpiarCompradosAsync">Quitar los comprados</button>
+                    }
+                    @if (!_confirmarVaciar)
+                    {
+                        <button class="linkbtn danger" type="button" disabled="@_m.Enviando" @onclick="() => _confirmarVaciar = true">Vaciar la lista</button>
+                    }
+                    else
+                    {
+                        <span role="alert">¿Borrar todos los productos?</span>
+                        <button class="linkbtn danger" type="button" disabled="@_m.Enviando" @onclick="VaciarAsync">Sí, vaciar</button>
+                        <button class="linkbtn" type="button" @onclick="() => _confirmarVaciar = false">Cancelar</button>
+                    }
+                </div>
+            }
+
             @if (PuedeEditar && !_m.Publica)
             {
                 <h3 class="u-titulo-form">Compartir por QR</h3>
@@ -163,6 +183,16 @@
     private async Task MarcarAsync(ProductoCompraDto p, bool comprado) => await Mostrar(_m.MarcarAsync(p, comprado));
 
     private async Task EliminarAsync(ProductoCompraDto p) => await Mostrar(_m.EliminarAsync(p));
+
+    private bool _confirmarVaciar;
+
+    private async Task LimpiarCompradosAsync() => await Mostrar(_m.LimpiarCompradosAsync());
+
+    private async Task VaciarAsync()
+    {
+        _confirmarVaciar = false;
+        await Mostrar(_m.VaciarAsync());
+    }
 
     private async Task CrearEnlaceAsync() => await Mostrar(_m.CrearEnlaceAsync(BaseAplicacion));
 

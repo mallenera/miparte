@@ -12,7 +12,7 @@ Es el proyecto fin de máster de desarrollo en IA (BigSchool). Está pensada par
 
 **Datos de partida acordados:**
 
-- Acceso desde web y desde Android, sin app nativa.
+- Acceso desde web y desde Android, sin app nativa (la APK de Android solo envuelve la web publicada, ver [despliegue.md](despliegue.md)).
 - Login con correo y contraseña, y con Google.
 - Nube gratuita o de bajo coste, con dominio propio económico.
 - Hay gastos que se reparten 2 contra 1 entre miembros.

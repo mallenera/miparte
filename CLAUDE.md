@@ -33,6 +33,7 @@ dotnet run --project src/Web
 dotnet run --project src/Database/MiParte.Database -- migrar --conexion "<cadena>"   # migrar; también: pendientes, script, marcar-aplicadas
 npm ci --prefix tests/pwa && npx --prefix tests/pwa playwright install chromium   # una vez, antes de la prueba de la PWA
 node tests/pwa/probar.mjs <publish>/wwwroot                      # PWA publicada como en Cloudflare Pages
+./scripts/compilar-apk.ps1                                       # APK de Android (TWA de android/); pide la contraseña de la clave
 docker compose up --build                                       # web :8080 (nginx sin privilegios), core :5001, assistant :5002
 ```
 

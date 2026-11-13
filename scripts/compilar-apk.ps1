@@ -80,6 +80,12 @@ try {
 finally { Pop-Location }
 
 $enlaces = Join-Path $raiz 'src\Web\wwwroot\.well-known\assetlinks.json'
+$anterior = if (Test-Path $enlaces) { [IO.File]::ReadAllText($enlaces) } else { '' }
+# Se conservan las huellas que ya hubiera (p. ej. la de Google Play, que vuelve a firmar la app): el fichero solo
+# declara este paquete, así que todas las huellas que contiene son suyas.
+$huellas = @(@([regex]::Matches($anterior, '(?:[0-9A-Fa-f]{2}:){31}[0-9A-Fa-f]{2}') | ForEach-Object { $_.Value.ToUpper() }) + $huella |
+    Select-Object -Unique)
+$lista = ($huellas | ForEach-Object { "`"$_`"" }) -join ', '
 $json = @"
 [
   {
@@ -87,12 +93,11 @@ $json = @"
     "target": {
       "namespace": "android_app",
       "package_name": "dev.pages.miparte.twa",
-      "sha256_cert_fingerprints": ["$huella"]
+      "sha256_cert_fingerprints": [$lista]
     }
   }
 ]
 "@
-$anterior = if (Test-Path $enlaces) { [IO.File]::ReadAllText($enlaces) } else { '' }
 # Sin BOM y con saltos de línea de Unix, como el resto de wwwroot.
 [IO.File]::WriteAllText($enlaces, ($json -replace "`r`n", "`n") + "`n", (New-Object Text.UTF8Encoding $false))
 

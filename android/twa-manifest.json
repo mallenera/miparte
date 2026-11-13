@@ -1,0 +1,42 @@
+{
+  "packageId": "dev.pages.miparte.twa",
+  "host": "miparte.pages.dev",
+  "name": "Mi parte, tu parte",
+  "launcherName": "Mi parte",
+  "display": "standalone",
+  "themeColor": "#7A1F33",
+  "themeColorDark": "#1C1114",
+  "navigationColor": "#FBF5EF",
+  "navigationColorDark": "#1C1114",
+  "navigationDividerColor": "#FBF5EF",
+  "navigationDividerColorDark": "#1C1114",
+  "backgroundColor": "#FBF5EF",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://miparte.pages.dev/icon-512.png",
+  "maskableIconUrl": "https://miparte.pages.dev/icon-maskable-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./miparte.keystore",
+    "alias": "miparte"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://miparte.pages.dev/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://miparte.pages.dev/",
+  "minSdkVersion": 24,
+  "orientation": "default",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": []
+}

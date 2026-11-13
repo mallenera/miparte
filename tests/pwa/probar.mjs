@@ -76,6 +76,15 @@ await paso('versión nueva desplegada: aviso, «Actualizar» y la app sigue abri
     if (!(await controlada())) throw new Error('El service worker nuevo no controla la página');
 });
 
+// Android verifica la APK (Trusted Web Activity) con este fichero: si faltara, el fallback de la SPA devolvería
+// index.html con un 200 y la app se abriría con la barra de direcciones sin que nada más fallara.
+await paso('/.well-known/assetlinks.json declara la app de Android', async () => {
+    const respuesta = await contexto.request.get(url + '/.well-known/assetlinks.json');
+    if (!/json/.test(respuesta.headers()['content-type'] ?? '')) throw new Error('No se sirve como JSON');
+    const enlaces = JSON.parse(await respuesta.text());
+    if (enlaces[0]?.target?.package_name !== 'dev.pages.miparte.twa') throw new Error('No declara dev.pages.miparte.twa');
+});
+
 await paso('sin errores de JavaScript ni violaciones de CSP', async () => {
     if (problemas.length) throw new Error(problemas.join(' | '));
 });

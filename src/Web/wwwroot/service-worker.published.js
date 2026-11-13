@@ -17,7 +17,9 @@ const offlineAssetsInclude = [ /\.dll$/, /\.pdb$/, /\.wasm/, /\.html/, /\.js$/, 
 // appsettings.json sí se precarga (Blazor lo lee al arrancar; sin él la app no abre sin conexión). Por eso el
 // workflow de despliegue fija CoreUrl y AssistantUrl ANTES de publicar: si lo tocara después, su hash no
 // coincidiría con el del manifiesto y la instalación del service worker fallaría por SRI.
-const offlineAssetsExclude = [ /^service-worker\.js$/ ];
+// .well-known/assetlinks.json solo lo lee Android para verificar la APK (ver docs/despliegue.md): no hace falta sin
+// conexión, y si el alojamiento no lo sirviera tal cual, precargarlo impediría instalar el worker.
+const offlineAssetsExclude = [ /^service-worker\.js$/, /^\.well-known\// ];
 
 // Replace with your base path if you are hosting on a subfolder. Ensure there is a trailing '/'.
 const base = "/";

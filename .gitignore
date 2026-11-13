@@ -14,6 +14,15 @@ supabase/.env
 # Configuración local del front (URL y anon key de tu proyecto)
 src/Web/wwwroot/appsettings.Development.json
 
+# APK de Android: salidas de Gradle y clave de firma (nunca en el repositorio)
+android/.gradle/
+android/build/
+android/app/build/
+android/salida/
+android/local.properties
+*.keystore
+*.jks
+
 # Dependencias de npm
 node_modules/
 

@@ -1,0 +1,10 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "dev.pages.miparte.twa",
+      "sha256_cert_fingerprints": ["48:9B:92:04:DC:B5:B0:2E:8F:4C:F7:95:59:53:E0:39:97:E5:75:59:51:53:72:55:62:DE:D9:3D:FE:5C:44:3F"]
+    }
+  }
+]

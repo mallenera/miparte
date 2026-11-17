@@ -1,0 +1,19 @@
+# Avisos y PR semanales de actualizaciones de dependencias (NuGet, npm de las pruebas de la PWA y acciones de GitHub).
+# Las alertas de seguridad llegan además en cuanto se publican si están activas en Settings > Code security.
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      nuget:
+        patterns: ["*"]
+  - package-ecosystem: npm
+    directory: "/tests/pwa"
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly

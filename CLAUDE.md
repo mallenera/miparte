@@ -48,7 +48,7 @@ dotnet run --project src/Database/MiParte.Database -- migrar --con-auth-stub --c
 MIPARTE_TEST_DB="Host=localhost;Database=miparte;Username=postgres;Password=..." dotnet test
 ```
 
-`supabase/tests/auth_stub.sql` simula el esquema `auth` de Supabase (y sus privilegios por defecto para `anon`/`authenticated`, necesarios para que los tests de permisos tengan algo que comprobar); lo aplica `migrar --con-auth-stub` antes de las migraciones (en Supabase real no se usa). El proyecto `MiParte.Database.Tests` crea y borra bases temporales a partir del servidor de `MIPARTE_TEST_DB`.
+`supabase/tests/auth_stub.sql` simula el esquema `auth` de Supabase (y sus privilegios por defecto sobre tablas **y funciones** para `anon`/`authenticated`, necesarios para que los tests de permisos tengan algo que comprobar: un `revoke ... from public` no quita esas concesiones explícitas, así que `00_Esquema.sql` las retira y solo las funciones que usa la RLS se conceden a `authenticated`); lo aplica `migrar --con-auth-stub` antes de las migraciones (en Supabase real no se usa). El proyecto `MiParte.Database.Tests` crea y borra bases temporales a partir del servidor de `MIPARTE_TEST_DB`.
 
 #### Montar un PostgreSQL local en Windows (una vez)
 

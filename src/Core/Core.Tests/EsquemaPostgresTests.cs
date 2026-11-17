@@ -304,6 +304,15 @@ public class EsquemaPostgresTests
         Assert.False((bool)(await EscalarAsync(conn, "select has_function_privilege('authenticated', 'public.aceptar_invitacion(text, text)', 'EXECUTE')"))!);
         // Las políticas RLS de lectura las siguen necesitando.
         Assert.True((bool)(await EscalarAsync(conn, "select has_function_privilege('authenticated', 'public.mis_hogares()', 'EXECUTE')"))!);
+
+        // Ninguna función de public es invocable sin sesión por /rest/v1/rpc, y con sesión solo las que usa la RLS. El auth stub
+        // imita los privilegios por defecto de Supabase, que conceden EXECUTE explícito a anon y authenticated en cada función nueva.
+        Assert.Equal("", await EscalarAsync(conn,
+            "select coalesce(string_agg(proname, ', ' order by proname), '') from pg_proc " +
+            "where pronamespace = 'public'::regnamespace and has_function_privilege('anon', oid, 'EXECUTE')"));
+        Assert.Equal("es_admin_hogar, hogar_tiene_otro_admin, mi_miembro_id, mis_hogares", await EscalarAsync(conn,
+            "select coalesce(string_agg(proname, ', ' order by proname), '') from pg_proc " +
+            "where pronamespace = 'public'::regnamespace and has_function_privilege('authenticated', oid, 'EXECUTE')"));
     }
 
     [SkippableFact]

@@ -4,11 +4,41 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Mi parte, tu parte</title>
+    <title>Mi parte, tu parte · Reparte los gastos del hogar</title>
     <base href="/" />
+    <!-- SEO: Blazor solo pinta en el navegador, así que lo que leen buscadores y previsualizaciones es este HTML.
+         Todas las rutas de la SPA sirven este mismo fichero: el canonical las agrupa en la raíz (ver robots.txt). -->
+    <meta name="description" content="Reparte los gastos de casa en pareja o en un piso compartido: por porcentajes, por partes o con cuenta común, y liquida el mes con las transferencias mínimas." />
+    <link rel="canonical" href="https://miparte.pages.dev/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Mi parte, tu parte" />
+    <meta property="og:locale" content="es_ES" />
+    <meta property="og:url" content="https://miparte.pages.dev/" />
+    <meta property="og:title" content="Mi parte, tu parte · Reparte los gastos del hogar" />
+    <meta property="og:description" content="Cada uno paga su parte, sin discutirla. Reparto por porcentajes, partes o cuenta común y liquidación mensual con las transferencias mínimas." />
+    <meta property="og:image" content="https://miparte.pages.dev/icon-512.png" />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
+    <meta property="og:image:alt" content="Símbolo de Mi parte, tu parte" />
+    <meta name="twitter:card" content="summary" />
+    <!-- Bloque de datos, no script: el navegador no lo ejecuta y la CSP no lo bloquea. -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Mi parte, tu parte",
+        "url": "https://miparte.pages.dev/",
+        "description": "Aplicación web para repartir los gastos del hogar entre sus miembros: reparto individual, por porcentajes, por partes o con cuenta común, liquidación mensual, gastos recurrentes, lista de la compra y asistente.",
+        "applicationCategory": "FinanceApplication",
+        "operatingSystem": "Web",
+        "browserRequirements": "Requiere JavaScript y WebAssembly",
+        "inLanguage": "es"
+    }
+    </script>
     <meta name="theme-color" content="#7A1F33" />
     <link rel="stylesheet" href="css/app.css" />
     <script src="js/tema.js"></script>
+    <script src="js/precarga.js"></script>
     <script src="js/compartir-resumen.js"></script>
     <script src="js/descargar-fichero.js"></script>
     <script src="js/avisos-push.js"></script>
@@ -20,14 +50,71 @@
 
 <body>
     <div id="app">
-        <div class="arranque" role="status" aria-label="Cargando">
-            <svg class="logo" width="64" height="64" viewBox="0 0 100 100" aria-hidden="true">
-                <g transform="rotate(45 50 50)">
-                    <path class="h1" d="M42 11 A33 33 0 0 0 42 77 Z"></path>
-                    <path class="h2" d="M48 14 A40 40 0 0 1 48 94 Z"></path>
-                </g>
-            </svg>
-            <div class="spin"></div>
+        <!-- Contenido previo a Blazor: lo sustituye la app al arrancar. Con sesión guardada (js/precarga.js) solo se ve
+             la pantalla de carga; sin ella, la portada con la propuesta de valor, que es lo que indexan los buscadores.
+             Estático y sin estilos ni scripts en línea por la CSP; el texto debe seguir lo que la app hace de verdad. -->
+        <div class="precarga">
+            <div class="arranque" role="status" aria-label="Cargando">
+                <svg class="logo" width="64" height="64" viewBox="0 0 100 100" aria-hidden="true">
+                    <g transform="rotate(45 50 50)">
+                        <path class="h1" d="M42 11 A33 33 0 0 0 42 77 Z"></path>
+                        <path class="h2" d="M48 14 A40 40 0 0 1 48 94 Z"></path>
+                    </g>
+                </svg>
+                <div class="spin"></div>
+            </div>
+            <div class="wrap escaparate">
+                <header class="top">
+                    <a class="brand" href="" aria-label="Mi parte, tu parte. Ir al inicio">
+                        <svg class="logo" width="40" height="40" viewBox="0 0 100 100" aria-hidden="true">
+                    <g transform="rotate(45 50 50)">
+                        <path class="h1" d="M42 11 A33 33 0 0 0 42 77 Z"></path>
+                        <path class="h2" d="M48 14 A40 40 0 0 1 48 94 Z"></path>
+                    </g>
+                </svg>
+                        <div>
+                            <p class="nombre" aria-hidden="true"><span class="w1">mi parte</span><span class="dot">·</span><span class="w2">tu parte</span></p>
+                            <p>Los gastos del hogar, cada uno con su parte</p>
+                        </div>
+                    </a>
+                </header>
+                <main>
+                    <div class="acceso">
+                        <section class="hero" aria-label="Qué es Mi parte, tu parte">
+                            <h1>Cada uno paga <em>su parte</em>, sin discutirla.</h1>
+                            <p>Reparte los gastos de casa en pareja, en familia o en un piso compartido por porcentajes, partes o cuenta común, y liquida el mes con las transferencias mínimas.</p>
+                            <ul class="ventajas">
+                                <li><span class="ico-caja"><svg class="ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg></span>Reparto justo, con el céntimo en su sitio</li>
+                                <li><span class="ico-caja"><svg class="ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg></span>Cuenta común con saldo y reembolsos</li>
+                                <li><span class="ico-caja"><svg class="ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg></span>Un asistente al que preguntar cuánto debes</li>
+                            </ul>
+                        </section>
+                        <div class="auth">
+                            <div class="spinbox" role="status">
+                                <div class="spin"></div>
+                                Preparando la aplicación…
+                            </div>
+                            <a class="btn btn-block" href="login">Iniciar sesión</a>
+                            <a class="btn btn-ghost btn-block" href="registro">Crear cuenta</a>
+                            <p class="muted">En la pantalla de acceso puedes probar la demo sin cuenta.</p>
+                        </div>
+                    </div>
+                    <section class="funciones" aria-labelledby="funciones-titulo">
+                        <h2 id="funciones-titulo">Qué puedes hacer</h2>
+                        <ul>
+                            <li><h3>Reparto a tu manera</h3><p>Cada gasto se reparte de forma individual, por porcentajes, por partes o a cargo de la cuenta común. El reparto se guarda con el gasto y el céntimo sobrante no se pierde.</p></li>
+                            <li><h3>Liquidación del mes</h3><p>Calcula quién debe a quién con el menor número de transferencias y registra los pagos.</p></li>
+                            <li><h3>Cuenta común</h3><p>Aportaciones, saldo, reembolsos, ahorro y adelantos de la cuenta conjunta del hogar.</p></li>
+                            <li><h3>Gastos recurrentes</h3><p>Plantillas para el alquiler, los suministros o las suscripciones que generan los gastos de cada mes.</p></li>
+                            <li><h3>Lista de la compra</h3><p>Compartida por todo el hogar y accesible desde un código QR sin necesidad de cuenta.</p></li>
+                            <li><h3>Panel de gastos</h3><p>Indicadores y gráficos del gasto entre dos fechas para ver en qué se va el dinero.</p></li>
+                            <li><h3>Miembros y permisos</h3><p>Varios hogares, invitaciones, personas a cargo y permisos por persona.</p></li>
+                            <li><h3>Asistente</h3><p>Pregunta en lenguaje natural cuánto has gastado o cuánto debes este mes.</p></li>
+                        </ul>
+                        <p class="muted">Se instala como aplicación en el móvil o el ordenador desde el navegador. <a href="contacto">Contacto</a></p>
+                    </section>
+                </main>
+            </div>
         </div>
     </div>
 

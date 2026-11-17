@@ -1,0 +1,18 @@
+# Todas las rutas de la SPA sirven el mismo index.html (con canonical a la raíz). Las privadas no aportan nada a los
+# buscadores, y /compra/ y /unirse llevan tokens: se excluyen. _framework y css no se bloquean: Google los necesita
+# para renderizar.
+User-agent: *
+Disallow: /gastos
+Disallow: /dashboard
+Disallow: /cuenta-comun
+Disallow: /lista-compra
+Disallow: /compra/
+Disallow: /recurrentes
+Disallow: /categorias
+Disallow: /hogar
+Disallow: /sin-hogar
+Disallow: /elegir-hogar
+Disallow: /unirse
+Disallow: /recuperar
+
+Sitemap: https://miparte.pages.dev/sitemap.xml

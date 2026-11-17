@@ -275,6 +275,18 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 
 /* Pantalla de carga de Blazor */
 .arranque { display: grid; justify-items: center; gap: 18px; padding-top: 22vh; }
+/* index.html antes de Blazor: portada pública (buscadores y visitas nuevas) o, con sesión guardada (js/precarga.js),
+   solo la pantalla de carga. Blazor sustituye todo el bloque al arrancar. */
+.precarga .arranque { display: none; }
+.con-sesion .precarga .arranque { display: grid; }
+.con-sesion .precarga .escaparate { display: none; }
+.precarga .spinbox { padding: 8px; }
+.funciones { display: grid; gap: 18px; padding-block: 0 72px; }
+.funciones h2 { font: 600 1.6rem/1.2 var(--font-display); }
+.funciones ul { list-style: none; padding: 0; display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.funciones li { background: var(--surface); border-radius: var(--radius); padding: 20px; display: grid; gap: 6px; align-content: start; }
+.funciones h3 { font-size: 1rem; font-weight: 700; color: var(--wine-text); }
+.funciones li p { color: var(--ink-2); }
 
 /* Cabecera y logotipo */
 .top {
@@ -285,12 +297,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .logo { flex: none; }
 .logo .h1 { fill: var(--orange); }
 .logo .h2 { fill: var(--logo-h2); }
-.brand h1 { font: 600 1.6rem/1.1 var(--font-display); letter-spacing: -.015em; white-space: nowrap; }
-.brand h1 .w1 { color: var(--wine-text); }
-.brand h1 .dot { color: var(--orange); padding-inline: .3em; font-weight: 400; }
-.brand h1 .w2 { color: var(--orange-text); font-style: italic; font-weight: 400; }
+.brand h1, .brand .nombre { font: 600 1.6rem/1.1 var(--font-display); letter-spacing: -.015em; white-space: nowrap; }
+.brand :is(h1, .nombre) .w1 { color: var(--wine-text); }
+.brand :is(h1, .nombre) .dot { color: var(--orange); padding-inline: .3em; font-weight: 400; }
+.brand :is(h1, .nombre) .w2 { color: var(--orange-text); font-style: italic; font-weight: 400; }
 .brand p { margin-top: 3px; color: var(--ink-2); font-size: .85rem; }
-@media (max-width: 520px) { .brand h1 { font-size: 1.3rem; } .brand p { display: none; } }
+.brand p.nombre { display: block; margin-top: 0; color: inherit; }
+@media (max-width: 520px) { .brand h1, .brand p.nombre { font-size: 1.3rem; } .brand p { display: none; } }
 .right { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
 
 /* Menús desplegables */
@@ -673,8 +686,8 @@ form { display: grid; gap: 14px; }
 @media (min-width: 900px) { .acceso { padding-block: 72px 112px; } }
 @media (max-width: 899px) { .acceso { grid-template-columns: minmax(0, 1fr); } }
 .hero { display: grid; gap: 22px; justify-items: start; }
-.hero h2 { font: 600 clamp(2.2rem, 5vw, 3.6rem)/1.05 var(--font-display); letter-spacing: -.02em; max-width: 14ch; }
-.hero h2 em { font-style: normal; font-weight: 400; color: var(--orange-text); } /* la cursiva es exclusiva del logotipo (docs/marca.md) */
+.hero :is(h1, h2) { font: 600 clamp(2.2rem, 5vw, 3.6rem)/1.05 var(--font-display); letter-spacing: -.02em; max-width: 14ch; }
+.hero :is(h1, h2) em { font-style: normal; font-weight: 400; color: var(--orange-text); } /* la cursiva es exclusiva del logotipo (docs/marca.md) */
 .hero > p { color: var(--ink-2); font-size: 1.05rem; max-width: 44ch; }
 .ventajas { list-style: none; padding: 0; display: grid; gap: 14px; margin-top: 8px; }
 .ventajas li { display: flex; align-items: center; gap: 14px; color: var(--ink); font-weight: 600; }

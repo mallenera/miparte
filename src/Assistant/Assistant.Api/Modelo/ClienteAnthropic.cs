@@ -186,7 +186,10 @@ public sealed class ClienteAnthropic : IClienteModelo
             }
         }
 
-        return new MessageParam { Role = m.Rol == RolModelo.Usuario ? Role.User : Role.Assistant, Content = bloques };
+        // Desde el SDK 13, MessageParam es una unión con una variante por rol.
+        return m.Rol == RolModelo.Usuario
+            ? new UserMessageParam { Content = bloques }
+            : new AssistantMessageParam { Content = bloques };
     }
 
     private static ToolUnion AHerramienta(DefinicionHerramienta h)

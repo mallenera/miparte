@@ -20,8 +20,8 @@ Core.Api  ──►  Core.Application  ──►  Core.Domain
 | `Core.Api` | Minimal API: lee claims y query string, llama al servicio y traduce el resultado a un código HTTP. Permisos con `RequierePermiso`. | Consultas EF, `DbContext` en endpoints, reglas de negocio. |
 | `Core.Mapeo` | Mapeo entidad → DTO de `Contracts` (`Dtos`) y parseo de parámetros de consulta (`ConsultasApi`). Lo comparten `Core.Api` y el modo demo del front, para que respondan igual. | Reglas de negocio ni acceso a datos. |
 
-La única excepción a «Api no usa `DbContext`» es la infraestructura transversal: `HogarActualMiddleware`, `CacheAcceso` y
-`RequierePermisoExtensions`.
+La única excepción a «Api no usa `DbContext`» es la infraestructura transversal: `HogarActualMiddleware`, `CacheAcceso`,
+`RequierePermisoExtensions` y la comprobación de salud de `Seguridad/Salud.cs` (solo abre una conexión para `/health/listo`).
 
 ### Flujo de una petición
 

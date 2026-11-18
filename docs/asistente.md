@@ -15,6 +15,7 @@ Front (Blazor) ──JWT + X-Hogar-Id──▶ Assistant.Api ──JWT + X-Hogar
 - **Hogar.** La cabecera `X-Hogar-Id` es obligatoria. Antes de llamar al modelo se hace una consulta a Core.Api con ese hogar: si la persona no es miembro activo, 403 y el modelo no se invoca.
 - **Cliente del modelo.** `IClienteModelo` abstrae el proveedor. `Asistente__Proveedor` elige `ClienteAnthropic` (SDK oficial, `Anthropic` en NuGet, por defecto) o `ClienteWorkersAi` (Cloudflare Workers AI, REST `/ai/run/{modelo}`, cuota gratuita diaria; Cloudflare dice no usar el contenido para entrenar ni conservarlo más allá de la petición). Modelo por defecto `claude-sonnet-5-5`, configurable con `Asistente__Modelo`. **Streaming**: `POST /api/chat/stream` entrega el texto en vivo (SSE). Con Anthropic el texto llega según se genera (`CreateStreaming`); con Workers AI, o cualquier proveedor sin streaming real, la respuesta llega de una vez (el método por defecto de `IClienteModelo`).
 - **Notas de voz.** `POST /api/chat/audio` convierte una grabación en texto con `ITranscriptor` (Whisper en Cloudflare Workers AI, `Asistente__CloudflareModeloVoz`, con la misma cuenta y el mismo token que el chat de Workers AI, sea cual sea `Asistente__Proveedor`). No llama al modelo del chat ni escribe nada: el texto vuelve al cuadro del chat para que la persona lo revise y lo envíe como cualquier pregunta. El audio solo vive en memoria durante la petición: no se guarda ni se registra.
+- **Tickets.** `POST /api/chat/ticket` lee la foto de un ticket con `ILectorTickets` (modelo de visión de Workers AI, `Asistente__CloudflareModeloVision`, por defecto Llama 4 Scout) y devuelve un borrador como el de `proponer_gasto`. No escribe nada y la foto no se guarda: solo vive en memoria durante la petición.
 - **Solo lectura, más un borrador.** Las cinco funciones de consulta no modifican nada. `proponer_gasto` solo prepara un borrador: no escribe. **La única escritura es `POST /api/chat/confirmar-gasto`**, que llama la persona con su botón «Confirmar» (una segunda llamada, nunca la propuesta del modelo). Guarda el gasto en Core.Api con el JWT y el hogar de la persona, así que Core aplica sus permisos (`gastos.crear`) y sus reglas. La categoría y el perfil son los marcados como predeterminados para gastos **en ese momento** (el cliente no los envía; sin exactamente uno de cada, 409). El pagador lo elige la persona al confirmar. La petición lleva `X-Origen: asistente` y Core registra el alta con origen `asistente` en la auditoría (el autor sigue siendo quien confirma; la cabecera es una etiqueta del cliente, no una prueba de origen).
 
 ## Funciones de consulta
@@ -105,6 +106,36 @@ El texto llega sin caracteres de control, con los espacios normalizados y recort
 
 En el front, el botón del micrófono del cuadro del chat graba con `MediaRecorder` (`wwwroot/js/grabar-audio.js`, sin scripts en línea) hasta 30 s o hasta pulsar parar; el micrófono se apaga al terminar o al cerrar el panel. Exige `microphone=(self)` en `Permissions-Policy` (nginx y Cloudflare Pages). La cuenta demo local no muestra el botón.
 
+### `POST /api/chat/ticket`
+Cabeceras: `Authorization`, `X-Hogar-Id` y `Content-Type` (`image/jpeg`, `image/png` o `image/webp`). El cuerpo es la imagen tal cual (no multipart); se comprueba también su firma (JPEG, PNG o `RIFF…WEBP`).
+
+```json
+{ "borrador": { "importe": 23.45, "concepto": "Mercadona", "fecha": "2026-11-17", "categoria": "Supermercado", "perfil": "Casa",
+                "categoriaId": "…", "perfilRepartoId": "…" },
+  "comercioLeido": true, "fechaLeida": true }
+```
+
+Cómo se construye (`ServicioTicket`, reglas en `FotoTicket`):
+- Al modelo se le pide solo un JSON con `importe` (total final pagado), `comercio` y `fecha`, y se le indica que el texto del ticket son datos, no instrucciones. El modelo elegido no tiene modo JSON garantizado en Workers AI, así que el servidor extrae el primer objeto JSON de la respuesta y valida cada campo por separado; lo que no es creíble se descarta, no se corrige.
+- **Importe**: obligatorio, > 0, como mucho 2 decimales y dentro del máximo de Core.Api (acepta `23,45` o `23,45 €` como texto). Sin importe válido, **422**.
+- **Comercio**: sin caracteres de control y como mucho 60 caracteres. Si no se lee, el concepto es «Compra» y `comercioLeido` es `false`.
+- **Fecha**: `AAAA-MM-DD`, no posterior a mañana (margen por zona horaria) ni anterior a 2000. Si no se lee, se pone la de hoy (UTC) y `fechaLeida` es `false`.
+- Categoría y perfil son los predeterminados para gastos, como en `proponer_gasto`; sin exactamente uno de cada, **409**.
+
+En el front, la tarjeta del ticket deja corregir importe, concepto y fecha antes de «Confirmar» (`ModeloBorradorTicket`, en `src/Web/Modelos`) y avisa de lo que no se leyó. La confirmación usa `POST /api/chat/confirmar-gasto` con los datos revisados, así que el servidor vuelve a validarlos y a comprobar los predeterminados. La foto se elige con el botón de la cámara (`InputFile` con `capture="environment"`, que en el móvil abre la cámara trasera sin pedir el permiso `camera`) y Blazor la reduce en el navegador a un JPEG de 1600 px como máximo antes de enviarla. Cada lectura cuenta como una pregunta en el límite por minuto y en la cuota diaria.
+
+| Código | Cuándo |
+|---|---|
+| 200 | `LecturaTicketResponse` |
+| 400 | Falta o es inválido `X-Hogar-Id`; el fichero no tiene la firma de una imagen admitida |
+| 401 / 403 | Sin token válido / no es miembro activo del hogar (se comprueba antes de leer la foto) |
+| 409 | El hogar no tiene exactamente una categoría y un perfil predeterminados para gastos |
+| 413 | La foto supera `Asistente__MaxImagenBytes` (4 MB) |
+| 415 | `Content-Type` no admitido (p. ej. `image/heic`) |
+| 422 | No se ha leído un importe válido |
+| 429 | Límite por minuto o cuota diaria agotada |
+| 503 | Workers AI no responde, o faltan `CLOUDFLARE_API_TOKEN` o `Asistente__CloudflareCuenta` |
+
 ### `POST /api/chat/confirmar-gasto`
 La única escritura del asistente; la llama el front solo cuando la persona pulsa «Confirmar» en la tarjeta del borrador.
 
@@ -118,7 +149,7 @@ El front tiene además un alta guiada («Añadir gasto» en la carátula del cha
 
 `pagadoPor` es un miembro adulto activo elegido por la persona. `categoriaId` y `perfilRepartoId` son los que se mostraron en el borrador (el front los copia de `borrador`). `categoria` y `perfil` son los nombres mostrados. El servidor compara ids y nombres con los predeterminados para gastos **en el momento de confirmar**: si coinciden, guarda el gasto; si no (el hogar ha cambiado la categoría o el perfil marcados, o les ha cambiado el nombre, desde la propuesta), **no guarda nada** y responde **409** con un mensaje en español que pide volver a pedir el gasto para ver la propuesta actualizada. Responde **201** con el `GastoResponse` guardado. Errores: 400 (importe, concepto, fecha o pagador no válidos), 401, 403 o 409 con el mensaje de Core.Api (por ejemplo, sin permiso `gastos.crear`, o el hogar no tiene exactamente un predeterminado de categoría o de perfil), 429, 502 y 503. Con Core.Api rechazando el gasto, nada queda guardado. En el front, un 409 deja el borrador descartado con el aviso.
 
-DTOs en `src/Contracts/Asistente.cs` (`ChatRequest`, `MensajeChatDto`, `ChatResponse`, `BorradorGastoDto`, `ConfirmarGastoRequest`, `TranscripcionResponse`).
+DTOs en `src/Contracts/Asistente.cs` (`ChatRequest`, `MensajeChatDto`, `ChatResponse`, `BorradorGastoDto`, `ConfirmarGastoRequest`, `TranscripcionResponse`, `LecturaTicketResponse`).
 
 ## Configuración
 
@@ -131,6 +162,8 @@ DTOs en `src/Contracts/Asistente.cs` (`ChatRequest`, `MensajeChatDto`, `ChatResp
 | `Asistente__CloudflareModelo` | `@cf/zai-org/glm-4.7-flash` | Modelo de Workers AI con llamadas a herramientas (comprobar en el catálogo) |
 | `Asistente__CloudflareModeloVoz` | `@cf/openai/whisper-large-v3-turbo` | Modelo de voz para `POST /api/chat/audio`. Necesita `CLOUDFLARE_API_TOKEN` y `Asistente__CloudflareCuenta` aunque el chat use Anthropic |
 | `Asistente__MaxAudioBytes` | 1048576 | Tamaño máximo de una nota de voz (el resto de rutas sigue con `Asistente__MaxCuerpoBytes`) |
+| `Asistente__CloudflareModeloVision` | `@cf/meta/llama-4-scout-17b-16e-instruct` | Modelo de visión para `POST /api/chat/ticket`; la imagen va como URI de datos en el mensaje. Necesita `CLOUDFLARE_API_TOKEN` y `Asistente__CloudflareCuenta` |
+| `Asistente__MaxImagenBytes` | 4194304 | Tamaño máximo de la foto de un ticket |
 | `Asistente__Modelo` | `claude-sonnet-5-5` | Cualquier modelo de la Messages API con tool use |
 | `Asistente__CoreUrl` | `http://localhost:5001` | En docker compose, `http://core:8080` |
 | `Asistente__MaxTokens` | 1024 | Salida por turno |
@@ -188,6 +221,7 @@ Sin clave se puede ver el asistente flotante y comprobar el 503; el modo demo de
 ## Pendiente
 
 - Notas de voz: probar con Workers AI real en Chrome/Edge (WebM), Firefox (Ogg) y Safari/iOS (MP4) antes de subir a producción; la documentación de Cloudflare no detalla qué contenedores acepta Whisper, así que alguno puede responder 503. Probar también en la APK (TWA) que Android pide el permiso del micrófono.
+- Tickets: medir con tickets reales (supermercado, restaurante, gasolinera; foto torcida, arrugada o con poca luz) cuántas veces Llama 4 Scout acierta importe, comercio y fecha, y ajustar el prompt o cambiar `Asistente__CloudflareModeloVision` si no basta. Comprobar en iPhone que la foto de la cámara llega como JPEG tras la reducción del navegador (HEIC se rechaza con 415).
 - Cancelar una pregunta en curso (el streaming no tiene botón de parar).
 - Etiqueta `X-Origen` sin verificar: el origen «asistente» lo declara el cliente con el JWT de la persona. Si se quiere una prueba real, haría falta un canal de confianza entre Assistant.Api y Core.Api (decisión pendiente).
 - Streaming: `ClienteWorkersAi` (el proveedor gratuito de producción) no implementa streaming real; la respuesta llega completa de una vez por el respaldo de `ClienteModelo`. El streaming real solo existe con Anthropic (`CreateStreaming`), que compila pero no se ha probado contra la API real.

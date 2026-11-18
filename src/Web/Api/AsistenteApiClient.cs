@@ -105,6 +105,21 @@ public sealed class AsistenteApiClient
         return EnviarAsync<TranscripcionResponse>(t => _http.PostAsync("api/chat/audio", contenido, t), ct);
     }
 
+    /// <summary>
+    /// Lee la foto de un ticket (<c>POST /api/chat/ticket</c>) y devuelve un borrador de gasto. No guarda nada: el gasto solo
+    /// se guarda con <see cref="ConfirmarGastoAsync"/>.
+    /// </summary>
+    /// <param name="imagen">Foto (JPEG, PNG o WebP).</param>
+    /// <param name="tipo">Tipo MIME de la foto.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    /// <exception cref="ApiException">No se ha podido leer el ticket; el mensaje es apto para el usuario.</exception>
+    public Task<LecturaTicketResponse> LeerTicketAsync(byte[] imagen, string tipo, CancellationToken ct = default)
+    {
+        var contenido = new ByteArrayContent(imagen);
+        contenido.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse(tipo);
+        return EnviarAsync<LecturaTicketResponse>(t => _http.PostAsync("api/chat/ticket", contenido, t), ct);
+    }
+
     private Task<T> EnviarAsync<T>(string ruta, object cuerpo, CancellationToken ct)
         => EnviarAsync<T>(t => _http.PostAsJsonAsync(ruta, cuerpo, t), ct);
 

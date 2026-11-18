@@ -59,4 +59,13 @@ public sealed class OpcionesAsistente
     /// navegadores que graban en AAC (Safari) sin admitir grabaciones largas.
     /// </summary>
     public long MaxAudioBytes { get; set; } = 1024 * 1024;
+
+    /// <summary>Modelo de visión de Workers AI que lee los tickets (se usa con cualquier proveedor del chat).</summary>
+    public string CloudflareModeloVision { get; set; } = "@cf/meta/llama-4-scout-17b-16e-instruct";
+
+    /// <summary>
+    /// Tamaño máximo de la foto de un ticket, en bytes. El front la reduce antes (JPEG de 1600 px, unos cientos de KB); el
+    /// margen cubre navegadores donde esa reducción falla y se envía el original.
+    /// </summary>
+    public long MaxImagenBytes { get; set; } = 4 * 1024 * 1024;
 }

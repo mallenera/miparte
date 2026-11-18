@@ -66,7 +66,7 @@ El MVP cubre el registro, el reparto y la liquidación mensual; el resto se aña
 | Control | Gastos anuales prorrateados (seguro, IBI) y objetivos de ahorro | Aplazado (decisión de la pareja) |
 | Datos | Exportación a Excel/PDF; importación de movimientos bancarios (CSV) | Aplazado (decisión de la pareja) |
 | IA | Categorización automática por descripción; detección de anomalías; previsión del mes siguiente | Aplazado (decisión de la pareja) |
-| IA | Alta de gastos por voz (transcripción → borrador del asistente) y lectura de tickets (OCR: importe y comercio → borrador), siempre con confirmación de la persona; la foto se procesa y se descarta | Planificado (decisión de la pareja, 2026-11-18; [plan-de-accion.md](plan-de-accion.md), puntos 32 y 33) |
+| IA | Alta de gastos por voz (transcripción → borrador del asistente) y lectura de tickets (OCR: importe y comercio → borrador), siempre con confirmación de la persona; la foto se procesa y se descarta | Hecho en código, con Cloudflare Workers AI (decisión de la pareja, 2026-11-18; pendiente de probar con el proveedor real; [plan-de-accion.md](plan-de-accion.md), puntos 32 y 33) |
 
 Lo que no entre en el MVP queda documentado como líneas futuras en la memoria del máster.
 

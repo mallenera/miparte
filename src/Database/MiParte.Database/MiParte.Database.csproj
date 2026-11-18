@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="dbup-postgresql" Version="6.0.*" />
+    <PackageReference Include="dbup-postgresql" Version="7.0.*" />
   </ItemGroup>
 
   <!-- estructura/: estado deseado, se aplica siempre de forma idempotente (fuente de verdad del esquema).

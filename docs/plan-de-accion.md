@@ -1,6 +1,6 @@
 # Plan de acción
 
-Estado a 2026-10-23. Este documento recoge lo que ya está hecho, lo que falta y en qué orden atacarlo. El detalle de cada tema (diseño frente a código) está en la tabla de [README.md](README.md); aquí solo se resume y se ordena.
+Estado a 2026-11-18. Este documento recoge lo que ya está hecho, lo que falta y en qué orden atacarlo. El detalle de cada tema (diseño frente a código) está en la tabla de [README.md](README.md); aquí solo se resume y se ordena.
 
 ## 1. Estado actual
 
@@ -91,6 +91,24 @@ Las fases van en orden de prioridad. Cada ítem indica su criterio de hecho.
 22. **Lista de la compra con enlace QR.** *Hecho en código* (2026-10-28): pestaña activable por hogar, productos con cantidad y check de comprado, QR con token que caduca a los 7 días y refresco cada 15 s. Esquema aplicado en Supabase el 2026-10-29 (`producto_compra`, `enlace_lista_compra`, `hogar.lista_compra_activa` y el permiso `lista.compra`; `deuda_cuenta` ya estaba). Pendiente: probar el QR con un móvil real, y tiempo real con push si el sondeo se queda corto. Hecho después (2026-10-29): panel para listar y revocar enlaces antiguos y auditoría de productos y enlaces.
 
 19-20: aplazados por decisión de la pareja.
+
+32. **Alta de gastos por voz.** *Planificado* (2026-11-18, decisión de la pareja). Flujo: grabar en el front → transcribir en `Assistant.Api` → el texto, revisable por la persona, entra en el chat normal → `proponer_gasto` → tarjeta del borrador → «Confirmar» (`POST /api/chat/confirmar-gasto`, sin cambios). El audio no se guarda.
+    - **Transcripción en el servidor**: Claude no acepta audio. Propuesta: Whisper en Cloudflare Workers AI (misma cuenta y token que el chat; nombre exacto del modelo por comprobar en el catálogo) detrás de un puerto nuevo `ITranscriptor` en `Assistant.Api/Modelo`, con implementación falsa para los tests. Se descarta la Web Speech API del navegador (no está en todos los navegadores y Chrome envía el audio a Google).
+    - **Endpoint** `POST /api/chat/audio` (multipart) → `{ texto }`. Límites propios: duración (p. ej. 30 s), tamaño (los 64 KB de `Asistente__MaxCuerpoBytes` no bastan), tipos MIME permitidos (webm, ogg, mp4) y consumo de `CuotaDiaria`. Errores 400/401/403/413/415/429/503 como el chat.
+    - **Front**: botón de micrófono en el panel del asistente; grabación con `MediaRecorder` en un script de `wwwroot/js/` (sin scripts en línea); estados grabando, transcribiendo y error. **Cambio de cabeceras**: `Permissions-Policy` pasa de `microphone=()` a `microphone=(self)` en `src/Web/default.conf.template` (y en las cabeceras de Cloudflare Pages).
+    - **Pruebas**: `Assistant.Tests` con transcriptor falso (límites, códigos de error, que no escribe nada) y bUnit del botón.
+    - **Documentación**: `docs/asistente.md` (contrato, configuración y seguridad).
+    - Hecho cuando decir «doce euros de café hoy» deja un borrador revisable, no se guarda nada sin «Confirmar» y el gasto aparece en Gastos con origen asistente.
+33. **Lectura de tickets (OCR) sin guardar la imagen.** *Planificado* (2026-11-18, decisión de la pareja). La foto se procesa en memoria y se descarta: no va a la base de datos, ni a almacenamiento, ni a logs. Guardar la foto adjunta al gasto sigue aplazado (punto 34).
+    - **Front**: `<input type="file" accept="image/*" capture="environment">` (abre la cámara nativa del móvil; no usa `getUserMedia`, así que no hace falta tocar `camera=()` en `Permissions-Policy`). Redimensionado y compresión en el cliente antes de enviar.
+    - **Endpoint** `POST /api/chat/ticket` (multipart con la imagen; solo JPEG, PNG o WebP; tamaño máximo propio; consume `CuotaDiaria`). El modelo con visión devuelve `{ importe, comercio, fecha? }`; esos datos pasan por la misma validación de `proponer_gasto` (importe > 0 con 2 decimales, concepto = comercio, máx. 200) y salen en la tarjeta del borrador. Si no se lee el importe, error explicado y nada propuesto.
+    - **Modelo**: nuevo bloque `BloqueImagen` en `Modelo/ClienteModelo.cs`. Anthropic lo admite; con Workers AI hay que elegir un modelo con visión del catálogo y **medir la calidad con tickets reales: es el principal riesgo**.
+    - **Seguridad**: el texto del ticket es entrada no fiable (prompt injection): solo produce un borrador que revisa la persona; la única escritura sigue siendo `confirmar-gasto`.
+    - **Pruebas**: modelo falso que devuelve el JSON; ticket ilegible; imagen de tipo o tamaño no válido; nada guardado sin confirmar.
+    - Hecho cuando una foto de un ticket real deja un borrador con importe y comercio correctos, se puede corregir antes de confirmar y la imagen no queda guardada en ningún sitio.
+34. **Foto del ticket adjunta al gasto.** *Aplazado* (decisión de la pareja; opcional tras el punto 33). Si se retoma: bucket privado de Supabase Storage (`{hogar_id}/{gasto_id}/{id}`), tabla `gasto_adjunto` en `Estructura/` con RLS y `HasQueryFilter`, endpoints `POST/GET/DELETE /api/gastos/{id}/adjunto` servidos por Core.Api (sin exponer Storage al front), borrado en cascada con el gasto, auditoría sin la ruta y `blob:` en `img-src` de la CSP para mostrarla. Antes, decidir conservación y límite por hogar.
+
+Orden propuesto: 32 (riesgo bajo, reutiliza todo el chat) → 33 (riesgo medio-alto por la calidad de la visión en Workers AI) → 34 solo si la pareja lo decide. Decisión pendiente para ambos: proveedor de transcripción y visión (Workers AI, gratuito y con calidad por validar, o Anthropic, de pago).
 
 **Nota pendiente:** el acceso con Google se probó y funcionaba, pero se ocultó por ser de pago (interruptor `FuncionesAcceso.GoogleActivo = false`; ver fase 2, punto 7).
 

@@ -65,7 +65,8 @@ El MVP cubre el registro, el reparto y la liquidación mensual; el resto se aña
 | Control | Presupuestos por categoría con aviso al acercarse al límite | Aplazado (decisión de la pareja) |
 | Control | Gastos anuales prorrateados (seguro, IBI) y objetivos de ahorro | Aplazado (decisión de la pareja) |
 | Datos | Exportación a Excel/PDF; importación de movimientos bancarios (CSV) | Aplazado (decisión de la pareja) |
-| IA | Categorización automática por descripción; detección de anomalías; previsión del mes siguiente; lectura de tickets (OCR) | Aplazado (decisión de la pareja) |
+| IA | Categorización automática por descripción; detección de anomalías; previsión del mes siguiente | Aplazado (decisión de la pareja) |
+| IA | Alta de gastos por voz (transcripción → borrador del asistente) y lectura de tickets (OCR: importe y comercio → borrador), siempre con confirmación de la persona; la foto se procesa y se descarta | Planificado (decisión de la pareja, 2026-11-18; [plan-de-accion.md](plan-de-accion.md), puntos 32 y 33) |
 
 Lo que no entre en el MVP queda documentado como líneas futuras en la memoria del máster.
 
@@ -113,7 +114,7 @@ Tres mejoras entran en el MVP porque hacen utilizable el resumen "A debe a B"; e
 | Simulador de reparto | Muestra qué cambia si varía el porcentaje, reutilizando la lógica de reparto | Aplazado (decisión de la pareja) |
 | Resumen anual | Totales del año por categoría y por persona | Aplazado (decisión de la pareja) |
 | Previsión de gasto fijo | Recurrentes más gastos prorrateados, para conocer el mínimo del mes | Aplazado (decisión de la pareja) |
-| Foto del ticket | Imagen adjunta al gasto, sin lectura automática | Aplazado (decisión de la pareja) |
+| Foto del ticket | Imagen adjunta y guardada con el gasto | Aplazado (decisión de la pareja); la lectura automática sin guardar la imagen está planificada (ver Alcance funcional) |
 | Avisos por correo | Resumen mensual y recibos próximos | Aplazado (decisión de la pareja) |
 | Invitación al hogar | Alta de la pareja por correo con permisos; la persona a cargo no necesita login | **Hecho** (invitaciones por enlace, `docs/api.md`) |
 | Historial de cambios | Quién modificó qué y cuándo | **Hecho** (rama `feature/security`; solo lo lee un admin, `docs/api.md` §3.10) |
@@ -294,7 +295,7 @@ Siete decisiones condicionan el desarrollo; la D3 y la D4 no dependen de la téc
 | D3 | Cómo se reparten los gastos del hijo | 100 % del miembro con hijo; proporcional a ingresos (el miembro sin hijo asume 2/3); perfil propio | Perfil propio configurable; el porcentaje lo fija cada hogar | **Resuelta por cada hogar**: la app ofrece los perfiles. Un miembro a cargo tiene peso en un perfil de porcentajes o partes, y ese perfil se asigna a una categoría o a un gasto. Cada hogar fija su porcentaje al configurar sus perfiles; la app no fija ninguno |
 | D4 | Reparto de la alimentación | Proporcional a ingresos; por partes contando al hijo | Cada hogar decide si el hijo cuenta como una parte | **Resuelta por cada hogar**: la app permite que el hijo cuente como una parte en un perfil por partes, con el peso que configure cada hogar. Si cuenta o no lo decide cada hogar al configurar sus perfiles |
 | D5 | Interfaz | Streamlit; FastAPI con frontend web instalable (PWA) | Streamlit para el MVP; migrar después reutilizando lógica y base de datos | **Superada**: se optó por Blazor WASM (PWA) + minimal API .NET + Supabase |
-| D6 | Alcance de la IA | Solo chatbot; chatbot más categorización automática de gastos | Chatbot en el MVP; categorización como extra si da tiempo | Chatbot hecho; categorización aplazada (decisión de la pareja) |
+| D6 | Alcance de la IA | Solo chatbot; chatbot más categorización automática de gastos | Chatbot en el MVP; categorización como extra si da tiempo | Chatbot hecho; categorización aplazada (decisión de la pareja); alta por voz y lectura de tickets sin guardar la imagen planificadas (2026-11-18) |
 | D7 | Modelo de lenguaje del chatbot y dominio | Proveedor, modelo y coste por definir; registrador del dominio por elegir | Comprobar requisitos del máster y precios actuales antes de decidir | **Decidido de momento**: Cloudflare Workers AI en el plan gratuito (`Asistente__Proveedor=cloudflare`, sin coste); Anthropic queda como alternativa de pago (`claude-sonnet-5-5`, configurable con `Asistente__Modelo`). **Dominio**: sin dominio propio de momento; la app se publica en `miparte.pages.dev`. Todo el stack es gratuito |
 
 ## Plan por fases, riesgos y calidad

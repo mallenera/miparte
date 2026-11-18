@@ -1,20 +1,19 @@
-@* Avisa cuando el service worker ha descargado una versión nueva de la web y deja elegir cuándo aplicarla. *@
+@* Cuando el service worker ha descargado una versión nueva de la web la aplica sola: tapa la app con una pantalla de
+   carga mientras el worker nuevo se activa y la página se recarga. *@
 @implements IDisposable
 @inject IJSRuntime JS
 
-@if (_hayVersionNueva && !_descartado)
+@if (_aplicando)
 {
-    <div class="aviso warn aviso-sistema" role="status">
-        Hay una versión nueva de la web.
-        <button class="btn btn-sm" type="button" @onclick="AplicarAsync">Actualizar</button>
-        <button class="btn btn-sm btn-ghost" type="button" @onclick="() => _descartado = true">Ahora no</button>
+    <div class="cargando-actualizacion" role="alert" aria-busy="true">
+        <div class="spin" aria-hidden="true"></div>
+        <p>Cargando actualización, por favor, espere…</p>
     </div>
 }
 
 @code {
     private DotNetObjectReference<AvisoActualizacion>? _referencia;
-    private bool _hayVersionNueva;
-    private bool _descartado;
+    private bool _aplicando;
 
     protected override async Task OnAfterRenderAsync(bool primera)
     {
@@ -23,16 +22,15 @@
         await JS.InvokeVoidAsync("miparteActualizacion.suscribir", _referencia);
     }
 
-    /// <summary>La llama <c>registrar-sw.js</c> cuando hay una versión nueva instalada y a la espera.</summary>
+    /// <summary>La llama <c>registrar-sw.js</c> cuando hay una versión nueva instalada y a la espera: la aplica sin preguntar.</summary>
     [JSInvokable]
-    public Task HayVersionNueva()
+    public async Task HayVersionNueva()
     {
-        _hayVersionNueva = true;
-        _descartado = false;
-        return InvokeAsync(StateHasChanged);
+        if (_aplicando) return;
+        _aplicando = true;
+        await InvokeAsync(StateHasChanged);
+        await JS.InvokeVoidAsync("miparteActualizacion.aplicar");
     }
-
-    private async Task AplicarAsync() => await JS.InvokeVoidAsync("miparteActualizacion.aplicar");
 
     public void Dispose() => _referencia?.Dispose();
 }

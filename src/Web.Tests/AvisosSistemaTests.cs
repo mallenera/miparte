@@ -230,41 +230,32 @@ public class AvisosSistemaTests : BunitContext
         return cut;
     }
 
-    /// <summary>Sin versión nueva no se muestra nada; al avisar el service worker aparece el botón.</summary>
+    /// <summary>Sin versión nueva no se muestra nada; al avisar el service worker aparece la pantalla de carga y se aplica sola.</summary>
     [Fact]
-    public async Task El_aviso_de_version_nueva_aparece_cuando_lo_notifica_el_service_worker()
-    {
-        var cut = RenderizarAvisoActualizacion(out var referencia);
-        Assert.Empty(cut.FindAll(".aviso"));
-
-        await cut.InvokeAsync(() => referencia.Value.HayVersionNueva());
-
-        Assert.Contains("versión nueva", cut.Find(".aviso").TextContent);
-    }
-
-    /// <summary>«Actualizar» pide al service worker activar la versión nueva.</summary>
-    [Fact]
-    public async Task Actualizar_activa_la_version_nueva()
+    public async Task La_version_nueva_se_aplica_sola_con_pantalla_de_carga()
     {
         var cut = RenderizarAvisoActualizacion(out var referencia);
         JSInterop.SetupVoid("miparteActualizacion.aplicar").SetVoidResult();
+        Assert.Empty(cut.FindAll(".cargando-actualizacion"));
+
         await cut.InvokeAsync(() => referencia.Value.HayVersionNueva());
 
-        cut.Find(".aviso .btn:not(.btn-ghost)").Click();
-
+        Assert.Contains("Cargando actualización, por favor, espere", cut.Find(".cargando-actualizacion").TextContent);
+        Assert.Empty(cut.FindAll("button"));
         Assert.Single(JSInterop.Invocations["miparteActualizacion.aplicar"]);
     }
 
-    /// <summary>«Ahora no» oculta el aviso hasta que llegue otra versión.</summary>
+    /// <summary>Si el service worker avisa dos veces, la versión nueva se aplica una sola vez.</summary>
     [Fact]
-    public async Task Ahora_no_oculta_el_aviso()
+    public async Task Un_segundo_aviso_no_vuelve_a_aplicar()
     {
         var cut = RenderizarAvisoActualizacion(out var referencia);
+        JSInterop.SetupVoid("miparteActualizacion.aplicar").SetVoidResult();
+
+        await cut.InvokeAsync(() => referencia.Value.HayVersionNueva());
         await cut.InvokeAsync(() => referencia.Value.HayVersionNueva());
 
-        cut.Find(".aviso .btn-ghost").Click();
-
-        Assert.Empty(cut.FindAll(".aviso"));
+        Assert.Single(JSInterop.Invocations["miparteActualizacion.aplicar"]);
     }
 
     /// <summary>El pie muestra el año y la fecha de actualización en español.</summary>

@@ -59,7 +59,7 @@ await paso('sin conexión', async () => {
     finally { await new Promise(r => servidor.listen(puerto, '127.0.0.1', r)); }
 });
 
-await paso('versión nueva desplegada: aviso, «Actualizar» y la app sigue abriendo', async () => {
+await paso('versión nueva desplegada: pantalla de carga, se aplica sola y la app sigue abriendo', async () => {
     // Un despliegue cambia la versión del manifiesto: el navegador ve un worker distinto y lo instala en espera.
     const manifiesto = path.join(raiz, 'service-worker-assets.js');
     const texto = await readFile(manifiesto, 'utf8');
@@ -68,13 +68,22 @@ await paso('versión nueva desplegada: aviso, «Actualizar» y la app sigue abri
     await writeFile(manifiesto, nueva);
 
     await abrir('/');
-    const boton = pagina.getByRole('button', { name: 'Actualizar' });
-    await boton.waitFor({ timeout: 60_000 });
-    await Promise.all([pagina.waitForEvent('load', { timeout: 60_000 }), boton.click()]);
+    // La pantalla de carga dura lo que tarda en activarse el worker y puede desaparecer entre dos sondeos: se anota en
+    // sessionStorage (sobrevive a la recarga) en cuanto aparece.
+    await pagina.evaluate(() => {
+        const anotar = () => { if (document.querySelector('.cargando-actualizacion')) sessionStorage.setItem('pantalla-carga', '1'); };
+        anotar();
+        new MutationObserver(anotar).observe(document.body, { childList: true, subtree: true });
+    });
+    // Sin pulsar nada, la página se recarga sola con la versión nueva.
+    await pagina.waitForEvent('load', { timeout: 60_000 });
     await arrancada();
+    if (!(await pagina.evaluate(() => sessionStorage.getItem('pantalla-carga')))) throw new Error('No se mostró la pantalla de carga');
     const cachés = await pagina.evaluate(() => caches.keys());
     if (cachés.length !== 1 || !cachés[0].endsWith('-nueva')) throw new Error(`Cachés tras actualizar: ${cachés.join(', ')}`);
     await abrir('/');
+    // Con el worker nuevo ya activo no debe volver a recargarse ni a mostrar la pantalla de carga.
+    if (await pagina.isVisible('.cargando-actualizacion')) throw new Error('La pantalla de carga sigue tras actualizar');
     if (!(await controlada())) throw new Error('El service worker nuevo no controla la página');
 });
 

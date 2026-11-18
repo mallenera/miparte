@@ -176,3 +176,18 @@ internal sealed class TranscriptorFalso(string texto = "Doce euros de café hoy"
         return Task.FromResult(texto);
     }
 }
+
+/// <summary>Lector de tickets de pruebas: devuelve una respuesta fija del modelo (o falla) y guarda las imágenes recibidas.</summary>
+internal sealed class LectorTicketsFalso(string respuesta = """{"importe": 23.45, "comercio": "Mercadona", "fecha": "2026-07-14"}""") : ILectorTickets
+{
+    public List<(byte[] Imagen, string Tipo)> Lecturas { get; } = [];
+
+    public Exception? Fallo { get; set; }
+
+    public Task<string> LeerAsync(byte[] imagen, string tipoMime, CancellationToken ct)
+    {
+        Lecturas.Add((imagen, tipoMime));
+        if (Fallo is not null) throw Fallo;
+        return Task.FromResult(respuesta);
+    }
+}

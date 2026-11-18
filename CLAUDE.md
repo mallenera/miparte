@@ -25,7 +25,7 @@ Si el código y el diseño chocan, manda el código; si te apartas del diseño a
 dotnet build
 dotnet test
 dotnet test --filter "FullyQualifiedName~RepartoTests"          # un test/clase concreto
-dotnet run --project src/Core/Core.Api                          # GET /health, GET /api/yo (no lee .env)
+dotnet run --project src/Core/Core.Api                          # GET /health, GET /health/listo (con BD), GET /api/yo (no lee .env)
 ./scripts/arrancar-core.ps1                                     # Core.Api cargando antes el .env de la raíz
 ./scripts/probar-api.ps1 -SupabaseUrl https://xxxx.supabase.co -Email ...   # prueba de humo contra Supabase real
 dotnet run --project src/Assistant/Assistant.Api                 # chatbot; necesita ANTHROPIC_API_KEY en el entorno

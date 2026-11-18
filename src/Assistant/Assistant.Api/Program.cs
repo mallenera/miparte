@@ -65,6 +65,8 @@ app.Logger.LogInformation(
 var reenviadas = ReenvioCabeceras.Crear(app.Configuration);
 if (reenviadas is not null) app.UseForwardedHeaders(reenviadas);
 
+app.UseRegistroPeticiones(); // duración de cada petición y del arranque en los logs
+
 app.UseCabecerasSeguridad();
 app.UseCors();
 app.UseErroresInesperados();

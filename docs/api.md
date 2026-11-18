@@ -9,7 +9,8 @@ Convenciones generales:
 - Errores no controlados: **500** `application/problem+json` (`ProblemDetails`, RFC 9457) `{ "type", "title": "Error interno del servidor.", "status": 500, "error": "Error interno del servidor.", "traceId" }` sin detalles internos (la traza queda en el log del servidor); conserva las cabeceras CORS. `error` repite el título para que el cliente lo lea igual que el resto de errores.
 - Base URL local: `http://localhost:5001` (docker compose) o la de `launchSettings.json`.
 - El chatbot tiene su propia API (`POST /api/chat`), documentada en [asistente.md](asistente.md).
-- Además existe `GET /health` (sin autenticación): `{ "service": "core", "status": "ok" }`.
+- Además existe `GET /health` (sin autenticación): `{ "service": "core", "status": "ok" }`. Solo dice que el proceso responde.
+- `GET /health/listo` (sin autenticación): comprueba además que la base de datos acepta conexiones (máx. 5 s). 200 `{ "service": "core", "status": "ok" }` o 503 con `"status": "caido"`, sin detalles (el motivo queda en el log). Es la URL del monitor externo; ver `docs/despliegue.md` § Disponibilidad y estadísticas. A diferencia de `/health`, pasa por el límite de peticiones.
 
 ## 1. Autenticación, hogar actual y CORS
 
@@ -229,7 +230,7 @@ Además del gasto nuevo, avisan: el cierre de un ciclo y el de un periodo propio
 
 ### 3.13 Contacto
 
-Formulario de la página pública `/contacto`. Es el único endpoint anónimo además de `/health`: no exige token ni hogar (si llega un token válido, se usa solo para el límite de peticiones). Core.Api envía el mensaje por correo al buzón del proyecto con la API HTTP de Resend (no SMTP: el plan gratuito de Render bloquea esos puertos). El remitente y el destino los fija la configuración (`Correo__Remitente`, `Correo__Destino`), nunca la petición; el correo de quien escribe va como `reply_to`. No se guarda nada en la base de datos.
+Formulario de la página pública `/contacto`. Es el único endpoint anónimo además de `/health` y `/health/listo` (y de las rutas públicas de la lista de la compra): no exige token ni hogar (si llega un token válido, se usa solo para el límite de peticiones). Core.Api envía el mensaje por correo al buzón del proyecto con la API HTTP de Resend (no SMTP: el plan gratuito de Render bloquea esos puertos). El remitente y el destino los fija la configuración (`Correo__Remitente`, `Correo__Destino`), nunca la petición; el correo de quien escribe va como `reply_to`. No se guarda nada en la base de datos.
 
 | Método y ruta | Descripción | Request | Response | Errores | Permisos |
 |---|---|---|---|---|---|
@@ -237,7 +238,7 @@ Formulario de la página pública `/contacto`. Es el único endpoint anónimo ad
 
 `ContactoRequest`: `{ "motivo": "duda", "email": "ana@ejemplo.es", "mensaje": "...", "nombre": "Ana", "web": null }`. `nombre` es opcional. `web` es un campo trampa que el formulario deja oculto y vacío: si llega relleno, la API responde 204 sin enviar nada. Con 503 el front ofrece escribir directamente a `mipartetuparte@gmail.com`.
 
-Total: 69 endpoints de negocio (5 hogares/yo, 10 miembros/invitaciones/enlaces de grupo, 4 categorías, 5 perfiles, 5 gastos, 6 recurrentes, 8 resumen/liquidación/pagos/ciclos, 16 cuenta común, 5 cierre de mes, 1 auditoría, 3 avisos del navegador, 1 contacto) más `GET /health`.
+Total: 69 endpoints de negocio (5 hogares/yo, 10 miembros/invitaciones/enlaces de grupo, 4 categorías, 5 perfiles, 5 gastos, 6 recurrentes, 8 resumen/liquidación/pagos/ciclos, 16 cuenta común, 5 cierre de mes, 1 auditoría, 3 avisos del navegador, 1 contacto) más `GET /health` y `GET /health/listo`.
 
 ### 3.14 Lista de la compra
 

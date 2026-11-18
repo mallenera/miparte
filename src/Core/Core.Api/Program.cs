@@ -42,6 +42,7 @@ builder.Services.TryAddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<CacheAcceso>(); // miembros activos por usuario: evita una consulta por petición
 builder.AddLimitacionPeticiones();
 builder.AddCabecerasSeguridad();
+builder.AddSalud(); // /health/listo: el proceso y la base de datos, para el monitor externo
 builder.AddEntradasSeguras(); // NUL y fechas fuera de rango: 400 en vez de un 500 al llegar a PostgreSQL
 
 // Cadena de conexión: variable de entorno ConnectionStrings__Default (nunca en el repo).
@@ -115,6 +116,9 @@ var app = builder.Build();
 var reenviadas = ReenvioCabeceras.Crear(app.Configuration);
 if (reenviadas is not null) app.UseForwardedHeaders(reenviadas);
 
+// Tras el reenvío y antes que nada más: mide también los rechazos del CORS, la autenticación y el limitador.
+app.UseRegistroPeticiones();
+
 // Deja en el log qué espera la validación del JWT (sin secretos): ayuda a diagnosticar 401.
 var supabase = app.Services.GetRequiredService<IOptions<SupabaseAuthOptions>>().Value;
 app.Logger.LogInformation(
@@ -142,6 +146,7 @@ app.UseAuthorization();
 app.UseMiddleware<HogarActualMiddleware>();
 
 app.MapGet("/health", () => Results.Ok(new { service = "core", status = "ok" })).DisableRateLimiting();
+app.MapSalud();
 
 app.MapHogares();
 app.MapGastos();

@@ -16,6 +16,12 @@ public static class ExportadorEstructura
     public const string RutaPorDefecto = "src/Database/MiParte.Database/Estructura";
 
     /// <summary>
+    /// Roles a los que la estructura concede privilegios: los de Supabase (PostgREST) y el de Core.Api. Se les revoca
+    /// todo antes de cada bloque de GRANT para que no sobreviva un privilegio que ya no está en la estructura.
+    /// </summary>
+    public const string RolesAplicacion = "anon, authenticated, miparte_api";
+
+    /// <summary>
     /// Ejecuta <c>pg_dump --schema-only</c> contra la base y escribe el resultado normalizado.
     /// Requiere <c>pg_dump</c> en el PATH.
     /// </summary>
@@ -81,14 +87,14 @@ public static class ExportadorEstructura
                 ruta = Clasificar(cabecera, cuerpo);
 
                 // pg_dump expresa los privilegios de tabla relativos a los de por defecto vigentes al crearla; al
-                // revocar antes a anon y authenticated, los GRANT que siguen valen sobre cualquier base de partida.
+                // revocar antes a los roles de la aplicación, los GRANT que siguen valen sobre cualquier base de partida.
                 if (cabecera.Contains("Type: DEFAULT ACL;", StringComparison.Ordinal))
                 {
                     // Igual que con las tablas: sin esto, los permisos por defecto previos de la base se sumarían.
                     if (!ficheros.TryGetValue(ruta, out var d))
                         ficheros[ruta] = d = new StringBuilder();
                     d.Append("--\n").Append(cabecera).Append("\n--\n\n")
-                        .Append("ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated;\n");
+                        .Append($"ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES FROM {RolesAplicacion};\n");
                     i += 2;
                     continue;
                 }
@@ -98,7 +104,7 @@ public static class ExportadorEstructura
                     if (!ficheros.TryGetValue(ruta, out var destino))
                         ficheros[ruta] = destino = new StringBuilder();
                     destino.Append("--\n").Append(cabecera).Append("\n--\n\n")
-                        .Append($"REVOKE ALL ON TABLE public.{tabla.Groups[1].Value} FROM anon, authenticated;\n");
+                        .Append($"REVOKE ALL ON TABLE public.{tabla.Groups[1].Value} FROM {RolesAplicacion};\n");
                     i += 2;
                     continue;
                 }

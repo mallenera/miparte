@@ -6,6 +6,13 @@ ALTER TABLE public.deuda_cuenta ENABLE ROW LEVEL SECURITY;
 
 
 --
+-- Name: deuda_cuenta api_servicio; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY api_servicio ON public.deuda_cuenta TO miparte_api USING (true) WITH CHECK (true);
+
+
+--
 -- Name: deuda_cuenta deuda_cuenta_hogar; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -16,5 +23,6 @@ CREATE POLICY deuda_cuenta_hogar ON public.deuda_cuenta TO authenticated USING (
 -- Name: TABLE deuda_cuenta; Type: ACL; Schema: public; Owner: -
 --
 
-REVOKE ALL ON TABLE public.deuda_cuenta FROM anon, authenticated;
+REVOKE ALL ON TABLE public.deuda_cuenta FROM anon, authenticated, miparte_api;
 GRANT SELECT ON TABLE public.deuda_cuenta TO authenticated;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.deuda_cuenta TO miparte_api;

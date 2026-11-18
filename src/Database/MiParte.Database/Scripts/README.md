@@ -13,7 +13,7 @@ existen. Cada script corre **una vez** (journal en `miparte_migraciones.scripts_
   - renombrar: `do $$ begin if exists (select 1 from information_schema.columns where table_name = '...' and column_name = 'vieja') then alter table ... rename column vieja to nueva; end if; end $$;`;
   - datos: `update ... where <condición que ya no se cumple tras aplicar>` o `insert ... on conflict do nothing`.
 - Funciones `SECURITY DEFINER`: `set search_path = ''` y nombres cualificados.
-- No uses `$miparte_script$` como etiqueta de dólar (la usa el comando `script`).
+- Etiqueta de dólar: usa `$$`. DbUp toma `$nombre$` como variable y falla («Variable nombre has no value defined»); además `$miparte_script$` la usa el comando `script`.
 - Nunca edites un script ya aplicado en algún entorno; crea otro.
 
 ## Generados

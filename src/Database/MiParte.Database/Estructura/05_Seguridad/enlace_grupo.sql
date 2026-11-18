@@ -5,6 +5,13 @@
 ALTER TABLE public.enlace_grupo ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: enlace_grupo api_servicio; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY api_servicio ON public.enlace_grupo TO miparte_api USING (true) WITH CHECK (true);
+
+
+--
 -- Name: enlace_grupo enlace_grupo_delete; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -36,6 +43,7 @@ CREATE POLICY enlace_grupo_update ON public.enlace_grupo FOR UPDATE TO authentic
 -- Name: TABLE enlace_grupo; Type: ACL; Schema: public; Owner: -
 --
 
-REVOKE ALL ON TABLE public.enlace_grupo FROM anon, authenticated;
+REVOKE ALL ON TABLE public.enlace_grupo FROM anon, authenticated, miparte_api;
 
 GRANT SELECT ON TABLE public.enlace_grupo TO authenticated;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.enlace_grupo TO miparte_api;

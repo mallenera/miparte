@@ -22,6 +22,29 @@ dotnet run --project src/Database/MiParte.Database -- migrar --conexion "$DATABA
 
 `pendientes` lista lo que falta sin tocar la base; `migrar` lo aplica y es idempotente. Detalle en `src/Database/MiParte.Database/Estructura/README.md`.
 
+`migrar` se ejecuta con el usuario `postgres` (propietario del esquema). Core.Api **no**: usa el rol `miparte_api`.
+
+### Rol de la base de datos para Core.Api (`miparte_api`)
+
+`postgres` es propietario de las tablas: se salta la RLS y puede crear o borrar tablas, leer `auth.users` o vaciar la auditoría. Si la API se conectara con él, un fallo en la API o una cadena de conexión filtrada darían control total de la base. `migrar` (script `Scripts/Antes/20261027140000_rol_miparte_api.sql` y `Estructura/05_Seguridad`) crea el rol `miparte_api`, que solo puede:
+
+- leer, insertar, actualizar y borrar filas de las tablas de `public` (en `auditoria`, solo leer e insertar), con una política RLS propia (`api_servicio`) que le deja ver todas las filas: el aislamiento por hogar dentro de la API lo sigue haciendo el filtro global de `MiParteDbContext`;
+- nada más: ni DDL, ni `TRUNCATE`, ni el esquema `auth`, ni el journal de migraciones, ni las RPC `crear_hogar`/`aceptar_invitacion`, ni hacerse pasar por otro rol.
+
+`EsquemaPostgresTests.RolDeLaApi_SoloLeeYEscribeFilasDePublic` lo comprueba, y en CI todas las pruebas de API contra PostgreSQL arrancan Core.Api con este rol (`MIPARTE_TEST_DB_API`).
+
+El rol se crea **sin contraseña** (nunca va en el repositorio). Una vez, tras `migrar`:
+
+1. Genera una contraseña larga sin `;` ni `=` (p. ej. `openssl rand -hex 32`).
+2. Supabase → SQL Editor: `alter role miparte_api with password '<contraseña>';`
+3. Render → `miparte-core` → Environment → `ConnectionStrings__Default`: la misma cadena del Session pooler cambiando el usuario a `miparte_api.<project-ref>` (el sufijo es el mismo que en `postgres.<project-ref>`) y la contraseña nueva. Render redespliega.
+4. Comprueba que la web carga los datos del hogar y que el log de Render no muestra `permission denied` ni `password authentication failed`. Si falla, vuelve a la cadena anterior mientras lo revisas.
+5. Cuando funcione, **cambia la contraseña de `postgres`** (Project Settings → Database → Reset database password): ha estado en Render y ya no debe estar en ningún servicio desplegado. Guárdala solo donde ejecutes `migrar`.
+
+Según la documentación de Supabase, los roles propios con `LOGIN` funcionan en conexión directa y en los poolers sin registrarlos aparte. Si acabas de cambiar la contraseña, el Session pooler puede tardar un poco en aceptarla (`28P01`): prueba primero con conexión directa y reintenta.
+
+Para cambiar la contraseña más adelante, repite los pasos 1-3. Una tabla nueva hereda los permisos de `miparte_api` (permisos por defecto de `00_Esquema.sql`), pero necesita también su política `api_servicio` en `05_Seguridad`; el test anterior falla si falta.
+
 ## Core.Api en Render
 
 1. Render → New → Blueprint, conecta el repositorio y elige `render.yaml`.

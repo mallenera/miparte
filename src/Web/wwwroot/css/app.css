@@ -593,6 +593,8 @@ input.invalid, input[aria-invalid="true"] { border-color: var(--err); outline: 0
 .chatform { display: flex; gap: 10px; align-items: center; margin-top: 14px; padding-top: 14px; }
 .chatform input { flex: 1 1 auto; min-width: 0; }
 .chatform .btn { flex: none; }
+.chatform .btn-voz { min-width: 42px; padding: 0 10px; }
+.chatform .btn-voz[aria-pressed="true"] { color: var(--err); border-color: var(--err); } /* taste-skill-ignore: estado de grabación; el icono de parar y el aviso de texto lo refuerzan */
 
 /* Asistente flotante: botón fijo abajo a la derecha y panel lateral (pantalla completa en móvil) */
 .fab-asistente {

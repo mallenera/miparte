@@ -346,4 +346,76 @@ public class AsistenteTests : BunitContext
             [("texto", "{\"texto\":\"Hola\"}"), ("texto", "{\"texto\":\"qué tal\"}"), ("fin", "{}")],
             eventos);
     }
+
+    private const string RutaAudio = "POST /api/chat/audio";
+
+    [Fact]
+    public async Task Nota_de_voz_transcrita_queda_en_el_cuadro_para_revisarla_sin_enviarse()
+    {
+        string? tipoEnviado = null;
+        byte[]? audioEnviado = null;
+        var api = new ApiFalsa().Responde(RutaAudio, r =>
+        {
+            tipoEnviado = r.Content!.Headers.ContentType!.ToString();
+            audioEnviado = r.Content.ReadAsByteArrayAsync().Result;
+            return ApiFalsa.Json(HttpStatusCode.OK, new TranscripcionResponse("Doce euros de café hoy"));
+        });
+        Registrar(api);
+        JSInterop.Setup<string>("grabacionAudio.iniciar", _ => true).SetResult("");
+        var c = Render<VistaAsistente>();
+
+        c.Find("button.btn-voz").Click();
+        Assert.Contains("Grabando", c.Markup);
+        Assert.Equal("true", c.Find("button.btn-voz").GetAttribute("aria-pressed"));
+
+        await c.InvokeAsync(() => c.Instance.AlTerminarGrabacion(Convert.ToBase64String([1, 2, 3]), "audio/webm;codecs=opus"));
+
+        Assert.Equal("Doce euros de café hoy", c.Find("#pregunta").GetAttribute("value"));
+        Assert.Contains("Revisa el texto dictado", c.Markup);
+        Assert.Equal("audio/webm; codecs=opus", tipoEnviado);
+        Assert.Equal(new byte[] { 1, 2, 3 }, audioEnviado);
+        Assert.DoesNotContain(RutaChat, api.Recibidas); // no se pregunta nada al asistente hasta pulsar Enviar
+    }
+
+    [Fact]
+    public void Pulsar_otra_vez_mientras_graba_para_la_grabacion()
+    {
+        Registrar(new ApiFalsa());
+        JSInterop.Setup<string>("grabacionAudio.iniciar", _ => true).SetResult("");
+        var detener = JSInterop.SetupVoid("grabacionAudio.detener");
+        var c = Render<VistaAsistente>();
+
+        c.Find("button.btn-voz").Click();
+        c.Find("button.btn-voz").Click();
+
+        Assert.Single(detener.Invocations);
+    }
+
+    [Fact]
+    public void Sin_permiso_de_microfono_muestra_el_motivo_y_no_graba()
+    {
+        Registrar(new ApiFalsa());
+        JSInterop.Setup<string>("grabacionAudio.iniciar", _ => true).SetResult("No hay permiso para usar el micrófono.");
+        var c = Render<VistaAsistente>();
+
+        c.Find("button.btn-voz").Click();
+
+        Assert.Contains("No hay permiso para usar el micrófono.", c.Find("[role=alert]").TextContent);
+        Assert.DoesNotContain("Grabando", c.Markup);
+    }
+
+    [Fact]
+    public async Task Error_al_transcribir_muestra_el_mensaje_del_asistente()
+    {
+        Registrar(new ApiFalsa().Error(RutaAudio, HttpStatusCode.UnprocessableEntity, "No he entendido nada en la nota de voz."));
+        JSInterop.Setup<string>("grabacionAudio.iniciar", _ => true).SetResult("");
+        var c = Render<VistaAsistente>();
+        c.Find("button.btn-voz").Click();
+
+        await c.InvokeAsync(() => c.Instance.AlTerminarGrabacion(Convert.ToBase64String([1, 2, 3]), "audio/webm"));
+
+        Assert.Contains("No he entendido nada en la nota de voz.", c.Find("[role=alert]").TextContent);
+        Assert.Equal("", c.Find("#pregunta").GetAttribute("value") ?? "");
+        Assert.Equal("false", c.Find("button.btn-voz").GetAttribute("aria-pressed"));
+    }
 }

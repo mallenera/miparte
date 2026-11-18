@@ -7,7 +7,7 @@ using MiParte.Contracts;
 namespace MiParte.Web.Api;
 
 /// <summary>
-/// Cliente tipado de Assistant.Api: el chat (completo o en streaming) y la confirmación de un gasto propuesto. Usa el
+/// Cliente tipado de Assistant.Api: el chat (completo o en streaming), la transcripción de notas de voz y la confirmación de un gasto propuesto. Usa el
 /// mismo manejador que Core.Api, que añade <c>Authorization</c> y <c>X-Hogar-Id</c>; no reintenta (cada pregunta cuesta
 /// tokens de pago, y una confirmación guarda un gasto).
 /// </summary>
@@ -90,12 +90,30 @@ public sealed class AsistenteApiClient
     public Task<GastoResponse> ConfirmarGastoAsync(ConfirmarGastoRequest peticion, CancellationToken ct = default)
         => EnviarAsync<GastoResponse>("api/chat/confirmar-gasto", peticion, ct);
 
-    private async Task<T> EnviarAsync<T>(string ruta, object cuerpo, CancellationToken ct)
+    /// <summary>
+    /// Convierte una nota de voz en texto (<c>POST /api/chat/audio</c>). No pregunta nada al asistente: el texto vuelve al
+    /// cuadro del chat para que la persona lo revise y lo envíe.
+    /// </summary>
+    /// <param name="audio">Grabación tal como la entrega el navegador.</param>
+    /// <param name="tipo">Tipo MIME de la grabación (p. ej. <c>audio/webm;codecs=opus</c>).</param>
+    /// <param name="ct">Token de cancelación.</param>
+    /// <exception cref="ApiException">No se ha podido transcribir; el mensaje es apto para el usuario.</exception>
+    public Task<TranscripcionResponse> TranscribirAsync(byte[] audio, string tipo, CancellationToken ct = default)
+    {
+        var contenido = new ByteArrayContent(audio);
+        contenido.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse(tipo);
+        return EnviarAsync<TranscripcionResponse>(t => _http.PostAsync("api/chat/audio", contenido, t), ct);
+    }
+
+    private Task<T> EnviarAsync<T>(string ruta, object cuerpo, CancellationToken ct)
+        => EnviarAsync<T>(t => _http.PostAsJsonAsync(ruta, cuerpo, t), ct);
+
+    private async Task<T> EnviarAsync<T>(Func<CancellationToken, Task<HttpResponseMessage>> enviar, CancellationToken ct)
     {
         HttpResponseMessage respuesta;
         try
         {
-            respuesta = await _http.PostAsJsonAsync(ruta, cuerpo, ct);
+            respuesta = await enviar(ct);
         }
         catch (HttpRequestException)
         {

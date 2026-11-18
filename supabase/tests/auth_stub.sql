@@ -14,8 +14,10 @@ $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
 grant usage on schema auth to authenticated, anon;
 grant execute on function auth.uid() to authenticated, anon;
 
--- Supabase concede por defecto todos los privilegios sobre las tablas de public a anon y authenticated
--- (a ellos los acota luego la RLS). Se imita para que los revoke de las migraciones tengan algo que quitar
--- y los tests de permisos sean significativos.
+-- Supabase concede por defecto todos los privilegios sobre las tablas y funciones de public a anon y authenticated
+-- (a las tablas las acota luego la RLS; a las funciones, nada: cualquiera las llama por /rest/v1/rpc). Se imita para que
+-- los revoke de la estructura tengan algo que quitar y los tests de permisos sean significativos. Un «revoke ... from
+-- public» no basta contra esto: la concesión es explícita a cada rol.
 grant usage on schema public to anon, authenticated;
 alter default privileges in schema public grant all on tables to anon, authenticated;
+alter default privileges in schema public grant all on functions to anon, authenticated;

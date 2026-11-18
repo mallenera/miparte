@@ -25,7 +25,7 @@ jobs:
       PGPASSWORD: pg
       MIPARTE_TEST_DB: Host=localhost;Database=miparte;Username=postgres;Password=pg
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
@@ -38,7 +38,7 @@ jobs:
     # Fijado: Playwright 1.56.1 no instala Chromium en ubuntu-latest (26.04).
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x

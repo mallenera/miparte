@@ -26,7 +26,7 @@ jobs:
       MIPARTE_TEST_DB: Host=localhost;Database=miparte;Username=postgres;Password=pg
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
       - name: Aplicar la estructura (proyecto de base de datos, con esquema auth simulado)
@@ -39,10 +39,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - run: dotnet publish src/Web -c Release -o salida

@@ -50,3 +50,13 @@ public record ConfirmarGastoRequest(
 /// </summary>
 /// <param name="Texto">Transcripción limpia (sin caracteres de control y con el mismo tope que un mensaje escrito).</param>
 public record TranscripcionResponse(string Texto);
+
+/// <summary>
+/// Respuesta de <c>POST /api/chat/ticket</c>: borrador de gasto leído de la foto de un ticket. No está guardado: la persona
+/// lo revisa, puede corregir importe, concepto y fecha, y lo confirma con <c>POST /api/chat/confirmar-gasto</c>. La foto no
+/// se guarda.
+/// </summary>
+/// <param name="Borrador">Gasto propuesto con la categoría y el perfil predeterminados.</param>
+/// <param name="ComercioLeido">false si no se leyó el comercio y el concepto es genérico.</param>
+/// <param name="FechaLeida">false si no se leyó la fecha y se ha puesto la de hoy.</param>
+public record LecturaTicketResponse(BorradorGastoDto Borrador, bool ComercioLeido, bool FechaLeida);

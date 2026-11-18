@@ -73,6 +73,8 @@ Core.Api responde `500 { "error": "Error interno del servidor." }` ante una exce
 
 Secretos de GitHub `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID`, y variable `CORE_URL` con la URL de Core.Api (y opcionalmente `ASSISTANT_URL`, ver arriba). El workflow la usa para `Api:CoreUrl` y para la CSP (`src/Web/cloudflare/_headers.template`, equivalente de `default.conf.template`). Escribe `Api:CoreUrl` y `Api:AssistantUrl` en `appsettings.json` **antes** de `dotnet publish`: el service worker precarga ese fichero comprobando el hash del manifiesto, así que no se puede modificar tras publicar. Antes de subir, `tests/pwa/probar.mjs` prueba la salida publicada con Chromium sobre un servidor que imita a Pages (redirección 308 de `/index.html`, fallback de SPA y `_headers`): primera y segunda visita, ruta profunda, sin conexión, aplicar una versión nueva con «Actualizar» y sin violaciones de CSP. Si falla, no se despliega. El mismo job (`pwa`) corre en cada PR desde `ci.yml`. En local, una vez: `npm ci --prefix tests/pwa` y `npx --prefix tests/pwa playwright install chromium`; después, `node tests/pwa/probar.mjs <salida>/wwwroot` (con `_headers` en la salida si se quiere comprobar la CSP).
 
+**Buscadores** (una vez): dar de alta `https://miparte.pages.dev/` en Google Search Console y en Bing Webmaster Tools (verificación por fichero HTML en `wwwroot` o por etiqueta `meta` en `index.html`) y enviar `https://miparte.pages.dev/sitemap.xml`. Qué ve un buscador y por qué está en `index.html`: ver la fila «Posicionamiento en buscadores» de [README.md](README.md).
+
 ## APK de Android (Trusted Web Activity)
 
 La app de Android no es una app nativa: `android/` es un proyecto mínimo generado con [Bubblewrap](https://github.com/GoogleChromeLabs/bubblewrap) que abre `https://miparte.pages.dev` a pantalla completa con Chrome (Trusted Web Activity). Usa la misma PWA, la misma sesión, el mismo service worker y los mismos avisos push, y se actualiza con cada despliegue de la web: solo hay que sacar una APK nueva si cambian el nombre, el icono, los colores de arranque o el dominio.
@@ -82,6 +84,59 @@ La app de Android no es una app nativa: `android/` es un proyecto mínimo genera
 - **Verificación del dominio**: Android solo quita la barra de direcciones si `https://miparte.pages.dev/.well-known/assetlinks.json` declara el paquete `dev.pages.miparte.twa` y la huella SHA-256 de la clave. El script escribe la huella en `src/Web/wwwroot/.well-known/assetlinks.json`; hay que subir ese cambio a `master` y esperar al despliegue antes de probar la APK. `tests/pwa/probar.mjs` comprueba que el fichero se sirve como JSON, y el service worker no lo precarga. Si la app se publicara en Google Play, que vuelve a firmarla, hay que añadir también la huella de Play.
 - **Cambiar la configuración**: edita `android/twa-manifest.json` y regenera con `npx @bubblewrap/cli update` desde `android/` (necesita `~/.bubblewrap/config.json` con `jdkPath` y `androidSdkPath`). La regeneración reescribe `app/build.gradle`: hay que volver a poner `buildToolsVersion "36.0.0"` y `versionName`, y subir `appVersionCode` en cada APK que se distribuya. `bubblewrap build` no acepta el SDK de Visual Studio; por eso se compila con Gradle desde el script.
 - **Requisitos en el móvil**: Android 7 o superior con Chrome; sin un navegador compatible, la app se abre como pestaña con barra de direcciones.
+
+## Disponibilidad y estadísticas
+
+### Caídas y tiempos de respuesta (UptimeRobot)
+
+Tres monitores HTTP(s) con intervalo de 5 minutos y alerta por correo:
+
+| Monitor | URL | Qué detecta |
+|---|---|---|
+| Web | `https://miparte.pages.dev/` | Cloudflare Pages no sirve el front |
+| Core | `https://<miparte-core>.onrender.com/health/listo` | Core.Api caída **o** sin base de datos (503) |
+| Asistente | `https://<miparte-assistant>.onrender.com/health` | Assistant.Api caída |
+
+En el de Core, el tipo «Keyword» con la palabra `"ok"` es más estricto que solo el código 200. El historial de disponibilidad (%) y el
+tiempo de respuesta de cada comprobación salen en el panel de UptimeRobot; con «Status page» se publica una página de estado.
+
+**Plan gratuito de Render**: los servicios se duermen tras un rato sin peticiones y la primera tarda decenas de segundos en
+despertar. Un monitor cada 5 minutos los mantiene despiertos (sin arranques en frío), pero consume horas de instancia de la cuota
+mensual del plan para cada servicio que vigile; revisa la cuota en el panel de Render. Si no alcanza, sube el intervalo o vigila
+solo Core: así el tiempo medido por UptimeRobot también incluirá los arranques en frío que sufre el usuario.
+
+### Tiempos dentro de la API (logs de Render)
+
+Core.Api y Assistant.Api escriben una línea por petición (categoría `MiParte.Peticiones`; `/health` no se registra):
+
+```text
+Petición GET /api/gastos -> 200 en 84 ms
+Servicio listo 2310 ms después de arrancar el proceso
+```
+
+Solo método, plantilla de ruta (sin ids), código y milisegundos: nada del usuario. Desde `Registro__PeticionLentaMs` (por defecto
+1000) la línea sale como aviso (`warn`), así que buscar `warn` en los logs de Render lista las peticiones lentas. Cada «Servicio
+listo» es un arranque (en el plan gratuito, normalmente un arranque en frío). Para silenciarlo:
+`Logging__LogLevel__MiParte.Peticiones=Warning` deja solo las lentas.
+
+### Usuarios y uso (SQL Editor de Supabase)
+
+Las altas salen de Supabase Auth, que es la fuente fiable. Guarda estas consultas en el SQL Editor; solo devuelven recuentos:
+
+```sql
+-- Altas por semana, confirmadas y activas (han entrado en los últimos 30 días)
+select date_trunc('week', created_at)::date as semana, count(*) as altas,
+       count(*) filter (where email_confirmed_at is not null) as confirmadas,
+       count(*) filter (where last_sign_in_at > now() - interval '30 days') as activas_30d
+from auth.users group by 1 order by 1;
+
+-- Hogares creados por semana
+select date_trunc('week', creado_en)::date as semana, count(*) as hogares from public.hogar group by 1 order by 1;
+
+-- Gastos por mes del gasto (gasto no guarda cuándo se registró, solo su fecha)
+select date_trunc('month', fecha)::date as mes, count(*) as gastos, count(distinct hogar_id) as hogares
+from public.gasto group by 1 order by 1;
+```
 
 ## Supabase Auth
 

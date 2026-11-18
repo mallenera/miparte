@@ -9,7 +9,7 @@ import path from 'node:path';
 const tipos = {
     '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json',
     '.css': 'text/css', '.wasm': 'application/wasm', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
-    '.woff2': 'font/woff2', '.woff': 'font/woff', '.webmanifest': 'application/manifest+json', '.txt': 'text/plain',
+    '.woff2': 'font/woff2', '.woff': 'font/woff', '.webmanifest': 'application/manifest+json', '.txt': 'text/plain', '.xml': 'application/xml',
 };
 
 /** Lee _headers: una línea sin sangría es un patrón de ruta (admite * al final); las sangradas, «Nombre: valor». */

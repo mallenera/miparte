@@ -10,8 +10,8 @@ using MiParte.Contracts;
 namespace MiParte.Assistant.Api.Chat;
 
 /// <summary>
-/// Endpoints del asistente: el chat (completo o en streaming), la transcripción de notas de voz y la confirmación de un
-/// gasto propuesto.
+/// Endpoints del asistente: el chat (completo o en streaming), la transcripción de notas de voz, la lectura de tickets y la
+/// confirmación de un gasto propuesto.
 /// </summary>
 public static class EndpointChat
 {
@@ -22,8 +22,8 @@ public static class EndpointChat
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     /// <summary>
-    /// Registra el chat, su versión en streaming, la transcripción de notas de voz y la confirmación de gastos (autenticados y
-    /// con límite de peticiones).
+    /// Registra el chat, su versión en streaming, la transcripción de notas de voz, la lectura de tickets y la confirmación de
+    /// gastos (autenticados y con límite de peticiones).
     /// </summary>
     /// <param name="app">Aplicación.</param>
     public static void MapChat(this WebApplication app)
@@ -35,6 +35,9 @@ public static class EndpointChat
             .RequireAuthorization()
             .RequireRateLimiting(SeguridadAsistente.PoliticaChat);
         app.MapPost("/api/chat/audio", TranscribirAsync)
+            .RequireAuthorization()
+            .RequireRateLimiting(SeguridadAsistente.PoliticaChat);
+        app.MapPost("/api/chat/ticket", LeerTicketAsync)
             .RequireAuthorization()
             .RequireRateLimiting(SeguridadAsistente.PoliticaChat);
         app.MapPost("/api/chat/confirmar-gasto", ConfirmarGastoAsync)
@@ -120,10 +123,7 @@ public static class EndpointChat
             return Error(StatusCodes.Status415UnsupportedMediaType, "Formato de audio no admitido. Graba la nota de voz desde la app.");
 
         var o = opciones.Value;
-        if (http.Request.ContentLength > o.MaxAudioBytes) return AudioDemasiadoLargo();
-        // El límite general de Kestrel (64 KB) es para el JSON del chat; solo esta ruta admite más.
-        if (http.Features.Get<IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } limite)
-            limite.MaxRequestBodySize = o.MaxAudioBytes;
+        if (!AmpliarTopeCuerpo(http, o.MaxAudioBytes)) return AudioDemasiadoLargo();
 
         var datos = DatosDe(http, fabrica, hogarId);
         try
@@ -149,6 +149,62 @@ public static class EndpointChat
             return Error(e.Codigo, e.Mensaje);
         }
     }
+
+    /// <summary>
+    /// <c>POST /api/chat/ticket</c>: lee la foto de un ticket (el cuerpo es la imagen, con su <c>Content-Type</c>) con
+    /// <see cref="ILectorTickets"/> y devuelve un borrador de gasto como el de <c>proponer_gasto</c>. No escribe nada: el
+    /// gasto se guarda solo con <c>confirmar-gasto</c>. La foto solo vive en memoria durante la petición.
+    /// </summary>
+    private static async Task<IResult> LeerTicketAsync(
+        HttpContext http, ServicioTicket servicio, IFabricaDatosHogar fabrica, CuotaDiaria cuota,
+        IOptions<OpcionesAsistente> opciones, ILogger<ServicioTicket> log, CancellationToken ct)
+    {
+        if (!LeerHogar(http, out var hogarId, out var error)) return error!;
+        if (FotoTicket.TipoPermitido(http.Request.ContentType) is not { } tipo)
+            return Error(StatusCodes.Status415UnsupportedMediaType, "Formato de imagen no admitido. Usa una foto en JPEG, PNG o WebP.");
+
+        var o = opciones.Value;
+        if (!AmpliarTopeCuerpo(http, o.MaxImagenBytes)) return ImagenDemasiadoGrande();
+
+        var datos = DatosDe(http, fabrica, hogarId);
+        try
+        {
+            await datos.MiembrosAsync(ct); // 403 antes de leer la foto si no es miembro activo de ese hogar
+            var imagen = await LeerConTopeAsync(http.Request.Body, o.MaxImagenBytes, ct);
+            if (imagen is null) return ImagenDemasiadoGrande();
+            if (!FotoTicket.FirmaValida(imagen)) return Error(StatusCodes.Status400BadRequest, "El fichero no es una imagen válida.");
+
+            ConsumirCuota(http, cuota); // leer un ticket cuesta como una pregunta
+            return Results.Ok(await servicio.LeerAsync(imagen, tipo, datos, ct));
+        }
+        catch (BadHttpRequestException e) when (e.StatusCode == StatusCodes.Status413PayloadTooLarge)
+        {
+            return ImagenDemasiadoGrande();
+        }
+        catch (TicketIlegibleException e)
+        {
+            return Error(StatusCodes.Status422UnprocessableEntity, e.Message);
+        }
+        catch (Exception ex) when (Traducir(ex, log) is { } e)
+        {
+            return Error(e.Codigo, e.Mensaje);
+        }
+    }
+
+    /// <summary>
+    /// Sube el tope de cuerpo de esta petición: el límite general de Kestrel (<c>MaxCuerpoBytes</c>, 64 KB) es para el JSON
+    /// del chat, y solo las rutas de audio y de foto admiten más. Devuelve false si la petición ya declara un tamaño mayor.
+    /// </summary>
+    private static bool AmpliarTopeCuerpo(HttpContext http, long maximo)
+    {
+        if (http.Request.ContentLength > maximo) return false;
+        if (http.Features.Get<IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } limite)
+            limite.MaxRequestBodySize = maximo;
+        return true;
+    }
+
+    private static IResult ImagenDemasiadoGrande()
+        => Error(StatusCodes.Status413PayloadTooLarge, "La foto es demasiado grande. Prueba con otra de menor resolución.");
 
     /// <summary>Lee el cuerpo entero si no supera <paramref name="maximo"/> bytes; null si lo supera (sin leer el resto).</summary>
     private static async Task<byte[]?> LeerConTopeAsync(Stream cuerpo, long maximo, CancellationToken ct)

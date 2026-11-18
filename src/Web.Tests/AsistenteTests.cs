@@ -418,4 +418,106 @@ public class AsistenteTests : BunitContext
         Assert.Equal("", c.Find("#pregunta").GetAttribute("value") ?? "");
         Assert.Equal("false", c.Find("button.btn-voz").GetAttribute("aria-pressed"));
     }
+
+    private const string RutaTicket = "POST /api/chat/ticket";
+
+    private static LecturaTicketResponse Lectura(bool comercio = true, bool fecha = true) => new(
+        new BorradorGastoDto(23.45m, comercio ? "Mercadona" : "Compra", new DateOnly(2026, 10, 6), "Supermercado", "Casa", CategoriaSuper, PerfilCasa),
+        comercio, fecha);
+
+    private static ApiFalsa CoreConAdultos() => new ApiFalsa().Responde("GET /api/miembros", HttpStatusCode.OK,
+        new[] { new MiembroDto(Ana, "Ana", "adulto", null, true, "admin", true, true), new MiembroDto(Luis, "Luis", "adulto", null, true, "miembro", true) });
+
+    private static void SubirFoto(IRenderedComponent<VistaAsistente> c, byte[] bytes)
+        => c.FindComponent<Microsoft.AspNetCore.Components.Forms.InputFile>()
+            .UploadFiles(InputFileContent.CreateFromBinary(bytes, "ticket.jpg", contentType: "image/jpeg"));
+
+    [Fact]
+    public void Foto_del_ticket_muestra_un_borrador_editable_sin_guardar_nada()
+    {
+        byte[]? enviada = null;
+        var api = new ApiFalsa().Responde(RutaTicket, r =>
+        {
+            enviada = r.Content!.ReadAsByteArrayAsync().Result;
+            return ApiFalsa.Json(HttpStatusCode.OK, Lectura());
+        });
+        Registrar(api, core: CoreConAdultos());
+        var c = Render<VistaAsistente>();
+
+        SubirFoto(c, [0xFF, 0xD8, 0xFF, 1, 2, 3]);
+
+        c.WaitForAssertion(() => Assert.Contains("He leído el ticket", c.Markup));
+        Assert.Equal(new byte[] { 0xFF, 0xD8, 0xFF, 1, 2, 3 }, enviada);
+        var campos = c.FindAll("div.borrador input");
+        Assert.Equal("23,45", campos[0].GetAttribute("value"));
+        Assert.Equal("Mercadona", campos[1].GetAttribute("value"));
+        Assert.Equal("2026-10-06", campos[2].GetAttribute("value"));
+        Assert.DoesNotContain(api.Recibidas, r => r.Contains("confirmar-gasto"));
+    }
+
+    [Fact]
+    public void Ticket_sin_comercio_ni_fecha_avisa_de_revisarlos()
+    {
+        Registrar(new ApiFalsa().Responde(RutaTicket, HttpStatusCode.OK, Lectura(comercio: false, fecha: false)), core: CoreConAdultos());
+        var c = Render<VistaAsistente>();
+
+        SubirFoto(c, [0xFF, 0xD8, 0xFF, 1]);
+
+        c.WaitForAssertion(() => Assert.Contains("No he leído el comercio", c.Markup));
+        Assert.Contains("No he leído la fecha", c.Markup);
+    }
+
+    [Fact]
+    public void Confirmar_un_ticket_envia_los_datos_corregidos()
+    {
+        var api = new ApiFalsa()
+            .Responde(RutaTicket, HttpStatusCode.OK, Lectura())
+            .Responde("POST /api/chat/confirmar-gasto", HttpStatusCode.Created,
+                new GastoResponse(Guid.NewGuid(), new DateOnly(2026, 10, 5), 24.5m, Guid.NewGuid(), Luis, Guid.NewGuid(), "Mercadona Centro", null, []));
+        Registrar(api, core: CoreConAdultos());
+        var c = Render<VistaAsistente>();
+        SubirFoto(c, [0xFF, 0xD8, 0xFF, 1]);
+        c.WaitForAssertion(() => Assert.Contains("He leído el ticket", c.Markup));
+
+        var campos = c.FindAll("div.borrador input");
+        campos[0].Change("24,50");
+        c.FindAll("div.borrador input")[1].Change("Mercadona Centro");
+        c.FindAll("div.borrador input")[2].Change("2026-10-05");
+        c.Find("div.borrador select").Change(Luis.ToString());
+        c.Find("div.borrador button.btn").Click();
+
+        Assert.Contains("Gasto guardado.", c.Markup);
+        var enviado = JsonSerializer.Deserialize<ConfirmarGastoRequest>(api.Cuerpos["POST /api/chat/confirmar-gasto"], Web)!;
+        Assert.Equal((24.5m, "Mercadona Centro", new DateOnly(2026, 10, 5), Luis), (enviado.Importe, enviado.Concepto, enviado.Fecha, enviado.PagadoPor));
+        Assert.Equal((CategoriaSuper, PerfilCasa, "Supermercado", "Casa"), (enviado.CategoriaId, enviado.PerfilRepartoId, enviado.Categoria, enviado.Perfil));
+    }
+
+    [Fact]
+    public void Ticket_con_importe_no_valido_no_se_confirma()
+    {
+        var api = new ApiFalsa().Responde(RutaTicket, HttpStatusCode.OK, Lectura());
+        Registrar(api, core: CoreConAdultos());
+        var c = Render<VistaAsistente>();
+        SubirFoto(c, [0xFF, 0xD8, 0xFF, 1]);
+        c.WaitForAssertion(() => Assert.Contains("He leído el ticket", c.Markup));
+
+        c.FindAll("div.borrador input")[0].Change("12,345");
+        c.Find("div.borrador select").Change(Luis.ToString());
+        c.Find("div.borrador button.btn").Click();
+
+        Assert.Contains("máximo 2 decimales", c.Find("div.borrador [role=alert]").TextContent);
+        Assert.DoesNotContain(api.Recibidas, r => r.Contains("confirmar-gasto"));
+    }
+
+    [Fact]
+    public void Ticket_ilegible_muestra_el_mensaje_del_asistente()
+    {
+        Registrar(new ApiFalsa().Error(RutaTicket, HttpStatusCode.UnprocessableEntity, "No he podido leer el importe total del ticket."));
+        var c = Render<VistaAsistente>();
+
+        SubirFoto(c, [0xFF, 0xD8, 0xFF, 1]);
+
+        c.WaitForAssertion(() => Assert.Contains("No he podido leer el importe total del ticket.", c.Find("[role=alert]").TextContent));
+        Assert.Empty(c.FindAll("div.borrador"));
+    }
 }

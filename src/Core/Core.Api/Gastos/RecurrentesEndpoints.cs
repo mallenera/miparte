@@ -90,14 +90,18 @@ public static class RecurrentesEndpoints
         return Results.Ok(new { activas = await servicio.ActivarAsync(req.Activas, ct) });
     }
 
-    /// <summary>Crea los gastos del mes para las plantillas activas que aún no tengan uno. Idempotente. 409 si las recurrentes están desactivadas en el hogar o el mes está cerrado.</summary>
+    /// <summary>
+    /// Crea los gastos del mes para las plantillas activas que aún no tengan uno (con <c>hastaDia</c>, solo las de ese día o antes).
+    /// Idempotente. 400 si el mes o <c>hastaDia</c> no son válidos; 409 si las recurrentes están desactivadas en el hogar o el mes está cerrado.
+    /// </summary>
     private static async Task<IResult> GenerarAsync(
-        [FromQuery] string? mes, [FromServices] ServicioRecurrentes servicio, [FromServices] IHogarActual hogar, CancellationToken ct)
+        [FromQuery] string? mes, [FromQuery] int? hastaDia, [FromServices] ServicioRecurrentes servicio, [FromServices] IHogarActual hogar,
+        CancellationToken ct)
     {
         if (hogar.HogarId is null) return ApiComun.SinHogar();
         if (!ApiComun.TryMes(mes, out var inicio)) return ApiComun.MesInvalido();
 
-        var r = await servicio.GenerarAsync(inicio, ct);
+        var r = await servicio.GenerarAsync(inicio, ct, hastaDia);
         if (r.Error is { } error) return ApiComun.Respuesta(error);
         return Results.Ok(new GenerarRecurrentesResponse(ApiComun.FormatoMes(r.Valor!.Mes), r.Valor.Creados, r.Valor.YaExistentes));
     }

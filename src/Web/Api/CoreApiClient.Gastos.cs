@@ -95,5 +95,13 @@ public sealed partial class CoreApiClient
     /// <param name="mes">Mes en formato YYYY-MM.</param>
     /// <param name="ct">Token de cancelación.</param>
     public Task<GenerarRecurrentesResponse> GenerarRecurrentesAsync(string mes, CancellationToken ct = default) =>
-        _nucleo.EnviarAsync<GenerarRecurrentesResponse>(HttpMethod.Post, $"api/gastos-recurrentes/generar?mes={Uri.EscapeDataString(mes)}", null, ct);
+        GenerarRecurrentesAsync(mes, null, ct);
+
+    /// <summary>Como <see cref="GenerarRecurrentesAsync(string, CancellationToken)"/>, pero solo con las plantillas cuyo día del mes ya ha llegado.</summary>
+    /// <param name="mes">Mes en formato YYYY-MM.</param>
+    /// <param name="hastaDia">Último día del mes que se genera (1-31); null genera todas.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<GenerarRecurrentesResponse> GenerarRecurrentesAsync(string mes, int? hastaDia, CancellationToken ct = default) =>
+        _nucleo.EnviarAsync<GenerarRecurrentesResponse>(HttpMethod.Post,
+            $"api/gastos-recurrentes/generar?mes={Uri.EscapeDataString(mes)}" + (hastaDia is { } d ? $"&hastaDia={d}" : ""), null, ct);
 }

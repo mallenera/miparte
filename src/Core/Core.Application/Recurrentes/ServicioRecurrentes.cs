@@ -97,10 +97,12 @@ public sealed class ServicioRecurrentes(IRepositorioRecurrentes recurrentes, IRe
     /// Crea los gastos del mes que empieza en <paramref name="inicio"/> para las plantillas activas que aún no tengan uno. Es
     /// idempotente: o se generan todos los pendientes o ninguno. Conflicto si el hogar tiene desactivados los gastos recurrentes, si el
     /// mes está cerrado, si una plantilla va a cargo de la cuenta común y el hogar no la ha activado, o si va a cargo del ahorro y
-    /// este no está activado o no alcanza; inválido si algún gasto no se puede repartir.
+    /// este no está activado o no alcanza; inválido si algún gasto no se puede repartir. Con <paramref name="hastaDia"/> solo cuenta las
+    /// plantillas cuyo día ya ha llegado: es lo que usa la generación automática al abrir la app, para no anotar a día 3 un gasto del 25.
     /// </summary>
-    public async Task<Resultado<GeneracionDelMes>> GenerarAsync(DateOnly inicio, CancellationToken ct)
+    public async Task<Resultado<GeneracionDelMes>> GenerarAsync(DateOnly inicio, CancellationToken ct, int? hastaDia = null)
     {
+        if (hastaDia is < 1 or > 31) return Resultado<GeneracionDelMes>.Invalido("hastaDia debe estar entre 1 y 31.");
         if (!await recurrentes.RecurrentesActivasAsync(ct)) return Resultado<GeneracionDelMes>.Conflicto(Mensajes.RecurrentesInactivas);
         if (await gastos.MesCerradoAsync(inicio, ct)) return Resultado<GeneracionDelMes>.Conflicto(Mensajes.MesCerrado);
 
@@ -108,7 +110,7 @@ public sealed class ServicioRecurrentes(IRepositorioRecurrentes recurrentes, IRe
         // y aquí se reintenta (hasta MaxReintentos veces) con una lectura nueva, que ya incluye lo que generó la otra petición.
         for (var intento = 0; ; intento++)
         {
-            var plantillas = await recurrentes.ActivasAsync(ct);
+            var plantillas = (await recurrentes.ActivasAsync(ct)).Where(p => hastaDia is null || p.DiaMes <= hastaDia).ToList();
             var yaGeneradas = await recurrentes.GeneradasEnElMesAsync(inicio, ct);
             var pendientes = plantillas.Where(p => !yaGeneradas.Contains(p.Id)).ToList();
 

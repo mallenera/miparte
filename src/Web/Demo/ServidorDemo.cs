@@ -119,7 +119,7 @@ public sealed partial class ServidorDemo
             ("gastos-recurrentes", 2, "GET") => Ok((await _recurrentes.ListarAsync(ct)).Select(r => r.ADto()).ToList()),
             ("gastos-recurrentes", 3, "GET") when id is { } i => await ObtenerRecurrente(i, ct),
             ("gastos-recurrentes", 2, "POST") => await CrearRecurrente((await Cuerpo<GastoRecurrenteRequest>())!, ct),
-            ("gastos-recurrentes", 3, "POST") when subruta == "generar" => await Generar(mes, ct),
+            ("gastos-recurrentes", 3, "POST") when subruta == "generar" => await Generar(mes, Consulta(uri, "hastaDia"), ct),
             ("gastos-recurrentes", 3, "PUT") when id is { } i => await EditarRecurrente(i, (await Cuerpo<GastoRecurrenteRequest>())!, ct),
             ("gastos-recurrentes", 3, "DELETE") when id is { } i => Sin(await _recurrentes.BorrarAsync(i, ct)),
 
@@ -305,10 +305,10 @@ public sealed partial class ServidorDemo
         return res.Error is { } e ? Error(e) : Ok(res.Valor!.ADto());
     }
 
-    private async Task<HttpResponseMessage> Generar(string? mes, CancellationToken ct)
+    private async Task<HttpResponseMessage> Generar(string? mes, string? hastaDia, CancellationToken ct)
     {
         if (!TryMes(mes, out var inicio)) return MesInvalido();
-        var res = await _recurrentes.GenerarAsync(inicio, ct);
+        var res = await _recurrentes.GenerarAsync(inicio, ct, int.TryParse(hastaDia, out var dia) ? dia : null);
         return res.Error is { } e ? Error(e) : Ok(new GenerarRecurrentesResponse(FormatosApi.FormatoMes(res.Valor!.Mes), res.Valor.Creados, res.Valor.YaExistentes));
     }
 

@@ -331,6 +331,11 @@ public class GastosLiquidacionTests
         // Otro mes genera uno nuevo.
         Assert.Equal(1, (await Leer<GenerarRecurrentesResponse>(await c.PostAsync("/api/gastos-recurrentes/generar?mes=2026-10", null))).Creados);
 
+        // Con hastaDia anterior al día de la plantilla (el 5) no se crea nada; ese día, sí.
+        Assert.Equal((0, 0), Par(await Leer<GenerarRecurrentesResponse>(await c.PostAsync("/api/gastos-recurrentes/generar?mes=2026-11&hastaDia=4", null))));
+        Assert.Equal((1, 0), Par(await Leer<GenerarRecurrentesResponse>(await c.PostAsync("/api/gastos-recurrentes/generar?mes=2026-11&hastaDia=5", null))));
+        static (int, int) Par(GenerarRecurrentesResponse r) => (r.Creados, r.YaExistentes);
+
         // Con gastos generados no se puede borrar (409); se desactiva.
         Assert.Equal(HttpStatusCode.Conflict, (await c.DeleteAsync($"/api/gastos-recurrentes/{rec.Id}")).StatusCode);
     }
@@ -345,6 +350,7 @@ public class GastosLiquidacionTests
         Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync("/api/gastos-recurrentes", ok with { DiaMes = 0 })).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync("/api/gastos-recurrentes", ok with { Importe = -1m })).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsync("/api/gastos-recurrentes/generar", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsync("/api/gastos-recurrentes/generar?mes=2026-09&hastaDia=40", null)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/gastos-recurrentes/{Guid.NewGuid()}")).StatusCode);
 
         var creada = await c.PostAsJsonAsync("/api/gastos-recurrentes", ok);

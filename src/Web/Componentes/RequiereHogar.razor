@@ -1,7 +1,9 @@
-@* Envuelve las páginas que necesitan un hogar seleccionado: si aún no lo hay, pasa por el flujo de arranque. *@
+@* Envuelve las páginas que necesitan un hogar seleccionado: si aún no lo hay, pasa por el flujo de arranque. Antes de pintar la página
+   genera los gastos recurrentes pendientes del mes (una vez al día por hogar), para que Resumen o Gastos ya los incluyan. *@
 @implements IDisposable
 @inject EstadoHogar Hogar
 @inject ServicioArranque Arranque
+@inject GeneradorRecurrentes Recurrentes
 @inject NavigationManager Navegacion
 
 @if (_error is not null)
@@ -11,7 +13,7 @@
         <button class="btn btn-link p-0 ms-2" @onclick="CargarAsync">Reintentar</button>
     </div>
 }
-else if (Hogar.HogarActual is not null)
+else if (Hogar.HogarActual is not null && _preparado)
 {
     @ChildContent
 }
@@ -24,11 +26,12 @@ else
     [Parameter] public RenderFragment? ChildContent { get; set; }
 
     private string? _error;
+    private bool _preparado;
 
     protected override async Task OnInitializedAsync()
     {
         Hogar.Cambiado += AlCambiarHogar;
-        if (Hogar.HogarActual is null) await CargarAsync();
+        await CargarAsync();
     }
 
     private async Task CargarAsync()
@@ -36,9 +39,15 @@ else
         _error = null;
         try
         {
-            var destino = await Arranque.CargarAsync();
-            if (destino == DestinoArranque.SinHogar) Navegacion.NavigateTo("sin-hogar", replace: true);
-            else if (destino == DestinoArranque.ElegirHogar) Navegacion.NavigateTo("elegir-hogar", replace: true);
+            if (Hogar.HogarActual is null)
+            {
+                var destino = await Arranque.CargarAsync();
+                if (destino == DestinoArranque.SinHogar) Navegacion.NavigateTo("sin-hogar", replace: true);
+                else if (destino == DestinoArranque.ElegirHogar) Navegacion.NavigateTo("elegir-hogar", replace: true);
+            }
+
+            await Recurrentes.GenerarPendientesAsync();
+            _preparado = true;
         }
         catch (ApiException e)
         {
@@ -46,7 +55,12 @@ else
         }
     }
 
-    private void AlCambiarHogar() => InvokeAsync(StateHasChanged);
+    // Cambiar de hogar sin salir de la página también genera los del hogar nuevo (lo ya hecho hoy vuelve sin esperar).
+    private void AlCambiarHogar() => InvokeAsync(async () =>
+    {
+        StateHasChanged();
+        if (_preparado && await Recurrentes.GenerarPendientesAsync() > 0) StateHasChanged();
+    });
 
     public void Dispose() => Hogar.Cambiado -= AlCambiarHogar;
 }

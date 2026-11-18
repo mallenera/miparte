@@ -161,3 +161,18 @@ internal static class Ayuda
         public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
     }
 }
+
+/// <summary>Transcriptor de pruebas: devuelve un texto fijo (o falla) y guarda el audio recibido.</summary>
+internal sealed class TranscriptorFalso(string texto = "Doce euros de café hoy") : ITranscriptor
+{
+    public List<byte[]> Audios { get; } = [];
+
+    public Exception? Fallo { get; set; }
+
+    public Task<string> TranscribirAsync(byte[] audio, CancellationToken ct)
+    {
+        Audios.Add(audio);
+        if (Fallo is not null) throw Fallo;
+        return Task.FromResult(texto);
+    }
+}

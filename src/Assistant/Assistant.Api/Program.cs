@@ -28,9 +28,11 @@ builder.Services.AddSingleton<IFabricaDatosHogar, FabricaDatosHogarCore>();
 
 // Modelo: la clave ANTHROPIC_API_KEY se lee solo del entorno.
 builder.Services.AddSingleton(TimeProvider.System);
+// Workers AI se registra siempre: además del chat (si es el proveedor elegido) transcribe las notas de voz.
+builder.Services.AddHttpClient(ClienteWorkersAi.NombreCliente, c => c.Timeout = TimeSpan.FromSeconds(60));
+builder.Services.AddSingleton<ITranscriptor, TranscriptorWorkersAi>();
 if (string.Equals(opciones.Proveedor, "cloudflare", StringComparison.OrdinalIgnoreCase))
 {
-    builder.Services.AddHttpClient(ClienteWorkersAi.NombreCliente, c => c.Timeout = TimeSpan.FromSeconds(60));
     builder.Services.AddSingleton<IClienteModelo, ClienteWorkersAi>();
 }
 else

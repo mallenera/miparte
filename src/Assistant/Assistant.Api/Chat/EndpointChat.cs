@@ -1,5 +1,7 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 using MiParte.Assistant.Api.Hogar;
 using MiParte.Assistant.Api.Modelo;
 using MiParte.Assistant.Api.Seguridad;
@@ -7,7 +9,10 @@ using MiParte.Contracts;
 
 namespace MiParte.Assistant.Api.Chat;
 
-/// <summary>Endpoints del asistente: el chat (completo o en streaming) y la confirmación de un gasto propuesto.</summary>
+/// <summary>
+/// Endpoints del asistente: el chat (completo o en streaming), la transcripción de notas de voz y la confirmación de un
+/// gasto propuesto.
+/// </summary>
 public static class EndpointChat
 {
     /// <summary>Cabecera con el hogar sobre el que se pregunta (la misma que usa Core.Api).</summary>
@@ -16,7 +21,10 @@ public static class EndpointChat
     /// <summary>Opciones de serialización de los eventos del streaming (camelCase, como el resto de la API).</summary>
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    /// <summary>Registra el chat, su versión en streaming y la confirmación de gastos (autenticados y con límite de peticiones).</summary>
+    /// <summary>
+    /// Registra el chat, su versión en streaming, la transcripción de notas de voz y la confirmación de gastos (autenticados y
+    /// con límite de peticiones).
+    /// </summary>
     /// <param name="app">Aplicación.</param>
     public static void MapChat(this WebApplication app)
     {
@@ -24,6 +32,9 @@ public static class EndpointChat
             .RequireAuthorization()
             .RequireRateLimiting(SeguridadAsistente.PoliticaChat);
         app.MapPost("/api/chat/stream", ResponderStreamingAsync)
+            .RequireAuthorization()
+            .RequireRateLimiting(SeguridadAsistente.PoliticaChat);
+        app.MapPost("/api/chat/audio", TranscribirAsync)
             .RequireAuthorization()
             .RequireRateLimiting(SeguridadAsistente.PoliticaChat);
         app.MapPost("/api/chat/confirmar-gasto", ConfirmarGastoAsync)
@@ -94,6 +105,67 @@ public static class EndpointChat
             return Results.Empty;
         }
     }
+
+    /// <summary>
+    /// <c>POST /api/chat/audio</c>: convierte una nota de voz (el cuerpo es el fichero, con su <c>Content-Type</c>) en texto
+    /// con <see cref="ITranscriptor"/>. No llama al modelo del chat ni escribe nada: devuelve el texto para que la persona lo
+    /// revise y lo envíe como pregunta. El audio solo vive en memoria durante la petición.
+    /// </summary>
+    private static async Task<IResult> TranscribirAsync(
+        HttpContext http, ITranscriptor transcriptor, IFabricaDatosHogar fabrica, CuotaDiaria cuota,
+        IOptions<OpcionesAsistente> opciones, ILogger<ServicioChat> log, CancellationToken ct)
+    {
+        if (!LeerHogar(http, out var hogarId, out var error)) return error!;
+        if (!NotaDeVoz.TipoPermitido(http.Request.ContentType))
+            return Error(StatusCodes.Status415UnsupportedMediaType, "Formato de audio no admitido. Graba la nota de voz desde la app.");
+
+        var o = opciones.Value;
+        if (http.Request.ContentLength > o.MaxAudioBytes) return AudioDemasiadoLargo();
+        // El límite general de Kestrel (64 KB) es para el JSON del chat; solo esta ruta admite más.
+        if (http.Features.Get<IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } limite)
+            limite.MaxRequestBodySize = o.MaxAudioBytes;
+
+        var datos = DatosDe(http, fabrica, hogarId);
+        try
+        {
+            await datos.MiembrosAsync(ct); // 403 antes de leer el audio si no es miembro activo de ese hogar
+            var audio = await LeerConTopeAsync(http.Request.Body, o.MaxAudioBytes, ct);
+            if (audio is null) return AudioDemasiadoLargo();
+            if (!NotaDeVoz.FirmaValida(audio))
+                return Error(StatusCodes.Status400BadRequest, "El fichero no es una nota de voz válida.");
+
+            ConsumirCuota(http, cuota); // la transcripción también cuesta: cuenta como una pregunta
+            var texto = NotaDeVoz.Limpiar(await transcriptor.TranscribirAsync(audio, ct), o.MaxCaracteresMensaje);
+            return texto.Length == 0
+                ? Error(StatusCodes.Status422UnprocessableEntity, "No he entendido nada en la nota de voz. Prueba a grabarla otra vez.")
+                : Results.Ok(new TranscripcionResponse(texto));
+        }
+        catch (BadHttpRequestException e) when (e.StatusCode == StatusCodes.Status413PayloadTooLarge)
+        {
+            return AudioDemasiadoLargo();
+        }
+        catch (Exception ex) when (Traducir(ex, log) is { } e)
+        {
+            return Error(e.Codigo, e.Mensaje);
+        }
+    }
+
+    /// <summary>Lee el cuerpo entero si no supera <paramref name="maximo"/> bytes; null si lo supera (sin leer el resto).</summary>
+    private static async Task<byte[]?> LeerConTopeAsync(Stream cuerpo, long maximo, CancellationToken ct)
+    {
+        using var memoria = new MemoryStream();
+        var buffer = new byte[16 * 1024];
+        int leidos;
+        while ((leidos = await cuerpo.ReadAsync(buffer, ct)) > 0)
+        {
+            if (memoria.Length + leidos > maximo) return null;
+            memoria.Write(buffer, 0, leidos);
+        }
+        return memoria.ToArray();
+    }
+
+    private static IResult AudioDemasiadoLargo()
+        => Error(StatusCodes.Status413PayloadTooLarge, "La nota de voz es demasiado larga. Graba un mensaje más corto.");
 
     /// <summary>
     /// <c>POST /api/chat/confirmar-gasto</c>: guarda el gasto que la persona confirma tras ver el borrador. Es la única vía

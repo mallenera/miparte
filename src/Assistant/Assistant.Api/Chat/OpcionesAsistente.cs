@@ -50,4 +50,13 @@ public sealed class OpcionesAsistente
 
     /// <summary>Tamaño máximo del cuerpo de la petición, en bytes.</summary>
     public long MaxCuerpoBytes { get; set; } = 64 * 1024;
+
+    /// <summary>Modelo de voz de Workers AI para transcribir notas de voz (se usa con cualquier proveedor del chat).</summary>
+    public string CloudflareModeloVoz { get; set; } = "@cf/openai/whisper-large-v3-turbo";
+
+    /// <summary>
+    /// Tamaño máximo de una nota de voz, en bytes. Con Opus, 30 s ocupan unos 100-200 KB; 1 MB deja margen para
+    /// navegadores que graban en AAC (Safari) sin admitir grabaciones largas.
+    /// </summary>
+    public long MaxAudioBytes { get; set; } = 1024 * 1024;
 }

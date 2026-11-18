@@ -43,3 +43,10 @@ public record BorradorGastoDto(
 /// <param name="Perfil">Nombre del perfil que se mostró. Si el nombre ha cambiado desde entonces, la API responde 409.</param>
 public record ConfirmarGastoRequest(
     decimal Importe, string Concepto, DateOnly Fecha, Guid PagadoPor, Guid CategoriaId, Guid PerfilRepartoId, string Categoria, string Perfil);
+
+/// <summary>
+/// Respuesta de <c>POST /api/chat/audio</c>: la nota de voz convertida en texto. No se envía sola al asistente: la persona
+/// la revisa en el cuadro del chat y la manda como cualquier pregunta. El audio no se guarda.
+/// </summary>
+/// <param name="Texto">Transcripción limpia (sin caracteres de control y con el mismo tope que un mensaje escrito).</param>
+public record TranscripcionResponse(string Texto);

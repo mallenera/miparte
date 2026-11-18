@@ -1,4 +1,6 @@
-@* Chat del asistente (vive en el panel flotante PanelAsistente). Las respuestas llegan en vivo y se pintan siempre como texto (nunca como HTML). Puede proponer un gasto como borrador: no se guarda hasta que la persona lo confirma. *@
+@* Chat del asistente (vive en el panel flotante PanelAsistente). Las respuestas llegan en vivo y se pintan siempre como texto (nunca como HTML). Puede proponer un gasto como borrador: no se guarda hasta que la persona lo confirma. La pregunta también se puede dictar: la nota de voz se transcribe y vuelve al cuadro para revisarla antes de enviarla. *@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
 @inject AsistenteApiClient Api
 @inject CoreApiClient Core
 @inject EstadoHogar Hogar
@@ -102,11 +104,30 @@
         {
             <div class="aviso err u-mt12" role="alert">@_error</div>
         }
+        @if (_grabando)
+        {
+            <div class="muted u-mt12" role="status">Grabando… pulsa el botón de parar al terminar (máximo @MaxSegundosVoz s).</div>
+        }
+        else if (_transcribiendo)
+        {
+            <div class="muted u-mt12" role="status">Pasando la nota de voz a texto…</div>
+        }
+        else if (_dictado)
+        {
+            <div class="muted u-mt12" role="status">Revisa el texto dictado y pulsa Enviar.</div>
+        }
 
         <form class="chatform" @onsubmit="() => EnviarFormularioAsync()">
             <label class="sr" for="pregunta">Tu pregunta</label>
             <input id="pregunta" type="text" autocomplete="off" maxlength="@MaxCaracteres" placeholder="@(_alta is null ? "Escribe tu pregunta…" : "Escribe tu respuesta…")"
-                   @bind="_texto" @bind:event="oninput" disabled="@_enviando" />
+                   @bind="_texto" @bind:event="oninput" disabled="@(_enviando || _grabando || _transcribiendo)" />
+            @if (!Sesion.EsDemoLocal)
+            {
+                <button class="btn btn-ghost btn-voz" type="button" disabled="@(_enviando || _transcribiendo)" @onclick="AlternarGrabacionAsync"
+                        aria-pressed="@(_grabando ? "true" : "false")" aria-label="@(_grabando ? "Parar la grabación" : "Dictar por voz")" title="@(_grabando ? "Parar la grabación" : "Dictar por voz")">
+                    <Icono Nombre="@(_grabando ? "square" : "mic")" Tamano="18" />
+                </button>
+            }
             <button class="btn" type="submit" disabled="@(_enviando || string.IsNullOrWhiteSpace(_texto))">Enviar</button>
         </form>
     }
@@ -118,6 +139,9 @@
 
     /// <summary>Mensajes del historial que se envían como contexto (los más recientes).</summary>
     private const int MaxHistorial = 20;
+
+    /// <summary>Duración máxima de una nota de voz; el servidor limita además el tamaño (<c>Asistente__MaxAudioBytes</c>).</summary>
+    private const int MaxSegundosVoz = 30;
 
     private static readonly string[] Sugerencias =
     [
@@ -153,6 +177,10 @@
     private bool _enviando;
     private bool _confirmando;
     private ModeloAltaGastoChat? _alta;
+    private bool _grabando;
+    private bool _transcribiendo;
+    private bool _dictado;
+    private DotNetObjectReference<VistaAsistente>? _referencia;
 
     private bool Disponible => Opciones.AsistenteConfigurado || Sesion.EsDemoLocal;
 
@@ -231,6 +259,7 @@
         pregunta = pregunta?.Trim();
         if (_enviando || string.IsNullOrEmpty(pregunta)) return; // evita el doble envío
         _enviando = true;
+        _dictado = false;
         _error = null;
         var usuario = new Burbuja(true, pregunta, []);
         _mensajes.Add(usuario);
@@ -319,6 +348,78 @@
         {
             _confirmando = false;
         }
+    }
+
+    /// <summary>Empieza a grabar una nota de voz o, si ya se está grabando, la termina (y se transcribe).</summary>
+    private async Task AlternarGrabacionAsync()
+    {
+        _error = null;
+        if (_grabando)
+        {
+            await JS.InvokeVoidAsync("grabacionAudio.detener");
+            return;
+        }
+        _referencia ??= DotNetObjectReference.Create(this);
+        var fallo = await JS.InvokeAsync<string>("grabacionAudio.iniciar", _referencia, MaxSegundosVoz);
+        if (string.IsNullOrEmpty(fallo))
+        {
+            _grabando = true;
+            _dictado = false;
+        }
+        else
+        {
+            _error = fallo;
+        }
+    }
+
+    /// <summary>
+    /// Recibe la grabación terminada (a mano o por tiempo) y la pasa a texto. El texto no se envía solo: queda en el cuadro
+    /// para que la persona lo corrija; la nota de voz no se guarda en ningún sitio.
+    /// </summary>
+    /// <param name="base64">Audio en base64.</param>
+    /// <param name="tipo">Tipo MIME de la grabación.</param>
+    [JSInvokable]
+    public async Task AlTerminarGrabacion(string base64, string tipo)
+    {
+        _grabando = false;
+        _transcribiendo = true;
+        StateHasChanged();
+        try
+        {
+            var r = await Api.TranscribirAsync(Convert.FromBase64String(base64), tipo);
+            _texto = r.Texto;
+            _dictado = true;
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+        catch (FormatException)
+        {
+            _error = "No se ha podido leer la grabación. Prueba otra vez.";
+        }
+        finally
+        {
+            _transcribiendo = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>Si se cierra el panel con una grabación en curso, se descarta y se apaga el micrófono.</summary>
+    public async ValueTask DisposeAsync()
+    {
+        if (_grabando)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("grabacionAudio.cancelar");
+            }
+            catch (JSDisconnectedException)
+            {
+                // La página ya se ha descargado: el navegador libera el micrófono solo.
+            }
+        }
+        _referencia?.Dispose();
     }
 
     private void Descartar(Burbuja m)

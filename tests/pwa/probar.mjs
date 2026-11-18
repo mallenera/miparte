@@ -30,10 +30,12 @@ async function paso(nombre, accion) {
     catch (e) { fallos++; console.log(`FALLA ${nombre}\n      ${e.message.split('\n')[0]}`); }
 }
 
-// La app ha arrancado cuando Blazor sustituye la pantalla de carga y pinta un título (sin sesión, el de login).
+// La app ha arrancado cuando Blazor sustituye el contenido previo (.precarga, que ya trae su propio h1 para los
+// buscadores) y pinta un título (sin sesión, el de login).
+const arrancada = () => pagina.waitForFunction(() => !document.querySelector('#app .precarga') && !!document.querySelector('#app h1'), null, { timeout: 60_000 });
 async function abrir(ruta) {
     await pagina.goto(url + ruta, { waitUntil: 'load' });
-    await pagina.waitForSelector('#app h1', { timeout: 60_000 });
+    await arrancada();
     if (await pagina.isVisible('#blazor-error-ui')) throw new Error('Blazor muestra «Se ha producido un error inesperado»');
 }
 const controlada = () => pagina.evaluate(() => !!navigator.serviceWorker.controller);
@@ -69,7 +71,7 @@ await paso('versión nueva desplegada: aviso, «Actualizar» y la app sigue abri
     const boton = pagina.getByRole('button', { name: 'Actualizar' });
     await boton.waitFor({ timeout: 60_000 });
     await Promise.all([pagina.waitForEvent('load', { timeout: 60_000 }), boton.click()]);
-    await pagina.waitForSelector('#app h1', { timeout: 60_000 });
+    await arrancada();
     const cachés = await pagina.evaluate(() => caches.keys());
     if (cachés.length !== 1 || !cachés[0].endsWith('-nueva')) throw new Error(`Cachés tras actualizar: ${cachés.join(', ')}`);
     await abrir('/');
@@ -83,6 +85,18 @@ await paso('/.well-known/assetlinks.json declara la app de Android', async () =>
     if (!/json/.test(respuesta.headers()['content-type'] ?? '')) throw new Error('No se sirve como JSON');
     const enlaces = JSON.parse(await respuesta.text());
     if (enlaces[0]?.target?.package_name !== 'dev.pages.miparte.twa') throw new Error('No declara dev.pages.miparte.twa');
+});
+
+// Lo que leen buscadores y previsualizaciones es el HTML sin ejecutar: debe traer texto, descripción y canonical, y
+// robots.txt y sitemap.xml deben ser ficheros de verdad y no el fallback de la SPA.
+await paso('SEO: index.html con contenido, robots.txt y sitemap.xml', async () => {
+    const html = await (await contexto.request.get(url + '/')).text();
+    for (const marca of ['<meta name="description"', '<link rel="canonical"', 'application/ld+json', '<h1>Cada uno paga'])
+        if (!html.includes(marca)) throw new Error(`index.html sin ${marca}`);
+    const robots = await contexto.request.get(url + '/robots.txt');
+    if (!/text\/plain/.test(robots.headers()['content-type'] ?? '') || !(await robots.text()).includes('Sitemap:')) throw new Error('robots.txt no se sirve');
+    const mapa = await contexto.request.get(url + '/sitemap.xml');
+    if (!(await mapa.text()).startsWith('<?xml')) throw new Error('sitemap.xml no se sirve');
 });
 
 await paso('sin errores de JavaScript ni violaciones de CSP', async () => {

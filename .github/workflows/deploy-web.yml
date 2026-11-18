@@ -50,7 +50,7 @@ jobs:
           # Supabase:Url sale del propio appsettings.json para que CSP y configuración no diverjan.
           export SUPABASE_URL=$(jq -r '.Supabase.Url' "$pub/appsettings.json")
           envsubst '${SUPABASE_URL} ${CORE_URL} ${ASSISTANT_URL}'< src/Web/cloudflare/_headers.template > "$pub/_headers"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Prueba de la PWA publicada (service worker, sin conexión, actualización y CSP)

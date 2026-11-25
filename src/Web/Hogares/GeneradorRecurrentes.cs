@@ -72,6 +72,9 @@ public sealed class GeneradorRecurrentes
             if (!_permisos.Tiene(CatalogoPermisos.RecurrentesGestionar) || _hogar.HogarActual?.Id != hogarId) return 0;
 
             var r = await _api.GenerarRecurrentesAsync(Formato.Mes(new DateOnly(hoy.Year, hoy.Month, 1)), hoy.Day);
+            // El manejador pone X-Hogar-Id al enviar: si entretanto se cambió de hogar, la llamada fue para el otro y este queda
+            // sin marcar para que la próxima entrada lo genere (en el servidor es idempotente, así que no duplica).
+            if (_hogar.HogarActual?.Id != hogarId) return 0;
             await _almacen.EscribirAsync(clave, marca);
             if (r.Creados > 0)
                 _avisos.Mostrar(r.Creados == 1
@@ -79,8 +82,10 @@ public sealed class GeneradorRecurrentes
                     : $"Se han creado {r.Creados} gastos recurrentes de {hoy.ToString("MMMM", Es)}");
             return r.Creados;
         }
-        catch (ApiException)
+        catch (Exception e) when (e is ApiException or HttpRequestException or TaskCanceledException)
         {
+            // Un timeout llega como TaskCanceledException, no como ApiException: si escapara, la página que espera se quedaría
+            // en «Cargando tu hogar…» y la tarea fallida seguiría en _enCurso el resto del día.
             return 0;
         }
     }

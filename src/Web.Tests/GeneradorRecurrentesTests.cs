@@ -88,4 +88,34 @@ public class GeneradorRecurrentesTests
         Assert.Null(m.Avisos.Texto);
         Assert.False(m.Almacen.Datos.ContainsKey($"miparte.recurrentes.{m.Resumen.Id}"));
     }
+
+    [Fact]
+    public async Task Un_timeout_no_se_propaga_y_la_pagina_puede_seguir()
+    {
+        var m = Crear();
+        m.Api.Responde(Generar, _ => throw new TaskCanceledException("timeout"));
+
+        Assert.Equal(0, await m.Generador.GenerarPendientesAsync());
+        Assert.Equal(0, await m.Generador.GenerarPendientesAsync());
+
+        Assert.False(m.Almacen.Datos.ContainsKey($"miparte.recurrentes.{m.Resumen.Id}"));
+    }
+
+    [Fact]
+    public async Task Si_se_cambia_de_hogar_durante_la_llamada_no_marca_el_hogar_de_partida()
+    {
+        var m = Crear();
+        var otro = new HogarResumen(Guid.NewGuid(), "Piso", false, false, RecurrentesActivas: true);
+        m.Api.Responde(Generar, _ =>
+        {
+            m.Hogar.AplicarAsync(new YoResponse(Guid.NewGuid().ToString(), [m.Resumen, otro], otro)).GetAwaiter().GetResult();
+            m.Hogar.SeleccionarAsync(otro.Id).GetAwaiter().GetResult();
+            return ApiFalsa.Json(HttpStatusCode.OK, new GenerarRecurrentesResponse("2026-11", 2, 1));
+        });
+
+        Assert.Equal(0, await m.Generador.GenerarPendientesAsync());
+
+        Assert.False(m.Almacen.Datos.ContainsKey($"miparte.recurrentes.{m.Resumen.Id}"));
+        Assert.Null(m.Avisos.Texto);
+    }
 }

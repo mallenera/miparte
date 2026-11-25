@@ -12,7 +12,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="10.0.*" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="11.0.*" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="11.0.*" PrivateAssets="all" />
-    <PackageReference Include="QRCoder" Version="1.8.1" />
+    <PackageReference Include="QRCoder" Version="1.9.0" />
   </ItemGroup>
 
   <ItemGroup>

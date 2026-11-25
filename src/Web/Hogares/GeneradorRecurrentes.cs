@@ -74,19 +74,21 @@ public sealed class GeneradorRecurrentes
             if (await _almacen.LeerAsync(clave) == marca) return 0; // ya generado hoy en este navegador
 
             await _permisos.AsegurarAsync();
-            if (!_permisos.Tiene(CatalogoPermisos.RecurrentesGestionar) || _hogar.HogarActual?.Id != hogarId) return 0;
-
-            var r = await _api.GenerarRecurrentesAsync(Formato.Mes(new DateOnly(hoy.Year, hoy.Month, 1)), hoy.Day);
-            // El manejador pone X-Hogar-Id al enviar: si entretanto se cambió de hogar, la llamada fue para el otro y este queda
-            // sin marcar para que la próxima entrada lo genere (en el servidor es idempotente, así que no duplica).
             if (_hogar.HogarActual?.Id != hogarId)
             {
-                // Este hogar sigue sin generar: fuera de la caché, para que volver a él hoy lo intente de nuevo.
+                // Se cambió de hogar mientras se cargaban los permisos (que ya son los del otro): este sigue sin generar, así que
+                // sale de la caché para que volver a él hoy lo intente de nuevo.
                 _enCurso.Remove(ClaveEnCurso(hogarId, hoy));
                 return 0;
             }
+            if (!_permisos.Tiene(CatalogoPermisos.RecurrentesGestionar)) return 0;
+
+            // Con el hogar fijo en la petición, la marca corresponde siempre al hogar en el que se ha generado (en el servidor es
+            // idempotente, así que no duplica).
+            var r = await _api.GenerarRecurrentesAsync(Formato.Mes(new DateOnly(hoy.Year, hoy.Month, 1)), hoy.Day, hogarId);
             await _almacen.EscribirAsync(clave, marca);
-            if (r.Creados > 0)
+            // El aviso solo si se sigue en ese hogar: en otro confundiría.
+            if (r.Creados > 0 && _hogar.HogarActual?.Id == hogarId)
                 _avisos.Mostrar(r.Creados == 1
                     ? $"Se ha creado 1 gasto recurrente de {hoy.ToString("MMMM", Es)}"
                     : $"Se han creado {r.Creados} gastos recurrentes de {hoy.ToString("MMMM", Es)}");

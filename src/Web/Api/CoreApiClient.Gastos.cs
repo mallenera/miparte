@@ -104,4 +104,17 @@ public sealed partial class CoreApiClient
     public Task<GenerarRecurrentesResponse> GenerarRecurrentesAsync(string mes, int? hastaDia, CancellationToken ct = default) =>
         _nucleo.EnviarAsync<GenerarRecurrentesResponse>(HttpMethod.Post,
             $"api/gastos-recurrentes/generar?mes={Uri.EscapeDataString(mes)}" + (hastaDia is { } d ? $"&hastaDia={d}" : ""), null, ct);
+
+    /// <summary>
+    /// Como <see cref="GenerarRecurrentesAsync(string, int?, CancellationToken)"/>, pero en un hogar fijo: la generación automática
+    /// guarda la marca del día de ese hogar, así que la petición no puede ir a otro si se cambia de hogar mientras se envía.
+    /// </summary>
+    /// <param name="mes">Mes en formato YYYY-MM.</param>
+    /// <param name="hastaDia">Último día del mes que se genera (1-31); null genera todas.</param>
+    /// <param name="hogarId">Hogar en el que se generan.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    public Task<GenerarRecurrentesResponse> GenerarRecurrentesAsync(string mes, int? hastaDia, Guid hogarId, CancellationToken ct = default) =>
+        _nucleo.EnviarAsync<GenerarRecurrentesResponse>(HttpMethod.Post,
+            $"api/gastos-recurrentes/generar?mes={Uri.EscapeDataString(mes)}" + (hastaDia is { } d ? $"&hastaDia={d}" : ""), null, ct,
+            hogarId: hogarId);
 }

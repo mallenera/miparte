@@ -127,6 +127,36 @@ public class ServicioRecurrentesTests
     }
 
     [Fact]
+    public async Task Generar_HastaDia_SoloCreaLasPlantillasCuyoDiaYaHaLlegado()
+    {
+        await Plantilla(Datos(dia: 5, concepto: "Internet"));
+        await Plantilla(Datos(dia: 18, concepto: "Luz"));
+        await Plantilla(Datos(dia: 25, concepto: "Alquiler"));
+
+        var hasta18 = await Servicio.GenerarAsync(Septiembre, default, hastaDia: 18);
+        Assert.Equal((2, 0), (hasta18.Valor!.Creados, hasta18.Valor.YaExistentes));
+        Assert.DoesNotContain(_gastos.Gastos, g => g.Fecha.Day == 25);
+
+        // Más adelante en el mes (o con el botón, sin límite) se crea la que faltaba y las demás no se duplican.
+        var completo = await Servicio.GenerarAsync(Septiembre, default);
+        Assert.Equal((1, 2), (completo.Valor!.Creados, completo.Valor.YaExistentes));
+        Assert.Equal(3, _gastos.Gastos.Count);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(32)]
+    public async Task Generar_HastaDiaFueraDeRango_EsInvalidoYNoGenera(int dia)
+    {
+        await Plantilla();
+
+        var r = await Servicio.GenerarAsync(Septiembre, default, hastaDia: dia);
+
+        Assert.NotNull(r.Error);
+        Assert.Empty(_gastos.Gastos);
+    }
+
+    [Fact]
     public async Task Generar_NoGeneraLasPlantillasInactivas()
     {
         var p = await Plantilla();

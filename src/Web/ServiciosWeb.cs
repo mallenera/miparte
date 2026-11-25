@@ -32,6 +32,7 @@ public static class ServiciosWeb
         servicios.AddSingleton<ServicioTema>();
         servicios.AddScoped<ServicioArranque>();
         servicios.AddScoped<ServicioPermisos>();
+        servicios.AddScoped<GeneradorRecurrentes>();
         servicios.AddSingleton<ServicioConexion>();
         servicios.AddTransient<ManejadorReintentos>();
         servicios.AddTransient<ManejadorCoreApi>();

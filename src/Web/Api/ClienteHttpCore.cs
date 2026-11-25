@@ -99,12 +99,17 @@ internal sealed class ClienteHttpCore
     /// <param name="ruta">Ruta relativa a la URL base de Core.Api.</param>
     /// <param name="cuerpo">Cuerpo JSON de la petición, si lo lleva.</param>
     /// <param name="ct">Token de cancelación.</param>
-    internal async Task<T> EnviarAsync<T>(HttpMethod metodo, string ruta, object? cuerpo, CancellationToken ct, string? cabeceraEnlace = null)
+    /// <param name="cabeceraEnlace">Token del enlace QR de la lista de la compra, si lo lleva.</param>
+    /// <param name="hogarId">Hogar fijo de la petición; si es null, <see cref="ManejadorCoreApi"/> pone el actual al enviarla.</param>
+    internal async Task<T> EnviarAsync<T>(HttpMethod metodo, string ruta, object? cuerpo, CancellationToken ct, string? cabeceraEnlace = null,
+        Guid? hogarId = null)
     {
         using var peticion = new HttpRequestMessage(metodo, ruta);
         if (cuerpo is not null) peticion.Content = JsonContent.Create(cuerpo, cuerpo.GetType());
         // Token del enlace QR de la lista de la compra: lo usan las rutas públicas, que no tienen sesión.
         if (cabeceraEnlace is not null) peticion.Headers.TryAddWithoutValidation("X-Enlace-Lista", cabeceraEnlace);
+        // ManejadorCoreApi no la sobrescribe: la petición va a este hogar aunque se cambie de hogar mientras se envía.
+        if (hogarId is { } h) peticion.Headers.Add("X-Hogar-Id", h.ToString());
 
         HttpResponseMessage respuesta;
         try

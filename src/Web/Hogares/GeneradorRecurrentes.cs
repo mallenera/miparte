@@ -54,11 +54,16 @@ public sealed class GeneradorRecurrentes
     {
         if (_hogar.HogarActual is not { RecurrentesActivas: true } actual) return Task.FromResult(0);
         var hoy = DateOnly.FromDateTime(_reloj.GetLocalNow().DateTime);
-        var clave = $"{actual.Id}|{hoy:yyyy-MM-dd}";
-        if (!_enCurso.TryGetValue(clave, out var tarea))
-            _enCurso[clave] = tarea = GenerarAsync(actual.Id, hoy);
+        var clave = ClaveEnCurso(actual.Id, hoy);
+        if (_enCurso.TryGetValue(clave, out var tarea)) return tarea;
+        tarea = GenerarAsync(actual.Id, hoy);
+        // Si ya ha terminado (p. ej. lo generado hoy en otra sesión) no hace falta guardarla; y así no se guarda una que haya
+        // pedido no quedarse en la caché antes de que se insertara.
+        if (!tarea.IsCompleted) _enCurso[clave] = tarea;
         return tarea;
     }
+
+    private static string ClaveEnCurso(Guid hogarId, DateOnly hoy) => $"{hogarId}|{hoy:yyyy-MM-dd}";
 
     private async Task<int> GenerarAsync(Guid hogarId, DateOnly hoy)
     {
@@ -74,7 +79,12 @@ public sealed class GeneradorRecurrentes
             var r = await _api.GenerarRecurrentesAsync(Formato.Mes(new DateOnly(hoy.Year, hoy.Month, 1)), hoy.Day);
             // El manejador pone X-Hogar-Id al enviar: si entretanto se cambió de hogar, la llamada fue para el otro y este queda
             // sin marcar para que la próxima entrada lo genere (en el servidor es idempotente, así que no duplica).
-            if (_hogar.HogarActual?.Id != hogarId) return 0;
+            if (_hogar.HogarActual?.Id != hogarId)
+            {
+                // Este hogar sigue sin generar: fuera de la caché, para que volver a él hoy lo intente de nuevo.
+                _enCurso.Remove(ClaveEnCurso(hogarId, hoy));
+                return 0;
+            }
             await _almacen.EscribirAsync(clave, marca);
             if (r.Creados > 0)
                 _avisos.Mostrar(r.Creados == 1

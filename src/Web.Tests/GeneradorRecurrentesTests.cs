@@ -117,5 +117,12 @@ public class GeneradorRecurrentesTests
 
         Assert.False(m.Almacen.Datos.ContainsKey($"miparte.recurrentes.{m.Resumen.Id}"));
         Assert.Null(m.Avisos.Texto);
+
+        // Al volver al hogar de partida el mismo día, la misma sesión lo vuelve a intentar.
+        m.Api.Responde(Generar, HttpStatusCode.OK, new GenerarRecurrentesResponse("2026-11", 2, 1));
+        await m.Hogar.SeleccionarAsync(m.Resumen.Id);
+        Assert.Equal(2, await m.Generador.GenerarPendientesAsync());
+        Assert.Equal(2, m.Api.Recibidas.Count(r => r == Generar));
+        Assert.Equal("2026-11-18", m.Almacen.Datos[$"miparte.recurrentes.{m.Resumen.Id}"]);
     }
 }

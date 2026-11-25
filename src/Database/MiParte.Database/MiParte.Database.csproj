@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <PackageReference Include="dbup-postgresql" Version="7.0.*" />
+    <PackageReference Include="Npgsql" Version="11.0.0" />
   </ItemGroup>
 
   <!-- estructura/: estado deseado, se aplica siempre de forma idempotente (fuente de verdad del esquema).
